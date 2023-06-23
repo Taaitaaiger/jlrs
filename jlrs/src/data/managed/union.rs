@@ -9,7 +9,7 @@ use super::{
     Ref,
 };
 use crate::{
-    data::{managed::{private::ManagedPriv, value::Value, Managed}},
+    data::managed::{private::ManagedPriv, value::Value, Managed},
     impl_julia_typecheck,
     memory::target::Target,
     private::Private,
@@ -236,7 +236,7 @@ pub type UnionRef<'scope> = Ref<'scope, 'static, Union<'scope>>;
 /// `ccall`able functions that return a [`Union`].
 pub type UnionRet = Ref<'static, 'static, Union<'static>>;
 
-impl_valid_layout!(UnionRef, Union);
+impl_valid_layout!(UnionRef, Union, jl_uniontype_type);
 
 use crate::memory::target::target_type::TargetType;
 

@@ -9,7 +9,7 @@ use std::{marker::PhantomData, ptr::NonNull};
 use jl_sys::{jl_method_match_t, jl_method_match_type};
 
 use crate::{
-    data::{managed::{private::ManagedPriv, simple_vector::SimpleVector, value::Value, Ref}},
+    data::managed::{private::ManagedPriv, simple_vector::SimpleVector, value::Value, Ref},
     impl_julia_typecheck,
     private::Private,
 };
@@ -95,7 +95,7 @@ pub type MethodMatchRef<'scope> = Ref<'scope, 'static, MethodMatch<'scope>>;
 /// `ccall`able functions that return a [`MethodMatch`].
 pub type MethodMatchRet = Ref<'static, 'static, MethodMatch<'static>>;
 
-impl_valid_layout!(MethodMatchRef, MethodMatch);
+impl_valid_layout!(MethodMatchRef, MethodMatch, jl_method_match_type);
 
 use super::method::Method;
 use crate::memory::target::target_type::TargetType;

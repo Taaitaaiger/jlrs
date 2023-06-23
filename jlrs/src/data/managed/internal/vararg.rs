@@ -67,7 +67,7 @@ impl<'scope, 'data> ManagedPriv<'scope, 'data> for Vararg<'scope> {
 
 /// A reference to a [`Vararg`] that has not been explicitly rooted.
 pub type VarargRef<'scope> = Ref<'scope, 'static, Vararg<'scope>>;
-impl_valid_layout!(VarargRef, Vararg);
+impl_valid_layout!(VarargRef, Vararg, jl_vararg_type);
 
 use crate::memory::target::target_type::TargetType;
 

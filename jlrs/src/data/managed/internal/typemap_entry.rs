@@ -13,12 +13,10 @@ use jl_sys::{jl_typemap_entry_t, jl_typemap_entry_type};
 use jlrs_macros::julia_version;
 
 use crate::{
-    data::{
-        managed::{
-            private::ManagedPriv,
-            value::{Value, ValueData, ValueRef},
-            Ref,
-        },
+    data::managed::{
+        private::ManagedPriv,
+        value::{Value, ValueData, ValueRef},
+        Ref,
     },
     impl_julia_typecheck,
     memory::target::Target,
@@ -178,7 +176,7 @@ pub type TypeMapEntryRef<'scope> = Ref<'scope, 'static, TypeMapEntry<'scope>>;
 /// `ccall`able functions that return a [`TypeMapEntry`].
 pub type TypeMapEntryRet = Ref<'static, 'static, TypeMapEntry<'static>>;
 
-impl_valid_layout!(TypeMapEntryRef, TypeMapEntry);
+impl_valid_layout!(TypeMapEntryRef, TypeMapEntry, jl_typemap_entry_type);
 
 use crate::memory::target::target_type::TargetType;
 

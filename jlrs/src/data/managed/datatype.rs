@@ -45,7 +45,7 @@ use crate::{
             value::{Value, ValueResult},
             Managed,
         },
-        types::{typecheck::Typecheck},
+        types::typecheck::Typecheck,
     },
     error::{AccessError, JlrsResult, CANNOT_DISPLAY_TYPE},
     impl_julia_typecheck,
@@ -1553,7 +1553,7 @@ pub type DataTypeRef<'scope> = Ref<'scope, 'static, DataType<'scope>>;
 /// `ccall`able functions that return a [`DataType`].
 pub type DataTypeRet = Ref<'static, 'static, DataType<'static>>;
 
-impl_valid_layout!(DataTypeRef, DataType);
+impl_valid_layout!(DataTypeRef, DataType, jl_datatype_type);
 
 use crate::memory::target::target_type::TargetType;
 

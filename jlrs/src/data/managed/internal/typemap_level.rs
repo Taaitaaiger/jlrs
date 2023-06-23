@@ -13,11 +13,11 @@ use jl_sys::{jl_typemap_level_t, jl_typemap_level_type};
 use jlrs_macros::julia_version;
 
 use crate::{
-    data::{managed::{
+    data::managed::{
         private::ManagedPriv,
         value::{ValueData, ValueRef},
         Ref,
-    }},
+    },
     impl_julia_typecheck,
     memory::target::Target,
     private::Private,
@@ -262,7 +262,7 @@ pub type TypeMapLevelRef<'scope> = Ref<'scope, 'static, TypeMapLevel<'scope>>;
 /// `ccall`able functions that return a [`TypeMapLevel`].
 pub type TypeMapLevelRet = Ref<'static, 'static, TypeMapLevel<'static>>;
 
-impl_valid_layout!(TypeMapLevelRef, TypeMapLevel);
+impl_valid_layout!(TypeMapLevelRef, TypeMapLevel, jl_typemap_level_type);
 
 use crate::memory::target::target_type::TargetType;
 

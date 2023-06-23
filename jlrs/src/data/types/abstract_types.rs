@@ -30,7 +30,7 @@ macro_rules! impl_construct_julia_type_abstract {
         unsafe impl ConstructType for $ty {
             type Static = $ty;
 
-            fn construct_type<'target, T>(
+            fn construct_type_uncached<'target, T>(
                 target: ExtendedTarget<'target, '_, '_, T>,
             ) -> ValueData<'target, 'static, T>
             where
@@ -145,7 +145,7 @@ unsafe impl AbstractType for AnyType {}
 unsafe impl ConstructType for AnyType {
     type Static = AnyType;
 
-    fn construct_type<'target, T>(
+    fn construct_type_uncached<'target, T>(
         target: ExtendedTarget<'target, '_, '_, T>,
     ) -> ValueData<'target, 'static, T>
     where
@@ -180,7 +180,7 @@ unsafe impl<T: ConstructType, N: ConstructType> AbstractType for AbstractArray<T
 unsafe impl<T: ConstructType, N: ConstructType> ConstructType for AbstractArray<T, N> {
     type Static = AbstractArray<T::Static, N::Static>;
 
-    fn construct_type<'target, Tgt>(
+    fn construct_type_uncached<'target, Tgt>(
         target: ExtendedTarget<'target, '_, '_, Tgt>,
     ) -> ValueData<'target, 'static, Tgt>
     where
@@ -225,7 +225,7 @@ unsafe impl<T: ConstructType, N: ConstructType> AbstractType for DenseArray<T, N
 unsafe impl<T: ConstructType, N: ConstructType> ConstructType for DenseArray<T, N> {
     type Static = DenseArray<T::Static, N::Static>;
 
-    fn construct_type<'target, Tgt>(
+    fn construct_type_uncached<'target, Tgt>(
         target: ExtendedTarget<'target, '_, '_, Tgt>,
     ) -> ValueData<'target, 'static, Tgt>
     where
@@ -269,7 +269,7 @@ unsafe impl<T: ConstructType> AbstractType for RefTypeConstructor<T> {}
 unsafe impl<T: ConstructType> ConstructType for RefTypeConstructor<T> {
     type Static = RefTypeConstructor<T::Static>;
 
-    fn construct_type<'target, Tgt>(
+    fn construct_type_uncached<'target, Tgt>(
         target: ExtendedTarget<'target, '_, '_, Tgt>,
     ) -> ValueData<'target, 'static, Tgt>
     where
@@ -312,7 +312,7 @@ unsafe impl<T: ConstructType> AbstractType for TypeTypeConstructor<T> {}
 unsafe impl<T: ConstructType> ConstructType for TypeTypeConstructor<T> {
     type Static = TypeTypeConstructor<T::Static>;
 
-    fn construct_type<'target, Tgt>(
+    fn construct_type_uncached<'target, Tgt>(
         target: ExtendedTarget<'target, '_, '_, Tgt>,
     ) -> ValueData<'target, 'static, Tgt>
     where
@@ -355,7 +355,7 @@ unsafe impl<T: ConstructType> AbstractType for AbstractChannel<T> {}
 unsafe impl<T: ConstructType> ConstructType for AbstractChannel<T> {
     type Static = AbstractChannel<T::Static>;
 
-    fn construct_type<'target, Tgt>(
+    fn construct_type_uncached<'target, Tgt>(
         target: ExtendedTarget<'target, '_, '_, Tgt>,
     ) -> ValueData<'target, 'static, Tgt>
     where
@@ -408,7 +408,7 @@ unsafe impl<T: ConstructType, K: ConstructType> AbstractType for AbstractDict<T,
 unsafe impl<K: ConstructType, V: ConstructType> ConstructType for AbstractDict<K, V> {
     type Static = AbstractDict<K::Static, V::Static>;
 
-    fn construct_type<'target, Tgt>(
+    fn construct_type_uncached<'target, Tgt>(
         target: ExtendedTarget<'target, '_, '_, Tgt>,
     ) -> ValueData<'target, 'static, Tgt>
     where
@@ -461,7 +461,7 @@ unsafe impl<T: ConstructType> AbstractType for AbstractMatrix<T> {}
 unsafe impl<T: ConstructType> ConstructType for AbstractMatrix<T> {
     type Static = AbstractMatrix<T::Static>;
 
-    fn construct_type<'target, Tgt>(
+    fn construct_type_uncached<'target, Tgt>(
         target: ExtendedTarget<'target, '_, '_, Tgt>,
     ) -> ValueData<'target, 'static, Tgt>
     where
@@ -513,7 +513,7 @@ unsafe impl<T: ConstructType> AbstractType for AbstractRange<T> {}
 unsafe impl<T: ConstructType> ConstructType for AbstractRange<T> {
     type Static = AbstractRange<T::Static>;
 
-    fn construct_type<'target, Tgt>(
+    fn construct_type_uncached<'target, Tgt>(
         target: ExtendedTarget<'target, '_, '_, Tgt>,
     ) -> ValueData<'target, 'static, Tgt>
     where
@@ -565,7 +565,7 @@ unsafe impl<T: ConstructType> AbstractType for AbstractSet<T> {}
 unsafe impl<T: ConstructType> ConstructType for AbstractSet<T> {
     type Static = AbstractSet<T::Static>;
 
-    fn construct_type<'target, Tgt>(
+    fn construct_type_uncached<'target, Tgt>(
         target: ExtendedTarget<'target, '_, '_, Tgt>,
     ) -> ValueData<'target, 'static, Tgt>
     where
@@ -621,7 +621,7 @@ unsafe impl<T: ConstructType, N: ConstructType> AbstractType for AbstractSlices<
 unsafe impl<T: ConstructType, N: ConstructType> ConstructType for AbstractSlices<T, N> {
     type Static = AbstractSlices<T::Static, N::Static>;
 
-    fn construct_type<'target, Tgt>(
+    fn construct_type_uncached<'target, Tgt>(
         target: ExtendedTarget<'target, '_, '_, Tgt>,
     ) -> ValueData<'target, 'static, Tgt>
     where
@@ -672,7 +672,7 @@ pub struct AbstractUnitRange<T: ConstructType> {
 unsafe impl<T: ConstructType> ConstructType for AbstractUnitRange<T> {
     type Static = AbstractUnitRange<T::Static>;
 
-    fn construct_type<'target, Tgt>(
+    fn construct_type_uncached<'target, Tgt>(
         target: ExtendedTarget<'target, '_, '_, Tgt>,
     ) -> ValueData<'target, 'static, Tgt>
     where
@@ -726,7 +726,7 @@ unsafe impl<T: ConstructType> AbstractType for AbstractVector<T> {}
 unsafe impl<T: ConstructType> ConstructType for AbstractVector<T> {
     type Static = AbstractVector<T::Static>;
 
-    fn construct_type<'target, Tgt>(
+    fn construct_type_uncached<'target, Tgt>(
         target: ExtendedTarget<'target, '_, '_, Tgt>,
     ) -> ValueData<'target, 'static, Tgt>
     where
@@ -778,7 +778,7 @@ unsafe impl<T: ConstructType> AbstractType for DenseMatrix<T> {}
 unsafe impl<T: ConstructType> ConstructType for DenseMatrix<T> {
     type Static = DenseMatrix<T::Static>;
 
-    fn construct_type<'target, Tgt>(
+    fn construct_type_uncached<'target, Tgt>(
         target: ExtendedTarget<'target, '_, '_, Tgt>,
     ) -> ValueData<'target, 'static, Tgt>
     where
@@ -830,7 +830,7 @@ unsafe impl<T: ConstructType> AbstractType for DenseVector<T> {}
 unsafe impl<T: ConstructType> ConstructType for DenseVector<T> {
     type Static = DenseVector<T::Static>;
 
-    fn construct_type<'target, Tgt>(
+    fn construct_type_uncached<'target, Tgt>(
         target: ExtendedTarget<'target, '_, '_, Tgt>,
     ) -> ValueData<'target, 'static, Tgt>
     where
@@ -882,7 +882,7 @@ unsafe impl<T: ConstructType> AbstractType for Enum<T> {}
 unsafe impl<T: ConstructType> ConstructType for Enum<T> {
     type Static = Enum<T::Static>;
 
-    fn construct_type<'target, Tgt>(
+    fn construct_type_uncached<'target, Tgt>(
         target: ExtendedTarget<'target, '_, '_, Tgt>,
     ) -> ValueData<'target, 'static, Tgt>
     where
@@ -947,7 +947,7 @@ unsafe impl<T: ConstructType, S: ConstructType> AbstractType for OrdinalRange<T,
 unsafe impl<T: ConstructType, S: ConstructType> ConstructType for OrdinalRange<T, S> {
     type Static = OrdinalRange<T::Static, S::Static>;
 
-    fn construct_type<'target, Tgt>(
+    fn construct_type_uncached<'target, Tgt>(
         target: ExtendedTarget<'target, '_, '_, Tgt>,
     ) -> ValueData<'target, 'static, Tgt>
     where

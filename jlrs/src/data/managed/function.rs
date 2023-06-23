@@ -151,6 +151,10 @@ unsafe impl ValidLayout for FunctionRef<'_, '_> {
         ty.subtype(function_type.as_value())
     }
 
+    fn type_object<'target, Tgt: Target<'target>>(target: &Tgt) -> Value<'target, 'static> {
+        DataType::function_type(&target).as_value()
+    }
+
     const IS_REF: bool = true;
 }
 
@@ -184,7 +188,7 @@ unsafe impl CCallReturn for FunctionRet {
 
 unsafe impl ConstructType for Function<'_, '_> {
     type Static = Function<'static, 'static>;
-    fn construct_type<'target, T>(
+    fn construct_type_uncached<'target, T>(
         target: crate::memory::target::ExtendedTarget<'target, '_, '_, T>,
     ) -> super::value::ValueData<'target, 'static, T>
     where

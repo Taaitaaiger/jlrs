@@ -7,17 +7,17 @@ use jl_sys::jl_float16_type;
 
 use crate::{
     convert::{into_julia::IntoJulia, unbox::Unbox},
-    data::{managed::{
+    data::managed::{
         datatype::{DataType, DataTypeData},
         private::ManagedPriv,
-    }},
+    },
     impl_julia_typecheck, impl_valid_layout,
     memory::target::Target,
     private::Private,
 };
 
 impl_julia_typecheck!(f16, jl_float16_type);
-impl_valid_layout!(f16);
+impl_valid_layout!(f16, jl_float16_type);
 
 unsafe impl Unbox for f16 {
     type Output = Self;

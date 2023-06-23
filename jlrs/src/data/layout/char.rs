@@ -9,7 +9,7 @@ use jl_sys::{jl_char_type, jl_unbox_uint32};
 
 use crate::{
     convert::unbox::Unbox,
-    data::{managed::{private::ManagedPriv, value::Value}},
+    data::managed::{private::ManagedPriv, value::Value},
     impl_julia_typecheck, impl_valid_layout,
     private::Private,
 };
@@ -57,7 +57,7 @@ impl<'scope> Debug for Char {
 }
 
 impl_julia_typecheck!(Char, jl_char_type);
-impl_valid_layout!(Char);
+impl_valid_layout!(Char, jl_char_type);
 
 unsafe impl Unbox for Char {
     type Output = Self;

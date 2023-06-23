@@ -1,13 +1,4 @@
-use jlrs::{
-    data::{
-        layout::typed_data::{
-            AssociatedLayout, AssociatedTypeConstructor, AssociateType, TypedLayout, TypedLayoutFor,
-        },
-        managed::value::typed::TypedValue,
-        types::{construct_type::{ConstantBool, ConstructType}},
-    },
-    prelude::*,
-};
+use jlrs::prelude::*;
 
 #[derive(ConstructType)]
 #[jlrs(julia_type = "Main.AnAbstractType")]
@@ -432,6 +423,20 @@ pub struct DoubleVariant {
 }
 
 #[repr(C)]
+#[derive(
+    Clone, Debug, Unbox, ValidLayout, Typecheck, ValidField, ConstructType, CCallArg, CCallReturn,
+)]
+#[jlrs(julia_type = "Main.DoubleUVariant")]
+pub struct DoubleUVariant {
+    #[jlrs(bits_union_align)]
+    _a_align: ::jlrs::data::layout::union::Align4,
+    #[jlrs(bits_union)]
+    pub a: ::jlrs::data::layout::union::BitsUnion<4>,
+    #[jlrs(bits_union_flag)]
+    pub a_flag: u8,
+}
+
+#[repr(C)]
 #[derive(Clone, Debug, Unbox, ValidLayout, Typecheck, IntoJulia, ValidField, ConstructType)]
 #[jlrs(julia_type = "Main.Empty", zero_sized_type)]
 pub struct Empty {}
@@ -708,6 +713,16 @@ pub struct WithNestedGenericT<T> {
 #[derive(
     Clone, Debug, Unbox, ValidLayout, Typecheck, ValidField, ConstructType, CCallArg, CCallReturn,
 )]
+#[jlrs(julia_type = "Main.WithGenericTU")]
+pub struct WithGenericTU<T, U> {
+    pub a: T,
+    pub b: U,
+}
+
+#[repr(C)]
+#[derive(
+    Clone, Debug, Unbox, ValidLayout, Typecheck, ValidField, ConstructType, CCallArg, CCallReturn,
+)]
 #[jlrs(julia_type = "Main.WithPropagatedLifetime")]
 pub struct WithPropagatedLifetime<'scope> {
     pub a: WithGenericT<::std::option::Option<::jlrs::data::managed::module::ModuleRef<'scope>>>,
@@ -880,29 +895,4 @@ pub struct HasElidedParam<T> {
 pub struct HasElidedParamTypeConstructor<T, U> {
     _t: ::std::marker::PhantomData<T>,
     _u: ::std::marker::PhantomData<U>,
-}
-
-unsafe impl<T, U> AssociatedLayout for HasElidedParamTypeConstructor<T, U>
-where
-    T: jlrs::data::layout::valid_layout::ValidField,
-    U: ConstructType, 
-{
-    type Layout = HasElidedParam<T>;
-}
-
-impl<T, U> AssociatedTypeConstructor<HasElidedParamTypeConstructor<T, U>> for HasElidedParam<T>
-where
-    T: jlrs::data::layout::valid_layout::ValidField,
-    U: ConstructType,
-    HasElidedParamTypeConstructor<T, U>: ConstructType
-{
-}
-
-fn foo() {
-    let a = HasElidedParam { a: 3.0 };
-    type ElidedParam<T, const U: bool> = HasElidedParamTypeConstructor<T, ConstantBool<U>>;
-    let tl = TypedLayoutFor::<ElidedParam<f64, true>>::from_layout(a);
-    let tid = std::any::TypeId::of::<<ElidedParam<f64, true> as ConstructType>::Static>();
-
-
 }

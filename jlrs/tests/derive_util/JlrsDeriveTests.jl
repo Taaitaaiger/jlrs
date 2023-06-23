@@ -127,6 +127,10 @@ struct DoubleVariant
     a::Union{Int16, Int32}
 end
 
+struct DoubleUVariant
+    a::Union{UInt16, UInt32}
+end
+
 struct SizeAlignMismatch
     a::Union{Tuple{Int16, Int16, Int16}, Int32}
 end
@@ -280,6 +284,7 @@ end
 #    DoubleHasGeneric,
 #    DoubleImmut,
 #    DoubleVariant,
+#    DoubleUVariant,
 #    Empty,
 #    HasGeneric,
 #    HasGenericImmut,

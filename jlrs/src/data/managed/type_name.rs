@@ -20,9 +20,9 @@ use jlrs_macros::julia_version;
 
 use super::Ref;
 use crate::{
-    data::{managed::{
+    data::managed::{
         module::Module, private::ManagedPriv, simple_vector::SimpleVector, symbol::Symbol,
-    }},
+    },
     impl_julia_typecheck,
     memory::target::Target,
     private::Private,
@@ -389,7 +389,7 @@ pub type TypeNameRef<'scope> = Ref<'scope, 'static, TypeName<'scope>>;
 /// `ccall`able functions that return a [`TypeName`].
 pub type TypeNameRet = Ref<'static, 'static, TypeName<'static>>;
 
-impl_valid_layout!(TypeNameRef, TypeName);
+impl_valid_layout!(TypeNameRef, TypeName, jl_typename_type);
 
 use crate::memory::target::target_type::TargetType;
 

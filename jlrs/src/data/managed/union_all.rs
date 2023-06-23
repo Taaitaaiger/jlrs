@@ -18,7 +18,7 @@ use super::{
     Managed, Ref,
 };
 use crate::{
-    data::{managed::{datatype::DataType, private::ManagedPriv, type_var::TypeVar, value::Value}},
+    data::managed::{datatype::DataType, private::ManagedPriv, type_var::TypeVar, value::Value},
     impl_julia_typecheck,
     memory::target::{ExtendedTarget, Target},
     private::Private,
@@ -150,6 +150,7 @@ impl<'scope> UnionAll<'scope> {
         }
     }
 
+    // TODO: unsafe, document, test
     pub fn rewrap<'target, T: Target<'target>>(
         target: ExtendedTarget<'target, '_, '_, T>,
         ty: DataType,
@@ -163,7 +164,7 @@ impl<'scope> UnionAll<'scope> {
                 let params = params.data().as_slice();
                 let mut body = ty.as_value();
 
-                for param in params.iter().copied() {
+                for param in params.iter().rev().copied() {
                     unsafe {
                         let param = param.unwrap().as_value();
                         if let Ok(tvar) = param.cast::<TypeVar>() {
@@ -326,7 +327,7 @@ pub type UnionAllRef<'scope> = Ref<'scope, 'static, UnionAll<'scope>>;
 /// `ccall`able functions that return a [`UnionAll`].
 pub type UnionAllRet = Ref<'static, 'static, UnionAll<'static>>;
 
-impl_valid_layout!(UnionAllRef, UnionAll);
+impl_valid_layout!(UnionAllRef, UnionAll, jl_unionall_type);
 
 use crate::memory::target::target_type::TargetType;
 

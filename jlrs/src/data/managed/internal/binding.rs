@@ -10,7 +10,7 @@ use std::{marker::PhantomData, ptr::NonNull, sync::atomic::Ordering};
 use jl_sys::{jl_binding_t, jl_binding_type};
 
 use crate::{
-    data::{managed::{private::ManagedPriv, value::ValueData, Ref}},
+    data::managed::{private::ManagedPriv, value::ValueData, Ref},
     impl_julia_typecheck,
     memory::target::Target,
     private::Private,
@@ -128,7 +128,7 @@ pub type BindingRef<'scope> = Ref<'scope, 'static, Binding<'scope>>;
 /// `ccall`able functions that return a [`Binding`].
 pub type BindingRet = Ref<'static, 'static, Binding<'static>>;
 
-impl_valid_layout!(BindingRef, Binding);
+impl_valid_layout!(BindingRef, Binding, jl_binding_type);
 
 use crate::memory::target::target_type::TargetType;
 

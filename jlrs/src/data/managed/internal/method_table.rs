@@ -13,14 +13,14 @@ use jl_sys::{jl_methtable_t, jl_methtable_type};
 use jlrs_macros::julia_version;
 
 use crate::{
-    data::{managed::{
+    data::managed::{
         array::{ArrayData, ArrayRef},
         module::Module,
         private::ManagedPriv,
         symbol::Symbol,
         value::{ValueData, ValueRef},
         Ref,
-    }},
+    },
     impl_julia_typecheck,
     memory::target::Target,
     private::Private,
@@ -251,7 +251,7 @@ pub type MethodTableRef<'scope> = Ref<'scope, 'static, MethodTable<'scope>>;
 /// `ccall`able functions that return a [`MethodTable`].
 pub type MethodTableRet = Ref<'static, 'static, MethodTable<'static>>;
 
-impl_valid_layout!(MethodTableRef, MethodTable);
+impl_valid_layout!(MethodTableRef, MethodTable, jl_methtable_type);
 
 use crate::memory::target::target_type::TargetType;
 

@@ -477,7 +477,7 @@ pub type MethodRef<'scope> = Ref<'scope, 'static, Method<'scope>>;
 /// `ccall`able functions that return a [`Method`].
 pub type MethodRet = Ref<'static, 'static, Method<'static>>;
 
-impl_valid_layout!(MethodRef, Method);
+impl_valid_layout!(MethodRef, Method, jl_method_type);
 
 use super::method_instance::MethodInstanceData;
 use crate::memory::target::target_type::TargetType;

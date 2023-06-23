@@ -1,6 +1,15 @@
-#### v0.18
+#### v0.19
 
-- A `StaticType` trait has been added which is compatible with most types that implement `ConstructType`. It erases the lifetimes present in the constructible type and exposes this new type as the associated `Static` type. Because this type must be `'static` it has a type id.
+- The `ConstructType` trait has gained an associated type and constant, and two new trait methods. The associated `Static` type provides a unique, static Rust type for the type constructor, which must be `Self` with static lifetimes. The associated `CACHEABLE` constant indicates whether the constructed type might be cacheable. The `construct_type` method uses the cached entry if it's available, or construct and cache it when supported otherwise. The `construct_type_uncached` method always constructs the type without checking if a cached entry exists. The `type_id` method returns the type id of the associated `Static` type, which is internally used as a key for the cache.
+
+- `Value`s can be instantiated from a layout and a type constructor with `Value::try_new_with`. This method copies the provided layout from Rust to Julia if the provided type constructor is compatible with the provided layout. This method is also available for `TypedValue`.
+
+- The `ValidLayout` trait has gained a `type_object` method. This method must return the Julia type object associated with this type. Its main use is correctly handling unions in `Value::try_new_with`.
+
+- The methods of the `ForeignType` and `OpaqueType` traits that used to take a `Target` now take an `ExtendedTarget`.
+
+- The `ParametricBase` and `ParametricVariant` traits have been added which let you create opaque types with type parameters.
+
 
 #### v0.18
 

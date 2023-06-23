@@ -5,12 +5,12 @@ use std::{marker::PhantomData, ptr::NonNull};
 use jl_sys::{jl_expr_t, jl_expr_type};
 
 use crate::{
-    data::{managed::{
+    data::managed::{
         array::{ArrayData, ArrayRef},
         private::ManagedPriv,
         symbol::Symbol,
         Ref,
-    }},
+    },
     impl_julia_typecheck,
     memory::target::Target,
     private::Private,
@@ -81,7 +81,7 @@ pub type ExprRef<'scope> = Ref<'scope, 'static, Expr<'scope>>;
 /// `ccall`able functions that return a [`Expr`].
 pub type ExprRet = Ref<'static, 'static, Expr<'static>>;
 
-impl_valid_layout!(ExprRef, Expr);
+impl_valid_layout!(ExprRef, Expr, jl_expr_type);
 
 use crate::memory::target::target_type::TargetType;
 

@@ -1,20 +1,19 @@
 //! Construct Julia type objects from Rust types.
 
-use std::{
-    any::TypeId, collections::HashMap, ffi::c_void, marker::PhantomData, ptr::NonNull, sync::RwLock,
-};
+use std::{any::TypeId, ffi::c_void, marker::PhantomData, ptr::NonNull, sync::RwLock};
 
+use fnv::FnvHashMap;
 use jl_sys::{
     jl_array_type, jl_bool_type, jl_bottom_type, jl_char_type, jl_float32_type, jl_float64_type,
     jl_int16_type, jl_int32_type, jl_int64_type, jl_int8_type, jl_pointer_type, jl_uint16_type,
     jl_uint32_type, jl_uint64_type, jl_uint8_type, jl_uniontype_type, jl_value_t,
     jl_voidpointer_type,
 };
-
 use lazy_static::lazy_static;
 
 use super::abstract_types::AnyType;
 use crate::{
+    convert::to_symbol::ToSymbol,
     data::{
         layout::valid_layout::ValidField,
         managed::{
@@ -34,42 +33,6 @@ lazy_static! {
     static ref CONSTRUCTED_TYPE_REGISTRY: ConstructedTypes = ConstructedTypes::new();
 }
 
-struct ConstructedTypes {
-    data: RwLock<HashMap<TypeId, Value<'static, 'static>>>,
-}
-
-impl ConstructedTypes {
-    fn new() -> Self {
-        ConstructedTypes {
-            data: RwLock::new(HashMap::new()),
-        }
-    }
-
-    fn find_or_try_insert<'target, T: ConstructType, Tgt: Target<'target>>(
-        &self,
-        target: ExtendedTarget<'target, '_, '_, Tgt>,
-    ) -> Option<Value> {
-        let tid = T::type_id();
-        let res = self
-            .data
-            .read()
-            .expect("Lock poisoned")
-            .get(&tid)
-            .map(|dt| dt.clone());
-
-        if res.is_some() {
-            res
-        } else {
-            
-            // T::construct_type(target);
-            todo!()
-        }
-    }
-}
-
-unsafe impl Sync for ConstructedTypes {}
-unsafe impl Send for ConstructedTypes {}
-
 /// Associate a Julia type object with a Rust type.
 ///
 /// Safety:
@@ -80,13 +43,34 @@ pub unsafe trait ConstructType: Sized {
     /// `Self`, but with all lifetimes set to `'static`.
     type Static: 'static + ConstructType;
 
+    /// Indicates whether the type might be cacheable.
+    ///
+    /// If set to `false`, `construct_type` will never try to cache or look up the
+    /// constructed type. It should be set to `false` if the constructed type isn't a `DataType`.
+    const CACHEABLE: bool = true;
+
     /// Returns the `TypeId` of this type.
     fn type_id() -> TypeId {
         TypeId::of::<Self::Static>()
     }
 
-    /// Constructs the type object associated with this type.
+    /// Construct the type object and try to cache the result. If a cached entry is available, it
+    /// is returned.
     fn construct_type<'target, T>(
+        target: ExtendedTarget<'target, '_, '_, T>,
+    ) -> ValueData<'target, 'static, T>
+    where
+        T: Target<'target>,
+    {
+        if Self::CACHEABLE {
+            CONSTRUCTED_TYPE_REGISTRY.find_or_construct::<Self, _>(target)
+        } else {
+            Self::construct_type_uncached(target)
+        }
+    }
+
+    /// Constructs the type object associated with this type.
+    fn construct_type_uncached<'target, T>(
         target: ExtendedTarget<'target, '_, '_, T>,
     ) -> ValueData<'target, 'static, T>
     where
@@ -116,7 +100,9 @@ macro_rules! impl_construct_julia_type_constant {
         unsafe impl<const N: $const_ty> ConstructType for $ty {
             type Static = $ty;
 
-            fn construct_type<'target, T>(
+            const CACHEABLE: bool = false;
+
+            fn construct_type_uncached<'target, T>(
                 target: ExtendedTarget<'target, '_, '_, T>,
             ) -> ValueData<'target, 'static, T>
             where
@@ -141,7 +127,7 @@ macro_rules! impl_construct_julia_type_primitive {
         unsafe impl ConstructType for $ty {
             type Static = $ty;
 
-            fn construct_type<'target, T>(
+            fn construct_type_uncached<'target, T>(
                 target: ExtendedTarget<'target, '_, '_, T>,
             ) -> ValueData<'target, 'static, T>
             where
@@ -220,16 +206,49 @@ impl_construct_julia_type_constant!(ConstantBool<N>, bool);
 pub struct ConstantChar<const N: char>;
 impl_construct_julia_type_constant!(ConstantChar<N>, char);
 
+/// Constant string. Not a type constructor, but can be used to implement multi-character type
+/// vars.
+pub trait ConstantStr: 'static {
+    /// The string constant.
+    const STR: &'static str;
+}
+
 /// The name of a `TypeVar`.
 pub struct Name<const N: char>;
 
 /// Trait to set the name of`TypeVar`.
+///
+/// Implemented by [`Name`], [`ConstantChar`], and implementations of [`ConstantStr`].
 pub trait TypeVarName: 'static {
-    const NAME: char;
+    /// The type returned by `name`.
+    type Sym: ToSymbol;
+
+    // Returns the name.
+    fn name() -> Self::Sym;
 }
 
 impl<const N: char> TypeVarName for Name<N> {
-    const NAME: char = N;
+    type Sym = String;
+
+    fn name() -> Self::Sym {
+        String::from(N)
+    }
+}
+
+impl<const N: char> TypeVarName for ConstantChar<N> {
+    type Sym = String;
+
+    fn name() -> Self::Sym {
+        String::from(N)
+    }
+}
+
+impl<T: ConstantStr> TypeVarName for T {
+    type Sym = &'static str;
+
+    fn name() -> Self::Sym {
+        Self::STR
+    }
 }
 
 /// Construct a new `TypeVar` from the provided type parameters.
@@ -248,7 +267,7 @@ unsafe impl<N: TypeVarName, U: ConstructType, L: ConstructType> ConstructType
 {
     type Static = TypeVarConstructor<N, U::Static, L::Static>;
 
-    fn construct_type<'target, T>(
+    fn construct_type_uncached<'target, T>(
         target: ExtendedTarget<'target, '_, '_, T>,
     ) -> ValueData<'target, 'static, T>
     where
@@ -263,7 +282,7 @@ unsafe impl<N: TypeVarName, U: ConstructType, L: ConstructType> ConstructType
                 unsafe {
                     Ok(TypeVar::new_unchecked(
                         &target,
-                        N::NAME.to_string(),
+                        N::name(),
                         Some(lower_bound),
                         Some(upper_bound),
                     )
@@ -291,7 +310,7 @@ pub struct ArrayTypeConstructor<T: ConstructType, N: ConstructType> {
 unsafe impl<T: ConstructType, N: ConstructType> ConstructType for ArrayTypeConstructor<T, N> {
     type Static = ArrayTypeConstructor<T::Static, N::Static>;
 
-    fn construct_type<'target, Tgt>(
+    fn construct_type_uncached<'target, Tgt>(
         target: ExtendedTarget<'target, '_, '_, Tgt>,
     ) -> ValueData<'target, 'static, Tgt>
     where
@@ -345,7 +364,7 @@ pub struct UnionTypeConstructor<L: ConstructType, R: ConstructType> {
 unsafe impl<L: ConstructType, R: ConstructType> ConstructType for UnionTypeConstructor<L, R> {
     type Static = UnionTypeConstructor<L::Static, R::Static>;
 
-    fn construct_type<'target, T>(
+    fn construct_type_uncached<'target, T>(
         target: ExtendedTarget<'target, '_, '_, T>,
     ) -> ValueData<'target, 'static, T>
     where
@@ -384,7 +403,7 @@ pub struct BottomType;
 unsafe impl ConstructType for BottomType {
     type Static = BottomType;
 
-    fn construct_type<'target, T>(
+    fn construct_type_uncached<'target, T>(
         target: ExtendedTarget<'target, '_, '_, T>,
     ) -> ValueData<'target, 'static, T>
     where
@@ -444,7 +463,7 @@ impl_construct_julia_type_primitive!(*mut c_void, jl_voidpointer_type);
 unsafe impl<U: ConstructType> ConstructType for *mut U {
     type Static = *mut U::Static;
 
-    fn construct_type<'target, T>(
+    fn construct_type_uncached<'target, T>(
         target: ExtendedTarget<'target, '_, '_, T>,
     ) -> ValueData<'target, 'static, T>
     where
@@ -478,3 +497,50 @@ unsafe impl<U: ConstructType> ConstructType for *mut U {
         }
     }
 }
+
+struct ConstructedTypes {
+    data: RwLock<FnvHashMap<TypeId, Value<'static, 'static>>>,
+}
+
+impl ConstructedTypes {
+    fn new() -> Self {
+        ConstructedTypes {
+            data: RwLock::new(FnvHashMap::default()),
+        }
+    }
+
+    fn find_or_construct<'target, T: ConstructType, Tgt: Target<'target>>(
+        &self,
+        target: ExtendedTarget<'target, '_, '_, Tgt>,
+    ) -> ValueData<'target, 'static, Tgt> {
+        let tid = T::type_id();
+        let res = self.data.read().expect("Lock poisoned").get(&tid).cloned();
+
+        if let Some(res) = res {
+            let (target, _) = target.split();
+            res.root(target)
+        } else {
+            let (target, frame) = target.split();
+            frame
+                .scope(|mut frame| {
+                    let ty = T::construct_type_uncached(frame.as_extended_target());
+
+                    if let Ok(dt) = ty.cast::<DataType>() {
+                        if !dt.has_free_type_vars() {
+                            unsafe {
+                                self.data
+                                    .write()
+                                    .expect("Lock poisoned")
+                                    .insert(tid, ty.leak().as_value());
+                            }
+                        }
+                    }
+
+                    Ok(ty.root(target))
+                })
+                .unwrap()
+        }
+    }
+}
+
+unsafe impl Sync for ConstructedTypes {}

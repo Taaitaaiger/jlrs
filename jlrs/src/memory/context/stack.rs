@@ -20,7 +20,7 @@ use crate::{
     call::Call,
     data::{
         managed::{module::Module, private::ManagedPriv, symbol::Symbol, value::Value, Managed},
-        types::foreign_type::{ForeignType, OpaqueType},
+        types::foreign_type::{create_foreign_type_nostack, ForeignType},
     },
     memory::{stack_frame::PinnedFrame, target::unrooted::Unrooted, PTls},
     private::Private,
@@ -128,7 +128,7 @@ impl Stack {
             // Safety: create_foreign_type is called with the correct arguments, the new type is
             // rooted until the constant has been set, and we've just checked if JlrsCore.Stack
             // already exists.
-            let dt_ref = Self::create_type(global, sym, module);
+            let dt_ref = create_foreign_type_nostack::<Self, _>(global, sym, module);
             let ptr = dt_ref.ptr();
             frame.set_sync_root(ptr.cast().as_ptr());
 

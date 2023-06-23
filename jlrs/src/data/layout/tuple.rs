@@ -212,6 +212,20 @@ macro_rules! impl_tuple {
                 }
             }
 
+            fn type_object<'target, Tgt>(
+                _: &Tgt
+            ) -> $crate::data::managed::value::Value<'target, 'static>
+            where
+                Tgt: $crate::memory::target::Target<'target>
+            {
+                unsafe {
+                    <$crate::data::managed::value::Value as $crate::data::managed::private::ManagedPriv>::wrap_non_null(
+                        std::ptr::NonNull::new_unchecked(jl_sys::jl_anytuple_type.cast()),
+                        $crate::private::Private
+                    )
+                }
+            }
+
             const IS_REF: bool = false;
         }
 
@@ -266,7 +280,7 @@ macro_rules! impl_tuple {
         {
             type Static = $name<$($types :: Static),*>;
 
-            fn construct_type<'target, Tgt>(
+            fn construct_type_uncached<'target, Tgt>(
                 target: $crate::memory::target::ExtendedTarget<'target, '_, '_, Tgt>,
             ) -> $crate::data::managed::value::ValueData<'target, 'static, Tgt>
             where
@@ -336,6 +350,20 @@ macro_rules! impl_tuple {
                 false
             }
 
+            fn type_object<'target, Tgt>(
+                _: &Tgt
+            ) -> $crate::data::managed::value::Value<'target, 'static>
+            where
+                Tgt: $crate::memory::target::Target<'target>
+            {
+                unsafe {
+                    <$crate::data::managed::value::Value as $crate::data::managed::private::ManagedPriv>::wrap_non_null(
+                        std::ptr::NonNull::new_unchecked(jl_sys::jl_emptytuple_type.cast()),
+                        $crate::private::Private
+                    )
+                }
+            }
+
             const IS_REF: bool = false;
         }
 
@@ -367,7 +395,7 @@ macro_rules! impl_tuple {
         unsafe impl $crate::data::types::construct_type::ConstructType for $name {
             type Static = $name;
 
-            fn construct_type<'target, Tgt>(
+            fn construct_type_uncached<'target, Tgt>(
                 target: $crate::memory::target::ExtendedTarget<'target, '_, '_, Tgt>,
             ) -> $crate::data::managed::value::ValueData<'target, 'static, Tgt>
             where

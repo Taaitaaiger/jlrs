@@ -7,8 +7,7 @@ pub use jlrs_macros::julia_module;
 pub use jlrs_macros::julia_version;
 #[cfg(feature = "jlrs-derive")]
 pub use jlrs_macros::{
-    CCallArg, CCallReturn, ConstructType, IntoJulia, Typecheck, Unbox, ValidField,
-    ValidLayout,
+    CCallArg, CCallReturn, ConstructType, IntoJulia, Typecheck, Unbox, ValidField, ValidLayout,
 };
 
 #[cfg(feature = "ccall")]

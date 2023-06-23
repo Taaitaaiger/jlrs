@@ -2504,7 +2504,7 @@ impl ArrayUnbound {
 pub type ArrayRet = Ref<'static, 'static, Array<'static, 'static>>;
 
 unsafe impl ConstructType for Array<'_, '_> {
-    fn construct_type<'target, T>(
+    fn construct_type_uncached<'target, T>(
         target: ExtendedTarget<'target, '_, '_, T>,
     ) -> super::value::ValueData<'target, 'static, T>
     where
@@ -2533,6 +2533,10 @@ unsafe impl ValidLayout for ArrayRef<'_, '_> {
         } else {
             false
         }
+    }
+
+    fn type_object<'target, Tgt: Target<'target>>(target: &Tgt) -> Value<'target, 'static> {
+        UnionAll::array_type(target).as_value()
     }
 
     const IS_REF: bool = true;
@@ -2613,6 +2617,10 @@ unsafe impl<T: ValidField> ValidLayout for TypedArrayRef<'_, '_, T> {
         } else {
             false
         }
+    }
+
+    fn type_object<'target, Tgt: Target<'target>>(target: &Tgt) -> Value<'target, 'static> {
+        UnionAll::array_type(target).as_value()
     }
 
     const IS_REF: bool = true;
@@ -2785,6 +2793,10 @@ unsafe impl<const N: isize> ValidLayout for RankedArrayRef<'_, '_, N> {
         }
     }
 
+    fn type_object<'target, Tgt: Target<'target>>(target: &Tgt) -> Value<'target, 'static> {
+        UnionAll::array_type(target).as_value()
+    }
+
     const IS_REF: bool = true;
 }
 
@@ -2874,7 +2886,7 @@ unsafe impl<U: ConstructType + ValidField, const N: isize> ConstructType
 {
     type Static = ArrayTypeConstructor<U::Static, ConstantIsize<N>>;
 
-    fn construct_type<'target, T>(
+    fn construct_type_uncached<'target, T>(
         target: ExtendedTarget<'target, '_, '_, T>,
     ) -> super::value::ValueData<'target, 'static, T>
     where
@@ -2984,6 +2996,10 @@ unsafe impl<U: ValidField, const N: isize> ValidLayout for TypedRankedArrayRef<'
         } else {
             false
         }
+    }
+
+    fn type_object<'target, Tgt: Target<'target>>(target: &Tgt) -> Value<'target, 'static> {
+        UnionAll::array_type(target).as_value()
     }
 
     const IS_REF: bool = true;

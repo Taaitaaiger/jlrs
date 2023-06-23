@@ -1,3 +1,5 @@
+use std::ops::AddAssign;
+
 use jlrs::{
     ccall::AsyncCallback,
     data::{
@@ -9,10 +11,12 @@ use jlrs::{
         },
         types::{
             abstract_types::{AnyType, Number},
-            foreign_type::{ForeignType, OpaqueType},
+            construct_type::ConstructType,
+            foreign_type::{ForeignType, OpaqueType, ParametricBase, ParametricVariant},
         },
     },
     error::JlrsError,
+    impl_type_parameters, impl_variant_parameters,
     memory::gc::{mark_queue_obj, write_barrier},
     prelude::*,
 };
@@ -131,8 +135,122 @@ impl OpaqueInt {
     }
 }
 
+#[derive(Clone)]
+pub struct POpaque<T> {
+    value: T,
+}
+
+impl<T> POpaque<T>
+where
+    T: 'static + Send + ConstructType + AddAssign + Copy + jlrs::convert::into_julia::IntoJulia,
+{
+    fn new(value: T) -> TypedValueRet<Self> {
+        unsafe {
+            CCall::invoke(|mut frame| {
+                let data = POpaque { value };
+                TypedValue::new(&mut frame, data).leak()
+            })
+        }
+    }
+
+    fn get(&self) -> RustResultRet<T> {
+        unsafe {
+            CCall::invoke(|mut frame| {
+                let data = TypedValue::new(&mut frame, self.value);
+                RustResult::ok(frame.as_extended_target(), data).leak()
+            })
+        }
+    }
+
+    fn get_cloned(self) -> RustResultRet<T> {
+        unsafe {
+            CCall::invoke(|mut frame| {
+                let data = TypedValue::new(&mut frame, self.value);
+                RustResult::ok(frame.as_extended_target(), data).leak()
+            })
+        }
+    }
+
+    fn set(&mut self, value: T) -> RustResultRet<Nothing> {
+        unsafe {
+            CCall::invoke(|mut frame| {
+                self.value = value;
+                let nothing = Value::nothing(&frame).as_typed_unchecked::<Nothing>();
+                RustResult::ok(frame.as_extended_target(), nothing).leak()
+            })
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct POpaqueTwo<T, U> {
+    value: T,
+    value2: U,
+}
+
+unsafe impl<T> ParametricBase for POpaque<T>
+where
+    T: 'static + Send + ConstructType,
+{
+    type Key = POpaque<()>;
+    impl_type_parameters!('T');
+}
+
+unsafe impl<T: 'static + Send + ConstructType> ParametricVariant for POpaque<T> {
+    impl_variant_parameters!(T);
+}
+
 pub struct ForeignThing {
     a: ValueRef<'static, 'static>,
+}
+impl<T, U> POpaqueTwo<T, U>
+where
+    T: 'static + Send + ConstructType + AddAssign + Copy + jlrs::convert::into_julia::IntoJulia,
+    U: 'static + Send + ConstructType + AddAssign + Copy + jlrs::convert::into_julia::IntoJulia,
+{
+    fn new(value: T, value2: U) -> TypedValueRet<Self> {
+        unsafe {
+            CCall::invoke(|mut frame| {
+                let data = POpaqueTwo { value, value2 };
+                TypedValue::new(&mut frame, data).leak()
+            })
+        }
+    }
+
+    fn get_v1(&self) -> RustResultRet<T> {
+        unsafe {
+            CCall::invoke(|mut frame| {
+                let data = TypedValue::new(&mut frame, self.value);
+                RustResult::ok(frame.as_extended_target(), data).leak()
+            })
+        }
+    }
+
+    fn get_v2(&self) -> RustResultRet<U> {
+        unsafe {
+            CCall::invoke(|mut frame| {
+                let data = TypedValue::new(&mut frame, self.value2);
+                RustResult::ok(frame.as_extended_target(), data).leak()
+            })
+        }
+    }
+}
+
+unsafe impl<T, U> ParametricBase for POpaqueTwo<T, U>
+where
+    T: 'static + Send + ConstructType,
+    U: 'static + Send + ConstructType,
+{
+    type Key = POpaqueTwo<(), ()>;
+    impl_type_parameters!('T', 'U');
+}
+
+unsafe impl<T, U> ParametricVariant for POpaqueTwo<T, U>
+where
+    T: 'static + Send + ConstructType,
+    U: 'static + Send + ConstructType,
+{
+    impl_variant_parameters!(T, U);
 }
 
 unsafe impl Send for ForeignThing {}
@@ -200,6 +318,22 @@ fn async_callback_init_err() -> JlrsResult<impl AsyncCallback<isize>> {
 fn async_callback_callback_err() -> JlrsResult<impl AsyncCallback<isize>> {
     Ok(move || Err(JlrsError::exception("Err"))?)
 }
+fn generic_async_callback<T>(t: T) -> JlrsResult<impl AsyncCallback<T>>
+where
+    T: jlrs::convert::into_julia::IntoJulia
+        + Send
+        + jlrs::data::types::construct_type::ConstructType,
+{
+    Ok(move || Ok(t))
+}
+
+unsafe extern "C" fn has_generic<T>(t: T) -> T {
+    t
+}
+
+unsafe extern "C" fn has_two_generics<T, U>(t: T, _u: U) -> T {
+    t
+}
 
 const CONST_U8: u8 = 1;
 static STATIC_U8: u8 = 2;
@@ -239,39 +373,32 @@ julia_module! {
     async fn async_callback_init_err() -> JlrsResult<impl AsyncCallback<isize>>;
     async fn async_callback_callback_err() -> JlrsResult<impl AsyncCallback<isize>>;
 
+    for T in [f64, f32, f64] {
+        fn has_generic(t: T) -> T;
+
+        struct POpaque<T>;
+
+        in POpaque<T> fn new(value: T) -> TypedValueRet<POpaque<T>> as POpaque;
+        #[jlrs(untracked)]
+        in POpaque<T> fn get(&self) -> RustResultRet<T> as popaque_get;
+        in POpaque<T> fn get_cloned(self) -> RustResultRet<T> as popaque_get_cloned;
+        in POpaque<T> fn set(&mut self, value: T) -> RustResultRet<Nothing> as popaque_set;
+
+        async fn generic_async_callback<T>(t: T) -> JlrsResult<impl AsyncCallback<T>>;
+
+        for U in [T, i32] {
+            struct POpaqueTwo<T, U>;
+
+            in POpaqueTwo<T, U> fn new(value: T, value2: U) -> TypedValueRet<POpaqueTwo<T, U>> as POpaqueTwo;
+            in POpaqueTwo<T, U> fn get_v1(&self) -> RustResultRet<T> as get_v1;
+            in POpaqueTwo<T, U> fn get_v2(&self) -> RustResultRet<U> as get_v2;
+
+            fn has_two_generics<T, U>(t: T, u: U) -> T;
+        }
+    };
+
     const CONST_U8: u8;
     static CONST_U8: u8 as STATIC_CONST_U8;
     const STATIC_U8: u8 as CONST_STATIC_U8;
     static STATIC_U8: u8;
-
-    /*
-
-    struct Foo<T, U> {
-        a: T,
-        b: U
-    }
-
-    impl<T, U> Foo<T, U> {
-        
-    }
-
-    
-
-
-    unsafe impl<T, U> ParametricOpaqueType for Foo<T, U> 
-    where 
-        T: ConstructType, 
-        U: ConstructType,
-    {
-        type Bounds = (
-            TypeVarConstructor<Name<'T'>>,
-            TypeVarConstructor<Name<'U'>>,
-        )
-    }
-
-    for T in [f32, f64] {
-        struct FFTPlanner<T>;
-    }
-    
-     */
 }

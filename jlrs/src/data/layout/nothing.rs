@@ -4,10 +4,10 @@ use jl_sys::jl_nothing_type;
 
 use crate::{
     convert::{ccall_types::CCallReturn, into_julia::IntoJulia, unbox::Unbox},
-    data::{managed::{
+    data::managed::{
         datatype::{DataType, DataTypeData},
         Managed,
-    }},
+    },
     impl_julia_typecheck, impl_valid_layout,
     memory::target::Target,
 };
@@ -17,7 +17,7 @@ use crate::{
 pub struct Nothing;
 
 impl_julia_typecheck!(Nothing, jl_nothing_type);
-impl_valid_layout!(Nothing);
+impl_valid_layout!(Nothing, jl_nothing_type);
 
 unsafe impl Unbox for Nothing {
     type Output = Self;

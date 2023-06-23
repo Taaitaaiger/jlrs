@@ -12,13 +12,13 @@ use jl_sys::{jl_method_instance_t, jl_method_instance_type};
 use jlrs_macros::julia_version;
 
 use crate::{
-    data::{managed::{
+    data::managed::{
         internal::code_instance::CodeInstanceRef,
         private::ManagedPriv,
         simple_vector::{SimpleVectorData, SimpleVectorRef},
         value::{ValueData, ValueRef},
         Ref,
-    }},
+    },
     impl_julia_typecheck,
     memory::target::Target,
     private::Private,
@@ -230,7 +230,7 @@ pub type MethodInstanceRef<'scope> = Ref<'scope, 'static, MethodInstance<'scope>
 /// `ccall`able functions that return a [`MethodInstance`].
 pub type MethodInstanceRet = Ref<'static, 'static, MethodInstance<'static>>;
 
-impl_valid_layout!(MethodInstanceRef, MethodInstance);
+impl_valid_layout!(MethodInstanceRef, MethodInstance, jl_method_instance_type);
 
 use super::code_instance::CodeInstanceData;
 use crate::memory::target::target_type::TargetType;

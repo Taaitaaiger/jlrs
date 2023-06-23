@@ -34,7 +34,7 @@ macro_rules! impl_construct_type_managed {
         unsafe impl crate::data::types::construct_type::ConstructType for $ty<'_> {
             type Static = $ty<'static>;
 
-            fn construct_type<'target, 'current, 'borrow, T>(
+            fn construct_type_uncached<'target, 'current, 'borrow, T>(
                 target: $crate::memory::target::ExtendedTarget<'target, '_, '_, T>,
             ) -> $crate::data::managed::value::ValueData<'target, 'static, T>
             where
@@ -67,7 +67,7 @@ macro_rules! impl_construct_type_managed {
         unsafe impl crate::data::types::construct_type::ConstructType for $ty<'_, '_> {
             type Static = $ty<'static, 'static>;
 
-            fn construct_type<'target, 'current, 'borrow, T>(
+            fn construct_type_uncached<'target, 'current, 'borrow, T>(
                 target: $crate::memory::target::ExtendedTarget<'target, '_, '_, T>,
             ) -> $crate::data::managed::value::ValueData<'target, 'static, T>
             where
@@ -152,13 +152,27 @@ macro_rules! impl_into_typed {
 }
 
 macro_rules! impl_valid_layout {
-    ($ref_type:ident, $type:ident) => {
+    ($ref_type:ident, $type:ident, $type_obj:ident) => {
         unsafe impl $crate::data::layout::valid_layout::ValidLayout for $ref_type<'_> {
             fn valid_layout(ty: $crate::data::managed::value::Value) -> bool {
                 if let Ok(dt) = ty.cast::<$crate::data::managed::datatype::DataType>() {
                     dt.is::<$type>()
                 } else {
                     false
+                }
+            }
+
+            fn type_object<'target, Tgt>(
+                _: &Tgt
+            ) -> $crate::data::managed::value::Value<'target, 'static>
+            where
+                Tgt: $crate::memory::target::Target<'target>
+            {
+                unsafe {
+                    <$crate::data::managed::value::Value as $crate::data::managed::private::ManagedPriv>::wrap_non_null(
+                        std::ptr::NonNull::new_unchecked($type_obj.cast()),
+                        $crate::private::Private
+                    )
                 }
             }
 
@@ -181,6 +195,20 @@ macro_rules! impl_valid_layout {
                     dt.is::<$type>()
                 } else {
                     false
+                }
+            }
+
+            fn type_object<'target, Tgt>(
+                _: &Tgt
+            ) -> $crate::data::managed::value::Value<'target, 'static>
+            where
+                Tgt: $crate::memory::target::Target<'target>
+            {
+                unsafe {
+                    <$crate::data::managed::value::Value as $crate::data::managed::private::ManagedPriv>::wrap_non_null(
+                        std::ptr::NonNull::new_unchecked($type_obj.cast()),
+                        $crate::private::Private
+                    )
                 }
             }
 
@@ -501,6 +529,24 @@ impl<'scope, 'data, W: Managed<'scope, 'data>> Ref<'scope, 'data, W> {
     }
 }
 
+pub fn leak<'scope, 'data, M: Managed<'scope, 'data>>(
+    data: M,
+) -> Ref<'static, 'data, M::TypeConstructor<'static, 'data>> {
+    data.as_ref().leak()
+}
+
+pub unsafe fn assume_rooted<'scope, M: Managed<'scope, 'static>>(
+    data: Ref<'scope, 'static, M>,
+) -> M {
+    data.as_managed()
+}
+
+pub unsafe fn erase_scope_lifetime<'scope, 'data, M: Managed<'scope, 'data>>(
+    data: M,
+) -> M::TypeConstructor<'static, 'data> {
+    data.leak().as_managed()
+}
+
 pub(crate) mod private {
     use std::{fmt::Debug, ptr::NonNull};
 
@@ -518,7 +564,7 @@ pub(crate) mod private {
         // rooted, it must never be used after becoming unreachable.
         unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self;
 
-        #[inline(always)]
+        #[inline]
         // Safety: `Self` must be the correct type for `value`.
         unsafe fn from_value_unchecked(value: Value<'scope, 'data>, _: Private) -> Self {
             Self::wrap_non_null(value.unwrap_non_null(Private).cast(), Private)
@@ -526,7 +572,7 @@ pub(crate) mod private {
 
         fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps>;
 
-        #[inline(always)]
+        #[inline]
         fn unwrap(self, _: Private) -> *mut Self::Wraps {
             self.unwrap_non_null(Private).as_ptr()
         }

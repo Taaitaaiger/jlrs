@@ -74,6 +74,27 @@ impl<U: ConstructType + IntoJulia> TypedValue<'_, '_, U> {
     }
 }
 
+impl<U: ConstructType> TypedValue<'_, '_, U> {
+    /// Create a new typed value, any type that implements [`ValidLayout`] can be converted using
+    /// this function as long as it's valid for `U`.
+    pub fn try_new_with<'target, L, T>(
+        target: ExtendedTarget<'target, '_, '_, T>,
+        data: L,
+    ) -> JlrsResult<TypedValueData<'target, 'static, U, T>>
+    where
+        L: ValidLayout,
+        T: Target<'target>,
+    {
+        unsafe {
+            let (target, frame) = target.split();
+            frame.scope(|mut frame| {
+                let v = Value::try_new_with::<U, _, _>(frame.as_extended_target(), data)?;
+                Ok(TypedValue::<U>::from_value_unchecked(v).root(target))
+            })
+        }
+    }
+}
+
 impl<'scope, 'data, U: ConstructType> TypedValue<'scope, 'data, U> {
     /// Create a new typed value from an existing value.
     pub fn from_value(
@@ -228,6 +249,13 @@ where
         ValueRef::valid_layout(v)
     }
 
+    fn type_object<'target, Tgt>(target: &Tgt) -> Value<'target, 'static>
+    where
+        Tgt: Target<'target>,
+    {
+        T::base_type(target).expect("Type has no base type")
+    }
+
     const IS_REF: bool = true;
 }
 unsafe impl<T> ValidField for Option<TypedValue<'_, '_, T>>
@@ -273,13 +301,13 @@ where
 {
     type Static = U::Static;
 
-    fn construct_type<'target, T>(
+    fn construct_type_uncached<'target, T>(
         target: ExtendedTarget<'target, '_, '_, T>,
     ) -> ValueData<'target, 'static, T>
     where
         T: Target<'target>,
     {
-        U::construct_type(target)
+        U::construct_type_uncached(target)
     }
 
     fn base_type<'target, Tgt>(_target: &Tgt) -> Option<Value<'target, 'static>>

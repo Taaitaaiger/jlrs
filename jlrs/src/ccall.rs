@@ -30,7 +30,7 @@ use crate::{
             value::{Value, ValueRef},
             Managed,
         },
-        types::{construct_type::ConstructType},
+        types::construct_type::ConstructType,
     },
     error::{JlrsError, JlrsResult},
     init_jlrs,
@@ -315,7 +315,7 @@ pub struct AsyncCCall {
 unsafe impl ConstructType for AsyncCCall {
     type Static = AsyncCCall;
 
-    fn construct_type<'target, T>(
+    fn construct_type_uncached<'target, T>(
         target: crate::memory::target::ExtendedTarget<'target, '_, '_, T>,
     ) -> crate::data::managed::value::ValueData<'target, 'static, T>
     where

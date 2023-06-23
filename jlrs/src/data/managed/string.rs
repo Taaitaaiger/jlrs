@@ -14,7 +14,7 @@ use jl_sys::{jl_pchar_to_string, jl_string_type};
 use super::Ref;
 use crate::{
     convert::unbox::Unbox,
-    data::{managed::{private::ManagedPriv, value::Value}},
+    data::managed::{private::ManagedPriv, value::Value},
     error::{JlrsError, JlrsResult},
     impl_julia_typecheck,
     memory::target::Target,
@@ -140,7 +140,7 @@ pub type StringRef<'scope> = Ref<'scope, 'static, JuliaString<'scope>>;
 /// `ccall`able functions that return a [`JuliaString`].
 pub type StringRet = Ref<'static, 'static, JuliaString<'static>>;
 
-impl_valid_layout!(StringRef, JuliaString);
+impl_valid_layout!(StringRef, JuliaString, jl_string_type);
 
 use crate::memory::target::target_type::TargetType;
 

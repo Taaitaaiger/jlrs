@@ -442,7 +442,7 @@ pub type ModuleRef<'scope> = Ref<'scope, 'static, Module<'scope>>;
 /// `ccall`able functions that return a [`Module`].
 pub type ModuleRet = Ref<'static, 'static, Module<'static>>;
 
-impl_valid_layout!(ModuleRef, Module);
+impl_valid_layout!(ModuleRef, Module, jl_module_type);
 
 use crate::memory::target::target_type::TargetType;
 

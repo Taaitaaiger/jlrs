@@ -120,6 +120,57 @@ end
     @test !isconst(JuliaModuleTest, :STATIC_U8)
 end
 
+@testset "POpaque" begin
+    @test JuliaModuleTest.POpaque isa UnionAll
+
+    p32 = JuliaModuleTest.POpaque(Float32(1.0))
+    @test JuliaModuleTest.popaque_get(p32) === Float32(1.0)
+    
+    p64 = JuliaModuleTest.POpaque(Float64(1.0))
+    @test JuliaModuleTest.popaque_get(p64) === Float64(1.0)
+end
+
+@testset "has_generic" begin
+    @test JuliaModuleTest.has_generic(Float32(1.0)) == Float32(1.0)
+    @test JuliaModuleTest.has_generic(Float64(1.0)) == Float64(1.0)
+end
+
+@testset "generic_callback" begin
+    @test JuliaModuleTest.generic_async_callback(Float32(1.0)) == Float32(1.0)
+    @test JuliaModuleTest.generic_async_callback(Float64(1.0)) == Float64(1.0)
+end
+
+@testset "POpaqueTwo" begin
+    @test JuliaModuleTest.POpaqueTwo isa UnionAll
+
+    f32f32 = JuliaModuleTest.POpaqueTwo(Float32(1.0), Float32(2.0))
+    @test typeof(f32f32) === JuliaModuleTest.POpaqueTwo{Float32, Float32}
+    @test JuliaModuleTest.get_v1(f32f32) === Float32(1.0)
+    @test JuliaModuleTest.get_v2(f32f32) === Float32(2.0)
+    
+    f32i32 = JuliaModuleTest.POpaqueTwo(Float32(1.0), Int32(2))
+    @test typeof(f32i32) === JuliaModuleTest.POpaqueTwo{Float32, Int32}
+    @test JuliaModuleTest.get_v1(f32i32) === Float32(1.0)
+    @test JuliaModuleTest.get_v2(f32i32) === Int32(2)
+
+    f64f64 = JuliaModuleTest.POpaqueTwo(Float64(1.0), Float64(2.0))
+    @test typeof(f64f64) === JuliaModuleTest.POpaqueTwo{Float64, Float64}
+    @test JuliaModuleTest.get_v1(f64f64) === Float64(1.0)
+    @test JuliaModuleTest.get_v2(f64f64) === Float64(2.0)
+
+    f64i32 = JuliaModuleTest.POpaqueTwo(Float64(1.0), Int32(2))
+    @test typeof(f64i32) === JuliaModuleTest.POpaqueTwo{Float64, Int32}
+    @test JuliaModuleTest.get_v1(f64i32) === Float64(1.0)
+    @test JuliaModuleTest.get_v2(f64i32) === Int32(2)
+end
+
+@testset "has_two_generics" begin
+    @test JuliaModuleTest.has_two_generics(Float32(1.0), Float32(2.0)) === Float32(1.0)
+    @test JuliaModuleTest.has_two_generics(Float32(1.0), Int32(2)) === Float32(1.0)
+    @test JuliaModuleTest.has_two_generics(Float64(1.0), Float64(2.0)) === Float64(1.0)
+    @test JuliaModuleTest.has_two_generics(Float64(1.0), Int32(2)) === Float64(1.0)
+end
+
 # using BenchmarkTools
 #
 # v = Vector{UInt32}()

@@ -7,13 +7,13 @@ use jl_sys::{jl_new_typevar, jl_tvar_t, jl_tvar_type};
 use super::{value::ValueData, Ref};
 use crate::{
     convert::to_symbol::ToSymbol,
-    data::{managed::{
+    data::managed::{
         datatype::DataType,
         private::ManagedPriv,
         symbol::Symbol,
         value::{Value, ValueRef},
         Managed,
-    }},
+    },
     impl_julia_typecheck,
     memory::target::Target,
     private::Private,
@@ -162,7 +162,7 @@ pub type TypeVarRef<'scope> = Ref<'scope, 'static, TypeVar<'scope>>;
 /// `ccall`able functions that return a [`TypeVar`].
 pub type TypeVarRet = Ref<'static, 'static, TypeVar<'static>>;
 
-impl_valid_layout!(TypeVarRef, TypeVar);
+impl_valid_layout!(TypeVarRef, TypeVar, jl_tvar_type);
 
 use crate::memory::target::target_type::TargetType;
 

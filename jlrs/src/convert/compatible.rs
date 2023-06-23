@@ -157,6 +157,12 @@ mod tests {
         fn valid_layout(_: Value) -> bool {
             unimplemented!()
         }
+
+        fn type_object<'target, Tgt: crate::prelude::Target<'target>>(
+            _target: &Tgt,
+        ) -> Value<'target, 'static> {
+            unimplemented!()
+        }
     }
 
     unsafe impl Compatible<B> for A {}

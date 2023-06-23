@@ -6,7 +6,7 @@ use std::{
     ptr::{null_mut, NonNull},
 };
 
-use jl_sys::jl_opaque_closure_t;
+use jl_sys::{jl_opaque_closure_t, jl_opaque_closure_type};
 
 use crate::{
     call::Call,
@@ -18,7 +18,7 @@ use crate::{
             value::{Value, ValueResult},
             Managed as _, Ref,
         },
-        types::{typecheck::Typecheck},
+        types::typecheck::Typecheck,
     },
     memory::target::{unrooted::Unrooted, Target},
     private::Private,
@@ -177,7 +177,7 @@ pub type OpaqueClosureRef<'scope> = Ref<'scope, 'static, OpaqueClosure<'scope>>;
 /// `ccall`able functions that return a [`OpaqueClosure`].
 pub type OpaqueClosureRet = Ref<'static, 'static, OpaqueClosure<'static>>;
 
-impl_valid_layout!(OpaqueClosureRef, OpaqueClosure);
+impl_valid_layout!(OpaqueClosureRef, OpaqueClosure, jl_opaque_closure_type);
 
 use crate::memory::target::target_type::TargetType;
 

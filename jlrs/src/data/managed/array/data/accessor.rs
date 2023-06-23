@@ -403,6 +403,18 @@ impl<'borrow, 'array, 'data, T: ManagedRef<'array, 'data>>
 
         Ok(())
     }
+
+    /// Add capacity for `inc` more elements at the end of the array. The array must be
+    /// one-dimensional. If the array isn't one-dimensional an exception is thrown.
+    ///
+    /// Safety: Mutating things that should absolutely not be mutated is not prevented. If an
+    /// exception is thrown, it isn't caught.
+    pub unsafe fn grow_end_unchecked(&mut self, inc: usize)
+    where
+        'data: 'static,
+    {
+        self.array.grow_end_unchecked(inc);
+    }
 }
 
 impl<'borrow, 'array, 'data, D, T, M> Index<D> for PtrArrayAccessor<'borrow, 'array, 'data, T, M>
@@ -491,6 +503,18 @@ impl<'borrow, 'array, 'data, T> BitsArrayAccessor<'borrow, 'array, 'data, T, Mut
         let data = self.array.data_ptr().cast::<T>();
         // Safety: the layout is compatible and the lifetime is limited.
         unsafe { slice::from_raw_parts_mut(data, len) }
+    }
+
+    /// Add capacity for `inc` more elements at the end of the array. The array must be
+    /// one-dimensional. If the array isn't one-dimensional an exception is thrown.
+    ///
+    /// Safety: Mutating things that should absolutely not be mutated is not prevented. If an
+    /// exception is thrown, it isn't caught.
+    pub unsafe fn grow_end_unchecked(&mut self, inc: usize)
+    where
+        'data: 'static,
+    {
+        self.array.grow_end_unchecked(inc);
     }
 }
 

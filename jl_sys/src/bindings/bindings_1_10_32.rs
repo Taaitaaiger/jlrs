@@ -1,4 +1,4 @@
-/* generated from julia version 1.10.0-DEV (Commit: 0a05a5b05d 2023-05-13 14:18 UTC) */
+/* generated from julia version 1.10.0-DEV (Commit: 834aad4ab4 2023-06-14 14:15 UTC) */
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct __BindgenBitfieldUnit<Storage> {
@@ -536,6 +536,7 @@ pub struct _jl_method_t {
     pub nkw: u32,
     pub isva: u8,
     pub is_for_opaque_closure: u8,
+    pub nospecializeinfer: u8,
     pub constprop: u8,
     pub max_varargs: u8,
     pub purity: _jl_purity_overrides_t,
@@ -2230,6 +2231,7 @@ pub struct jl_options_t {
     pub rr_detach: i8,
     pub strip_metadata: i8,
     pub strip_ir: i8,
+    pub permalloc_pkgimg: i8,
     pub heap_size_hint: u64,
 }
 extern "C" {

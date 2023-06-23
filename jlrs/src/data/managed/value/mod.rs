@@ -127,9 +127,10 @@ use jl_sys::{
     jl_call0, jl_call1, jl_call2, jl_call3, jl_diverror_exception, jl_egal, jl_emptytuple,
     jl_eval_string, jl_exception_occurred, jl_false, jl_field_index, jl_field_isptr,
     jl_gc_add_finalizer, jl_gc_add_ptr_finalizer, jl_get_nth_field, jl_get_nth_field_noalloc,
-    jl_interrupt_exception, jl_isa, jl_memory_exception, jl_nothing, jl_object_id,
-    jl_readonlymemory_exception, jl_set_nth_field, jl_stackovf_exception, jl_stderr_obj,
-    jl_stdout_obj, jl_subtype, jl_true, jl_typeof_str, jl_undefref_exception, jl_value_t,
+    jl_interrupt_exception, jl_isa, jl_memory_exception, jl_new_struct_uninit, jl_nothing,
+    jl_object_id, jl_readonlymemory_exception, jl_set_nth_field, jl_stackovf_exception,
+    jl_stderr_obj, jl_stdout_obj, jl_subtype, jl_true, jl_typeof_str, jl_undefref_exception,
+    jl_value_t,
 };
 use jlrs_macros::julia_version;
 
@@ -217,6 +218,49 @@ impl Value<'_, '_> {
         T: Target<'target>,
     {
         value.into_julia(target)
+    }
+
+    pub unsafe fn try_new_with<'target, Ty, L, Tgt>(
+        target: ExtendedTarget<'target, '_, '_, Tgt>,
+        layout: L,
+    ) -> JlrsResult<ValueData<'target, 'static, Tgt>>
+    where
+        Ty: ConstructType,
+        L: ValidLayout,
+        Tgt: Target<'target>,
+    {
+        let (target, frame) = target.split();
+        frame.scope(|mut frame| {
+            let ty = Ty::construct_type(frame.as_extended_target());
+            let ty_dt = ty.cast::<DataType>()?;
+
+            if !ty_dt.is_concrete_type() {
+                let value = ty.display_string_or(CANNOT_DISPLAY_TYPE);
+                Err(TypeError::NotConcrete { value })?;
+            }
+
+            if !L::valid_layout(ty) || L::IS_REF {
+                let value_type = ty.display_string_or(CANNOT_DISPLAY_TYPE);
+                Err(TypeError::InvalidLayout { value_type })?;
+            }
+
+            if let Some(n_fields) = ty_dt.n_fields() {
+                for i in 0..n_fields as usize {
+                    let ft = ty_dt.field_type_unchecked(&frame, i).unwrap().as_value();
+
+                    if ty_dt.is_pointer_field_unchecked(i) {
+                        let offset = ty_dt.field_offset_unchecked(i) as usize;
+                        check_field_isa(ft, &layout, offset)?;
+                    } else if let Ok(u) = ft.cast::<Union>() {
+                        check_union_equivalent::<L>(&frame, i, u)?;
+                    }
+                }
+            }
+
+            let ptr = jl_new_struct_uninit(ty_dt.unwrap(Private));
+            std::ptr::write(ptr.cast::<L>(), layout);
+            Ok(target.data_from_ptr(NonNull::new_unchecked(ptr), Private))
+        })
     }
 
     /// Create a new named tuple, you should use the `named_tuple` macro rather than this method.
@@ -1561,6 +1605,10 @@ unsafe impl ValidLayout for ValueRef<'_, '_> {
         }
     }
 
+    fn type_object<'target, Tgt: Target<'target>>(target: &Tgt) -> Value<'target, 'static> {
+        DataType::any_type(target).as_value()
+    }
+
     const IS_REF: bool = true;
 }
 unsafe impl ValidField for Option<ValueRef<'_, '_>> {
@@ -1590,3 +1638,70 @@ pub type ValueResult<'target, 'data, T> =
 impl_ccall_arg_managed!(Value, 2);
 
 impl_construct_type_managed!(Value, 2, jl_any_type);
+
+unsafe fn check_union_equivalent<L: ValidLayout>(
+    frame: &GcFrame,
+    idx: usize,
+    u: Union,
+) -> JlrsResult<()> {
+    // TODO: Union{}?
+
+    // Field is a bits union. Check if the union in the layout and the constructed type contain
+    // the same types.
+    let type_obj = L::type_object(frame);
+    if let Ok(type_obj) = type_obj.cast::<DataType>() {
+        let ft_in_layout = type_obj
+            .field_type_unchecked(&frame, idx)
+            .unwrap()
+            .as_value();
+        if ft_in_layout != u {
+            Err(TypeError::IncompatibleType {
+                element_type: u.display_string_or(CANNOT_DISPLAY_TYPE),
+                value_type: ft_in_layout.display_string_or(CANNOT_DISPLAY_TYPE),
+            })?
+        }
+    } else if let Ok(type_obj) = type_obj.cast::<UnionAll>() {
+        let base_type_obj = type_obj.base_type();
+        let ft_in_layout = base_type_obj
+            .field_type_unchecked(&frame, idx)
+            .unwrap()
+            .as_value();
+        if ft_in_layout != u {
+            Err(TypeError::IncompatibleType {
+                element_type: u.display_string_or(CANNOT_DISPLAY_TYPE),
+                value_type: ft_in_layout.display_string_or(CANNOT_DISPLAY_TYPE),
+            })?
+        }
+    } else {
+        Err(TypeError::NotA {
+            value: type_obj.display_string_or(CANNOT_DISPLAY_TYPE),
+            field_type: "DataType or UnionAll".into(),
+        })?
+    }
+
+    Ok(())
+}
+
+unsafe fn check_field_isa<L: ValidLayout>(
+    ft: Value,
+    l_ptr: *const L,
+    offset: usize,
+) -> JlrsResult<()> {
+    // Field is a pointer field, check if the provided value in that position is a valid instance
+    // of the field type.
+    if let Some(field) = l_ptr
+        .cast::<MaybeUninit<u8>>()
+        .add(offset)
+        .cast::<Value>()
+        .as_ref()
+    {
+        if !field.isa(ft) {
+            Err(TypeError::NotA {
+                value: field.display_string_or("<Cannot display value>"),
+                field_type: ft.display_string_or("<Cannot display type>"),
+            })?
+        }
+    }
+
+    Ok(())
+}

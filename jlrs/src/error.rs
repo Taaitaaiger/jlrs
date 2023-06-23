@@ -66,6 +66,10 @@ pub enum TypeError {
     },
     #[error("{value} is not a {field_type}")]
     NotA { value: String, field_type: String },
+    #[error("{value} is not a concrete datatype")]
+    NotConcrete { value: String },
+    #[error("layout is invalid for {value_type}")]
+    InvalidLayout { value_type: String },
     #[error("{value_type} is immutable")]
     Immutable { value_type: String },
     #[error("No base type is available")]

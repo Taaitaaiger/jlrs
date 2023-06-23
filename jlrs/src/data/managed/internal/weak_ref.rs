@@ -5,11 +5,11 @@ use std::{marker::PhantomData, ptr::NonNull};
 use jl_sys::{jl_weakref_t, jl_weakref_type};
 
 use crate::{
-    data::{managed::{
+    data::managed::{
         private::ManagedPriv,
         value::{ValueData, ValueRef},
         Ref,
-    }},
+    },
     impl_julia_typecheck,
     memory::target::Target,
     private::Private,
@@ -69,7 +69,7 @@ pub type WeakRefRef<'scope> = Ref<'scope, 'static, WeakRef<'scope>>;
 /// `ccall`able functions that return a [`WeakRef`].
 pub type WeakRefRet = Ref<'static, 'static, WeakRef<'static>>;
 
-impl_valid_layout!(WeakRefRef, WeakRef);
+impl_valid_layout!(WeakRefRef, WeakRef, jl_weakref_type);
 
 use crate::memory::target::target_type::TargetType;
 

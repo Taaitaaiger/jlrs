@@ -1,6 +1,6 @@
 #[cfg(all(feature = "async-std-rt",))]
 #[cfg(test)]
-mod util;
+mod async_util;
 
 #[cfg(all(feature = "async-std-rt",))]
 #[cfg(test)]
@@ -10,7 +10,7 @@ mod tests {
     use jlrs::prelude::*;
     use once_cell::sync::OnceCell;
 
-    use super::util::{async_tasks::*, ASYNC_TESTS_JL};
+    use super::async_util::{async_tasks::*, ASYNC_TESTS_JL};
 
     fn init() -> Arc<AsyncJulia<AsyncStd>> {
         unsafe {

@@ -36,7 +36,7 @@ use crate::{
             typecheck::Typecheck,
         },
     },
-    error::{JlrsError, JlrsResult, TypeError},
+    error::{JlrsError, JlrsResult, TypeError, CANNOT_DISPLAY_TYPE},
     memory::target::{
         frame::{BorrowedFrame, GcFrame},
         unrooted::Unrooted,
@@ -85,7 +85,7 @@ where
             }
 
             Err(TypeError::IncompatibleBaseType {
-                base_type: base_type.display_string_or("<Cannot display type>"),
+                base_type: base_type.display_string_or(CANNOT_DISPLAY_TYPE),
             })?
         }
     }

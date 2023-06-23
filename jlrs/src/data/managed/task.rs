@@ -14,7 +14,7 @@ use jl_sys::{jl_task_t, jl_task_type};
 use jlrs_macros::julia_version;
 
 use super::Ref;
-use crate::{data::{managed::private::ManagedPriv}, impl_julia_typecheck, private::Private};
+use crate::{data::managed::private::ManagedPriv, impl_julia_typecheck, private::Private};
 #[cfg(feature = "extra-fields")]
 use crate::{
     data::managed::value::{ValueData, ValueRef},
@@ -224,7 +224,7 @@ pub type TaskRef<'scope> = Ref<'scope, 'static, Task<'scope>>;
 /// `ccall`able functions that return a [`Task`].
 pub type TaskRet = Ref<'static, 'static, Task<'static>>;
 
-impl_valid_layout!(TaskRef, Task);
+impl_valid_layout!(TaskRef, Task, jl_task_type);
 
 use crate::memory::target::target_type::TargetType;
 

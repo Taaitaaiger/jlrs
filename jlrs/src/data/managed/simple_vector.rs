@@ -19,7 +19,7 @@ use crate::{
     data::{
         layout::valid_layout::{ValidField, ValidLayout},
         managed::value::Value,
-        types::{typecheck::Typecheck},
+        types::typecheck::Typecheck,
     },
     error::{AccessError, JlrsResult},
     memory::target::{unrooted::Unrooted, Target},
@@ -45,6 +45,14 @@ impl<'scope, 'borrow, T: ManagedRef<'scope, 'static>> SimpleVectorContent<'scope
     pub fn as_slice(&self) -> &'borrow [Option<T>] {
         // Safety: the C API function is called with valid data
         unsafe { std::slice::from_raw_parts(jl_svec_data(self.0.as_ptr()).cast(), self.len()) }
+    }
+
+    /// Returns the content of this `SimpleVector` as a slice.
+    ///
+    /// Safety: the `SimpleVector` must not contain any undefined references.
+    pub unsafe fn as_slice_non_null_managed(&self) -> &'borrow [T::Managed] {
+        // Safety: the C API function is called with valid data
+        std::slice::from_raw_parts(jl_svec_data(self.0.as_ptr()).cast(), self.len())
     }
 }
 
@@ -246,6 +254,10 @@ impl<'scope> SimpleVector<'scope> {
         // Safety: the pointer points to valid data
         unsafe { self.0.as_ref().length }
     }
+
+    pub unsafe fn value_slice_unchecked<'a>(&'a self) -> &'a [Value<'scope, 'static>] {
+        unsafe { std::slice::from_raw_parts(jl_svec_data(self.0.as_ptr()).cast(), self.len()) }
+    }
 }
 
 impl<'base> SimpleVector<'base> {
@@ -305,6 +317,10 @@ unsafe impl<'scope> ValidLayout for SimpleVectorRef<'scope> {
         } else {
             false
         }
+    }
+
+    fn type_object<'target, Tgt: Target<'target>>(target: &Tgt) -> Value<'target, 'static> {
+        DataType::simplevector_type(target).as_value()
     }
 
     const IS_REF: bool = true;

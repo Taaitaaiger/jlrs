@@ -25,7 +25,7 @@ impl<'scope> Debug for SSAValue {
 }
 
 impl_julia_typecheck!(SSAValue, jl_ssavalue_type);
-impl_valid_layout!(SSAValue);
+impl_valid_layout!(SSAValue, jl_ssavalue_type);
 
 unsafe impl Unbox for SSAValue {
     type Output = Self;

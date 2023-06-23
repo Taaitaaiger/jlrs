@@ -287,7 +287,7 @@ pub fn impl_typecheck(ast: &syn::DeriveInput) -> TokenStream {
             wc.predicates.push(clause);
             for generic in generics.type_params() {
                 let clause: syn::WherePredicate = syn::parse_quote! {
-                    #generic: ::jlrs::data::layout::valid_layout::ValidLayout
+                    #generic: ::jlrs::data::layout::valid_layout::ValidField
                 };
                 wc.predicates.push(clause)
             }
@@ -302,7 +302,7 @@ pub fn impl_typecheck(ast: &syn::DeriveInput) -> TokenStream {
 
             for generic in generics.type_params() {
                 let clause: syn::WherePredicate = syn::parse_quote! {
-                    #generic: ::jlrs::data::layout::valid_layout::ValidLayout
+                    #generic: ::jlrs::data::layout::valid_layout::ValidField
                 };
                 predicates.push(clause)
             }
@@ -373,8 +373,6 @@ pub fn impl_construct_type(ast: &syn::DeriveInput) -> TokenStream {
     let ty = modules.pop().expect("ConstructType can only be derived if the corresponding Julia type is set with #[jlrs(julia_type = \"Main.MyModule.Submodule.StructType\")]");
     let modules_it = modules.iter();
     let modules_it_b = modules_it.clone();
-    let modules_it_c = modules_it.clone();
-    let modules_it_d = modules_it.clone();
 
     let generics = &ast.generics;
     let wc = match ast.generics.where_clause.as_ref() {
@@ -416,7 +414,7 @@ pub fn impl_construct_type(ast: &syn::DeriveInput) -> TokenStream {
         unsafe impl #generics ::jlrs::data::types::construct_type::ConstructType for #name #generics #wc {
             type Static = #name <#(#lifetimes,)* #(#static_types,)*>;
 
-            fn construct_type<'target, Tgt>(
+            fn construct_type_uncached<'target, Tgt>(
                 target: ::jlrs::memory::target::ExtendedTarget<'target, '_, '_, Tgt>,
             ) -> ::jlrs::data::managed::value::ValueData<'target, 'static, Tgt>
             where
@@ -425,17 +423,7 @@ pub fn impl_construct_type(ast: &syn::DeriveInput) -> TokenStream {
                 let (target, frame) = target.split();
 
                 frame.scope(|mut frame| {
-                    let base_type = unsafe {
-                        #func
-                        #(
-                            .submodule(&frame, #modules_it)
-                            .expect(&format!("Submodule {} cannot be found", #modules_it_b))
-                            .as_managed()
-                        )*
-                        .global(&frame, #ty)
-                        .expect(&format!("Type {} cannot be found in module", #ty))
-                        .as_value()
-                    };
+                    let base_type = Self::base_type(&frame).expect("Type does not have a base type");
 
                     if base_type.is::<::jlrs::data::managed::datatype::DataType>() {
                         return Ok(base_type.root(target))
@@ -448,7 +436,7 @@ pub fn impl_construct_type(ast: &syn::DeriveInput) -> TokenStream {
                     unsafe {
                         let types = std::mem::transmute::<&[Option<::jlrs::data::managed::value::Value>; #n_generics], &[::jlrs::data::managed::value::Value; #n_generics]>(&types);
                         let applied = base_type
-                            .apply_type_unchecked(&mut frame, types);
+                            .apply_type(&mut frame, types).into_jlrs_result()?;
                         Ok(::jlrs::data::managed::union_all::UnionAll::rewrap(
                             target.into_extended_target(&mut frame),
                             applied.cast_unchecked::<::jlrs::data::managed::datatype::DataType>(),
@@ -467,8 +455,8 @@ pub fn impl_construct_type(ast: &syn::DeriveInput) -> TokenStream {
                 let base_type = unsafe {
                     #func
                     #(
-                        .submodule(target, #modules_it_c)
-                        .expect(&format!("Submodule {} cannot be found", #modules_it_d))
+                        .submodule(target, #modules_it)
+                        .expect(&format!("Submodule {} cannot be found", #modules_it_b))
                         .as_managed()
                     )*
                     .global(target, #ty)
@@ -528,6 +516,44 @@ pub fn impl_valid_layout(ast: &syn::DeriveInput) -> TokenStream {
         _ => panic!("ValidLayout cannot be derived for tuple structs."),
     };
 
+    let mut attrs = JlrsTypeAttrs::parse(ast);
+    let jl_type = attrs.julia_type
+        .take()
+        .expect("IntoJulia can only be derived if the corresponding Julia type is set with #[julia_type = \"Main.MyModule.Submodule.StructType\"]");
+
+    let mut type_it = jl_type.split('.');
+    let func: syn::Expr = match type_it.next() {
+        Some("Main") => syn::parse_quote! {
+            {
+                ::jlrs::data::managed::module::Module::main(&frame)
+            }
+        },
+        Some("Base") => syn::parse_quote! {
+            {
+                ::jlrs::data::managed::module::Module::base(&frame)
+            }
+        },
+        Some("Core") => syn::parse_quote! {
+            {
+                ::jlrs::data::managed::module::Module::core(&frame)
+            }
+        },
+        Some(pkg) => syn::parse_quote! {
+            {
+                let module = ::jlrs::data::managed::module::Module::package_root_module(&frame, #pkg);
+                match module {
+                    Some(module) => module,
+                    _ => panic!("Package {} cannot be found", #pkg)
+                }
+            }
+        },
+        _ => panic!("ConstructType can only be derived if the first module of \"julia_type\" is either \"Main\", \"Base\" or \"Core\", or a package name."),
+    };
+    let mut modules = type_it.collect::<Vec<_>>();
+    let ty = modules.pop().expect("ConstructType can only be derived if the corresponding Julia type is set with #[jlrs(julia_type = \"Main.MyModule.Submodule.StructType\")]");
+    let modules_it = modules.iter();
+    let modules_it_b = modules_it.clone();
+
     let rs_flag_fields = classified_fields.rs_flag_fields.iter();
     let rs_align_fields = classified_fields.rs_align_fields.iter();
     let rs_union_fields = classified_fields.rs_union_fields.iter();
@@ -575,6 +601,28 @@ pub fn impl_valid_layout(ast: &syn::DeriveInput) -> TokenStream {
                 }
 
                 false
+            }
+
+            fn type_object<'target, Tgt>(
+                target: &Tgt
+            ) -> ::jlrs::data::managed::value::Value<'target, 'static>
+            where
+                Tgt: ::jlrs::memory::target::Target<'target>,
+            {
+                let frame = target;
+                let base_type = unsafe {
+                    #func
+                    #(
+                        .submodule(target, #modules_it)
+                        .expect(&format!("Submodule {} cannot be found", #modules_it_b))
+                        .as_managed()
+                    )*
+                    .global(target, #ty)
+                    .expect(&format!("Type {} cannot be found in module", #ty))
+                    .as_value()
+                };
+
+                base_type
             }
 
             const IS_REF: bool = false;

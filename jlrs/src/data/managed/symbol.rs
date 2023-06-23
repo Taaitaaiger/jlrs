@@ -16,7 +16,7 @@ use jl_sys::{
 use super::Ref;
 use crate::{
     catch::catch_exceptions,
-    data::{managed::private::ManagedPriv},
+    data::managed::private::ManagedPriv,
     error::{JlrsError, JlrsResult},
     impl_julia_typecheck,
     memory::target::Target,
@@ -197,7 +197,7 @@ pub type SymbolRef<'scope> = Ref<'scope, 'static, Symbol<'scope>>;
 /// `ccall`able functions that return a [`Symbol`].
 pub type SymbolRet = Ref<'static, 'static, Symbol<'static>>;
 
-impl_valid_layout!(SymbolRef, Symbol);
+impl_valid_layout!(SymbolRef, Symbol, jl_symbol_type);
 
 use crate::memory::target::target_type::TargetType;
 
