@@ -947,7 +947,6 @@ mod tests {
         })
     }
 
-    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
     fn derive_with_propagated_lifetimes() {
         JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
