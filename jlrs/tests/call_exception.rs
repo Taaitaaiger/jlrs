@@ -34,7 +34,7 @@ mod tests {
             jlrs.instance(&mut frame)
                 .scope(|mut frame| unsafe {
                     let arg = Value::new(&mut frame, 1usize);
-                    let kw = named_tuple!(frame.as_extended_target(), "a" => arg);
+                    let kw = named_tuple!(&mut frame, "a" => arg);
 
                     let func = Module::main(&frame)
                         .submodule(&frame, "JlrsTests")?
@@ -81,7 +81,7 @@ mod tests {
             jlrs.instance(&mut frame)
                 .scope(|mut frame| unsafe {
                     let arg = Value::new(&mut frame, 1usize);
-                    let kw = named_tuple!(frame.as_extended_target(), "a" => arg);
+                    let kw = named_tuple!(&mut frame, "a" => arg);
 
                     let func = Module::main(&frame)
                         .submodule(&frame, "JlrsTests")?
@@ -128,7 +128,7 @@ mod tests {
             jlrs.instance(&mut frame)
                 .scope(|mut frame| unsafe {
                     let arg = Value::new(&mut frame, 1usize);
-                    let kw = named_tuple!(frame.as_extended_target(), "a" => arg);
+                    let kw = named_tuple!(&mut frame, "a" => arg);
 
                     let func = Module::main(&frame)
                         .submodule(&frame, "JlrsTests")?
@@ -175,7 +175,7 @@ mod tests {
             jlrs.instance(&mut frame)
                 .scope(|mut frame| unsafe {
                     let arg = Value::new(&mut frame, 1usize);
-                    let kw = named_tuple!(frame.as_extended_target(), "a" => arg);
+                    let kw = named_tuple!(&mut frame, "a" => arg);
 
                     let func = Module::main(&frame)
                         .submodule(&frame, "JlrsTests")?
@@ -221,7 +221,7 @@ mod tests {
             jlrs.instance(&mut frame)
                 .scope(|mut frame| unsafe {
                     let arg = Value::new(&mut frame, 1usize);
-                    let kw = named_tuple!(frame.as_extended_target(), "a" => arg);
+                    let kw = named_tuple!(&mut frame, "a" => arg);
 
                     let func = Module::main(&frame)
                         .submodule(&frame, "JlrsTests")?

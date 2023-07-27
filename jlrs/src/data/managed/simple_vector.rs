@@ -22,7 +22,7 @@ use crate::{
         types::typecheck::Typecheck,
     },
     error::{AccessError, JlrsResult},
-    memory::target::{unrooted::Unrooted, Target},
+    memory::target::{unrooted::Unrooted, Target, TargetResult},
     private::Private,
 };
 
@@ -36,12 +36,14 @@ pub struct SimpleVectorContent<'scope, 'borrow, T = ValueRef<'scope, 'static>>(
 
 impl<'scope, 'borrow, T: ManagedRef<'scope, 'static>> SimpleVectorContent<'scope, 'borrow, T> {
     /// Returns the length of this `SimpleVector`.
+    #[inline]
     pub fn len(&self) -> usize {
         // Safety: the pointer points to valid data
         unsafe { self.0.as_ref().length }
     }
 
     /// Returns the content of this `SimpleVector` as a slice.
+    #[inline]
     pub fn as_slice(&self) -> &'borrow [Option<T>] {
         // Safety: the C API function is called with valid data
         unsafe { std::slice::from_raw_parts(jl_svec_data(self.0.as_ptr()).cast(), self.len()) }
@@ -50,6 +52,7 @@ impl<'scope, 'borrow, T: ManagedRef<'scope, 'static>> SimpleVectorContent<'scope
     /// Returns the content of this `SimpleVector` as a slice.
     ///
     /// Safety: the `SimpleVector` must not contain any undefined references.
+    #[inline]
     pub unsafe fn as_slice_non_null_managed(&self) -> &'borrow [T::Managed] {
         // Safety: the C API function is called with valid data
         std::slice::from_raw_parts(jl_svec_data(self.0.as_ptr()).cast(), self.len())
@@ -68,12 +71,14 @@ where
 
 impl<'scope, 'borrow, T: ManagedRef<'scope, 'static>> SimpleVectorContentMut<'scope, 'borrow, T> {
     /// Returns the length of this `SimpleVector`.
+    #[inline]
     pub fn len(&self) -> usize {
         // Safety: the pointer points to valid data
         unsafe { self.0.as_ref().length }
     }
 
     /// Returns the contents of this `SimpleVector` as a slice.
+    #[inline]
     pub fn as_slice(&self) -> &'borrow [Option<T>] {
         // Safety: the C API function is called with valid data
         unsafe { std::slice::from_raw_parts(jl_svec_data(self.0.as_ptr()).cast(), self.len()) }
@@ -116,6 +121,7 @@ pub struct SimpleVector<'scope>(NonNull<jl_svec_t>, PhantomData<&'scope ()>);
 
 impl<'scope> SimpleVector<'scope> {
     /// Create a new `SimpleVector` that can hold `n` values.
+    #[inline]
     pub fn with_capacity<T>(target: T, n: usize) -> SimpleVectorData<'scope, T>
     where
         T: Target<'scope>,
@@ -131,6 +137,7 @@ impl<'scope> SimpleVector<'scope> {
     ///
     /// Safety: The contents must be set before calling Julia again, the contents must never be
     /// accessed before all elements are set.
+    #[inline]
     pub unsafe fn with_capacity_uninit<T>(target: T, n: usize) -> SimpleVectorData<'scope, T>
     where
         T: Target<'scope>,
@@ -141,11 +148,13 @@ impl<'scope> SimpleVector<'scope> {
 
     /// Access the contents of this `SimpleVector` as `ValueRef`.
     // TODO: ledger
+    #[inline]
     pub fn data<'borrow>(&'borrow self) -> SimpleVectorContent<'scope, 'borrow> {
         SimpleVectorContent(self.unwrap_non_null(Private), PhantomData, PhantomData)
     }
 
     /// Mutably ccess the contents of this `SimpleVector` as `ValueRef`.
+    #[inline]
     pub unsafe fn data_mut<'borrow>(&'borrow mut self) -> SimpleVectorContentMut<'scope, 'borrow> {
         SimpleVectorContentMut(self.unwrap_non_null(Private), PhantomData, PhantomData)
     }
@@ -200,6 +209,7 @@ impl<'scope> SimpleVector<'scope> {
     /// Access the contents of this `SimpleVector` as `U`.
     ///
     /// Safety: this method doesn't check if `U` is correct for all elements.
+    #[inline]
     pub unsafe fn typed_data_unchecked<'borrow, U>(
         &'borrow self,
     ) -> SimpleVectorContent<'scope, 'borrow, U>
@@ -212,6 +222,7 @@ impl<'scope> SimpleVector<'scope> {
     /// Mutably access the contents of this `SimpleVector` as `U`.
     ///
     /// Safety: this method doesn't check if `U` is correct for all elements.
+    #[inline]
     pub unsafe fn typed_data_mut_unchecked<'borrow, U>(
         &'borrow mut self,
     ) -> SimpleVectorContentMut<'scope, 'borrow, U>
@@ -250,11 +261,13 @@ impl<'scope> SimpleVector<'scope> {
     }
 
     /// Returns the length of this `SimpleVector`.
+    #[inline]
     pub fn len(&self) -> usize {
         // Safety: the pointer points to valid data
         unsafe { self.0.as_ref().length }
     }
 
+    #[inline]
     pub unsafe fn value_slice_unchecked<'a>(&'a self) -> &'a [Value<'scope, 'static>] {
         unsafe { std::slice::from_raw_parts(jl_svec_data(self.0.as_ptr()).cast(), self.len()) }
     }
@@ -262,6 +275,7 @@ impl<'scope> SimpleVector<'scope> {
 
 impl<'base> SimpleVector<'base> {
     /// The empty `SimpleVector`.
+    #[inline]
     pub fn emptysvec<T: Target<'base>>(_: &T) -> Self {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_emptysvec), Private) }
@@ -270,6 +284,7 @@ impl<'base> SimpleVector<'base> {
 
 // Safety: if the type is jl_simplevector_type the data is an SimpleVector
 unsafe impl<'scope> Typecheck for SimpleVector<'scope> {
+    #[inline]
     fn typecheck(t: DataType) -> bool {
         // Safety: can only be called from a thread known to Julia
         t == DataType::simplevector_type(unsafe { &Unrooted::new() })
@@ -292,10 +307,12 @@ impl<'scope> ManagedPriv<'scope, '_> for SimpleVector<'scope> {
 
     // Safety: `inner` must not have been freed yet, the result must never be
     // used after the GC might have freed it.
+    #[inline]
     unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self {
         Self(inner, PhantomData)
     }
 
+    #[inline]
     fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps> {
         self.0
     }
@@ -311,14 +328,17 @@ pub type SimpleVectorRef<'scope> = Ref<'scope, 'static, SimpleVector<'scope>>;
 pub type SimpleVectorRet = Ref<'static, 'static, SimpleVector<'static>>;
 
 unsafe impl<'scope> ValidLayout for SimpleVectorRef<'scope> {
+    #[inline]
     fn valid_layout(v: Value) -> bool {
-        if let Ok(dt) = v.cast::<DataType>() {
+        if v.is::<DataType>() {
+            let dt = unsafe { v.cast_unchecked::<DataType>() };
             dt.is::<SimpleVector>()
         } else {
             false
         }
     }
 
+    #[inline]
     fn type_object<'target, Tgt: Target<'target>>(target: &Tgt) -> Value<'target, 'static> {
         DataType::simplevector_type(target).as_value()
     }
@@ -327,8 +347,10 @@ unsafe impl<'scope> ValidLayout for SimpleVectorRef<'scope> {
 }
 
 unsafe impl<'scope> ValidField for Option<SimpleVectorRef<'scope>> {
+    #[inline]
     fn valid_field(v: Value) -> bool {
-        if let Ok(dt) = v.cast::<DataType>() {
+        if v.is::<DataType>() {
+            let dt = unsafe { v.cast_unchecked::<DataType>() };
             dt.is::<SimpleVector>()
         } else {
             false
@@ -336,7 +358,7 @@ unsafe impl<'scope> ValidField for Option<SimpleVectorRef<'scope>> {
     }
 }
 
-use crate::memory::target::target_type::TargetType;
+use crate::memory::target::TargetType;
 
 /// `SimpleVector` or `SimpleVectorRef`, depending on the target type `T`.
 pub type SimpleVectorData<'target, T> =
@@ -344,8 +366,7 @@ pub type SimpleVectorData<'target, T> =
 
 /// `JuliaResult<SimpleVector>` or `JuliaResultRef<SimpleVectorRef>`, depending on the target type
 /// `T`.
-pub type SimpleVectorResult<'target, T> =
-    <T as TargetType<'target>>::Result<'static, SimpleVector<'target>>;
+pub type SimpleVectorResult<'target, T> = TargetResult<'target, 'static, SimpleVector<'target>, T>;
 
 impl_ccall_arg_managed!(SimpleVector, 1);
 impl_into_typed!(SimpleVector);

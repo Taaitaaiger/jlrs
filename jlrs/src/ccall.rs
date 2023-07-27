@@ -2,20 +2,21 @@
 //!
 //! This module is only available if the `ccall` feature is enabled.
 
+// TODO
+
 use std::{
     cell::UnsafeCell,
     ffi::c_void,
     fmt::Debug,
     hint::spin_loop,
     ptr::NonNull,
-    sync::{atomic::AtomicBool, Arc, Mutex},
+    sync::{atomic::AtomicBool, Arc},
 };
 
 use atomic::Ordering;
 #[cfg(feature = "uv")]
 use jl_sys::uv_async_send;
 use jl_sys::{jl_tagged_gensym, jl_throw};
-use once_cell::sync::OnceCell;
 use threadpool::{Builder, ThreadPool};
 
 use crate::{
@@ -23,21 +24,24 @@ use crate::{
     convert::{ccall_types::CCallReturn, into_julia::IntoJulia},
     data::{
         managed::{
-            module::Module,
+            module::{JlrsCore, Module},
             private::ManagedPriv,
-            rust_result::{RustResult, RustResultRet},
             symbol::Symbol,
-            value::{Value, ValueRef},
+            value::{Value, ValueRet},
             Managed,
         },
         types::construct_type::ConstructType,
     },
     error::{JlrsError, JlrsResult},
+    gc_safe::{GcSafeMutex, GcSafeOnceLock},
     init_jlrs,
     memory::{
-        context::stack::Stack,
         stack_frame::{PinnedFrame, StackFrame},
-        target::{frame::GcFrame, unrooted::Unrooted, Target},
+        target::{
+            frame::{GcFrame, LocalFrame, LocalGcFrame},
+            unrooted::Unrooted,
+            Target,
+        },
     },
     private::Private,
     InstallJlrsCore,
@@ -47,15 +51,15 @@ use crate::{
 // ThreadPool is !Sync, but it is safe to clone it (which creates a new handle to the pool) and
 // use that handle to schedule new jobs to avoid having to lock the pool whenever a new job is
 // scheduled.
-static POOL: OnceCell<Mutex<ThreadPool>> = OnceCell::new();
-static POOL_NAME: OnceCell<String> = OnceCell::new();
+static POOL: GcSafeOnceLock<GcSafeMutex<ThreadPool>> = GcSafeOnceLock::new();
+static POOL_NAME: GcSafeOnceLock<String> = GcSafeOnceLock::new();
 thread_local! {
     static LOCAL_POOL: ThreadPool = unsafe {
-        init_pool().lock().unwrap().clone()
+        init_pool().lock().clone()
     }
 }
 
-unsafe fn init_pool() -> &'static Mutex<ThreadPool> {
+unsafe fn init_pool() -> &'static GcSafeMutex<ThreadPool> {
     POOL.get_or_init(|| {
         let name = POOL_NAME.get_or_init(|| {
             let pool_name = "jlrs-pool";
@@ -70,12 +74,12 @@ unsafe fn init_pool() -> &'static Mutex<ThreadPool> {
             .thread_name(name.clone())
             .build();
 
-        Mutex::new(pool)
+        GcSafeMutex::new(pool)
     })
 }
 
 unsafe extern "C" fn set_pool_size(size: usize) {
-    init_pool().lock().unwrap().set_num_threads(size);
+    init_pool().lock().set_num_threads(size);
 }
 
 unsafe extern "C" fn set_pool_name(module: Module) {
@@ -91,8 +95,6 @@ unsafe extern "C" fn set_pool_name(module: Module) {
 /// initialize it again causes a crash. In order to still be able to call Julia from Rust
 /// you must create a scope first. You can use this struct to do so. It must never be used outside
 /// functions called through `ccall`, and only once for each `ccall`ed function.
-///
-/// Exceptions must only be thrown indirectly by returning a `RustResult`.
 pub struct CCall<'context> {
     frame: PinnedFrame<'context, 0>,
 }
@@ -102,6 +104,7 @@ impl<'context> CCall<'context> {
     ///
     /// Safety: This function must never be called outside a function called through `ccall` from
     /// Julia and must only be called once during that call.
+    #[inline]
     pub unsafe fn new(frame: &'context mut StackFrame<0>) -> Self {
         CCall { frame: frame.pin() }
     }
@@ -117,6 +120,7 @@ impl<'context> CCall<'context> {
     ///
     /// Safety: the handle must be acquired from an `AsyncCondition`.
     #[cfg(feature = "uv")]
+    #[inline]
     pub unsafe fn uv_async_send(handle: *mut std::ffi::c_void) -> bool {
         uv_async_send(handle.cast()) == 0
     }
@@ -133,6 +137,52 @@ impl<'context> CCall<'context> {
             std::mem::drop(owner);
             ret
         }
+    }
+
+    /// Create a [`LocalGcFrame`], call the given closure, and return its result.
+    #[inline]
+    pub unsafe fn local_scope<T, F, const N: usize>(func: F) -> JlrsResult<T>
+    where
+        for<'scope> F: FnOnce(LocalGcFrame<'scope, N>) -> JlrsResult<T>,
+    {
+        let mut local_frame = LocalFrame::new();
+        #[cfg(not(feature = "julia-1-6"))]
+        let pgcstack = NonNull::new_unchecked(jl_sys::jl_get_pgcstack());
+
+        #[cfg(feature = "julia-1-6")]
+        let pgcstack = {
+            let ptls = jl_sys::jl_get_ptls_states();
+            NonNull::new_unchecked(jl_sys::jlrs_pgcstack(ptls))
+        };
+
+        let pinned = local_frame.pin(pgcstack);
+        let res = func(LocalGcFrame::new(&pinned));
+        pinned.pop(pgcstack);
+
+        res
+    }
+
+    /// Create a [`LocalGcFrame`], call the given closure, and return its result.
+    #[inline]
+    pub unsafe fn infallible_local_scope<T, F, const N: usize>(func: F) -> T
+    where
+        for<'scope> F: FnOnce(LocalGcFrame<'scope, N>) -> T,
+    {
+        let mut local_frame = LocalFrame::new();
+        #[cfg(not(feature = "julia-1-6"))]
+        let pgcstack = NonNull::new_unchecked(jl_sys::jl_get_pgcstack());
+
+        #[cfg(feature = "julia-1-6")]
+        let pgcstack = {
+            let ptls = jl_sys::jl_get_ptls_states();
+            NonNull::new_unchecked(jl_sys::jlrs_pgcstack(ptls))
+        };
+
+        let pinned = local_frame.pin(pgcstack);
+        let res = func(LocalGcFrame::new(&pinned));
+        pinned.pop(pgcstack);
+
+        res
     }
 
     /// Create an instance of `CCall` and use it to invoke the provided closure.
@@ -160,10 +210,10 @@ impl<'context> CCall<'context> {
     ///
     /// Safety: this method must only be called from `ccall`ed functions. The returned data is
     /// unrooted and must be returned to Julia immediately.
-    pub unsafe fn invoke_fallible<T, F>(func: F) -> RustResultRet<T>
+    pub unsafe fn invoke_fallible<T, F>(func: F) -> JlrsResult<T>
     where
         T: ConstructType,
-        for<'scope> F: FnOnce(GcFrame<'scope>) -> JlrsResult<RustResultRet<T>>,
+        for<'scope> F: FnOnce(GcFrame<'scope>) -> JlrsResult<T>,
     {
         let mut frame = StackFrame::new();
         let mut ccall = CCall::new(&mut frame);
@@ -171,15 +221,7 @@ impl<'context> CCall<'context> {
         let stack = ccall.frame.stack_frame().sync_stack();
         let (owner, frame) = GcFrame::base(stack);
 
-        let ret = match func(frame) {
-            Ok(res) => res,
-            Err(e) => {
-                let mut frame = owner.restore();
-                RustResult::<T>::jlrs_error(frame.as_extended_target(), *e)
-                    .as_ref()
-                    .leak()
-            }
-        };
+        let ret = func(frame);
         std::mem::drop(owner);
         std::mem::drop(ccall);
         ret
@@ -189,6 +231,7 @@ impl<'context> CCall<'context> {
     ///
     /// Safety: this method must only be called from `ccall`ed functions. The returned data is
     /// unrooted and must be returned to Julia immediately.
+    #[inline]
     pub unsafe fn stackless_invoke<T, F>(func: F) -> T
     where
         T: 'static + CCallReturn,
@@ -197,26 +240,23 @@ impl<'context> CCall<'context> {
         func(Unrooted::new())
     }
 
-    /// Create and throw an exception.
-    ///
-    /// This method calls `func` and throws the result as a Julia exception.
+    /// Throw an exception.
     ///
     /// Safety:
     ///
-    /// Julia exceptions are implemented with `setjmp` / `longjmp`. This means that when an
-    /// exception is thrown, control flow is returned to a `catch` block by jumping over
-    /// intermediate stack frames. It's undefined behaviour to jump over frames that have pending
-    /// drops, so you must take care to structure your code such that none of the intermediate
-    /// frames have any pending drops.
-    #[inline(never)]
-    pub unsafe fn throw_exception<F>(mut self, func: F) -> !
-    where
-        F: for<'scope> FnOnce(&mut GcFrame<'scope>) -> Value<'scope, 'static>,
-    {
-        let exception = construct_exception(self.frame.stack_frame().sync_stack(), func);
-        // catch unwinds the GC stack, so it's okay to forget self.
-        std::mem::forget(self);
+    /// Don't jump over any frames that have pendings drops. Julia exceptions are implemented with
+    /// `setjmp` / `longjmp`. This means that when an exception is thrown, control flow is
+    /// returned to a `catch` block by jumping over intermediate stack frames.
+    #[inline]
+    pub unsafe fn throw_exception(exception: ValueRet) -> ! {
         jl_throw(exception.ptr().as_ptr())
+    }
+
+    #[inline]
+    pub unsafe fn throw_borrow_exception() -> ! {
+        let unrooted = Unrooted::new();
+        let err = JlrsCore::borrow_error(&unrooted).instance().unwrap();
+        jl_throw(err.unwrap(Private))
     }
 
     /// Create an [`Unrooted`], call the given closure, and return its result.
@@ -224,6 +264,7 @@ impl<'context> CCall<'context> {
     /// Unlike [`CCall::scope`] this method doesn't allocate a stack.
     ///
     /// Safety: must only be called from a `ccall`ed function that doesn't need to root any data.
+    #[inline]
     pub unsafe fn stackless_scope<T, F>(func: F) -> JlrsResult<T>
     where
         for<'scope> F: FnOnce(Unrooted<'scope>) -> JlrsResult<T>,
@@ -232,6 +273,7 @@ impl<'context> CCall<'context> {
     }
 
     /// Set the size of the internal thread pool.
+    #[inline]
     pub fn set_pool_size(&self, size: usize) {
         unsafe { set_pool_size(size) }
     }
@@ -280,25 +322,6 @@ impl<'context> CCall<'context> {
     }
 }
 
-impl Drop for CCall<'_> {
-    fn drop(&mut self) {
-        #[cfg(feature = "mem-debug")]
-        eprintln!("Drop CCall");
-    }
-}
-
-#[inline(never)]
-unsafe fn construct_exception<'stack, F>(stack: &'stack Stack, func: F) -> ValueRef<'stack, 'static>
-where
-    for<'scope> F: FnOnce(&mut GcFrame<'scope>) -> Value<'scope, 'static>,
-{
-    let (owner, mut frame) = GcFrame::base(stack);
-    let ret = func(&mut frame);
-    let rewrapped = ValueRef::wrap(ret.unwrap_non_null(Private));
-    std::mem::drop(owner);
-    rewrapped
-}
-
 #[doc(hidden)]
 #[repr(transparent)]
 pub struct AsyncConditionHandle(pub *mut c_void);
@@ -315,22 +338,13 @@ pub struct AsyncCCall {
 unsafe impl ConstructType for AsyncCCall {
     type Static = AsyncCCall;
 
-    fn construct_type_uncached<'target, T>(
-        target: crate::memory::target::ExtendedTarget<'target, '_, '_, T>,
-    ) -> crate::data::managed::value::ValueData<'target, 'static, T>
+    fn construct_type_uncached<'target, Tgt>(
+        target: Tgt,
+    ) -> crate::data::managed::value::ValueData<'target, 'static, Tgt>
     where
-        T: Target<'target>,
+        Tgt: Target<'target>,
     {
-        let (target, _) = target.split();
-        unsafe {
-            Module::package_root_module(&target, "JlrsCore")
-                .unwrap()
-                .submodule(&target, "Wrap")
-                .unwrap()
-                .as_managed()
-                .global(target, "AsyncCCall")
-                .unwrap()
-        }
+        unsafe { Self::base_type(&target).unwrap_unchecked().root(target) }
     }
 
     fn base_type<'target, Tgt>(
@@ -339,18 +353,13 @@ unsafe impl ConstructType for AsyncCCall {
     where
         Tgt: crate::memory::target::Target<'target>,
     {
-        unsafe {
-            Some(
-                Module::package_root_module(target, "JlrsCore")
-                    .unwrap()
-                    .submodule(target, "Wrap")
-                    .unwrap()
-                    .as_managed()
-                    .global(target, "AsyncCCall")
-                    .unwrap()
-                    .as_value(),
-            )
-        }
+        /*Some(inline_static_ref!(
+            ASYNC_CCALL,
+            Value,
+            "JlrsCore.Wrap.AsyncCCall",
+            target
+        ))*/
+        unsafe { Module::typed_global_cached(target, "JlrsCore.Wrap.AsyncCCall").ok() }
     }
 }
 
@@ -403,6 +412,7 @@ impl<T: IntoJulia> DispatchHandle<T> {
     ///
     /// Safety: this method must only be called once.
     pub unsafe fn join(self: Arc<Self>) -> JlrsResult<T> {
+        // TODO: enter GC-safe?
         while !self.flag.load(Ordering::Acquire) {
             spin_loop();
         }

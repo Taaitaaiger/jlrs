@@ -13,8 +13,7 @@ mod tests {
 
             jlrs.instance(&mut frame)
                 .scope(|mut frame| {
-                    let arr = Array::new::<f32, _, _>(frame.as_extended_target(), (1, 2))
-                        .into_jlrs_result()?;
+                    let arr = Array::new::<f32, _, _>(&mut frame, (1, 2)).into_jlrs_result()?;
                     assert!(arr.track_shared().is_ok());
                     Ok(())
                 })
@@ -29,8 +28,7 @@ mod tests {
 
             jlrs.instance(&mut frame)
                 .scope(|mut frame| {
-                    let arr = Array::new::<f32, _, _>(frame.as_extended_target(), (1, 2))
-                        .into_jlrs_result()?;
+                    let arr = Array::new::<f32, _, _>(&mut frame, (1, 2)).into_jlrs_result()?;
                     let t1 = arr.track_shared();
                     let t2 = arr.track_shared();
                     assert!(t1.is_ok());
@@ -48,8 +46,7 @@ mod tests {
 
             jlrs.instance(&mut frame)
                 .scope(|mut frame| unsafe {
-                    let mut arr = Array::new::<f32, _, _>(frame.as_extended_target(), (1, 2))
-                        .into_jlrs_result()?;
+                    let mut arr = Array::new::<f32, _, _>(&mut frame, (1, 2)).into_jlrs_result()?;
                     assert!(arr.track_exclusive().is_ok());
                     Ok(())
                 })
@@ -64,8 +61,7 @@ mod tests {
 
             jlrs.instance(&mut frame)
                 .scope(|mut frame| unsafe {
-                    let mut arr = Array::new::<f32, _, _>(frame.as_extended_target(), (1, 2))
-                        .into_jlrs_result()?;
+                    let mut arr = Array::new::<f32, _, _>(&mut frame, (1, 2)).into_jlrs_result()?;
                     let mut arr2 = arr;
 
                     {
@@ -95,8 +91,7 @@ mod tests {
 
             jlrs.instance(&mut frame)
                 .scope(|mut frame| {
-                    let arr = TypedArray::<f32>::new(frame.as_extended_target(), (1, 2))
-                        .into_jlrs_result()?;
+                    let arr = TypedArray::<f32>::new(&mut frame, (1, 2)).into_jlrs_result()?;
                     assert!(arr.track_shared().is_ok());
                     Ok(())
                 })
@@ -111,8 +106,7 @@ mod tests {
 
             jlrs.instance(&mut frame)
                 .scope(|mut frame| {
-                    let arr = TypedArray::<f32>::new(frame.as_extended_target(), (1, 2))
-                        .into_jlrs_result()?;
+                    let arr = TypedArray::<f32>::new(&mut frame, (1, 2)).into_jlrs_result()?;
                     let t1 = arr.track_shared();
                     let t2 = arr.track_shared();
                     assert!(t1.is_ok());
@@ -130,8 +124,7 @@ mod tests {
 
             jlrs.instance(&mut frame)
                 .scope(|mut frame| unsafe {
-                    let mut arr = TypedArray::<f32>::new(frame.as_extended_target(), (1, 2))
-                        .into_jlrs_result()?;
+                    let mut arr = TypedArray::<f32>::new(&mut frame, (1, 2)).into_jlrs_result()?;
                     assert!(arr.track_exclusive().is_ok());
                     Ok(())
                 })
@@ -146,8 +139,7 @@ mod tests {
 
             jlrs.instance(&mut frame)
                 .scope(|mut frame| unsafe {
-                    let mut arr = TypedArray::<f32>::new(frame.as_extended_target(), (1, 2))
-                        .into_jlrs_result()?;
+                    let mut arr = TypedArray::<f32>::new(&mut frame, (1, 2)).into_jlrs_result()?;
                     let mut arr2 = arr;
 
                     {

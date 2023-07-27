@@ -24,10 +24,8 @@ use crate::{
         managed::{datatype::DataType, module::Module, symbol::Symbol, value::Value},
         types::foreign_type::{create_foreign_type_internal, ForeignType},
     },
-    memory::{
-        stack_frame::StackFrame,
-        target::{unrooted::Unrooted, RootingTarget},
-    },
+    memory::{stack_frame::StackFrame, target::unrooted::Unrooted},
+    prelude::Target,
     private::Private,
 };
 
@@ -78,15 +76,13 @@ pub trait AttachParachute: 'static + Sized + Send + Sync {
     ///
     /// By attaching a parachute, you move ownership of the data from Rust to Julia. This ensures
     /// the data is freed by Julia's GC after it has become unreachable.
-    fn attach_parachute<'scope, T: RootingTarget<'scope>>(
-        self,
-        target: T,
-    ) -> WithParachute<'scope, Self> {
-        let output = target.into_output();
+    // FIXME
+    fn attach_parachute<'scope, T: Target<'scope>>(self, target: T) -> WithParachute<'scope, Self> {
         let parachute = Parachute { _data: Some(self) };
-        let data = Value::new(output, parachute);
+        let data = Value::new(&target, parachute);
         unsafe {
-            let mut ptr: NonNull<Option<Self>> = data.unwrap_non_null(Private).cast();
+            data.root(target);
+            let mut ptr: NonNull<Option<Self>> = data.ptr().cast();
             WithParachute { data: ptr.as_mut() }
         }
     }

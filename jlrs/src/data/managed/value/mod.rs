@@ -23,12 +23,15 @@
 //! [`named_tuple`]: crate::named_tuple!
 
 /*
-TODO:
-jl_atomic_cmpswap_bits
-jl_atomic_bool_cmpswap_bits
-jl_atomic_new_bits
-jl_atomic_store_bits
-jl_atomic_swap_bits
+    TODO
+
+    Atomic operations:
+
+        jl_atomic_cmpswap_bits
+        jl_atomic_bool_cmpswap_bits
+        jl_atomic_new_bits
+        jl_atomic_store_bits
+        jl_atomic_swap_bits
 */
 
 pub mod field_accessor;
@@ -71,7 +74,7 @@ macro_rules! count {
 ///     let i = Value::new(&mut frame, 2u64);
 ///     let j = Value::new(&mut frame, 1u32);
 ///
-///     let _nt = named_tuple!(frame.as_extended_target(), "i" => i, "j" => j);
+///     let _nt = named_tuple!(&mut frame, "i" => i, "j" => j);
 ///
 ///     Ok(())
 /// }).unwrap();
@@ -81,31 +84,41 @@ macro_rules! count {
 #[macro_export]
 macro_rules! named_tuple {
     ($frame:expr, $name:expr => $value:expr) => {
-        $crate::data::managed::value::Value::new_named_tuple($frame, &mut [$name], &mut [$value]).expect("Invalid use of named_tuple!")
+        {
+            let name = $crate::convert::to_symbol::ToSymbol::to_symbol(&$name, &$frame);
+            $crate::data::managed::value::Value::new_named_tuple($frame, &[(name, $value)])
+        }
     };
     ($frame:expr, $name:expr => $value:expr, $($rest:tt)+) => {
         {
-            let n = $crate::count!($($rest)+);
-            let mut names = ::smallvec::SmallVec::<[_; $crate::data::managed::value::MAX_SIZE]>::with_capacity(n);
-            let mut values = ::smallvec::SmallVec::<[_; $crate::data::managed::value::MAX_SIZE]>::with_capacity(n);
+            const n: usize = $crate::count!($($rest)+);
+            let mut pairs: [::std::mem::MaybeUninit::<($crate::data::managed::symbol::Symbol, $crate::data::managed::value::Value)>; n] = [::std::mem::MaybeUninit::uninit(); n];
+            let name = $crate::convert::to_symbol::ToSymbol::to_symbol(&$name, &$frame);
 
-            names.push($name);
-            values.push($value);
-            $crate::named_tuple!($frame, &mut names, &mut values, $($rest)+)
+            pairs[0].write((name, $value));
+            $crate::named_tuple!($frame, 1, &mut pairs, $($rest)+)
         }
     };
-    ($frame:expr, $names:expr, $values:expr, $name:expr => $value:expr, $($rest:tt)+) => {
+    ($frame:expr, $i:expr, $pairs:expr, $name:expr => $value:expr, $($rest:tt)+) => {
         {
-            $names.push($name);
-            $values.push($value);
-            named_tuple!($frame, $names, $values, $($rest)+)
+            let name = $crate::convert::to_symbol::ToSymbol::to_symbol(&$name, &$frame);
+            $pairs[$i].write((name, $value));
+            named_tuple!($frame, $i + 1, $pairs, $($rest)+)
         }
     };
-    ($frame:expr, $names:expr, $values:expr, $name:expr => $value:expr) => {
+    ($frame:expr, $i:expr, $pairs:expr, $name:expr => $value:expr) => {
         {
-            $names.push($name);
-            $values.push($value);
-            $crate::data::managed::value::Value::new_named_tuple($frame, $names, $values).expect("Invalid use of named_tuple!")
+            let name = $crate::convert::to_symbol::ToSymbol::to_symbol(&$name, &$frame);
+            $pairs[$i].write((name, $value));
+
+            let pairs: &[($crate::data::managed::symbol::Symbol, $crate::data::managed::value::Value); n] = unsafe {
+                ::std::mem::transmute::<
+                    &[::std::mem::MaybeUninit::<($crate::data::managed::symbol::Symbol, $crate::data::managed::value::Value)>; n],
+                    &[($crate::data::managed::symbol::Symbol, $crate::data::managed::value::Value); n]
+                >($pairs)
+            };
+
+            $crate::data::managed::value::Value::new_named_tuple($frame, pairs)
         }
     };
 }
@@ -122,25 +135,31 @@ use std::{
 #[julia_version(since = "1.7")]
 use jl_sys::jl_pair_type;
 use jl_sys::{
-    jl_an_empty_string, jl_an_empty_vec_any, jl_any_type, jl_apply_type, jl_array_any_type,
-    jl_array_int32_type, jl_array_symbol_type, jl_array_uint8_type, jl_bottom_type, jl_call,
-    jl_call0, jl_call1, jl_call2, jl_call3, jl_diverror_exception, jl_egal, jl_emptytuple,
-    jl_eval_string, jl_exception_occurred, jl_false, jl_field_index, jl_field_isptr,
-    jl_gc_add_finalizer, jl_gc_add_ptr_finalizer, jl_get_nth_field, jl_get_nth_field_noalloc,
-    jl_interrupt_exception, jl_isa, jl_memory_exception, jl_new_struct_uninit, jl_nothing,
-    jl_object_id, jl_readonlymemory_exception, jl_set_nth_field, jl_stackovf_exception,
-    jl_stderr_obj, jl_stdout_obj, jl_subtype, jl_true, jl_typeof_str, jl_undefref_exception,
-    jl_value_t,
+    jl_an_empty_string, jl_an_empty_vec_any, jl_any_type, jl_apply_generic, jl_apply_type,
+    jl_array_any_type, jl_array_int32_type, jl_array_symbol_type, jl_array_uint8_type,
+    jl_bottom_type, jl_call, jl_call0, jl_call1, jl_call2, jl_call3, jl_diverror_exception,
+    jl_egal, jl_emptytuple, jl_eval_string, jl_exception_occurred, jl_false, jl_field_index,
+    jl_field_isptr, jl_gc_add_finalizer, jl_gc_add_ptr_finalizer, jl_get_nth_field,
+    jl_get_nth_field_noalloc, jl_get_world_counter, jl_interrupt_exception, jl_isa,
+    jl_memory_exception, jl_new_struct_uninit, jl_nothing, jl_object_id,
+    jl_readonlymemory_exception, jl_set_nth_field, jl_stackovf_exception, jl_stderr_obj,
+    jl_stdout_obj, jl_subtype, jl_true, jl_typeof_str, jl_undefref_exception, jl_value_t,
 };
 use jlrs_macros::julia_version;
 
 use self::{field_accessor::FieldAccessor, typed::TypedValue};
 use super::Ref;
 use crate::{
+    args::Values,
     call::{Call, ProvideKeywords, WithKeywords},
+    catch::catch_exceptions,
     convert::{into_julia::IntoJulia, to_symbol::ToSymbol, unbox::Unbox},
     data::{
-        layout::valid_layout::{ValidField, ValidLayout},
+        layout::{
+            is_bits::IsBits,
+            typed_layout::HasLayout,
+            valid_layout::{ValidField, ValidLayout},
+        },
         managed::{
             array::Array,
             datatype::DataType,
@@ -158,23 +177,15 @@ use crate::{
             typecheck::{NamedTuple, Typecheck},
         },
     },
-    error::{
-        AccessError, IOError, InstantiationError, JlrsError, JlrsResult, TypeError,
-        CANNOT_DISPLAY_TYPE,
-    },
+    error::{AccessError, IOError, JlrsError, JlrsResult, TypeError, CANNOT_DISPLAY_TYPE},
     memory::{
         context::ledger::Ledger,
         get_tls,
-        target::{frame::GcFrame, unrooted::Unrooted, ExtendedTarget, Target},
+        target::{unrooted::Unrooted, Target, TargetException, TargetResult},
     },
+    prelude::NTuple,
     private::Private,
 };
-
-/// In some cases it's necessary to place one or more arguments in front of the arguments a
-/// function is called with. Examples include the `named_tuple` macro and `Value::call_async`.
-/// If they are called with fewer than `MAX_SIZE` arguments (including the added arguments), no
-/// heap allocation is required to store them.
-pub const MAX_SIZE: usize = 8;
 
 /// Arbitrary Julia data.
 ///
@@ -196,8 +207,17 @@ pub struct Value<'scope, 'data>(
 );
 
 impl<'scope, 'data, T: Managed<'scope, 'data>> PartialEq<T> for Value<'_, '_> {
+    #[inline]
     fn eq(&self, other: &T) -> bool {
         self.egal(other.as_value())
+    }
+}
+
+// Safety: it's always safe to treat managed data as a `Value`.
+unsafe impl Typecheck for Value<'_, '_> {
+    #[inline]
+    fn typecheck(_: DataType) -> bool {
+        true
     }
 }
 
@@ -212,16 +232,91 @@ impl<'scope, 'data, T: Managed<'scope, 'data>> PartialEq<T> for Value<'_, '_> {
 impl Value<'_, '_> {
     /// Create a new Julia value, any type that implements [`IntoJulia`] can be converted using
     /// this function.
-    pub fn new<'target, V, T>(target: T, value: V) -> ValueData<'target, 'static, T>
+    #[inline]
+    pub fn new<'target, V, Tgt>(target: Tgt, value: V) -> ValueData<'target, 'static, Tgt>
     where
         V: IntoJulia,
-        T: Target<'target>,
+        Tgt: Target<'target>,
     {
         value.into_julia(target)
     }
 
+    /// Create a new Julia value, any type that implements [`IsBits`] can be converted using
+    /// this function.
+    pub fn new_bits<'target, T, Tgt>(target: Tgt, layout: T) -> ValueData<'target, 'static, Tgt>
+    where
+        T: ConstructType + ValidLayout + IsBits,
+        Tgt: Target<'target>,
+    {
+        unsafe {
+            let ty = T::construct_type(&target)
+                .as_value()
+                .cast_unchecked::<DataType>();
+            let val = NonNull::new_unchecked(jl_new_struct_uninit(ty.unwrap(Private)));
+            val.cast::<MaybeUninit<T>>().as_mut().write(layout);
+            target.data_from_ptr(val, Private)
+        }
+    }
+
+    /// Create a new Julia value using `T` to construct the type. The layout must implement
+    /// `IsBits`.
+    pub fn new_bits_from_layout<'target, T, Tgt>(
+        target: Tgt,
+        layout: T::Layout,
+    ) -> JlrsResult<ValueData<'target, 'static, Tgt>>
+    where
+        T: HasLayout<'target, 'static>,
+        T::Layout: IsBits,
+        Tgt: Target<'target>,
+    {
+        unsafe {
+            let ty = T::construct_type(&target).as_value().cast::<DataType>()?;
+            let val = NonNull::new_unchecked(jl_new_struct_uninit(ty.unwrap(Private)));
+            val.cast::<MaybeUninit<T::Layout>>().as_mut().write(layout);
+            Ok(target.data_from_ptr(val, Private))
+        }
+    }
+
+    /// Create a new Julia value using `T` to construct the type and an arbitrary layout `L`.
+    ///
+    /// If the layout is not valid for `T` `TypeError::InvalidLayout` is returned.
+    pub fn new_bits_with_type<'target, T, L, Tgt>(
+        target: Tgt,
+        layout: L,
+    ) -> JlrsResult<ValueData<'target, 'static, Tgt>>
+    where
+        T: ConstructType,
+        L: IsBits + ValidLayout,
+        Tgt: Target<'target>,
+    {
+        unsafe {
+            let ty = T::construct_type(&target).as_value();
+            if !L::valid_layout(ty) {
+                let value_type = ty.display_string_or(CANNOT_DISPLAY_TYPE);
+                Err(TypeError::InvalidLayout { value_type })?;
+            }
+
+            let ty = ty.cast_unchecked::<DataType>();
+            let val = NonNull::new_unchecked(jl_new_struct_uninit(ty.unwrap(Private)));
+            val.cast::<MaybeUninit<L>>().as_mut().write(layout);
+            Ok(target.data_from_ptr(val, Private))
+        }
+    }
+
+    /// Create a new `Value` from the provided layout and type constructor.
+    ///
+    /// This is a more powerful version of [`Value::new`]. While that method is limited to types
+    /// that implement `IntoJulia`, this method can create instances of any constructible type by
+    /// providing a layout which is compatible with that type.
+    ///
+    /// This method returns an error if `L` is not a valid layout for `V`.
+    ///
+    /// Safety:
+    ///
+    /// If the layout contains references to Julia data, those fields must either be `None` or
+    /// point to valid data.
     pub unsafe fn try_new_with<'target, Ty, L, Tgt>(
-        target: ExtendedTarget<'target, '_, '_, Tgt>,
+        target: Tgt,
         layout: L,
     ) -> JlrsResult<ValueData<'target, 'static, Tgt>>
     where
@@ -229,9 +324,8 @@ impl Value<'_, '_> {
         L: ValidLayout,
         Tgt: Target<'target>,
     {
-        let (target, frame) = target.split();
-        frame.scope(|mut frame| {
-            let ty = Ty::construct_type(frame.as_extended_target());
+        target.with_local_scope::<_, _, 1>(|target, mut frame| {
+            let ty = Ty::construct_type(&mut frame);
             let ty_dt = ty.cast::<DataType>()?;
 
             if !ty_dt.is_concrete_type() {
@@ -252,7 +346,7 @@ impl Value<'_, '_> {
                         let offset = ty_dt.field_offset_unchecked(i) as usize;
                         check_field_isa(ft, &layout, offset)?;
                     } else if let Ok(u) = ft.cast::<Union>() {
-                        check_union_equivalent::<L>(&frame, i, u)?;
+                        check_union_equivalent::<L, _>(&frame, i, u)?;
                     }
                 }
             }
@@ -264,66 +358,44 @@ impl Value<'_, '_> {
     }
 
     /// Create a new named tuple, you should use the `named_tuple` macro rather than this method.
-    pub fn new_named_tuple<'target, 'current, 'borrow, 'value, 'data, S, N, T, V>(
-        scope: ExtendedTarget<'target, '_, '_, S>,
-        field_names: N,
-        values: V,
-    ) -> JlrsResult<ValueData<'target, 'data, S>>
+    pub fn new_named_tuple<'target, 'value, 'data, Tgt, const N: usize>(
+        target: Tgt,
+        pairs: &[(Symbol<'value>, Value<'value, 'data>); N],
+    ) -> ValueData<'target, 'data, Tgt>
     where
-        S: Target<'target>,
-        N: AsRef<[T]>,
-        T: ToSymbol,
-        V: AsRef<[Value<'value, 'data>]>,
+        Tgt: Target<'target>,
     {
-        let field_names = field_names.as_ref();
-        let values_m = values.as_ref();
+        unsafe {
+            target
+                .with_local_scope::<_, _, 1>(|target, mut frame| {
+                    // Safety: this method can only be called from a thread known to Julia. The
+                    // unchecked methods are used because it can be guaranteed they won't throw
+                    // an exception for the given arguments.
+                    let field_names = pairs.map(|(sym, _)| sym.as_value());
 
-        let n_names = field_names.len();
-        let n_values = values_m.len();
+                    let names = NTuple::<Symbol, N>::construct_type(&frame)
+                        .as_value()
+                        .cast::<DataType>()?
+                        .instantiate_unchecked(&mut frame, &field_names);
 
-        if n_names != n_values {
-            Err(InstantiationError::NamedTupleSizeMismatch { n_names, n_values })?;
+                    let values = pairs.map(|(_, val)| val);
+                    let field_types = values.map(|val| val.datatype().as_value());
+
+                    let field_types = DataType::anytuple_type(&frame)
+                        .as_value()
+                        .apply_type_unchecked(&frame, &field_types)
+                        .as_value();
+
+                    let ty = UnionAll::namedtuple_type(&frame)
+                        .as_value()
+                        .apply_type_unchecked(&frame, &[names, field_types])
+                        .as_value()
+                        .cast_unchecked::<DataType>();
+
+                    Ok(ty.instantiate_unchecked(target, values))
+                })
+                .unwrap_unchecked()
         }
-
-        let (output, scope) = scope.split();
-
-        scope.scope(|mut frame| {
-            let symbol_ty = DataType::symbol_type(&frame).as_value();
-            let symbol_type_vec = vec![symbol_ty; n_names];
-
-            // Safety: this method can only be called from a thread known to Julia. The
-            // unchecked methods are used because it can be guaranteed they won't throw
-            // an exception for the given arguments.
-            unsafe {
-                let field_names_vec = field_names
-                    .iter()
-                    .map(|name| name.to_symbol_priv(Private).as_value())
-                    .collect::<smallvec::SmallVec<[_; MAX_SIZE]>>();
-
-                let names = DataType::anytuple_type(&frame)
-                    .as_value()
-                    .apply_type_unchecked(&mut frame, &symbol_type_vec)
-                    .cast::<DataType>()?
-                    .instantiate_unchecked(&mut frame, &field_names_vec);
-
-                let field_types_vec = values_m
-                    .iter()
-                    .copied()
-                    .map(|val| val.datatype().as_value())
-                    .collect::<smallvec::SmallVec<[_; MAX_SIZE]>>();
-
-                let field_type_tup = DataType::anytuple_type(&frame)
-                    .as_value()
-                    .apply_type_unchecked(&mut frame, &field_types_vec);
-
-                let ty = UnionAll::namedtuple_type(&frame)
-                    .as_value()
-                    .apply_type_unchecked(&mut frame, &[names, field_type_tup])
-                    .cast::<DataType>()?;
-
-                Ok(ty.instantiate_unchecked(output, values_m))
-            }
-        })
     }
 
     /// Apply the given types to `self`.
@@ -346,22 +418,18 @@ impl Value<'_, '_> {
         T: Target<'target>,
         V: AsRef<[Value<'value, 'data>]>,
     {
-        use crate::catch::catch_exceptions;
-
         // Safety: if an exception is thrown it's caught, the result is immediately rooted
         unsafe {
             let types = types.as_ref();
 
-            let mut callback = |result: &mut MaybeUninit<*mut jl_value_t>| {
-                let res =
-                    jl_apply_type(self.unwrap(Private), types.as_ptr() as *mut _, types.len());
-                result.write(res);
-                Ok(())
-            };
+            let callback =
+                || jl_apply_type(self.unwrap(Private), types.as_ptr() as *mut _, types.len());
 
-            let res = match catch_exceptions(&mut callback).unwrap() {
+            let exc = |err: Value| err.unwrap_non_null(Private);
+
+            let res = match catch_exceptions(callback, exc) {
                 Ok(ptr) => Ok(NonNull::new_unchecked(ptr)),
-                Err(e) => Err(e.ptr()),
+                Err(e) => Err(e),
             };
 
             target.result_from_ptr(res, Private)
@@ -382,6 +450,7 @@ impl Value<'_, '_> {
     /// function.
     ///
     /// [`Union::new`]: crate::data::managed::union::Union::new
+    #[inline]
     pub unsafe fn apply_type_unchecked<'target, 'value, 'data, T, V>(
         self,
         target: T,
@@ -404,6 +473,7 @@ impl Value<'_, '_> {
 impl<'scope, 'data> Value<'scope, 'data> {
     #[julia_version(until = "1.9")]
     /// Returns the `DataType` of this value.
+    #[inline]
     pub fn datatype(self) -> DataType<'scope> {
         // Safety: the pointer points to valid data, every value can be converted to a tagged
         // value.
@@ -418,6 +488,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
     }
 
     #[julia_version(since = "1.10")]
+    #[inline]
     /// Returns the `DataType` of this value.
     pub fn datatype(self) -> DataType<'scope> {
         // Safety: the pointer points to valid data, every value has a type.
@@ -429,6 +500,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
     }
 
     /// Returns the name of this value's [`DataType`] as a string slice.
+    #[inline]
     pub fn datatype_name(self) -> JlrsResult<&'scope str> {
         // Safety: the pointer points to valid data, the C API function
         // is called with a valid argument.
@@ -473,11 +545,13 @@ impl Value<'_, '_> {
     ///
     /// [`JuliaStruct`]: crate::data::managed::traits::julia_struct::JuliaStruct
     /// [here]: ../../../layout/typecheck/trait.Typecheck.html#implementors
+    #[inline]
     pub fn is<T: Typecheck>(self) -> bool {
         self.datatype().is::<T>()
     }
 
     /// Returns true if the value is an array with elements of type `T`.
+    #[inline]
     pub fn is_array_of<T: ValidField>(self) -> bool {
         match self.cast::<Array>() {
             Ok(arr) => arr.contains::<T>(),
@@ -486,6 +560,7 @@ impl Value<'_, '_> {
     }
 
     /// Returns true if `self` is a subtype of `sup`.
+    #[inline]
     pub fn subtype(self, sup: Value) -> bool {
         // Safety: the pointers point to valid data, the C API function
         // is called with valid arguments.
@@ -494,6 +569,7 @@ impl Value<'_, '_> {
 
     /// Returns true if `self` is the type of a `DataType`, `UnionAll`, `Union`, or `Union{}` (the
     /// bottom type).
+    #[inline]
     pub fn is_kind(self) -> bool {
         // Safety: this method can only be called from a thread known to Julia, its lifetime is
         // never used
@@ -508,11 +584,13 @@ impl Value<'_, '_> {
 
     /// Returns true if the value is a type, ie a `DataType`, `UnionAll`, `Union`, or `Union{}`
     /// (the bottom type).
+    #[inline]
     pub fn is_type(self) -> bool {
         Value::is_kind(self.datatype().as_value())
     }
 
     /// Returns true if `self` is of type `ty`.
+    #[inline]
     pub fn isa(self, ty: Value) -> bool {
         // Safety: the pointers point to valid data, the C API function
         // is called with valid arguments.
@@ -541,6 +619,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
     ///
     /// If the data is immutable the borrow isn't tracked by the ledger because it can't be
     /// mutably borrowed.
+    #[inline]
     pub fn track_shared<'borrow, T: ValidLayout>(
         &'borrow self,
     ) -> JlrsResult<Tracked<'borrow, 'scope, 'data, T>> {
@@ -583,6 +662,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
     /// mutable access to the contents of the data, which is inherently unsafe.
     ///
     /// [`write_barrier`]: crate::memory::gc::write_barrier
+    #[inline]
     pub unsafe fn track_exclusive<'borrow, T: ValidLayout>(
         &'borrow mut self,
     ) -> JlrsResult<TrackedMut<'borrow, 'scope, 'data, T>> {
@@ -603,16 +683,19 @@ impl<'scope, 'data> Value<'scope, 'data> {
     }
 
     /// Returns `true` if `self` is currently tracked.
+    #[inline]
     pub fn is_tracked(self) -> JlrsResult<bool> {
         Ledger::is_borrowed(self)
     }
 
     /// Returns `true` if `self` is currently tracked.
+    #[inline]
     pub fn is_tracked_shared(self) -> JlrsResult<bool> {
         Ledger::is_borrowed_shared(self)
     }
 
     /// Returns `true` if `self` is currently mutably tracked.
+    #[inline]
     pub fn is_tracked_exclusive(self) -> JlrsResult<bool> {
         Ledger::is_borrowed_exclusive(self)
     }
@@ -631,6 +714,7 @@ impl ValueUnbound {
     ///
     /// The returned instance of `Tracked` must only be used in the `ccall`ed function and the
     /// `AsyncCallback`.
+    #[inline]
     pub unsafe fn track_shared_unbound<T: ValidLayout + Send>(
         self,
     ) -> JlrsResult<Tracked<'static, 'static, 'static, T>> {
@@ -658,6 +742,7 @@ impl ValueUnbound {
     ///
     /// The returned instance of `TrackedMut` must only be used in the `ccall`ed function and the
     /// `AsyncCallback`.
+    #[inline]
     pub unsafe fn track_exclusive_unbound<T: ValidLayout + Send>(
         self,
     ) -> JlrsResult<TrackedMut<'static, 'static, 'static, T>> {
@@ -690,6 +775,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
     /// data this function can be used to relax its second lifetime to `'static`.
     ///
     /// Safety: The value must not contain any data borrowed from Rust.
+    #[inline]
     pub unsafe fn assume_owned(self) -> Value<'scope, 'static> {
         Value::wrap_non_null(self.unwrap_non_null(Private), Private)
     }
@@ -709,6 +795,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
 /// unboxed value can't be used as a [`Value`] again without reallocating it.
 impl<'scope, 'data> Value<'scope, 'data> {
     /// Cast the value to a managed type `T`. Returns an error if the conversion is invalid.
+    #[inline]
     pub fn cast<T: Managed<'scope, 'data> + Typecheck>(self) -> JlrsResult<T> {
         if self.is::<T>() {
             // Safety: self.is::<T>() returning true guarantees this is safe
@@ -723,12 +810,14 @@ impl<'scope, 'data> Value<'scope, 'data> {
     /// Cast the value to a managed type `T` without checking if this conversion is valid.
     ///
     /// Safety: You must guarantee `self.is::<T>()` would have returned `true`.
+    #[inline]
     pub unsafe fn cast_unchecked<T: Managed<'scope, 'data>>(self) -> T {
         T::from_value_unchecked(self, Private)
     }
 
     /// Unbox the contents of the value as the output type associated with `T`. Returns an error
     /// if the layout of `T::Output` is incompatible with the layout of the type in Julia.
+    #[inline]
     pub fn unbox<T: Unbox + Typecheck>(self) -> JlrsResult<T::Output> {
         if !self.is::<T>() {
             Err(AccessError::InvalidLayout {
@@ -744,17 +833,18 @@ impl<'scope, 'data> Value<'scope, 'data> {
     /// if the layout of `T::Output` is compatible with the layout of the type in Julia.
     ///
     /// Safety: You must guarantee `self.is::<T>()` would have returned `true`.
+    #[inline]
     pub unsafe fn unbox_unchecked<T: Unbox>(self) -> T::Output {
         T::unbox(self)
     }
 
     /// Convert this value to a typed value if this value is an instance of the constructed type.
-    pub fn as_typed<T: ConstructType>(
+    pub fn as_typed<'target, T: ConstructType, Tgt: Target<'target>>(
         self,
-        frame: &mut GcFrame<'_>,
+        target: &Tgt,
     ) -> JlrsResult<TypedValue<'scope, 'data, T>> {
-        frame.scope(|mut frame| {
-            let ty = T::construct_type(frame.as_extended_target());
+        target.with_local_scope::<_, _, 1>(|_, mut frame| {
+            let ty = T::construct_type(&mut frame);
             if self.isa(ty) {
                 unsafe { Ok(TypedValue::<T>::from_value_unchecked(self)) }
             } else {
@@ -769,6 +859,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
     /// Convert this value to a typed value without checking if the conversion is valid.
     ///
     /// Safety: the converted value must be an instance of the constructed type.
+    #[inline]
     pub unsafe fn as_typed_unchecked<T: ConstructType>(self) -> TypedValue<'scope, 'data, T> {
         TypedValue::<T>::from_value_unchecked(self)
     }
@@ -776,6 +867,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
     /// Returns a pointer to the data, this is useful when the output type of `Unbox` is different
     /// than the implementation type and you have to write a custom unboxing function. It's your
     /// responsibility this pointer is used correctly.
+    #[inline]
     pub fn data_ptr(self) -> NonNull<c_void> {
         self.unwrap_non_null(Private).cast()
     }
@@ -798,6 +890,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
 /// the second as a `u32`.
 impl<'scope, 'data> Value<'scope, 'data> {
     /// Returns the field names of this value as a slice of `Symbol`s.
+    #[inline]
     pub fn field_names(self) -> &'scope [Symbol<'scope>] {
         // Symbol and SymbolRef have the same layout, and this data is non-null. Symbols are
         // globally rooted.
@@ -805,11 +898,13 @@ impl<'scope, 'data> Value<'scope, 'data> {
     }
 
     /// Returns the number of fields the underlying Julia value has.
+    #[inline]
     pub fn n_fields(self) -> usize {
         self.datatype().n_fields().unwrap() as _
     }
 
     /// Returns an accessor to access the contents of this value without allocating temporary Julia data.
+    #[inline]
     pub fn field_accessor(self) -> FieldAccessor<'scope, 'data> {
         FieldAccessor::new(self)
     }
@@ -977,12 +1072,10 @@ impl<'scope, 'data> Value<'scope, 'data> {
         target: T,
         idx: usize,
         value: Value<'_, 'data>,
-    ) -> JlrsResult<T::Exception<'data, ()>>
+    ) -> JlrsResult<TargetException<'target, 'data, (), T>>
     where
         T: Target<'target>,
     {
-        use crate::catch::catch_exceptions;
-
         let n_fields = self.n_fields();
         if n_fields <= idx {
             Err(AccessError::OutOfBoundsField {
@@ -1009,15 +1102,12 @@ impl<'scope, 'data> Value<'scope, 'data> {
             })?
         }
 
-        let mut callback = |result: &mut MaybeUninit<()>| {
-            jl_set_nth_field(self.unwrap(Private), idx, value.unwrap(Private));
-            result.write(());
-            Ok(())
-        };
+        let callback = || jl_set_nth_field(self.unwrap(Private), idx, value.unwrap(Private));
+        let exc = |err: Value| err.unwrap_non_null(Private);
 
-        let res = match catch_exceptions(&mut callback)? {
+        let res = match catch_exceptions(callback, exc) {
             Ok(_) => Ok(()),
-            Err(e) => Err(e.ptr()),
+            Err(e) => Err(e),
         };
 
         Ok(target.exception_from_ptr(res, Private))
@@ -1028,6 +1118,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
     /// Safety: this method doesn't check if the type of the value is a subtype of the field's
     /// type. Mutating things that should absolutely not be mutated, like the fields of a
     /// `DataType`, is also not prevented.
+    #[inline]
     pub unsafe fn set_nth_field_unchecked(self, idx: usize, value: Value<'_, 'data>) {
         jl_set_nth_field(self.unwrap(Private), idx, value.unwrap(Private))
     }
@@ -1043,13 +1134,11 @@ impl<'scope, 'data> Value<'scope, 'data> {
         target: T,
         field_name: N,
         value: Value<'_, 'data>,
-    ) -> JlrsResult<T::Exception<'data, ()>>
+    ) -> JlrsResult<TargetException<'target, 'data, (), T>>
     where
         N: ToSymbol,
         T: Target<'target>,
     {
-        use crate::catch::catch_exceptions;
-
         let symbol = field_name.to_symbol_priv(Private);
         let idx = jl_field_index(self.datatype().unwrap(Private), symbol.unwrap(Private), 0);
 
@@ -1077,15 +1166,14 @@ impl<'scope, 'data> Value<'scope, 'data> {
             })?
         }
 
-        let mut callback = |result: &mut MaybeUninit<()>| {
-            jl_set_nth_field(self.unwrap(Private), idx as usize, value.unwrap(Private));
-            result.write(());
-            Ok(())
-        };
+        let callback =
+            || jl_set_nth_field(self.unwrap(Private), idx as usize, value.unwrap(Private));
 
-        let res = match catch_exceptions(&mut callback)? {
+        let exc = |err: Value| err.unwrap_non_null(Private);
+
+        let res = match catch_exceptions(callback, exc) {
             Ok(_) => Ok(()),
-            Err(e) => Err(e.ptr()),
+            Err(e) => Err(e),
         };
 
         Ok(target.exception_from_ptr(res, Private))
@@ -1133,6 +1221,7 @@ impl Value<'_, '_> {
     ///
     /// Safety: The command can't be checked for correctness, nothing prevents you from causing a
     /// segmentation fault with a command like `unsafe_load(Ptr{Float64}(C_NULL))`.
+    #[inline]
     pub unsafe fn eval_string<'target, C, T>(target: T, cmd: C) -> ValueResult<'target, 'static, T>
     where
         C: AsRef<str>,
@@ -1156,6 +1245,7 @@ impl Value<'_, '_> {
     ///
     /// Safety: The command can't be checked for correctness, nothing prevents you from causing a
     /// segmentation fault with a command like `unsafe_load(Ptr{Float64}(C_NULL))`.
+    #[inline]
     pub unsafe fn eval_cstring<'target, C, T>(target: T, cmd: C) -> ValueResult<'target, 'static, T>
     where
         C: AsRef<CStr>,
@@ -1178,23 +1268,22 @@ impl Value<'_, '_> {
     ///
     /// Safety: The content of the file can't be checked for correctness, nothing prevents you
     /// from causing a segmentation fault with code like `unsafe_load(Ptr{Float64}(C_NULL))`.
-    pub unsafe fn include<'target, 'current, 'borrow, P, T>(
-        target: ExtendedTarget<'target, '_, '_, T>,
+    pub unsafe fn include<'target, 'current, 'borrow, P, Tgt>(
+        target: Tgt,
         path: P,
-    ) -> JlrsResult<ValueResult<'target, 'static, T>>
+    ) -> JlrsResult<ValueResult<'target, 'static, Tgt>>
     where
         P: AsRef<Path>,
-        T: Target<'target>,
+        Tgt: Target<'target>,
     {
         if path.as_ref().exists() {
-            let (output, scope) = target.split();
-            return scope.scope(|mut frame| {
+            return target.with_local_scope::<_, _, 1>(|target, mut frame| {
                 let path_jl_str = JuliaString::new(&mut frame, path.as_ref().to_string_lossy());
                 let include_func = Module::main(&frame)
                     .function(&frame, "include")?
                     .as_managed();
 
-                Ok(include_func.call1(output, path_jl_str.as_value()))
+                Ok(include_func.call1(target, path_jl_str.as_value()))
             });
         }
 
@@ -1207,6 +1296,7 @@ impl Value<'_, '_> {
 /// # Equality
 impl Value<'_, '_> {
     /// Returns the object id of this value.
+    #[inline]
     pub fn object_id(self) -> usize {
         // Safety: the pointer points to valid data, the C API
         // functions is called with a valid argument.
@@ -1214,6 +1304,7 @@ impl Value<'_, '_> {
     }
 
     /// Returns true if `self` and `other` are equal.
+    #[inline]
     pub fn egal(self, other: Value) -> bool {
         // Safety: the pointer points to valid data, the C API
         // functions is called with a valid argument.
@@ -1227,6 +1318,7 @@ impl Value<'_, '_> {
     /// called when this value is about to be freed by the garbage collector.
     ///
     /// Safety: the finalizer must be compatible with the data.
+    #[inline]
     pub unsafe fn add_finalizer(self, f: Value<'_, 'static>) {
         jl_gc_add_finalizer(self.unwrap(Private), f.unwrap(Private))
     }
@@ -1235,6 +1327,7 @@ impl Value<'_, '_> {
     /// takes one argument, the value as a void pointer.
     ///
     /// Safety: the finalizer must be compatible with the data.
+    #[inline]
     pub unsafe fn add_ptr_finalizer(self, f: unsafe extern "C" fn(*mut c_void) -> ()) {
         jl_gc_add_ptr_finalizer(get_tls(), self.unwrap(Private), f as *mut c_void)
     }
@@ -1243,6 +1336,7 @@ impl Value<'_, '_> {
 /// # Constant values.
 impl<'scope> Value<'scope, 'static> {
     /// `Union{}`.
+    #[inline]
     pub fn bottom_type<T>(_: &T) -> Self
     where
         T: Target<'scope>,
@@ -1252,6 +1346,7 @@ impl<'scope> Value<'scope, 'static> {
     }
 
     /// `StackOverflowError`.
+    #[inline]
     pub fn stackovf_exception<T>(_: &T) -> Self
     where
         T: Target<'scope>,
@@ -1261,6 +1356,7 @@ impl<'scope> Value<'scope, 'static> {
     }
 
     /// `OutOfMemoryError`.
+    #[inline]
     pub fn memory_exception<T>(_: &T) -> Self
     where
         T: Target<'scope>,
@@ -1270,6 +1366,7 @@ impl<'scope> Value<'scope, 'static> {
     }
 
     /// `ReadOnlyMemoryError`.
+    #[inline]
     pub fn readonlymemory_exception<T>(_: &T) -> Self
     where
         T: Target<'scope>,
@@ -1281,6 +1378,7 @@ impl<'scope> Value<'scope, 'static> {
     }
 
     /// `DivideError`.
+    #[inline]
     pub fn diverror_exception<T>(_: &T) -> Self
     where
         T: Target<'scope>,
@@ -1290,6 +1388,7 @@ impl<'scope> Value<'scope, 'static> {
     }
 
     /// `UndefRefError`.
+    #[inline]
     pub fn undefref_exception<T>(_: &T) -> Self
     where
         T: Target<'scope>,
@@ -1299,6 +1398,7 @@ impl<'scope> Value<'scope, 'static> {
     }
 
     /// `InterruptException`.
+    #[inline]
     pub fn interrupt_exception<T>(_: &T) -> Self
     where
         T: Target<'scope>,
@@ -1308,6 +1408,7 @@ impl<'scope> Value<'scope, 'static> {
     }
 
     /// An empty `Array{Any, 1}.
+    #[inline]
     pub fn an_empty_vec_any<T>(_: &T) -> Self
     where
         T: Target<'scope>,
@@ -1317,6 +1418,7 @@ impl<'scope> Value<'scope, 'static> {
     }
 
     /// An empty immutable String, "".
+    #[inline]
     pub fn an_empty_string<T>(_: &T) -> Self
     where
         T: Target<'scope>,
@@ -1326,6 +1428,7 @@ impl<'scope> Value<'scope, 'static> {
     }
 
     /// `Array{UInt8, 1}`
+    #[inline]
     pub fn array_uint8_type<T>(_: &T) -> Self
     where
         T: Target<'scope>,
@@ -1335,6 +1438,7 @@ impl<'scope> Value<'scope, 'static> {
     }
 
     /// `Array{Any, 1}`
+    #[inline]
     pub fn array_any_type<T>(_: &T) -> Self
     where
         T: Target<'scope>,
@@ -1344,6 +1448,7 @@ impl<'scope> Value<'scope, 'static> {
     }
 
     /// `Array{Symbol, 1}`
+    #[inline]
     pub fn array_symbol_type<T>(_: &T) -> Self
     where
         T: Target<'scope>,
@@ -1353,6 +1458,7 @@ impl<'scope> Value<'scope, 'static> {
     }
 
     /// `Array{Int32, 1}`
+    #[inline]
     pub fn array_int32_type<T>(_: &T) -> Self
     where
         T: Target<'scope>,
@@ -1362,6 +1468,7 @@ impl<'scope> Value<'scope, 'static> {
     }
 
     /// The empty tuple, `()`.
+    #[inline]
     pub fn emptytuple<T>(_: &T) -> Self
     where
         T: Target<'scope>,
@@ -1371,6 +1478,7 @@ impl<'scope> Value<'scope, 'static> {
     }
 
     /// The instance of `true`.
+    #[inline]
     pub fn true_v<T>(_: &T) -> Self
     where
         T: Target<'scope>,
@@ -1380,6 +1488,7 @@ impl<'scope> Value<'scope, 'static> {
     }
 
     /// The instance of `false`.
+    #[inline]
     pub fn false_v<T>(_: &T) -> Self
     where
         T: Target<'scope>,
@@ -1389,6 +1498,7 @@ impl<'scope> Value<'scope, 'static> {
     }
 
     /// The instance of `Nothing`, `nothing`.
+    #[inline]
     pub fn nothing<T>(_: &T) -> Self
     where
         T: Target<'scope>,
@@ -1398,6 +1508,7 @@ impl<'scope> Value<'scope, 'static> {
     }
 
     /// The handle to `stdout` as a Julia value.
+    #[inline]
     pub fn stdout<T>(_: &T) -> Self
     where
         T: Target<'scope>,
@@ -1407,6 +1518,7 @@ impl<'scope> Value<'scope, 'static> {
     }
 
     /// The handle to `stderr` as a Julia value.
+    #[inline]
     pub fn stderr<T>(_: &T) -> Self
     where
         T: Target<'scope>,
@@ -1417,6 +1529,7 @@ impl<'scope> Value<'scope, 'static> {
 
     #[julia_version(since = "1.7")]
     /// The `Pair` type
+    #[inline]
     pub fn pair_type<T>(_: &T) -> Self
     where
         T: Target<'scope>,
@@ -1442,6 +1555,39 @@ impl<'data> Call<'data> for Value<'_, 'data> {
         };
 
         target.result_from_ptr(res, Private)
+    }
+
+    #[inline]
+    unsafe fn call_unchecked<'target, 'value, V, T, const N: usize>(
+        self,
+        target: T,
+        args: V,
+    ) -> ValueData<'target, 'data, T>
+    where
+        V: Values<'value, 'data, N>,
+        T: Target<'target>,
+    {
+        #[cfg(feature = "julia-1-6")]
+        let mut task = NonNull::new_unchecked(jl_sys::jl_get_ptls_states());
+        #[cfg(not(feature = "julia-1-6"))]
+        let mut task = NonNull::new_unchecked(jl_sys::jl_get_current_task());
+
+        let last_age = {
+            let task = task.as_mut();
+            let last_age = task.world_age;
+            task.world_age = jl_get_world_counter();
+            last_age
+        };
+
+        let args = args.as_slice(Private);
+        let v = jl_apply_generic(self.0.as_ptr(), args.as_ptr() as *mut _, args.len() as _);
+
+        {
+            let task = task.as_mut();
+            task.world_age = last_age;
+        }
+
+        target.data_from_ptr(NonNull::new_unchecked(v), Private)
     }
 
     #[inline]
@@ -1520,16 +1666,16 @@ impl<'data> Call<'data> for Value<'_, 'data> {
     }
 
     #[inline]
-    unsafe fn call<'target, 'value, V, T>(
+    unsafe fn call<'target, 'value, V, T, const N: usize>(
         self,
         target: T,
         args: V,
     ) -> ValueResult<'target, 'data, T>
     where
-        V: AsRef<[Value<'value, 'data>]>,
+        V: Values<'value, 'data, N>,
         T: Target<'target>,
     {
-        let args = args.as_ref();
+        let args = args.as_slice(Private);
         let n = args.len();
         let res = jl_call(
             self.unwrap(Private),
@@ -1549,6 +1695,7 @@ impl<'data> Call<'data> for Value<'_, 'data> {
 }
 
 impl<'value, 'data> ProvideKeywords<'value, 'data> for Value<'value, 'data> {
+    #[inline]
     fn provide_keywords(
         self,
         kws: Value<'value, 'data>,
@@ -1570,10 +1717,12 @@ impl<'scope, 'data> ManagedPriv<'scope, 'data> for Value<'scope, 'data> {
 
     // Safety: `inner` must not have been freed yet, the result must never be
     // used after the GC might have freed it.
+    #[inline]
     unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self {
         Self(inner, PhantomData, PhantomData)
     }
 
+    #[inline]
     fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps> {
         self.0
     }
@@ -1593,31 +1742,63 @@ pub type ValueRet = Ref<'static, 'static, Value<'static, 'static>>;
 pub type ValueUnbound = Value<'static, 'static>;
 
 unsafe impl ValidLayout for ValueRef<'_, '_> {
+    #[inline]
     fn valid_layout(v: Value) -> bool {
-        if let Ok(dt) = v.cast::<DataType>() {
+        if v.is::<DataType>() {
+            let dt = unsafe { v.cast_unchecked::<DataType>() };
             !dt.is_inline_alloc()
-        } else if v.cast::<UnionAll>().is_ok() {
+        } else if v.is::<UnionAll>() {
             true
-        } else if let Ok(u) = v.cast::<Union>() {
+        } else if v.is::<Union>() {
+            let u = unsafe { v.cast_unchecked::<Union>() };
             !u.is_bits_union()
         } else {
             false
         }
     }
 
+    #[inline]
     fn type_object<'target, Tgt: Target<'target>>(target: &Tgt) -> Value<'target, 'static> {
         DataType::any_type(target).as_value()
     }
 
     const IS_REF: bool = true;
 }
-unsafe impl ValidField for Option<ValueRef<'_, '_>> {
-    fn valid_field(v: Value) -> bool {
-        if let Ok(dt) = v.cast::<DataType>() {
+
+unsafe impl ValidLayout for Value<'static, 'static> {
+    #[inline]
+    fn valid_layout(v: Value) -> bool {
+        if v.is::<DataType>() {
+            let dt = unsafe { v.cast_unchecked::<DataType>() };
             !dt.is_inline_alloc()
-        } else if v.cast::<UnionAll>().is_ok() {
+        } else if v.is::<UnionAll>() {
             true
-        } else if let Ok(u) = v.cast::<Union>() {
+        } else if v.is::<Union>() {
+            let u = unsafe { v.cast_unchecked::<Union>() };
+            !u.is_bits_union()
+        } else {
+            false
+        }
+    }
+
+    #[inline]
+    fn type_object<'target, Tgt: Target<'target>>(target: &Tgt) -> Value<'target, 'static> {
+        DataType::any_type(target).as_value()
+    }
+
+    const IS_REF: bool = true;
+}
+
+unsafe impl ValidField for Option<ValueRef<'_, '_>> {
+    #[inline]
+    fn valid_field(v: Value) -> bool {
+        if v.is::<DataType>() {
+            let dt = unsafe { v.cast_unchecked::<DataType>() };
+            !dt.is_inline_alloc()
+        } else if v.is::<UnionAll>() {
+            true
+        } else if v.is::<Union>() {
+            let u = unsafe { v.cast_unchecked::<Union>() };
             !u.is_bits_union()
         } else {
             false
@@ -1625,22 +1806,21 @@ unsafe impl ValidField for Option<ValueRef<'_, '_>> {
     }
 }
 
-use crate::memory::target::target_type::TargetType;
+use crate::memory::target::TargetType;
 
 /// `Value` or `ValueRef`, depending on the target type `T`.
 pub type ValueData<'target, 'data, T> =
     <T as TargetType<'target>>::Data<'data, Value<'target, 'data>>;
 
 /// `JuliaResult<Value>` or `JuliaResultRef<ValueRef>`, depending on the target type `T`.
-pub type ValueResult<'target, 'data, T> =
-    <T as TargetType<'target>>::Result<'data, Value<'target, 'data>>;
+pub type ValueResult<'target, 'data, T> = TargetResult<'target, 'data, Value<'target, 'data>, T>;
 
 impl_ccall_arg_managed!(Value, 2);
 
 impl_construct_type_managed!(Value, 2, jl_any_type);
 
-unsafe fn check_union_equivalent<L: ValidLayout>(
-    frame: &GcFrame,
+unsafe fn check_union_equivalent<'target, L: ValidLayout, Tgt: Target<'target>>(
+    target: &Tgt,
     idx: usize,
     u: Union,
 ) -> JlrsResult<()> {
@@ -1648,10 +1828,10 @@ unsafe fn check_union_equivalent<L: ValidLayout>(
 
     // Field is a bits union. Check if the union in the layout and the constructed type contain
     // the same types.
-    let type_obj = L::type_object(frame);
+    let type_obj = L::type_object(target);
     if let Ok(type_obj) = type_obj.cast::<DataType>() {
         let ft_in_layout = type_obj
-            .field_type_unchecked(&frame, idx)
+            .field_type_unchecked(target, idx)
             .unwrap()
             .as_value();
         if ft_in_layout != u {
@@ -1663,7 +1843,7 @@ unsafe fn check_union_equivalent<L: ValidLayout>(
     } else if let Ok(type_obj) = type_obj.cast::<UnionAll>() {
         let base_type_obj = type_obj.base_type();
         let ft_in_layout = base_type_obj
-            .field_type_unchecked(&frame, idx)
+            .field_type_unchecked(target, idx)
             .unwrap()
             .as_value();
         if ft_in_layout != u {

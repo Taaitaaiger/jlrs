@@ -568,7 +568,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
             jlrs.instance(&mut frame)
                 .scope(|mut frame| {
-                    let ty = TypedArray::<usize>::new(frame.as_extended_target(), 1)
+                    let ty = TypedArray::<usize>::new(&mut frame, 1)
                         .into_jlrs_result()?
                         .as_value()
                         .datatype();

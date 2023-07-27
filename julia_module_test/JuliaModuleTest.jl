@@ -1,23 +1,7 @@
-module JuliaModuleTestTests
-try
-    using JlrsCore
-catch e
-    import Pkg; Pkg.add("JlrsCore")
-    using JlrsCore
-end
+include("JuliaModule.jl")
 
 using JlrsCore.Ledger
 using Test
-
-module JuliaModuleTest
-using JlrsCore.Wrap
-
-@wrapmodule("./libjulia_module_test", :julia_module_tests_init_fn)
-
-function __init__()
-    @initjlrs
-end
-end
 
 @testset "Freestanding functions" begin
     @test isnothing(JuliaModuleTest.freestanding_func_trivial())
@@ -125,7 +109,7 @@ end
 
     p32 = JuliaModuleTest.POpaque(Float32(1.0))
     @test JuliaModuleTest.popaque_get(p32) === Float32(1.0)
-    
+
     p64 = JuliaModuleTest.POpaque(Float64(1.0))
     @test JuliaModuleTest.popaque_get(p64) === Float64(1.0)
 end
@@ -147,7 +131,7 @@ end
     @test typeof(f32f32) === JuliaModuleTest.POpaqueTwo{Float32, Float32}
     @test JuliaModuleTest.get_v1(f32f32) === Float32(1.0)
     @test JuliaModuleTest.get_v2(f32f32) === Float32(2.0)
-    
+
     f32i32 = JuliaModuleTest.POpaqueTwo(Float32(1.0), Int32(2))
     @test typeof(f32i32) === JuliaModuleTest.POpaqueTwo{Float32, Int32}
     @test JuliaModuleTest.get_v1(f32i32) === Float32(1.0)
@@ -169,36 +153,4 @@ end
     @test JuliaModuleTest.has_two_generics(Float32(1.0), Int32(2)) === Float32(1.0)
     @test JuliaModuleTest.has_two_generics(Float64(1.0), Float64(2.0)) === Float64(1.0)
     @test JuliaModuleTest.has_two_generics(Float64(1.0), Int32(2)) === Float64(1.0)
-end
-
-# using BenchmarkTools
-#
-# v = Vector{UInt32}()
-# v2 = Vector{AbstractChar}()
-# ty = Int32
-#
-# println("Benchmark freestanding_func_trivial")
-# @btime JuliaModuleTest.freestanding_func_trivial()
-# println("Benchmark freestanding_func_noargs")
-# @btime JuliaModuleTest.freestanding_func_noargs()
-# println("Benchmark freestanding_func_bitsarg")
-# @btime JuliaModuleTest.freestanding_func_bitsarg(UInt(3))
-# println("Benchmark freestanding_func_ref_bitsarg")
-# @btime JuliaModuleTest.freestanding_func_ref_bitsarg(UInt(3))
-# println("Benchmark freestanding_func_ref_mutarg")
-# @btime JuliaModuleTest.freestanding_func_ref_mutarg(Main)
-# println("Benchmark freestanding_func_ref_any")
-# @btime JuliaModuleTest.freestanding_func_ref_any(Main)
-# println("Benchmark freestanding_func_ref_abstract")
-# @btime JuliaModuleTest.freestanding_func_ref_abstract(1)
-# println("Benchmark freestanding_func_arrayarg")
-# @btime JuliaModuleTest.freestanding_func_arrayarg(v)
-# println("Benchmark freestanding_func_arrayarg")
-# @btime JuliaModuleTest.freestanding_func_arrayarg(v2)
-# println("Benchmark freestanding_func_typevaluearg")
-# @btime JuliaModuleTest.freestanding_func_typevaluearg(UInt(3))
-# println("Benchmark freestanding_func_ret_array")
-# @btime JuliaModuleTest.freestanding_func_ret_array(ty)
-# println("Benchmark freestanding_func_ret_rust_result")
-# @btime JuliaModuleTest.freestanding_func_ret_rust_result(false)
 end

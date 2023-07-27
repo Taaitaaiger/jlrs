@@ -25,21 +25,24 @@
 //! # }
 //! ```
 //!
-//! Additionally, [`Tuple` ] can be used to create a tuple from an arbitrary number of `Value`s.
+//! [`Tuple::new`] can be used to create a tuple from an arbitrary number of `Value`s.
 
-use jl_sys::jl_tuple_typename;
+use std::{marker::PhantomData, ptr::NonNull};
+
+use jl_sys::{jl_apply_tuple_type_v, jl_tuple_typename, jlrs_tuple_of};
 
 use crate::{
+    catch::catch_exceptions,
     data::{
         managed::{
             datatype::DataType,
             private::ManagedPriv as _,
-            value::{Value, ValueData, ValueResult, MAX_SIZE},
+            value::{Value, ValueData, ValueResult},
             Managed as _,
         },
-        types::typecheck::Typecheck,
+        types::{construct_type::ConstructType, typecheck::Typecheck},
     },
-    memory::target::{ExtendedTarget, Target},
+    memory::target::Target,
     private::Private,
 };
 
@@ -51,82 +54,46 @@ pub struct Tuple;
 impl Tuple {
     /// Create a new tuple from the contents of `values`.
     pub fn new<'target, 'current, 'borrow, 'value, 'data, V, T>(
-        target: ExtendedTarget<'target, '_, '_, T>,
+        target: T,
         values: V,
     ) -> ValueResult<'target, 'data, T>
     where
         V: AsRef<[Value<'value, 'data>]>,
         T: Target<'target>,
     {
-        let (output, frame) = target.split();
-        frame
-            .scope(|mut frame| {
-                let types: smallvec::SmallVec<[_; MAX_SIZE]> = values
-                    .as_ref()
-                    .iter()
-                    .copied()
-                    .map(|v| v.datatype().as_value())
-                    .collect();
+        unsafe {
+            let values = values.as_ref();
+            let callback = || Self::new_unchecked(&target, values);
+            let exc = |err: Value| err.unwrap_non_null(Private);
 
-                let tuple_ty = DataType::tuple_type(&frame)
-                    .as_value()
-                    .apply_type(&mut frame, types);
-
-                unsafe {
-                    match tuple_ty {
-                        Ok(ty) => {
-                            debug_assert!(ty.is::<DataType>());
-                            ty.cast_unchecked::<DataType>().instantiate(output, values)
-                        }
-                        Err(exc) => {
-                            return Ok(
-                                output.result_from_ptr(Err(exc.unwrap_non_null(Private)), Private)
-                            );
-                        }
-                    }
-                }
-            })
-            .unwrap()
+            match catch_exceptions(callback, exc) {
+                Ok(tup) => Ok(target.data_from_ptr(tup.ptr(), Private)),
+                Err(err) => Err(target.data_from_ptr(err, Private)),
+            }
+        }
     }
 
     /// Create a new tuple from the contents of `values`.
     pub unsafe fn new_unchecked<'target, 'current, 'borrow, 'value, 'data, V, T>(
-        target: ExtendedTarget<'target, '_, '_, T>,
+        target: T,
         values: V,
     ) -> ValueData<'target, 'data, T>
     where
         V: AsRef<[Value<'value, 'data>]>,
         T: Target<'target>,
     {
-        let (output, frame) = target.split();
-        frame
-            .scope(|mut frame| {
-                let types: smallvec::SmallVec<[_; MAX_SIZE]> = values
-                    .as_ref()
-                    .iter()
-                    .copied()
-                    .map(|v| v.datatype().as_value())
-                    .collect();
+        let values = values.as_ref();
+        let n = values.len();
+        let values_ptr = values.as_ptr();
+        let tuple: *mut jl_sys::_jl_value_t =
+            jlrs_tuple_of(values_ptr as *const _ as *mut _, n as _);
 
-                // The tuple type is constructed with the types of the values as its type
-                // parameters, since only concrete types can have instances, all types are
-                // concrete so the tuple type is concrete, too.
-                let tuple_ty = DataType::tuple_type(&frame)
-                    .as_value()
-                    .apply_type_unchecked(&mut frame, types);
-
-                {
-                    debug_assert!(tuple_ty.is::<DataType>());
-                    Ok(tuple_ty
-                        .cast_unchecked::<DataType>()
-                        .instantiate_unchecked(output, values))
-                }
-            })
-            .unwrap()
+        target.data_from_ptr(NonNull::new_unchecked(tuple), Private)
     }
 }
 
 unsafe impl Typecheck for Tuple {
+    #[inline]
     fn typecheck(t: DataType) -> bool {
         unsafe { t.unwrap_non_null(Private).as_ref().name == jl_tuple_typename }
     }
@@ -161,25 +128,24 @@ macro_rules! impl_tuple {
             $($types: $crate::convert::into_julia::IntoJulia + ::std::fmt::Debug + Copy),+
         {}
 
+        unsafe impl<$($types),+> $crate::data::layout::is_bits::IsBits for $name<$($types),+>
+        where
+            $($types: $crate::data::layout::is_bits::IsBits),+
+        {}
+
         unsafe impl<$($types),+> $crate::convert::into_julia::IntoJulia for $name<$($types),+>
         where
-            $($types: $crate::convert::into_julia::IntoJulia + ::std::fmt::Debug + Clone),+
+            $($types: $crate::convert::into_julia::IntoJulia + $crate::data::types::construct_type::ConstructType + ::std::fmt::Debug + Clone),+
         {
+            #[inline]
             fn julia_type<'scope, T>(
                 target: T,
             ) -> $crate::data::managed::datatype::DataTypeData<'scope, T>
             where
                 T: $crate::memory::target::Target<'scope>
             {
-                let types = &mut [
-                    $(<$types as $crate::convert::into_julia::IntoJulia>::julia_type(&target)),+
-                ];
-
                 unsafe {
-                    target.data_from_ptr(
-                        ::std::ptr::NonNull::new_unchecked(::jl_sys::jl_apply_tuple_type_v(types.as_mut_ptr().cast(), types.len()).cast()),
-                        $crate::private::Private,
-                    )
+                    <Self as $crate::data::types::construct_type::ConstructType>::construct_type(&target).as_value().cast_unchecked::<DataType>().root(target)
                 }
             }
         }
@@ -190,7 +156,8 @@ macro_rules! impl_tuple {
         {
             fn valid_layout(v: $crate::data::managed::value::Value) -> bool {
                 unsafe {
-                    if let Ok(dt) = v.cast::<$crate::data::managed::datatype::DataType>() {
+                    if v.is::<$crate::data::managed::datatype::DataType>() {
+                        let dt = v.cast_unchecked::<$crate::data::managed::datatype::DataType>();
                         let global = v.unrooted_target();
                         let fieldtypes = dt.field_types(global);
                         let n = count!($($types),+);
@@ -212,6 +179,7 @@ macro_rules! impl_tuple {
                 }
             }
 
+            #[inline]
             fn type_object<'target, Tgt>(
                 _: &Tgt
             ) -> $crate::data::managed::value::Value<'target, 'static>
@@ -235,7 +203,8 @@ macro_rules! impl_tuple {
         {
             fn valid_field(v: $crate::data::managed::value::Value) -> bool {
                 unsafe {
-                    if let Ok(dt) = v.cast::<$crate::data::managed::datatype::DataType>() {
+                    if v.is::<$crate::data::managed::datatype::DataType>() {
+                        let dt = v.cast_unchecked::<$crate::data::managed::datatype::DataType>();
                         let global = v.unrooted_target();
                         let fieldtypes = dt.field_types(global);
                         let n = count!($($types),+);
@@ -269,6 +238,7 @@ macro_rules! impl_tuple {
         where
             $($types: $crate::data::layout::valid_layout::ValidField + Clone + ::std::fmt::Debug),+
         {
+            #[inline]
             fn typecheck(t: $crate::data::managed::datatype::DataType) -> bool {
                 <Self as $crate::data::layout::valid_layout::ValidLayout>::valid_layout(t.as_value())
             }
@@ -281,16 +251,16 @@ macro_rules! impl_tuple {
             type Static = $name<$($types :: Static),*>;
 
             fn construct_type_uncached<'target, Tgt>(
-                target: $crate::memory::target::ExtendedTarget<'target, '_, '_, Tgt>,
+                target: Tgt,
             ) -> $crate::data::managed::value::ValueData<'target, 'static, Tgt>
             where
                 Tgt: $crate::memory::target::Target<'target>,
             {
-                let (target, frame) = target.split();
+                const N: usize = count!($($types),*);
 
-                frame.scope(|mut frame| {
+                target.with_local_scope::<_, _, N>(|target, mut frame| {
                     let types = &mut [
-                        $(<$types as $crate::data::types::construct_type::ConstructType>::construct_type(frame.as_extended_target())),+
+                        $(<$types as $crate::data::types::construct_type::ConstructType>::construct_type(&mut frame)),+
                     ];
 
                     unsafe {
@@ -302,6 +272,7 @@ macro_rules! impl_tuple {
                 }).unwrap()
             }
 
+            #[inline]
             fn base_type<'target, Tgt>(target: &Tgt) -> Option<$crate::data::managed::value::Value<'target, 'static>>
             where
                 Tgt: $crate::memory::target::Target<'target>,
@@ -315,8 +286,11 @@ macro_rules! impl_tuple {
         #[derive(Copy, Clone, Debug, PartialEq, Eq)]
         pub struct $name();
 
+        unsafe impl $crate::data::layout::is_bits::IsBits for $name {}
+
         unsafe impl $crate::convert::into_julia::IntoJulia for $name
         {
+            #[inline]
             fn julia_type<'scope, T>(
                 target: T,
             ) -> $crate::data::managed::datatype::DataTypeData<'scope, T>
@@ -329,6 +303,7 @@ macro_rules! impl_tuple {
                 }
             }
 
+            #[inline]
             fn into_julia<'scope, T>(self, target: T) -> $crate::data::managed::value::ValueData<'scope, 'static, T>
             where
                 T: $crate::memory::target::Target<'scope>,
@@ -341,8 +316,10 @@ macro_rules! impl_tuple {
         }
 
         unsafe impl $crate::data::layout::valid_layout::ValidLayout for $name {
+            #[inline]
             fn valid_layout(v: $crate::data::managed::value::Value) -> bool {
-                if let Ok(dt) = v.cast::<$crate::data::managed::datatype::DataType>() {
+                if v.is::<$crate::data::managed::datatype::DataType>() {
+                    let dt = unsafe { v.cast_unchecked::<$crate::data::managed::datatype::DataType>() };
                     let global = unsafe {$crate::memory::target::unrooted::Unrooted::new()};
                     return dt == $crate::data::managed::datatype::DataType::emptytuple_type(&global)
                 }
@@ -350,6 +327,7 @@ macro_rules! impl_tuple {
                 false
             }
 
+            #[inline]
             fn type_object<'target, Tgt>(
                 _: &Tgt
             ) -> $crate::data::managed::value::Value<'target, 'static>
@@ -368,8 +346,10 @@ macro_rules! impl_tuple {
         }
 
         unsafe impl $crate::data::layout::valid_layout::ValidField for $name {
+            #[inline]
             fn valid_field(v: $crate::data::managed::value::Value) -> bool {
-                if let Ok(dt) = v.cast::<$crate::data::managed::datatype::DataType>() {
+                if v.is::<$crate::data::managed::datatype::DataType>() {
+                    let dt = unsafe { v.cast_unchecked::<$crate::data::managed::datatype::DataType>() };
                     let global = unsafe {$crate::memory::target::unrooted::Unrooted::new()};
                     return dt == $crate::data::managed::datatype::DataType::emptytuple_type(&global)
                 }
@@ -381,12 +361,14 @@ macro_rules! impl_tuple {
         unsafe impl $crate::convert::unbox::Unbox for $name {
             type Output = Self;
 
+            #[inline]
             unsafe fn unbox(_: $crate::data::managed::value::Value) -> Self::Output {
                 Tuple0()
             }
         }
 
         unsafe impl $crate::data::types::typecheck::Typecheck for $name {
+            #[inline]
             fn typecheck(t: $crate::data::managed::datatype::DataType) -> bool {
                 <Self as $crate::data::layout::valid_layout::ValidLayout>::valid_layout(t.as_value())
             }
@@ -395,16 +377,19 @@ macro_rules! impl_tuple {
         unsafe impl $crate::data::types::construct_type::ConstructType for $name {
             type Static = $name;
 
+            const CACHEABLE: bool = false;
+
+            #[inline]
             fn construct_type_uncached<'target, Tgt>(
-                target: $crate::memory::target::ExtendedTarget<'target, '_, '_, Tgt>,
+                target: Tgt,
             ) -> $crate::data::managed::value::ValueData<'target, 'static, Tgt>
             where
                 Tgt: $crate::memory::target::Target<'target>,
             {
-                let (target, _) = target.split();
                 $crate::data::managed::datatype::DataType::emptytuple_type(&target).as_value().root(target)
             }
 
+            #[inline]
             fn base_type<'target, Tgt>(target: &Tgt) -> Option<$crate::data::managed::value::Value<'target, 'static>>
             where
                 Tgt: $crate::memory::target::Target<'target>,
@@ -491,3 +476,34 @@ impl_tuple!(
     Tuple32, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, T17, T18, T19,
     T20, T21, T22, T23, T24, T25, T26, T27, T28, T29, T30, T31, T32
 );
+
+pub struct NTuple<T, const N: usize> {
+    _marker: PhantomData<[T; N]>,
+}
+
+unsafe impl<T: ConstructType, const N: usize> ConstructType for NTuple<T, N> {
+    type Static = NTuple<T::Static, N>;
+
+    fn construct_type_uncached<'target, Tgt>(target: Tgt) -> ValueData<'target, 'static, Tgt>
+    where
+        Tgt: Target<'target>,
+    {
+        unsafe {
+            target
+                .with_local_scope::<_, _, 1>(|target, mut frame| {
+                    let ty = T::construct_type(&mut frame);
+                    let types = [ty; N];
+                    let applied = jl_apply_tuple_type_v(&types as *const _ as *mut _, N);
+                    Ok(target.data_from_ptr(NonNull::new_unchecked(applied.cast()), Private))
+                })
+                .unwrap_unchecked()
+        }
+    }
+
+    fn base_type<'target, Tgt>(_target: &Tgt) -> Option<Value<'target, 'static>>
+    where
+        Tgt: Target<'target>,
+    {
+        None
+    }
+}

@@ -162,7 +162,7 @@ mod tests {
             jlrs.instance(&mut frame)
                 .scope(|mut frame| {
                     unsafe {
-                        let v = Array::new::<i32, _, _>(frame.as_extended_target(), (2, 2))
+                        let v = Array::new::<i32, _, _>(&mut frame, (2, 2))
                             .into_jlrs_result()?
                             .as_value();
                         assert!(ArrayRef::valid_layout(v.datatype().as_value()));
@@ -183,7 +183,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
             jlrs.instance(&mut frame)
                 .scope(|mut frame| {
-                    let v = Array::new::<i32, _, _>(frame.as_extended_target(), (2, 2))
+                    let v = Array::new::<i32, _, _>(&mut frame, (2, 2))
                         .into_jlrs_result()?
                         .as_value();
                     assert!(!bool::valid_layout(v));

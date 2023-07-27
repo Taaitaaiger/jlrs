@@ -51,6 +51,7 @@ pub unsafe trait IntoJulia: Sized + 'static {
         T: Target<'scope>;
 
     #[doc(hidden)]
+    #[inline]
     fn into_julia<'scope, T>(self, target: T) -> ValueData<'scope, 'static, T>
     where
         T: Target<'scope>,
@@ -58,7 +59,6 @@ pub unsafe trait IntoJulia: Sized + 'static {
         // Safety: trait is implemented incorrectly if this is incorrect. A new instance of the
         // associated
         unsafe {
-            // TODO: root this data until the data has been instantiated.
             let ty = Self::julia_type(&target).as_managed();
             debug_assert!(ty.is_bits());
 
@@ -78,7 +78,7 @@ macro_rules! impl_into_julia {
     ($type:ty, $boxer:ident, $julia_type:expr) => {
         // Safety: These implemetations use a boxing function provided by Julia
         unsafe impl IntoJulia for $type {
-            #[inline(always)]
+            #[inline]
             fn julia_type<'scope, T>(
                 target: T,
             ) -> $crate::data::managed::datatype::DataTypeData<'scope, T>
@@ -93,7 +93,7 @@ macro_rules! impl_into_julia {
                 }
             }
 
-            #[inline(always)]
+            #[inline]
             fn into_julia<'scope, T>(
                 self,
                 target: T,
@@ -150,9 +150,8 @@ unsafe impl<U: IntoJulia> IntoJulia for *mut U {
         let params = &mut [inner_ty];
         let param_ptr = params.as_mut_ptr().cast();
 
-        // Safety: Not rooting the result should be fine. The result must be a concrete type,
-        // which is globally rooted.
-        // TODO: investigate if this is true
+        // Safety: Not rooting the result is fine. The result must be a concrete type which is
+        // globally rooted.
         unsafe {
             let applied = jl_apply_type(ptr_ua.unwrap(Private).cast(), param_ptr, 1);
             debug_assert!(!applied.is_null());

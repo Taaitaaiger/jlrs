@@ -34,13 +34,15 @@ macro_rules! impl_construct_type_managed {
         unsafe impl crate::data::types::construct_type::ConstructType for $ty<'_> {
             type Static = $ty<'static>;
 
-            fn construct_type_uncached<'target, 'current, 'borrow, T>(
-                target: $crate::memory::target::ExtendedTarget<'target, '_, '_, T>,
-            ) -> $crate::data::managed::value::ValueData<'target, 'static, T>
+            const CACHEABLE: bool = false;
+
+            #[inline]
+            fn construct_type_uncached<'target, 'current, 'borrow, Tgt>(
+                target: Tgt,
+            ) -> $crate::data::managed::value::ValueData<'target, 'static, Tgt>
             where
-                T: $crate::memory::target::Target<'target>,
+                Tgt: $crate::memory::target::Target<'target>,
             {
-                let (target, _) = target.split();
                 unsafe {
                     target.data_from_ptr(
                         NonNull::new_unchecked($jl_ty.cast::<::jl_sys::jl_value_t>()),
@@ -49,6 +51,7 @@ macro_rules! impl_construct_type_managed {
                 }
             }
 
+            #[inline]
             fn base_type<'target, Tgt>(_target: &Tgt) -> Option<$crate::data::managed::value::Value<'target, 'static>>
             where
                 Tgt: crate::memory::target::Target<'target>,
@@ -67,13 +70,15 @@ macro_rules! impl_construct_type_managed {
         unsafe impl crate::data::types::construct_type::ConstructType for $ty<'_, '_> {
             type Static = $ty<'static, 'static>;
 
-            fn construct_type_uncached<'target, 'current, 'borrow, T>(
-                target: $crate::memory::target::ExtendedTarget<'target, '_, '_, T>,
-            ) -> $crate::data::managed::value::ValueData<'target, 'static, T>
+            const CACHEABLE: bool = false;
+
+            #[inline]
+            fn construct_type_uncached<'target, 'current, 'borrow, Tgt>(
+                target: Tgt,
+            ) -> $crate::data::managed::value::ValueData<'target, 'static, Tgt>
             where
-                T: $crate::memory::target::Target<'target>,
+                Tgt: $crate::memory::target::Target<'target>,
             {
-                let (target, _) = target.split();
                 unsafe {
                     target.data_from_ptr(
                         NonNull::new_unchecked($jl_ty.cast::<::jl_sys::jl_value_t>()),
@@ -82,6 +87,7 @@ macro_rules! impl_construct_type_managed {
                 }
             }
 
+            #[inline]
             fn base_type<'target, Tgt>(_target: &Tgt) -> Option<$crate::data::managed::value::Value<'target, 'static>>
             where
                 Tgt: crate::memory::target::Target<'target>,
@@ -110,6 +116,12 @@ macro_rules! impl_ccall_arg_managed {
         {
             type CCallReturnType = $crate::data::managed::value::Value<'static, 'static>;
             type FunctionReturnType = $ty<'static>;
+            type ReturnAs = Self;
+
+            #[inline]
+            unsafe fn return_or_throw(self) -> Self::ReturnAs {
+                self
+            }
         }
     };
 
@@ -124,6 +136,12 @@ macro_rules! impl_ccall_arg_managed {
         {
             type CCallReturnType = $crate::data::managed::value::Value<'static, 'static>;
             type FunctionReturnType = $ty<'static, 'static>;
+            type ReturnAs = Self;
+
+            #[inline]
+            unsafe fn return_or_throw(self) -> Self::ReturnAs {
+                self
+            }
         }
     };
 }
@@ -133,6 +151,7 @@ macro_rules! impl_into_typed {
         impl<'scope, 'data> $crate::data::managed::value::typed::AsTyped<'scope, 'data>
             for $ty<'scope>
         {
+            #[inline]
             fn as_typed(
                 self,
             ) -> $crate::error::JlrsResult<
@@ -155,7 +174,8 @@ macro_rules! impl_valid_layout {
     ($ref_type:ident, $type:ident, $type_obj:ident) => {
         unsafe impl $crate::data::layout::valid_layout::ValidLayout for $ref_type<'_> {
             fn valid_layout(ty: $crate::data::managed::value::Value) -> bool {
-                if let Ok(dt) = ty.cast::<$crate::data::managed::datatype::DataType>() {
+                if ty.is::<$crate::data::managed::datatype::DataType>() {
+                    let dt = unsafe { ty.cast_unchecked::<$crate::data::managed::datatype::DataType>() };
                     dt.is::<$type>()
                 } else {
                     false
@@ -180,8 +200,10 @@ macro_rules! impl_valid_layout {
         }
 
         unsafe impl $crate::data::layout::valid_layout::ValidField for Option<$ref_type<'_>> {
+            #[inline]
             fn valid_field(ty: $crate::data::managed::value::Value) -> bool {
-                if let Ok(dt) = ty.cast::<$crate::data::managed::datatype::DataType>() {
+                if ty.is::<$crate::data::managed::datatype::DataType>() {
+                    let dt = unsafe { ty.cast_unchecked::<$crate::data::managed::datatype::DataType>() };
                     dt.is::<$type>()
                 } else {
                     false
@@ -190,8 +212,10 @@ macro_rules! impl_valid_layout {
         }
 
         unsafe impl $crate::data::layout::valid_layout::ValidLayout for $type<'_> {
+            #[inline]
             fn valid_layout(ty: $crate::data::managed::value::Value) -> bool {
-                if let Ok(dt) = ty.cast::<$crate::data::managed::datatype::DataType>() {
+                if ty.is::<$crate::data::managed::datatype::DataType>() {
+                    let dt = unsafe { ty.cast_unchecked::<$crate::data::managed::datatype::DataType>() };
                     dt.is::<$type>()
                 } else {
                     false
@@ -216,8 +240,10 @@ macro_rules! impl_valid_layout {
         }
 
         unsafe impl $crate::data::layout::valid_layout::ValidField for Option<$type<'_>> {
+            #[inline]
             fn valid_field(ty: $crate::data::managed::value::Value) -> bool {
-                if let Ok(dt) = ty.cast::<$crate::data::managed::datatype::DataType>() {
+                if ty.is::<$crate::data::managed::datatype::DataType>() {
+                    let dt = unsafe { ty.cast_unchecked::<$crate::data::managed::datatype::DataType>() };
                     dt.is::<$type>()
                 } else {
                     false
@@ -266,6 +292,7 @@ use std::{
     ptr::NonNull,
 };
 
+use self::module::JlrsCore;
 use crate::{
     call::Call,
     data::{
@@ -301,17 +328,20 @@ pub trait Managed<'scope, 'data>: private::ManagedPriv<'scope, 'data> {
     type TypeConstructor<'target, 'da>: Managed<'target, 'da>;
 
     /// Convert the data to a `Ref`.
+    #[inline]
     fn as_ref(self) -> Ref<'scope, 'data, Self> {
         Ref::wrap(self.unwrap_non_null(Private))
     }
 
     /// Convert the data to a `Value`.
+    #[inline]
     fn as_value(self) -> Value<'scope, 'data> {
         // Safety: Managed types can always be converted to a Value
         unsafe { Value::wrap_non_null(self.unwrap_non_null(Private).cast(), Private) }
     }
 
     /// Use the target to reroot this data.
+    #[inline]
     fn root<'target, T>(self, target: T) -> T::Data<'data, Self::TypeConstructor<'target, 'data>>
     where
         T: Target<'target>,
@@ -320,6 +350,7 @@ pub trait Managed<'scope, 'data>: private::ManagedPriv<'scope, 'data> {
     }
 
     /// Returns a new `Unrooted`.
+    #[inline]
     fn unrooted_target(self) -> Unrooted<'scope> {
         unsafe { Unrooted::new() }
     }
@@ -332,11 +363,7 @@ pub trait Managed<'scope, 'data>: private::ManagedPriv<'scope, 'data> {
         let global = self.unrooted_target();
 
         let s = unsafe {
-            Module::main(&global)
-                .submodule(&global, "JlrsCore")?
-                .as_managed()
-                .function(&global, "valuestring")?
-                .as_managed()
+            JlrsCore::value_string(&global)
                 .call1(&global, self.as_value())
                 .map_err(|e| e.as_value().error_string_or(CANNOT_DISPLAY_VALUE))
                 .map_err(|e| JlrsError::exception(format!("JlrsCore.valuestring failed: {}", e)))?
@@ -361,12 +388,7 @@ pub trait Managed<'scope, 'data>: private::ManagedPriv<'scope, 'data> {
         let global = self.unrooted_target();
 
         let s = unsafe {
-            // TODO: caching?
-            Module::main(&global)
-                .submodule(&global, "JlrsCore")?
-                .as_managed()
-                .function(&global, "errorstring")?
-                .as_managed()
+            JlrsCore::error_string(&global)
                 .call1(&global, self.as_value())
                 .map_err(|e| e.as_value().error_string_or(CANNOT_DISPLAY_VALUE))
                 .map_err(|e| JlrsError::exception(format!("JlrsCore.errorstring failed: {}", e)))?
@@ -416,6 +438,7 @@ pub trait Managed<'scope, 'data>: private::ManagedPriv<'scope, 'data> {
     /// `'static`. This method should only be used to return Julia data from a `ccall`ed function,
     /// and in combination with the `ForeignType` trait to store references to Julia data in types
     /// that that implement that trait.
+    #[inline]
     fn leak(self) -> Ref<'static, 'data, Self::TypeConstructor<'static, 'data>> {
         self.as_ref().leak()
     }
@@ -453,6 +476,7 @@ impl<'scope, 'data, T> Clone for Ref<'scope, 'data, T>
 where
     T: Managed<'scope, 'data>,
 {
+    #[inline]
     fn clone(&self) -> Self {
         Ref(self.0, PhantomData, PhantomData)
     }
@@ -470,6 +494,7 @@ impl<'scope, 'data, W: Managed<'scope, 'data>> Ref<'scope, 'data, W> {
     /// Use `target` to root this data.
     ///
     /// Safety: The data pointed to by `self` must not have been freed by the GC yet.
+    #[inline]
     pub unsafe fn root<'target, T>(
         self,
         target: T,
@@ -480,6 +505,7 @@ impl<'scope, 'data, W: Managed<'scope, 'data>> Ref<'scope, 'data, W> {
         target.data_from_ptr(self.ptr().cast(), Private)
     }
 
+    #[inline]
     pub(crate) fn wrap(ptr: NonNull<W::Wraps>) -> Self {
         Ref(ptr, PhantomData, PhantomData)
     }
@@ -489,6 +515,7 @@ impl<'scope, 'data, W: Managed<'scope, 'data>> Ref<'scope, 'data, W> {
     /// Safety: a reference is only guaranteed to be valid as long as it's reachable from some
     /// GC root. If the reference is unreachable, the GC can free it. The GC can run whenever a
     /// safepoint is reached, this is typically the case when new Julia data is allocated.
+    #[inline]
     pub unsafe fn as_managed(self) -> W {
         W::wrap_non_null(self.ptr(), Private)
     }
@@ -498,6 +525,7 @@ impl<'scope, 'data, W: Managed<'scope, 'data>> Ref<'scope, 'data, W> {
     /// Safety: a reference is only guaranteed to be valid as long as it's reachable from some
     /// GC root. If the reference is unreachable, the GC can free it. The GC can run whenever a
     /// safepoint is reached, this is typically the case when new Julia data is allocated.
+    #[inline]
     pub unsafe fn as_value(self) -> Value<'scope, 'data> {
         Value::wrap_non_null(self.data_ptr().cast(), Private)
     }
@@ -506,6 +534,7 @@ impl<'scope, 'data, W: Managed<'scope, 'data>> Ref<'scope, 'data, W> {
     ///
     /// Safety: this method should only be used when no data borrowed from Rust is referenced by
     /// this Julia data.
+    #[inline]
     pub unsafe fn assume_owned(self) -> Ref<'scope, 'static, W::TypeConstructor<'scope, 'static>> {
         Ref::wrap(self.ptr().cast())
     }
@@ -515,32 +544,38 @@ impl<'scope, 'data, W: Managed<'scope, 'data>> Ref<'scope, 'data, W> {
     ///
     /// Safety: this method should only be called to return Julia data from a `ccall`ed function
     /// or when storing Julia data in a foreign type.
+    #[inline]
     pub fn leak(self) -> Ref<'static, 'data, W::TypeConstructor<'static, 'data>> {
         Ref::wrap(self.ptr().cast())
     }
 
     /// Returns a pointer to the data,
+    #[inline]
     pub fn data_ptr(self) -> NonNull<c_void> {
         self.ptr().cast()
     }
 
+    #[inline]
     pub(crate) fn ptr(self) -> NonNull<W::Wraps> {
         self.0
     }
 }
 
+#[inline]
 pub fn leak<'scope, 'data, M: Managed<'scope, 'data>>(
     data: M,
 ) -> Ref<'static, 'data, M::TypeConstructor<'static, 'data>> {
     data.as_ref().leak()
 }
 
+#[inline]
 pub unsafe fn assume_rooted<'scope, M: Managed<'scope, 'static>>(
     data: Ref<'scope, 'static, M>,
 ) -> M {
     data.as_managed()
 }
 
+#[inline]
 pub unsafe fn erase_scope_lifetime<'scope, 'data, M: Managed<'scope, 'data>>(
     data: M,
 ) -> M::TypeConstructor<'static, 'data> {
@@ -564,8 +599,8 @@ pub(crate) mod private {
         // rooted, it must never be used after becoming unreachable.
         unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self;
 
-        #[inline]
         // Safety: `Self` must be the correct type for `value`.
+        #[inline]
         unsafe fn from_value_unchecked(value: Value<'scope, 'data>, _: Private) -> Self {
             Self::wrap_non_null(value.unwrap_non_null(Private).cast(), Private)
         }

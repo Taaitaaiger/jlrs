@@ -1,25 +1,33 @@
 #include "jlrs_cc.h"
 
+#ifdef JLRS_FAST_TLS
+#ifdef JULIA_1_6
+JULIA_DEFINE_FAST_TLS()
+#else
+JULIA_DEFINE_FAST_TLS
+#endif
+#endif
+
 #ifdef __cplusplus
 extern "C"
 {
 #endif
-    jlrs_catch_t jlrs_catch_wrapper(void *callback, jlrs_callback_caller_t caller, void *result, void *frame_slice)
+    jlrs_catch_t jlrs_catch_wrapper(void *callback, jlrs_callback_caller_t caller, void *result)
     {
         jlrs_catch_t res = {.tag = JLRS_CATCH_OK, .error = NULL};
 
-#if !defined(JLRS_WINDOWS_LTS)
+#ifndef JLRS_WINDOWS_LTS
         JL_TRY
         {
-#endif
-            res = caller(callback, frame_slice, result);
-#if !defined(JLRS_WINDOWS_LTS)
+            res = caller(callback, result);
         }
         JL_CATCH
         {
             res.tag = JLRS_CATCH_EXCEPTION;
             res.error = jl_current_exception();
         }
+#else
+    res = caller(callback, result);
 #endif
         return res;
     }
@@ -73,7 +81,63 @@ extern "C"
         }
     }
 
-#if !defined(JULIA_1_6)
+    int8_t jlrs_gc_safe_enter(jl_ptls_t ptls)
+    {
+        return jl_gc_safe_enter(ptls);
+    }
+
+    int8_t jlrs_gc_unsafe_enter(jl_ptls_t ptls)
+    {
+        return jl_gc_unsafe_enter(ptls);
+    }
+
+    void jlrs_gc_safe_leave(jl_ptls_t ptls, int8_t state)
+    {
+        jl_gc_safe_leave(ptls, state);
+    }
+
+    void jlrs_gc_unsafe_leave(jl_ptls_t ptls, int8_t state)
+    {
+        jl_gc_unsafe_leave(ptls, state);
+    }
+
+    jl_datatype_t *jlrs_dimtuple_type(size_t rank)
+    {
+        jl_value_t **params = (jl_value_t **)alloca(rank);
+        if (sizeof(void *) == 4)
+        {
+
+            for (size_t i = 0; i < rank; ++i)
+            {
+                params[i] = (jl_value_t *)jl_int32_type;
+            }
+        }
+        else
+        {
+            for (size_t i = 0; i < rank; ++i)
+            {
+                params[i] = (jl_value_t *)jl_int64_type;
+            }
+        }
+
+        return (jl_datatype_t *)jl_apply_tuple_type_v(params, rank);
+    }
+
+    jl_value_t *jlrs_tuple_of(jl_value_t **values, size_t n)
+    {
+        jl_value_t **types = (jl_value_t **)alloca(n);
+        for (size_t i = 0; i < n; ++i)
+        {
+            types[i] = jl_typeof(values[i]);
+        }
+
+        // Should be a leaf type
+        jl_datatype_t *tupty = (jl_datatype_t *)jl_apply_tuple_type_v(types, n);
+
+        return jl_new_structv(tupty, values, n);
+    }
+
+#ifndef JULIA_1_6
     void jlrs_lock(jl_value_t *v)
     {
         jl_task_t *self = jl_current_task;
@@ -110,15 +174,16 @@ extern "C"
     }
 #endif
 
-#if defined(JULIA_1_6)
-    void **jlrs_pgcstack(jl_tls_states_t *ptls)
+#ifdef JULIA_1_6
+    jl_gcframe_t **jlrs_pgcstack(jl_tls_states_t *ptls)
     {
-        return (void **)&(ptls->pgcstack);
+        return &(ptls->pgcstack);
     }
 #endif
 
 #if !defined(JULIA_1_6) && !defined(JULIA_1_7) && !defined(JULIA_1_8) && !defined(JULIA_1_9)
-    jl_datatype_t *jlrs_typeof(jl_value_t *v) {
+    jl_datatype_t *jlrs_typeof(jl_value_t *v)
+    {
         return (jl_datatype_t *)jl_typeof(v);
     }
 #endif

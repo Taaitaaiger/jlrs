@@ -1,63 +1,201 @@
 //! Julia memory management.
 //!
-//! All Julia data (objects) is owned by the garbage collector (GC). The GC is a mark-and-sweep
-//! GC, during the mark phase all objects that can be reached from a root are marked as reachable,
-//! during the sweep phase all unreachable objects are freed.
+//! As you might already know Julia has a garbage collector (GC). Whenever new data, like an
+//! `Array` or a `String` is created, the GC is responsible for freeing that data when it has
+//! become unreachable. While Julia is aware of references to data existing in Julia code, it is
+//! unaware of references existing outside of Julia code.
 //!
-//! Roots are pointers to objects that are present on the GC stack. The GC stack is a linked list
-//! of GC frames. A C function that needs to protect one or more objects allocates an
-//! appropriately-sized GC frame and pushes it to the GC stack, typically at the beginning of the
-//! function call, stores the pointers to objects that are returned by the Julia C API in that
-//! frame, and pops the frame from the GC stack before returning from the function.
+//! To make Julia aware of such foreign references we'll need to tell it they exist and that the
+//! GC needs to leave that data alone. This is called rooting. While a reference is rooted, the GC
+//! won't free its data. Any Julia data referenced by rooted data is also safe from being freed.
 //!
-//! There are several problems with this approach from a Rust perspective. The API is pretty
-//! unsafe because it depends on manually pushing and popping GC frame to and from the GC stack,
-//! and manually inserting pointers into the frame. More importantly, the GC frame is a
-//! dynamically-sized type that is allocated on the stack with `alloca`. This is simply not
-//! supported by Rust, at least not without jumping through a number awkward and limiting hoops.
+//! Before data can be rooted a scope has to be created. Functions that call into Julia can
+//! only be called from a scope. When the sync runtime is used, a new scope can be created by
+//! calling [`Julia::scope`]. This function takes a closure which contains the code called inside
+//! that scope.
 //!
-//! In order to work around these issues, jlrs doesn't store the roots in the frame, but uses a
-//! custom object that contains a `Vec` of roots (stack). This stack is not part of the public
-//! API, you can only interact with it indirectly by creating a scope first. The sync runtime lets
-//! you create one directly with [`Julia::scope`], this method takes a closure which takes a
-//! single argument, a [`GcFrame`]. This `GcFrame` can access the internal stack and push new
-//! roots to it. The roots that are associated with a `GcFrame` are popped from the stack after
-//! the closure returns.
+//! This closure takes a single argument, a [`GcFrame`], which lets you root data. Methods
+//! in jlrs that return Julia data can be called with a mutable reference to a `GcFrame`. The
+//! returned data is guaranteed to be rooted until you leave the scope that provided it:
 //!
-//! Rather than returning raw pointers to objects, jlrs wraps these pointers in types that
-//! implement the [`Managed`] trait. Methods that return such types typically take an argument
-//! that implements the [`Target`] trait, which ensures the object is rooted. The returned managed
-//! type inherits the lifetime of the target to ensure this data can't be used after the scope
-//! whose  `GcFrame` has rooted it ends. Mutable references to `GcFrame` implement `Target`, when
-//! one is used as a target the returned data remains rooted until the scope ends.
+//! ```
+//! # use jlrs::prelude::*;
+//! # fn main() {
+//! # let mut julia = unsafe { RuntimeBuilder::new().start().unwrap() };
+//! # let mut frame = StackFrame::new();
+//! # let mut julia = julia.instance(&mut frame);
+//! julia
+//!     .scope(|mut frame| {
+//!         // This data is guaranteed to live at least until we leave this scope
+//!         let i = Value::new(&mut frame, 1u64);
+//!         Ok(())
+//!     })
+//!     .unwrap();
+//! # }
+//! ```
 //!
-//! Often you'll need to create some Julia data that doesn't need to live as long as the current
-//! scope. A nested scope, with its own `GcFrame`, can be created by calling [`GcFrame::scope`].
-//! In order to return managed data from a child scope it has to be rooted in the `GcFrame` of a
-//! parent scope, but this `GcFrame` can't be accessed from the child scope. Instead, you can
-//! create an [`Output`] by reserving a slot on the stack by calling  [`GcFrame::output`]. When an
-//! `Output` is used as a target, the reserved slot is used to root the data and the returned
-//! managed type inherits the lifetime of the parent scope, allowing it to be returned from the
-//! child scope.
+//! If you tried to return `i` from the scope in the example above, the code would fail to
+//! compile. A `GcFrame` has a lifetime that outlives the closure but doesn't outlive the scope.
+//! This lifetime is propageted to types like `Value` to prevent the data from being used after it
+//! has become unrooted.
 //!
-//! Several other target types exist, they can all be created through methods defined for
-//! `GcFrame`. You can find more information about them in the [`target`] module.
+//! A `GcFrame` can also be used to create a temporary subscope:
 //!
-//! Not all targets root the returned data. If you never need to use the data (e.g. because you
-//! call a function that returns `nothing`), or you access a global value in a module that is
-//! never mutated while you're using it, the result doesn't need to be rooted. A reference to a
-//! rooting target is guaranteed to be a valid non-rooting target. When a non-rooting target is
-//! used, the function doesn't return an instance of a managed type, but a [`Ref`] to a managed
-//! type to indicate the data has not been rooted.
+//! ```
+//! # use jlrs::prelude::*;
+//! # fn main() {
+//! # let mut julia = unsafe { RuntimeBuilder::new().start().unwrap() };
+//! # let mut frame = StackFrame::new();
+//! # let mut julia = julia.instance(&mut frame);
+//! julia
+//!     .scope(|mut frame| {
+//!         let i = Value::new(&mut frame, 1u64);
+//!
+//!         frame
+//!             .scope(|mut frame| {
+//!                 let j = Value::new(&mut frame, 2u64);
+//!                 // j can't be returned from this scope, but i can.
+//!                 Ok(i)
+//!             })
+//!             .unwrap();
+//!
+//!         Ok(())
+//!     })
+//!     .unwrap();
+//! # }
+//! ```
+//!
+//! As you can see in that example, `i` can be returned from the subscope because `i` is
+//! guaranteed to outlive it, while `j` can't because it doesn't. In many cases, though, we want
+//! to create a subscope and return data created in that scope. In that case, we'll need to
+//! allocate an [`Output`] in the targeted scope:
+//!
+//! ```
+//! # use jlrs::prelude::*;
+//! # fn main() {
+//! # let mut julia = unsafe { RuntimeBuilder::new().start().unwrap() };
+//! # let mut frame = StackFrame::new();
+//! # let mut julia = julia.instance(&mut frame);
+//! julia
+//!     .scope(|mut frame| {
+//!         let output = frame.output();
+//!
+//!         frame
+//!             .scope(|_| {
+//!                 let j = Value::new(output, 2u64);
+//!                 Ok(j)
+//!             })
+//!             .unwrap();
+//!
+//!         Ok(())
+//!     })
+//!     .unwrap();
+//! # }
+//! ```
+//!
+//! This works because an `Output` roots data in the `GcFrame` that was used to create it, and
+//! the lifetime of that frame is propageted to the result. We can also see that `Value::new`
+//! can't just take a mutable reference to a `GcFrame`, but also other types. These types are
+//! called targets.
+//!
+//! All targets implement the [`Target`] trait. Each target has a lifetime that enforces the
+//! result can't outlive the scope that roots it. In addition to rooting targets like
+//! `&mut GcFrame` and `Output` that we've already seen, there also exist non-rooting target.
+//! Non-rooting targets exist because it isn't always necessary to root data: we might be able to
+//! guarantee it's already rooted or reachable and avoid creating another root, or never use the
+//! data at all.
+//!
+//! Rooting targets can be used as a non-rooting target by using a reference to the target.
+//! Rooting and non-rooting targets return different types when they're used: `Value::new`
+//! returns a [`Value`] when a rooting target is used, but a [`ValueRef`] when a non-rooting one
+//! is used instead. Every type that represents managed Julia data has a rooted and an unrooted
+//! variant, which are named similarly to `Value` and `ValueRef`. There are two type aliases for
+//! each managed type that can be used as the return type of functions that take a target
+//! generically. For `Value` they are [`ValueData`] and [`ValueResult`]. `ValueData` is a `Value`
+//! if a rooting target is used and a `ValueRef` otherwise. `ValueResult` is a `Result` that
+//! contains `ValueData` in both its `Ok` and `Err` variants, if an `Err` is returned the
+//! operation failed and an exception was caught.
+//!
+//! Functions that take a `Target` and return Julia data have signatures like this:
+//!
+//! ```
+//! # use jlrs::prelude::*;
+//! fn takes_target<'target, Tgt>(target: Tgt) -> ValueData<'target, 'static, Tgt>
+//! where
+//!     Tgt: Target<'target>,
+//! {
+//! # todo!()
+//! }
+//! ```
+//!
+//! Because that funtion takes a `Target` rather than a `GcFrame` it's not possible to create a
+//! subscope. This prevents us creating and rooting temporary data. There are two ways to deal
+//! with this problem: a target can be extended, or a local scope can be created. A target can
+//! also be extended by calling [`Target::into_extended_target`]. This method bundles the target
+//! with the current frame into an [`ExtendedTarget`] which can be split later:
+//!
+//! ```
+//! # use jlrs::{prelude::*, memory::target::ExtendedTarget};
+//! fn takes_extended_target<'target, Tgt>(
+//!     target: ExtendedTarget<'target, '_, '_, Tgt>,
+//! ) -> JlrsResult<ValueData<'target, 'static, Tgt>>
+//! where
+//!     Tgt: Target<'target>,
+//! {
+//!     let (target, frame) = target.split();
+//!     frame.scope(|mut frame| {
+//! # todo!()
+//!     })
+//! }
+//! ```
+//!
+//! Local scopes are similar to the scopes we've seen so far. The main difference is that the
+//! closure takes a [`LocalGcFrame`], which is essentially a statically-sized, stack-allocated
+//! `GcFrame`. Unlike a `GcFrame`, which can grow to the appropriate size, a `LocalGcFrame` can
+//! only store as many roots as its size allows. There are local variants of most targets. It's
+//! your responsibility that the `LocalGcFrame` is created with the correct size, trying to create
+//! a new root when the frame is full will cause a `panic`, unused slots occupy stack space and
+//! slow down the GC.
+//!
+//! ```
+//! # use jlrs::prelude::*;
+//! fn creates_local_scope<'target, Tgt>(
+//!     target: Tgt,
+//! ) -> JlrsResult<ValueData<'target, 'static, Tgt>>
+//! where
+//!     Tgt: Target<'target>,
+//! {
+//!     target.with_local_scope::<_, _, 2>(|target, mut frame| {
+//!         let i = Value::new(&mut frame, 1usize);
+//!         let j = Value::new(&mut frame, 2usize);
+//!
+//!         // this would panic, the frame has capacity for two roots.
+//!         // let k = Value::new(&mut frame, 3usize);
+//!
+//!         let k = Value::new(target, 3usize);
+//!         Ok(k)
+//!     })
+//! }
+//! ```
+//!
+//! In general, it's highly advised that you only write function that take target. Each use of
+//! `&mut frame` in a closure will take one slot, and all you need to do is count how often
+//! `&mut frame` is used to find the required size of the `LocalGcFrame`.
 //!
 //! [`Julia::scope`]: crate::runtime::sync_rt::Julia::scope
 //! [`GcFrame`]: crate::memory::target::frame::GcFrame
+//! [`LocalGcFrame`]: crate::memory::target::frame::LocalGcFrame
 //! [`Output`]: crate::memory::target::output::Output
 //! [`GcFrame::scope`]: crate::memory::target::frame::GcFrame::scope
 //! [`GcFrame::output`]: crate::memory::target::frame::GcFrame::output
 //! [`Target`]: crate::memory::target::Target
-//! [`Ref`]: crate::data::managed::Ref
+//! [`Target::into_extended_target`]: crate::memory::target::Target::into_extended_target
+//! [`Value`]: crate::data::managed::value::Value
+//! [`ValueRef`]: crate::data::managed::value::ValueRef
+//! [`ValueData`]: crate::data::managed::value::ValueData
+//! [`ValueResult`]: crate::data::managed::value::ValueResult
 //! [`Managed`]: crate::data::managed::Managed
+//! [`ExtendedTarget`]: crate::memory::target::ExtendedTarget
 
 pub(crate) mod context;
 pub mod gc;
@@ -70,23 +208,24 @@ use jl_sys::jl_ptls_t;
 use jl_sys::jl_tls_states_t;
 use jlrs_macros::julia_version;
 
+#[doc(hidden)]
 #[julia_version(since = "1.8")]
 pub type PTls = jl_ptls_t;
 
+#[doc(hidden)]
 #[julia_version(until = "1.7")]
 pub type PTls = *mut jl_tls_states_t;
 
 #[julia_version(until = "1.6")]
+#[inline]
 pub(crate) unsafe fn get_tls() -> PTls {
-    use jl_sys::jl_get_ptls_states;
-    jl_get_ptls_states()
+    jl_sys::jl_get_ptls_states()
 }
 
 #[julia_version(since = "1.7")]
+#[inline]
 pub(crate) unsafe fn get_tls() -> PTls {
     use std::ptr::NonNull;
-
-    use jl_sys::jl_get_current_task;
-    let task = jl_get_current_task();
-    NonNull::new(task).unwrap().as_ref().ptls
+    let task = jl_sys::jl_get_current_task();
+    NonNull::new_unchecked(task).as_ref().ptls
 }

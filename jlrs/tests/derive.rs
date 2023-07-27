@@ -43,10 +43,7 @@ mod tests {
                     type ElidedParam<T, const U: bool> =
                         HasElidedParamTypeConstructor<T, ConstantBool<U>>;
                     let v = unsafe {
-                        Value::try_new_with::<ElidedParam<f64, true>, _, _>(
-                            frame.as_extended_target(),
-                            a,
-                        )?
+                        Value::try_new_with::<ElidedParam<f64, true>, _, _>(&mut frame, a)?
                     };
 
                     assert!(v.is::<HasElidedParam<f64>>());
@@ -71,10 +68,7 @@ mod tests {
                     type ElidedParam<T, const U: bool> =
                         HasElidedParamTypeConstructor<T, ConstantBool<U>>;
                     let v = unsafe {
-                        Value::try_new_with::<ElidedParam<Module, true>, _, _>(
-                            frame.as_extended_target(),
-                            a,
-                        )?
+                        Value::try_new_with::<ElidedParam<Module, true>, _, _>(&mut frame, a)?
                     };
 
                     assert!(v.is::<HasElidedParam<Option<ModuleRef>>>());
@@ -137,11 +131,9 @@ mod tests {
                         .into_jlrs_result()?;
 
                     let unboxed = jl_val.unbox::<DoubleVariant>()?;
-                    assert!(Value::try_new_with::<DoubleVariant, _, _>(
-                        frame.as_extended_target(),
-                        unboxed
-                    )
-                    .is_ok());
+                    assert!(
+                        Value::try_new_with::<DoubleVariant, _, _>(&mut frame, unboxed).is_ok()
+                    );
 
                     Ok(())
                 })
@@ -168,11 +160,9 @@ mod tests {
                         .into_jlrs_result()?;
 
                     let unboxed = jl_val.unbox::<DoubleVariant>()?;
-                    assert!(Value::try_new_with::<DoubleUVariant, _, _>(
-                        frame.as_extended_target(),
-                        unboxed
-                    )
-                    .is_err());
+                    assert!(
+                        Value::try_new_with::<DoubleUVariant, _, _>(&mut frame, unboxed).is_err()
+                    );
 
                     Ok(())
                 })
@@ -188,8 +178,7 @@ mod tests {
             julia
                 .instance(&mut frame)
                 .scope(|mut frame| {
-                    let ty =
-                        WithGenericTU::<isize, usize>::construct_type(frame.as_extended_target());
+                    let ty = WithGenericTU::<isize, usize>::construct_type(&mut frame);
                     assert_eq!(
                         ty.cast::<DataType>().unwrap().size().unwrap() as usize,
                         std::mem::size_of::<isize>() + std::mem::size_of::<usize>()
@@ -967,8 +956,7 @@ mod tests {
             julia
                 .instance(&mut frame)
                 .scope(|mut frame| unsafe {
-                    let arr = Array::new::<i32, _, _>(frame.as_extended_target(), (2, 2))
-                        .into_jlrs_result()?;
+                    let arr = Array::new::<i32, _, _>(&mut frame, (2, 2)).into_jlrs_result()?;
 
                     let wgt_constr = Module::main(&frame)
                         .global(&frame, "WithGenericT")?
@@ -1149,6 +1137,45 @@ mod tests {
         })
     }
 
+    fn isbits_into_julia() {
+        JULIA_DERIVE.with(|j| {
+            let mut julia = j.borrow_mut();
+            let mut frame = StackFrame::new();
+
+            julia
+                .instance(&mut frame)
+                .scope(|mut frame| {
+                    let wvt = WithValueType { a: 1 };
+                    type WVT = WithValueTypeTypeConstructor<ConstantBool<true>>;
+                    let v = Value::new_bits_from_layout::<WVT, _>(&mut frame, wvt.clone())?;
+                    let wvt_unboxed = v.unbox::<WithValueType>()?;
+                    assert_eq!(wvt, wvt_unboxed);
+
+                    Ok(())
+                })
+                .unwrap();
+        })
+    }
+
+    fn trivial_isbits_into_julia() {
+        JULIA_DERIVE.with(|j| {
+            let mut julia = j.borrow_mut();
+            let mut frame = StackFrame::new();
+
+            julia
+                .instance(&mut frame)
+                .scope(|mut frame| {
+                    let layout = WithGenericTU { a: 1i32, b: 2u32 };
+                    let v = Value::new_bits(&mut frame, layout.clone());
+                    let layout_unboxed = v.unbox::<WithGenericTU<i32, u32>>()?;
+                    assert_eq!(layout, layout_unboxed);
+
+                    Ok(())
+                })
+                .unwrap();
+        })
+    }
+
     #[test]
     fn derive_tests() {
         derive_bits_type_bool();
@@ -1189,6 +1216,8 @@ mod tests {
         derive_with_value_type();
         derive_zero_sized();
         derive_with_propagated_lifetimes();
-        derive_string()
+        derive_string();
+        isbits_into_julia();
+        trivial_isbits_into_julia();
     }
 }

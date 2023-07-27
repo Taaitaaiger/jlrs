@@ -1,33 +1,37 @@
-//! A frame roots data until its scope ends.
+//! Dynamically and statically-sized frames.
 //!
-//! Every scope has its own frame which can hold an arbitrary number of roots. When the scope
-//! ends these roots are removed from the set of roots, so all data rooted in a frame can safely
-//! be used until its scope ends. This hold true even if the frame is dropped before its scope
-//! ends.
+//! Every scope has its own frame which can hold some number of roots. When the scope ends these
+//! roots are removed from the set of roots, so all data rooted in a frame can safely be used
+//! until its scope ends. This hold true even if the frame is dropped before its scope ends.
 //!
-//! In addition to being usable as targets, frames can also be used to create [`Output`]s,
-//! [`ReusableSlot`]s, [`Unrooted`]s, and child scopes with their own frame.
+//! For more information see the documentation in the [`memory`] and [`target`] modules.
+//!
+//! [`memory`]: crate::memory
+//! [`target`]: crate::memory::target
 
-use std::{marker::PhantomData, ptr::NonNull};
+use std::{
+    cell::Cell,
+    ffi::c_void,
+    marker::PhantomData,
+    pin::Pin,
+    ptr::{null_mut, NonNull},
+};
 
 use cfg_if::cfg_if;
 
-use super::{output::Output, reusable_slot::ReusableSlot, unrooted::Unrooted};
+use super::{
+    output::{LocalOutput, Output},
+    reusable_slot::{LocalReusableSlot, ReusableSlot},
+    unrooted::Unrooted,
+    ExtendedTarget, Target,
+};
 use crate::{
-    data::managed::Managed,
-    error::JlrsResult,
-    memory::{
-        context::stack::Stack,
-        target::{ExtendedTarget, Target},
-    },
-    private::Private,
+    data::managed::Managed, error::JlrsResult, memory::context::stack::Stack, private::Private,
 };
 
-/// A frame associated with a scope.
-///
-/// Mutable references to a `GcFrame` can be used as a target, in this case the data will be
-/// rooted until the frame's scope ends.  Other targets can be created through a frame. For
-/// example, [`GcFrame::output`] creates a new `Output` that targets the current frame.
+const NULL_CELL: Cell<*mut c_void> = Cell::new(null_mut());
+
+/// A dynamically-sized frame that can hold an arbitrary number of roots.
 pub struct GcFrame<'scope> {
     stack: &'scope Stack,
     offset: usize,
@@ -48,9 +52,6 @@ impl<'scope> GcFrame<'scope> {
     }
 
     /// Borrow the current frame.
-    ///
-    /// When a frame is borrowed, no more roots can be pushed until a new scope has been created.
-    /// This is useful when a function needs to root Julia data but doesn't return Julia data.
     #[inline]
     pub fn borrow<'borrow>(&'borrow mut self) -> BorrowedFrame<'borrow, 'scope, Self> {
         BorrowedFrame(self, PhantomData)
@@ -121,9 +122,9 @@ impl<'scope> GcFrame<'scope> {
         }
     }
 
-    /// Returns a `Unrooted` that targets the current frame.
+    /// Returns an `Unrooted` that targets the current frame.
     #[inline]
-    pub fn unrooted(&self) -> Unrooted<'scope> {
+    pub const fn unrooted(&self) -> Unrooted<'scope> {
         unsafe { Unrooted::new() }
     }
 
@@ -161,7 +162,6 @@ impl<'scope> GcFrame<'scope> {
     /// # });
     /// # }
     /// ```
-
     #[inline]
     pub fn scope<T, F>(&mut self, func: F) -> JlrsResult<T>
     where
@@ -174,6 +174,7 @@ impl<'scope> GcFrame<'scope> {
     }
 
     // Safety: ptr must be a valid pointer to T
+    #[inline]
     pub(crate) unsafe fn root<'data, T: Managed<'scope, 'data>>(
         &self,
         ptr: NonNull<T::Wraps>,
@@ -182,10 +183,12 @@ impl<'scope> GcFrame<'scope> {
         T::wrap_non_null(ptr, Private)
     }
 
+    #[inline]
     pub(crate) fn stack(&self) -> &Stack {
         self.stack
     }
 
+    #[inline]
     pub(crate) fn nest<'nested>(&'nested mut self) -> (GcFrameOwner<'nested>, GcFrame<'nested>) {
         let owner = GcFrameOwner {
             stack: self.stack(),
@@ -201,6 +204,7 @@ impl<'scope> GcFrame<'scope> {
     }
 
     // Safety: only one base frame can exist per `Stack`
+    #[inline]
     pub(crate) unsafe fn base(stack: &'scope Stack) -> (GcFrameOwner<'scope>, GcFrame<'scope>) {
         debug_assert_eq!(stack.size(), 0);
         let owner = GcFrameOwner {
@@ -214,6 +218,69 @@ impl<'scope> GcFrame<'scope> {
             _marker: PhantomData,
         };
         (owner, frame)
+    }
+}
+
+/// A statically-sized frame that can hold `N` roots.
+pub struct LocalGcFrame<'scope, const N: usize> {
+    frame: &'scope PinnedLocalFrame<'scope, N>,
+    offset: usize,
+}
+
+impl<'scope, const N: usize> LocalGcFrame<'scope, N> {
+    /// Returns a mutable reference to this frame.
+    #[inline]
+    pub fn as_mut(&mut self) -> &mut Self {
+        self
+    }
+
+    /// Returns the number of values rooted in this frame.
+    #[inline]
+    pub fn n_roots(&self) -> usize {
+        self.offset
+    }
+
+    /// Returns the number of values that can be rooted in this frame.
+    #[inline]
+    pub const fn frame_size(&self) -> usize {
+        N
+    }
+
+    /// Returns a `LocalOutput` that targets the current frame.
+    #[inline]
+    pub fn local_output(&mut self) -> LocalOutput<'scope> {
+        let slot = &self.frame.frame.roots[self.offset];
+        self.offset += 1;
+        LocalOutput::new(slot)
+    }
+
+    /// Returns a `LocalReusableSlot` that targets the current frame.
+    #[inline]
+    pub fn local_reusable_slot(&mut self) -> LocalReusableSlot<'scope> {
+        let slot = &self.frame.frame.roots[self.offset];
+        self.offset += 1;
+        LocalReusableSlot::new(slot)
+    }
+
+    /// Returns a `Unrooted` that targets the current frame.
+    #[inline]
+    pub const fn unrooted(&self) -> Unrooted<'scope> {
+        unsafe { Unrooted::new() }
+    }
+
+    #[inline]
+    pub(crate) unsafe fn new(frame: &'scope PinnedLocalFrame<'scope, N>) -> Self {
+        LocalGcFrame { frame, offset: 0 }
+    }
+
+    #[inline]
+    pub(crate) unsafe fn root<'data, T: Managed<'scope, 'data>>(
+        &mut self,
+        ptr: NonNull<T::Wraps>,
+    ) -> T {
+        self.frame.frame.roots[self.offset].set(ptr.as_ptr().cast());
+        self.offset += 1;
+        T::wrap_non_null(ptr, Private)
     }
 }
 
@@ -277,6 +344,7 @@ cfg_if! {
             }
 
             // Safety: only one base frame can exist per `Stack`
+            #[inline]
             pub(crate) unsafe fn base(
                 stack: &'scope Stack,
             ) -> (GcFrameOwner<'scope>, AsyncGcFrame<'scope>) {
@@ -295,6 +363,7 @@ cfg_if! {
                 (owner, frame)
             }
 
+            #[inline]
             pub(crate) fn nest_async<'nested>(
                 &'nested mut self,
             ) -> (GcFrameOwner<'nested>, AsyncGcFrame<'nested>) {
@@ -311,51 +380,18 @@ cfg_if! {
         impl<'scope> Deref for AsyncGcFrame<'scope> {
             type Target = GcFrame<'scope>;
 
+            #[inline]
             fn deref(&self) -> &Self::Target {
                 &self.frame
             }
         }
 
         impl<'scope> DerefMut for AsyncGcFrame<'scope> {
+            #[inline]
             fn deref_mut(&mut self) -> &mut Self::Target {
                 &mut self.frame
             }
         }
-    }
-}
-
-pub(crate) struct GcFrameOwner<'scope> {
-    stack: &'scope Stack,
-    offset: usize,
-    _marker: PhantomData<&'scope mut &'scope ()>,
-}
-
-impl<'scope> GcFrameOwner<'scope> {
-    #[cfg(feature = "ccall")]
-    pub(crate) fn restore(&self) -> GcFrame<'scope> {
-        GcFrame {
-            stack: self.stack,
-            offset: self.stack.size(),
-            _marker: PhantomData,
-        }
-    }
-
-    #[cfg(feature = "async")]
-    pub(crate) unsafe fn reconstruct(&self, offset: usize) -> AsyncGcFrame<'scope> {
-        self.stack.pop_roots(offset);
-        AsyncGcFrame {
-            frame: GcFrame {
-                stack: self.stack,
-                offset,
-                _marker: PhantomData,
-            },
-        }
-    }
-}
-
-impl Drop for GcFrameOwner<'_> {
-    fn drop(&mut self) {
-        unsafe { self.stack.pop_roots(self.offset) }
     }
 }
 
@@ -414,5 +450,99 @@ impl<'borrow, 'current> BorrowedFrame<'borrow, 'current, AsyncGcFrame<'current>>
         F: FnOnce(AsyncGcFrame<'nested>) -> G,
     {
         self.0.relaxed_async_scope(func).await
+    }
+}
+
+pub(crate) struct GcFrameOwner<'scope> {
+    stack: &'scope Stack,
+    offset: usize,
+    _marker: PhantomData<&'scope mut &'scope ()>,
+}
+
+impl<'scope> GcFrameOwner<'scope> {
+    #[cfg(feature = "async")]
+    #[inline]
+    pub(crate) unsafe fn reconstruct(&self, offset: usize) -> AsyncGcFrame<'scope> {
+        self.stack.pop_roots(offset);
+        AsyncGcFrame {
+            frame: GcFrame {
+                stack: self.stack,
+                offset,
+                _marker: PhantomData,
+            },
+        }
+    }
+}
+
+impl Drop for GcFrameOwner<'_> {
+    fn drop(&mut self) {
+        unsafe { self.stack.pop_roots(self.offset) }
+    }
+}
+
+#[repr(C)]
+pub(crate) struct LocalFrame<const N: usize> {
+    n_roots: *mut c_void,
+    prev: *mut c_void,
+    roots: [Cell<*mut c_void>; N],
+}
+
+impl<const N: usize> LocalFrame<N> {
+    #[inline]
+    pub const fn new() -> Self {
+        LocalFrame {
+            n_roots: (N << 2) as *mut c_void,
+            prev: null_mut(),
+            roots: [NULL_CELL; N],
+        }
+    }
+
+    #[inline]
+    pub(crate) unsafe fn pin<'scope>(
+        &'scope mut self,
+        pgcstack: NonNull<*mut jl_sys::jl_gcframe_t>,
+    ) -> PinnedLocalFrame<'scope, N> {
+        PinnedLocalFrame::new(self, pgcstack)
+    }
+}
+
+pub(crate) struct PinnedLocalFrame<'scope, const N: usize> {
+    frame: Pin<&'scope mut LocalFrame<N>>,
+    _marker: PhantomData<&'scope mut &'scope ()>,
+}
+
+impl<'scope, const N: usize> PinnedLocalFrame<'scope, N> {
+    #[inline]
+    unsafe fn new(
+        frame: &'scope mut LocalFrame<N>,
+        mut pgcstack: NonNull<*mut jl_sys::jl_gcframe_t>,
+    ) -> Self {
+        let gcstack_ref = pgcstack.as_mut();
+        frame.prev = gcstack_ref.cast();
+
+        #[cfg(feature = "mem-debug")]
+        eprintln!(
+            "Push local frame: {:p} -> {:p}",
+            gcstack_ref, frame as *const _
+        );
+
+        *gcstack_ref = frame as *mut _ as *mut _;
+
+        PinnedLocalFrame {
+            frame: Pin::new(frame),
+            _marker: PhantomData,
+        }
+    }
+
+    #[inline]
+    pub(crate) unsafe fn pop(&self, mut pgcstack: NonNull<*mut jl_sys::jl_gcframe_t>) {
+        let gcstack_ref = pgcstack.as_mut();
+        #[cfg(feature = "mem-debug")]
+        eprintln!(
+            "Pop local frame: {:p} -> {:p}",
+            *gcstack_ref, self.frame.prev
+        );
+
+        *gcstack_ref = self.frame.prev.cast();
     }
 }

@@ -4,25 +4,30 @@
 //! can be used to call Julia functions, including inner and outer constructors; schedule a
 //! function call as a new Julia task; and provide keyword arguments respectively.
 
-use std::ptr::NonNull;
+use std::{mem::ManuallyDrop, ptr::NonNull};
 
 #[julia_version(until = "1.8")]
 use jl_sys::jl_get_kwsorter;
 #[julia_version(since = "1.9")]
 use jl_sys::jl_kwcall_func;
-use jl_sys::{jl_call, jl_exception_occurred};
+use jl_sys::{jl_apply_generic, jl_call, jl_exception_occurred, jl_get_world_counter};
 use jlrs_macros::julia_version;
-use smallvec::SmallVec;
 
-#[julia_version(until = "1.8")]
-use crate::data::managed::private::ManagedPriv as _;
-#[cfg(feature = "async")]
-use crate::error::JuliaResult;
 use crate::{
-    data::managed::value::{Value, ValueResult, MAX_SIZE},
+    args::Values,
+    data::managed::{
+        private::ManagedPriv,
+        value::{Value, ValueResult},
+    },
     error::{AccessError, JlrsResult},
     memory::{context::ledger::Ledger, target::Target},
+    prelude::ValueData,
     private::Private,
+};
+#[cfg(feature = "async")]
+use crate::{
+    data::managed::{erase_scope_lifetime, module::JlrsCore},
+    error::JuliaResult,
 };
 
 /// A function and its keyword arguments.
@@ -73,6 +78,15 @@ pub trait Call<'data>: private::CallPriv {
     unsafe fn call0<'target, T>(self, target: T) -> ValueResult<'target, 'data, T>
     where
         T: Target<'target>;
+
+    unsafe fn call_unchecked<'target, 'value, V, Tgt, const N: usize>(
+        self,
+        target: Tgt,
+        args: V,
+    ) -> ValueData<'target, 'data, Tgt>
+    where
+        V: Values<'value, 'data, N>,
+        Tgt: Target<'target>;
 
     /// Call a function with one argument.
     ///
@@ -129,13 +143,13 @@ pub trait Call<'data>: private::CallPriv {
     /// check if any of the arguments is currently borrowed from Rust.
     ///
     /// [`safety`]: crate::safety
-    unsafe fn call<'target, 'value, V, T>(
+    unsafe fn call<'target, 'value, V, T, const N: usize>(
         self,
         target: T,
         args: V,
     ) -> ValueResult<'target, 'data, T>
     where
-        V: AsRef<[Value<'value, 'data>]>,
+        V: Values<'value, 'data, N>,
         T: Target<'target>;
 
     /// Call a function with an arbitrary number arguments.
@@ -201,7 +215,7 @@ pub trait ProvideKeywords<'value, 'data>: Call<'data> {
     ///
     ///     let a = Value::new(&mut frame, 1isize);
     ///     let b = Value::new(&mut frame, 2isize);
-    ///     let nt = named_tuple!(frame.as_extended_target(), "a" => a, "b" => b);
+    ///     let nt = named_tuple!(&mut frame, "a" => a, "b" => b);
     ///
     ///     // Call the previously defined function. This function simply sums its three
     ///     // keyword arguments and has no side effects, so it's safe to call.
@@ -226,28 +240,15 @@ pub trait ProvideKeywords<'value, 'data>: Call<'data> {
 }
 
 impl<'data> Call<'data> for WithKeywords<'_, 'data> {
+    #[inline]
     unsafe fn call0<'target, T>(self, target: T) -> ValueResult<'target, 'data, T>
     where
         T: Target<'target>,
     {
-        #[cfg(not(any(feature = "julia-1-10", feature = "julia-1-9")))]
-        let func = jl_get_kwsorter(self.func.datatype().unwrap(Private).cast());
-        #[cfg(any(feature = "julia-1-10", feature = "julia-1-9"))]
-        let func = jl_kwcall_func;
-        let args = &mut [self.keywords, self.func];
-
-        let res = jl_call(func, args.as_mut_ptr().cast(), 2);
-        let exc = jl_exception_occurred();
-
-        let res = if exc.is_null() {
-            Ok(NonNull::new_unchecked(res))
-        } else {
-            Err(NonNull::new_unchecked(exc))
-        };
-
-        target.result_from_ptr(res, Private)
+        self.call(target, [])
     }
 
+    #[inline]
     unsafe fn call1<'target, T>(
         self,
         target: T,
@@ -256,24 +257,10 @@ impl<'data> Call<'data> for WithKeywords<'_, 'data> {
     where
         T: Target<'target>,
     {
-        #[cfg(not(any(feature = "julia-1-10", feature = "julia-1-9")))]
-        let func = jl_get_kwsorter(self.func.datatype().unwrap(Private).cast());
-        #[cfg(any(feature = "julia-1-10", feature = "julia-1-9"))]
-        let func = jl_kwcall_func;
-        let args = &mut [self.keywords, self.func, arg0];
-
-        let res = jl_call(func, args.as_mut_ptr().cast(), 3);
-        let exc = jl_exception_occurred();
-
-        let res = if exc.is_null() {
-            Ok(NonNull::new_unchecked(res))
-        } else {
-            Err(NonNull::new_unchecked(exc))
-        };
-
-        target.result_from_ptr(res, Private)
+        self.call(target, [arg0])
     }
 
+    #[inline]
     unsafe fn call2<'target, T>(
         self,
         target: T,
@@ -283,24 +270,10 @@ impl<'data> Call<'data> for WithKeywords<'_, 'data> {
     where
         T: Target<'target>,
     {
-        #[cfg(not(any(feature = "julia-1-10", feature = "julia-1-9")))]
-        let func = jl_get_kwsorter(self.func.datatype().unwrap(Private).cast());
-        #[cfg(any(feature = "julia-1-10", feature = "julia-1-9"))]
-        let func = jl_kwcall_func;
-        let args = &mut [self.keywords, self.func, arg0, arg1];
-
-        let res = jl_call(func, args.as_mut_ptr().cast(), 4);
-        let exc = jl_exception_occurred();
-
-        let res = if exc.is_null() {
-            Ok(NonNull::new_unchecked(res))
-        } else {
-            Err(NonNull::new_unchecked(exc))
-        };
-
-        target.result_from_ptr(res, Private)
+        self.call(target, [arg0, arg1])
     }
 
+    #[inline]
     unsafe fn call3<'target, T>(
         self,
         target: T,
@@ -311,13 +284,34 @@ impl<'data> Call<'data> for WithKeywords<'_, 'data> {
     where
         T: Target<'target>,
     {
+        self.call(target, [arg0, arg1, arg2])
+    }
+
+    #[inline]
+    unsafe fn call<'target, 'value, V, T, const N: usize>(
+        self,
+        target: T,
+        args: V,
+    ) -> ValueResult<'target, 'data, T>
+    where
+        V: Values<'value, 'data, N>,
+        T: Target<'target>,
+    {
         #[cfg(not(any(feature = "julia-1-10", feature = "julia-1-9")))]
         let func = jl_get_kwsorter(self.func.datatype().unwrap(Private).cast());
         #[cfg(any(feature = "julia-1-10", feature = "julia-1-9"))]
         let func = jl_kwcall_func;
-        let args = &mut [self.keywords, self.func, arg0, arg1, arg2];
 
-        let res = jl_call(func, args.as_mut_ptr().cast(), 5);
+        let values = args.into_extended_pointers_with_start(
+            [
+                self.keywords().unwrap(Private),
+                self.function().unwrap(Private),
+            ],
+            Private,
+        );
+        let values = values.as_ref();
+
+        let res = jl_call(func, values.as_ptr() as *mut _, values.len() as _);
         let exc = jl_exception_occurred();
 
         let res = if exc.is_null() {
@@ -329,36 +323,51 @@ impl<'data> Call<'data> for WithKeywords<'_, 'data> {
         target.result_from_ptr(res, Private)
     }
 
-    unsafe fn call<'target, 'value, V, T>(
+    #[inline]
+    unsafe fn call_unchecked<'target, 'value, V, T, const N: usize>(
         self,
         target: T,
         args: V,
-    ) -> ValueResult<'target, 'data, T>
+    ) -> ValueData<'target, 'data, T>
     where
-        V: AsRef<[Value<'value, 'data>]>,
+        V: Values<'value, 'data, N>,
         T: Target<'target>,
     {
         #[cfg(not(any(feature = "julia-1-10", feature = "julia-1-9")))]
         let func = jl_get_kwsorter(self.func.datatype().unwrap(Private).cast());
         #[cfg(any(feature = "julia-1-10", feature = "julia-1-9"))]
         let func = jl_kwcall_func;
-        let args = args.as_ref();
-        let mut vals: SmallVec<[Value; MAX_SIZE]> = SmallVec::with_capacity(2 + args.len());
-        vals.push(self.keywords);
-        vals.push(self.func);
-        vals.extend_from_slice(args);
 
-        let n = vals.len();
-        let res = jl_call(func, vals.as_mut_ptr().cast(), n as _);
-        let exc = jl_exception_occurred();
+        let values = args.into_extended_pointers_with_start(
+            [self.keywords.unwrap(Private), self.func.unwrap(Private)],
+            Private,
+        );
 
-        let res = if exc.is_null() {
-            Ok(NonNull::new_unchecked(res))
-        } else {
-            Err(NonNull::new_unchecked(exc))
+        // Manually drop to keep this a pof.
+        let mut values = ManuallyDrop::new(values);
+
+        #[cfg(feature = "julia-1-6")]
+        let mut task = NonNull::new_unchecked(jl_sys::jl_get_ptls_states());
+        #[cfg(not(feature = "julia-1-6"))]
+        let mut task = NonNull::new_unchecked(jl_sys::jl_get_current_task());
+
+        let last_age = {
+            let task = task.as_mut();
+            let last_age = task.world_age;
+            task.world_age = jl_get_world_counter();
+            last_age
         };
 
-        target.result_from_ptr(res, Private)
+        let args = values.as_ref();
+        let v = jl_apply_generic(func, args.as_ptr() as *mut _, args.len() as _);
+
+        {
+            let task = task.as_mut();
+            task.world_age = last_age;
+        }
+
+        ManuallyDrop::drop(&mut values);
+        target.data_from_ptr(NonNull::new_unchecked(v), Private)
     }
 }
 
@@ -370,7 +379,6 @@ cfg_if::cfg_if! {
             data::managed::{
                 Managed,
                 task::Task,
-                module::Module,
                 function::Function
             },
             async_util::{
@@ -395,13 +403,13 @@ cfg_if::cfg_if! {
             /// check if any of the arguments is currently borrowed from Rust.
             ///
             /// [`safety`]: crate::safety
-            async unsafe fn call_async<'target, 'value, V>(
+            async unsafe fn call_async<'target, 'value, V, const N: usize>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
             ) -> JuliaResult<'target, 'data>
             where
-                V: AsRef<[Value<'value, 'data>]>;
+                V: Values<'value, 'data, N>;
 
             /// Creates and schedules a new task with `Base.Threads.@spawn`, and returns a future
             /// that resolves when this task is finished.
@@ -415,15 +423,15 @@ cfg_if::cfg_if! {
             /// correctness. More information can be found in the [`safety`] module.
             ///
             /// [`safety`]: crate::safety
-            async unsafe fn call_async_tracked<'target, 'value, V>(
+            async unsafe fn call_async_tracked<'target, 'value, V, const N: usize>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
             ) -> JlrsResult<JuliaResult<'target, 'data>>
             where
-                V: AsRef<[Value<'value, 'data>]>
+                V: Values<'value, 'data, N>
             {
-                let args = args.as_ref();
+                let args = args.as_slice(Private);
                 let res = args
                     .iter()
                     .copied()
@@ -455,13 +463,13 @@ cfg_if::cfg_if! {
             ///
             /// [`safety`]: crate::safety
             /// [`PersistentTask::init`]: crate::async_util::task::PersistentTask::init
-            unsafe fn schedule_async<'target, 'value, V>(
+            unsafe fn schedule_async<'target, 'value, V, const N: usize>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
             ) -> JuliaResult<Task<'target>, 'target, 'data>
             where
-                V: AsRef<[Value<'value, 'data>]>;
+                V: Values<'value, 'data, N>;
 
             /// Does the same thing as [`CallAsync::call_async`], but the task is returned rather than an
             /// awaitable `Future`. This method should only be called in [`PersistentTask::init`],
@@ -477,16 +485,16 @@ cfg_if::cfg_if! {
             ///
             /// [`safety`]: crate::safety
             /// [`PersistentTask::init`]: crate::async_util::task::PersistentTask::init
-            unsafe fn schedule_async_tracked<'target, 'value, V, T>(
+            unsafe fn schedule_async_tracked<'target, 'value, V, T, const N: usize>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
             ) -> JlrsResult<JuliaResult<Task<'target>, 'target, 'data>>
             where
-                V: AsRef<[Value<'value, 'data>]>,
+                V: Values<'value, 'data, N>,
                 T: Target<'target>,
             {
-                let args = args.as_ref();
+                let args = args.as_slice(Private);
                 let res = args
                     .iter()
                     .copied()
@@ -518,13 +526,13 @@ cfg_if::cfg_if! {
             /// check if any of the arguments is currently borrowed from Rust.
             ///
             /// [`safety`]: crate::safety
-            async unsafe fn call_async_interactive<'target, 'value, V>(
+            async unsafe fn call_async_interactive<'target, 'value, V, const N: usize>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
             ) -> JuliaResult<'target, 'data>
             where
-                V: AsRef<[Value<'value, 'data>]>;
+                V: Values<'value, 'data, N>;
 
                 #[julia_version(since = "1.9")]
             /// Call a function on another thread with the given arguments. This method uses
@@ -541,15 +549,15 @@ cfg_if::cfg_if! {
             /// returns an `AccessError::BorrowError` if any of the arguments is.
             ///
             /// [`safety`]: crate::safety
-            async unsafe fn call_async_interactive_tracked<'target, 'value, V>(
+            async unsafe fn call_async_interactive_tracked<'target, 'value, V, const N: usize>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
             ) -> JlrsResult<JuliaResult<'target, 'data>>
             where
-                V: AsRef<[Value<'value, 'data>]>
+                V: Values<'value, 'data, N>
             {
-                let args = args.as_ref();
+                let args = args.as_slice(Private);
                 let res = args
                     .iter()
                     .copied()
@@ -581,13 +589,13 @@ cfg_if::cfg_if! {
             ///
             /// [`safety`]: crate::safety
             /// [`PersistentTask::init`]: crate::async_util::task::PersistentTask::init
-            unsafe fn schedule_async_interactive<'target, 'value, V>(
+            unsafe fn schedule_async_interactive<'target, 'value, V, const N: usize>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
             ) -> JuliaResult<Task<'target>, 'target, 'data>
             where
-                V: AsRef<[Value<'value, 'data>]>;
+                V: Values<'value, 'data, N>;
 
 
                 #[julia_version(since = "1.9")]
@@ -605,16 +613,16 @@ cfg_if::cfg_if! {
             ///
             /// [`safety`]: crate::safety
             /// [`PersistentTask::init`]: crate::async_util::task::PersistentTask::init
-            unsafe fn schedule_async_interactive_tracked<'target, 'value, V, T>(
+            unsafe fn schedule_async_interactive_tracked<'target, 'value, V, T, const N: usize>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
             ) -> JlrsResult<JuliaResult<Task<'target>, 'target, 'data>>
             where
-                V: AsRef<[Value<'value, 'data>]>,
+                V: Values<'value, 'data, N>,
                 T: Target<'target>,
             {
-                let args = args.as_ref();
+                let args = args.as_slice(Private);
                 let res = args
                     .iter()
                     .copied()
@@ -645,13 +653,13 @@ cfg_if::cfg_if! {
             /// check if any of the arguments is currently borrowed from Rust.
             ///
             /// [`safety`]: crate::safety
-            async unsafe fn call_async_local<'target, 'value, V>(
+            async unsafe fn call_async_local<'target, 'value, V, const N: usize>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
             ) -> JuliaResult<'target, 'data>
             where
-                V: AsRef<[Value<'value, 'data>]>;
+                V: Values<'value, 'data, N>;
 
             /// Call a function with the given arguments in an `@async` block. Like `call_async`, the
             /// function is not called on the main thread, but on a separate thread that handles all
@@ -667,15 +675,15 @@ cfg_if::cfg_if! {
             /// returns an `AccessError::BorrowError` if any of the arguments is.
             ///
             /// [`safety`]: crate::safety
-            async unsafe fn call_async_local_tracked<'target, 'value, V>(
+            async unsafe fn call_async_local_tracked<'target, 'value, V, const N: usize>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
             ) -> JlrsResult<JuliaResult<'target, 'data>>
             where
-                V: AsRef<[Value<'value, 'data>]>
+                V: Values<'value, 'data, N>
             {
-                let args = args.as_ref();
+                let args = args.as_slice(Private);
                 let res = args
                     .iter()
                     .copied()
@@ -706,13 +714,13 @@ cfg_if::cfg_if! {
             ///
             /// [`safety`]: crate::safety
             /// [`PersistentTask::init`]: crate::async_util::task::PersistentTask::init
-            unsafe fn schedule_async_local<'target, 'value, V>(
+            unsafe fn schedule_async_local<'target, 'value, V, const N: usize>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
             ) -> JuliaResult<Task<'target>, 'target, 'data>
             where
-                V: AsRef<[Value<'value, 'data>]>;
+                V: Values<'value, 'data, N>;
 
 
             /// Does the same thing as [`CallAsync::call_async_local`], but the task is returned rather
@@ -729,16 +737,16 @@ cfg_if::cfg_if! {
             ///
             /// [`safety`]: crate::safety
             /// [`PersistentTask::init`]: crate::async_util::task::PersistentTask::init
-            unsafe fn schedule_async_local_tracked<'target, 'value, V, T>(
+            unsafe fn schedule_async_local_tracked<'target, 'value, V, T, const N: usize>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
             ) -> JlrsResult<JuliaResult<Task<'target>, 'target, 'data>>
             where
-                V: AsRef<[Value<'value, 'data>]>,
+                V: Values<'value, 'data, N>,
                 T: Target<'target>,
             {
-                let args = args.as_ref();
+                let args = args.as_slice(Private);
                 let res = args
                     .iter()
                     .copied()
@@ -768,13 +776,13 @@ cfg_if::cfg_if! {
             /// check if any of the arguments is currently borrowed from Rust.
             ///
             /// [`safety`]: crate::safety
-            async unsafe fn call_async_main<'target, 'value, V>(
+            async unsafe fn call_async_main<'target, 'value, V, const N: usize>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
             ) -> JuliaResult<'target, 'data>
             where
-                V: AsRef<[Value<'value, 'data>]>;
+                V: Values<'value, 'data, N>;
 
 
             /// Call a function with the given arguments in an `@async` block. The task is scheduled on
@@ -790,15 +798,15 @@ cfg_if::cfg_if! {
             /// returns an `AccessError::BorrowError` if any of the arguments is.
             ///
             /// [`safety`]: crate::safety
-            async unsafe fn call_async_main_tracked<'target, 'value, V>(
+            async unsafe fn call_async_main_tracked<'target, 'value, V, const N: usize>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
             ) -> JlrsResult<JuliaResult<'target, 'data>>
             where
-                V: AsRef<[Value<'value, 'data>]>
+                V: Values<'value, 'data, N>
             {
-                let args = args.as_ref();
+                let args = args.as_slice(Private);
                 let res = args
                     .iter()
                     .copied()
@@ -829,13 +837,13 @@ cfg_if::cfg_if! {
             ///
             /// [`safety`]: crate::safety
             /// [`PersistentTask::init`]: crate::async_util::task::PersistentTask::init
-            unsafe fn schedule_async_main<'target, 'value, V>(
+            unsafe fn schedule_async_main<'target, 'value, V, const N: usize>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
             ) ->JuliaResult<Task<'target>, 'target, 'data>
             where
-                V: AsRef<[Value<'value, 'data>]>;
+                V: Values<'value, 'data, N>;
 
             /// Does the same thing as [`CallAsync::call_async_main`], but the task is returned rather
             /// than an awaitable `Future`. This method should only be called in [`PersistentTask::init`],
@@ -851,16 +859,16 @@ cfg_if::cfg_if! {
             ///
             /// [`safety`]: crate::safety
             /// [`PersistentTask::init`]: crate::async_util::task::PersistentTask::init
-            unsafe fn schedule_async_main_tracked<'target, 'value, V, T>(
+            unsafe fn schedule_async_main_tracked<'target, 'value, V, T, const N: usize>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
             ) -> JlrsResult<JuliaResult<Task<'target>, 'target, 'data>>
             where
-                V: AsRef<[Value<'value, 'data>]>,
+                V: Values<'value, 'data, N>,
                 T: Target<'target>,
             {
-                let args = args.as_ref();
+                let args = args.as_slice(Private);
                 let res = args
                     .iter()
                     .copied()
@@ -882,52 +890,45 @@ cfg_if::cfg_if! {
 
         #[async_trait(?Send)]
         impl<'data> CallAsync<'data> for Value<'_, 'data> {
-            async unsafe fn call_async<'target, 'value, V>(
+            #[inline]
+            async unsafe fn call_async<'target, 'value, V, const N: usize>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
             ) -> JuliaResult<'target, 'data>
             where
-                V: AsRef<[Value<'value, 'data>]>,
+                V: Values<'value, 'data, N>,
             {
-                JuliaFuture::new(frame, self, args).await
+                JuliaFuture::new(frame, erase_scope_lifetime(self), args).await
             }
 
             #[julia_version(since = "1.9")]
-            async unsafe fn call_async_interactive<'target, 'value, V>(
+            #[inline]
+            async unsafe fn call_async_interactive<'target, 'value, V, const N: usize>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
             ) -> JuliaResult<'target, 'data>
             where
-                V: AsRef<[Value<'value, 'data>]>
+                V: Values<'value, 'data, N>
             {
-                JuliaFuture::new_interactive(frame, self, args).await
+                JuliaFuture::new_interactive(frame, erase_scope_lifetime(self), args).await
             }
 
             #[julia_version(since = "1.9")]
-            unsafe fn schedule_async_interactive<'target, 'value, V>(
+            #[inline]
+            unsafe fn schedule_async_interactive<'target, 'value, V, const N: usize>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
             ) -> JuliaResult<Task<'target>, 'target, 'data>
             where
-                V: AsRef<[Value<'value, 'data>]>,
+                V: Values<'value, 'data, N>,
             {
-                let values = args.as_ref();
-                let mut vals: SmallVec<[Value; MAX_SIZE]> = SmallVec::with_capacity(1 + values.len());
+                let args = args.into_extended_with_start([erase_scope_lifetime(self)], Private);
 
-                vals.push(self);
-                vals.extend_from_slice(values);
-
-                let task = Module::main(&frame)
-                    .submodule(&frame, "JlrsThreads")
-                    .expect("JlrsCore.Threads not available")
-                    .as_managed()
-                    .function(&frame, "interactivecall")
-                    .expect("interactivecall not available")
-                    .as_managed()
-                    .call(&mut *frame, &mut vals);
+                let task = JlrsCore::interactive_call(&frame)
+                    .call(&mut *frame, args.as_ref());
 
                 match task {
                     Ok(t) => Ok(t.cast_unchecked::<Task>()),
@@ -935,28 +936,19 @@ cfg_if::cfg_if! {
                 }
             }
 
-            unsafe fn schedule_async<'target, 'value, V>(
+            #[inline]
+            unsafe fn schedule_async<'target, 'value, V, const N: usize>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
             ) -> JuliaResult<Task<'target>, 'target, 'data>
             where
-                V: AsRef<[Value<'value, 'data>]>,
+                V: Values<'value, 'data, N>,
             {
-                let values = args.as_ref();
-                let mut vals: SmallVec<[Value; MAX_SIZE]> = SmallVec::with_capacity(1 + values.len());
+                let args = args.into_extended_with_start([erase_scope_lifetime(self)], Private);
 
-                vals.push(self);
-                vals.extend_from_slice(values);
-
-                let task = Module::main(&frame)
-                    .submodule(&frame, "JlrsThreads")
-                    .expect("JlrsCore.Threads not available")
-                    .as_managed()
-                    .function(&frame, "asynccall")
-                    .expect("asynccall not available")
-                    .as_managed()
-                    .call(&mut *frame, &mut vals);
+                let task = JlrsCore::async_call(&frame)
+                    .call(&mut *frame, args.as_ref());
 
                 match task {
                     Ok(t) => Ok(t.cast_unchecked::<Task>()),
@@ -964,39 +956,31 @@ cfg_if::cfg_if! {
                 }
             }
 
-            async unsafe fn call_async_local<'target, 'value, V>(
+            #[inline]
+            async unsafe fn call_async_local<'target, 'value, V, const N: usize>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
             ) -> JuliaResult<'target, 'data>
             where
-                V: AsRef<[Value<'value, 'data>]>,
+                V: Values<'value, 'data, N>,
             {
-                JuliaFuture::new_local(frame, self, args).await
+                JuliaFuture::new_local(frame, erase_scope_lifetime(self), args).await
             }
 
-            unsafe fn schedule_async_local<'target, 'value, V>(
+            #[inline]
+            unsafe fn schedule_async_local<'target, 'value, V, const N: usize>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
             ) -> JuliaResult<Task<'target>, 'target, 'data>
             where
-                V: AsRef<[Value<'value, 'data>]>,
+                V: Values<'value, 'data, N>,
             {
-                let values = args.as_ref();
-                let mut vals: SmallVec<[Value; MAX_SIZE]> = SmallVec::with_capacity(1 + values.len());
+                let args = args.into_extended_with_start([erase_scope_lifetime(self)], Private);
 
-                vals.push(self);
-                vals.extend_from_slice(values);
-
-                let task = Module::main(&frame)
-                    .submodule(&frame, "JlrsThreads")
-                    .expect("JlrsCore.Threads not available")
-                    .as_managed()
-                    .function(&frame, "scheduleasynclocal")
-                    .expect("scheduleasynclocal not available")
-                    .as_managed()
-                    .call(&mut *frame, &mut vals);
+                let task = JlrsCore::schedule_async_local(&frame)
+                    .call(&mut *frame, args.as_ref());
 
                 match task {
                     Ok(t) => Ok(t.cast_unchecked::<Task>()),
@@ -1004,39 +988,31 @@ cfg_if::cfg_if! {
                 }
             }
 
-            async unsafe fn call_async_main<'target, 'value, V>(
+            #[inline]
+            async unsafe fn call_async_main<'target, 'value, V, const N: usize>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
             ) -> JuliaResult<'target, 'data>
             where
-                V: AsRef<[Value<'value, 'data>]>,
+                V: Values<'value, 'data, N>,
             {
-                JuliaFuture::new_main(frame, self, args).await
+                JuliaFuture::new_main(frame, erase_scope_lifetime(self), args).await
             }
 
-            unsafe fn schedule_async_main<'target, 'value, V>(
+            #[inline]
+            unsafe fn schedule_async_main<'target, 'value, V, const N: usize>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
             ) -> JuliaResult<Task<'target>, 'target, 'data>
             where
-                V: AsRef<[Value<'value, 'data>]>,
+                V: Values<'value, 'data, N>,
             {
-                let values = args.as_ref();
-                let mut vals: SmallVec<[Value; MAX_SIZE]> = SmallVec::with_capacity(1 + values.len());
+                let args = args.into_extended_with_start([erase_scope_lifetime(self)], Private);
 
-                vals.push(self);
-                vals.extend_from_slice(values);
-
-                let task = Module::main(&frame)
-                    .submodule(&frame, "JlrsThreads")
-                    .expect("JlrsCore.Threads not available")
-                    .as_managed()
-                    .function(&frame, "scheduleasync")
-                    .expect("scheduleasync not available")
-                    .as_managed()
-                    .call(&mut *frame, &mut vals);
+                let task = JlrsCore::schedule_async(&frame)
+                    .call(&mut *frame, args.as_ref());
 
                 match task {
                     Ok(t) => Ok(t.cast_unchecked::<Task>()),
@@ -1047,92 +1023,100 @@ cfg_if::cfg_if! {
 
         #[async_trait(?Send)]
         impl<'data> CallAsync<'data> for Function<'_, 'data> {
-            async unsafe fn call_async<'target, 'value, V>(
+            #[inline]
+            async unsafe fn call_async<'target, 'value, V, const N: usize>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
             ) -> JuliaResult<'target, 'data>
             where
-                V: AsRef<[Value<'value, 'data>]>,
+                V: Values<'value, 'data, N>,
             {
-                JuliaFuture::new(frame, self.as_value(), args).await
+                JuliaFuture::new(frame, erase_scope_lifetime(self.as_value()), args).await
             }
 
             #[julia_version(since = "1.9")]
-            async unsafe fn call_async_interactive<'target, 'value, V>(
+            #[inline]
+            async unsafe fn call_async_interactive<'target, 'value, V, const N: usize>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
             ) -> JuliaResult<'target, 'data>
             where
-                V: AsRef<[Value<'value, 'data>]>,
+                V: Values<'value, 'data, N>,
             {
-                JuliaFuture::new_interactive(frame, self.as_value(), args).await
+                JuliaFuture::new_interactive(frame, erase_scope_lifetime(self.as_value()), args).await
             }
 
             #[julia_version(since = "1.9")]
-            unsafe fn schedule_async_interactive<'target, 'value, V>(
+            #[inline]
+            unsafe fn schedule_async_interactive<'target, 'value, V, const N: usize>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
             ) -> JuliaResult<Task<'target>, 'target, 'data>
             where
-                V: AsRef<[Value<'value, 'data>]>,
+                V: Values<'value, 'data, N>,
             {
                 self.as_value().schedule_async_interactive(frame, args)
             }
 
-            unsafe fn schedule_async<'target, 'value, V>(
+            #[inline]
+            unsafe fn schedule_async<'target, 'value, V, const N: usize>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
             ) -> JuliaResult<Task<'target>, 'target, 'data>
             where
-                V: AsRef<[Value<'value, 'data>]>,
+                V: Values<'value, 'data, N>,
             {
                 self.as_value().schedule_async(frame, args)
             }
 
-            async unsafe fn call_async_local<'target, 'value, V>(
+            #[inline]
+            async unsafe fn call_async_local<'target, 'value, V, const N: usize>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
             ) -> JuliaResult<'target, 'data>
             where
-                V: AsRef<[Value<'value, 'data>]>,
+                V: Values<'value, 'data, N>,
             {
-                JuliaFuture::new_local(frame, self.as_value(), args).await
+                JuliaFuture::new_local(frame, erase_scope_lifetime(self.as_value()), args).await
             }
 
-            unsafe fn schedule_async_local<'target, 'value, V>(
+            #[inline]
+            unsafe fn schedule_async_local<'target, 'value, V, const N: usize>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
             ) -> JuliaResult<Task<'target>, 'target, 'data>
             where
-                V: AsRef<[Value<'value, 'data>]>,
+                V: Values<'value, 'data, N>,
             {
                 self.as_value().schedule_async_local(frame, args)
             }
 
-            async unsafe fn call_async_main<'target, 'value, V>(
+            #[inline]
+            async unsafe fn call_async_main<'target, 'value, V, const N: usize>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
             ) -> JuliaResult<'target, 'data>
             where
-                V: AsRef<[Value<'value, 'data>]>,
+                V: Values<'value, 'data, N>,
             {
-                JuliaFuture::new_main(frame, self.as_value(), args).await
+                JuliaFuture::new_main(frame, erase_scope_lifetime(self.as_value()), args).await
             }
 
-            unsafe fn schedule_async_main<'target, 'value, V>(
+            #[inline]
+            unsafe fn schedule_async_main<'target, 'value, V, const N: usize>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
             ) -> JuliaResult<Task<'target>, 'target, 'data>
             where
-                V: AsRef<[Value<'value, 'data>]>,
+                V: Values<'value, 'data, N>,
             {
                 self.as_value().schedule_async_main(frame, args)
             }
@@ -1140,54 +1124,47 @@ cfg_if::cfg_if! {
 
         #[async_trait(?Send)]
         impl<'data> CallAsync<'data> for WithKeywords<'_, 'data> {
-            async unsafe fn call_async<'target, 'value, V>(
+            #[inline]
+            async unsafe fn call_async<'target, 'value, V, const N: usize>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
             ) -> JuliaResult<'target, 'data>
             where
-                V: AsRef<[Value<'value, 'data>]>,
+                V: Values<'value, 'data, N>,
             {
                 JuliaFuture::new_with_keywords(frame, self, args).await
             }
 
             #[julia_version(since = "1.9")]
-            async unsafe fn call_async_interactive<'target, 'value, V>(
+            #[inline]
+            async unsafe fn call_async_interactive<'target, 'value, V, const N: usize>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
             ) -> JuliaResult<'target, 'data>
             where
-                V: AsRef<[Value<'value, 'data>]>,
+                V: Values<'value, 'data, N>,
             {
                 JuliaFuture::new_interactive_with_keywords(frame, self, args).await
             }
 
             #[julia_version(since = "1.9")]
-            unsafe fn schedule_async_interactive<'target, 'value, V>(
+            #[inline]
+            unsafe fn schedule_async_interactive<'target, 'value, V, const N: usize>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
             ) -> JuliaResult<Task<'target>, 'target, 'data>
             where
-                V: AsRef<[Value<'value, 'data>]>,
+                V: Values<'value, 'data, N>,
             {
-                let values = args.as_ref();
-                let mut vals: SmallVec<[Value; MAX_SIZE]> = SmallVec::with_capacity(1 + values.len());
+                let args = args.into_extended_with_start([erase_scope_lifetime(self.function())], Private);
 
-                vals.push(self.function());
-                vals.extend_from_slice(values);
-
-                let task = Module::main(&frame)
-                    .submodule(&frame, "JlrsThreads")
-                    .expect("JlrsCore.Threads not available")
-                    .as_managed()
-                    .function(&frame, "interactivecall")
-                    .expect("interactivecall not available")
-                    .as_managed()
+                let task = JlrsCore::interactive_call(&frame)
                     .provide_keywords(self.keywords())
                     .expect("Keywords invalid")
-                    .call(&mut *frame, &mut vals);
+                    .call(&mut *frame, args.as_ref());
 
                 match task {
                     Ok(t) => Ok(t.cast_unchecked::<Task>()),
@@ -1195,30 +1172,21 @@ cfg_if::cfg_if! {
                 }
             }
 
-            unsafe fn schedule_async<'target, 'value, V>(
+            #[inline]
+            unsafe fn schedule_async<'target, 'value, V, const N: usize>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
             ) -> JuliaResult<Task<'target>, 'target, 'data>
             where
-                V: AsRef<[Value<'value, 'data>]>,
+                V: Values<'value, 'data, N>,
             {
-                let values = args.as_ref();
-                let mut vals: SmallVec<[Value; MAX_SIZE]> = SmallVec::with_capacity(1 + values.len());
+                let args = args.into_extended_with_start([erase_scope_lifetime(self.function())], Private);
 
-                vals.push(self.function());
-                vals.extend_from_slice(values);
-
-                let task = Module::main(&frame)
-                    .submodule(&frame, "JlrsThreads")
-                    .expect("JlrsCore.Threads not available")
-                    .as_managed()
-                    .function(&frame, "asynccall")
-                    .expect("asynccall not available")
-                    .as_managed()
+                let task = JlrsCore::schedule_async(&frame)
                     .provide_keywords(self.keywords())
                     .expect("Keywords invalid")
-                    .call(&mut *frame, &mut vals);
+                    .call(&mut *frame, args.as_ref());
 
                 match task {
                     Ok(t) => Ok(t.cast_unchecked::<Task>()),
@@ -1226,41 +1194,33 @@ cfg_if::cfg_if! {
                 }
             }
 
-            async unsafe fn call_async_local<'target, 'value, V>(
+            #[inline]
+            async unsafe fn call_async_local<'target, 'value, V, const N: usize>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
             ) -> JuliaResult<'target, 'data>
             where
-                V: AsRef<[Value<'value, 'data>]>,
+                V: Values<'value, 'data, N>,
             {
                 JuliaFuture::new_local_with_keywords(frame, self, args).await
             }
 
-            unsafe fn schedule_async_local<'target, 'value, V>(
+            #[inline]
+            unsafe fn schedule_async_local<'target, 'value, V, const N: usize>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
             ) -> JuliaResult<Task<'target>, 'target, 'data>
             where
-                V: AsRef<[Value<'value, 'data>]>,
+                V: Values<'value, 'data, N>,
             {
-                let values = args.as_ref();
-                let mut vals: SmallVec<[Value; MAX_SIZE]> = SmallVec::with_capacity(1 + values.len());
+                let args = args.into_extended_with_start([erase_scope_lifetime(self.function())], Private);
 
-                vals.push(self.function());
-                vals.extend_from_slice(values);
-
-                let task = Module::main(&frame)
-                    .submodule(&frame, "JlrsThreads")
-                    .expect("JlrsCore.Threads not available")
-                    .as_managed()
-                    .function(&frame, "scheduleasynclocal")
-                    .expect("scheduleasynclocal not available")
-                    .as_managed()
+                let task = JlrsCore::schedule_async_local(&frame)
                     .provide_keywords(self.keywords())
                     .expect("Keywords invalid")
-                    .call(&mut *frame, &mut vals);
+                    .call(&mut *frame, args.as_ref());
 
                 match task {
                     Ok(t) => Ok(t.cast_unchecked::<Task>()),
@@ -1268,41 +1228,33 @@ cfg_if::cfg_if! {
                 }
             }
 
-            async unsafe fn call_async_main<'target, 'value, V>(
+            #[inline]
+            async unsafe fn call_async_main<'target, 'value, V, const N: usize>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
             ) -> JuliaResult<'target, 'data>
             where
-                V: AsRef<[Value<'value, 'data>]>,
+                V: Values<'value, 'data, N>,
             {
                 JuliaFuture::new_main_with_keywords(frame, self, args).await
             }
 
-            unsafe fn schedule_async_main<'target, 'value, V>(
+            #[inline]
+            unsafe fn schedule_async_main<'target, 'value, V, const N: usize>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
             ) -> JuliaResult<Task<'target>, 'target, 'data>
             where
-                V: AsRef<[Value<'value, 'data>]>,
+                V: Values<'value, 'data, N>,
             {
-                let values = args.as_ref();
-                let mut vals: SmallVec<[Value; MAX_SIZE]> = SmallVec::with_capacity(1 + values.len());
+                let args = args.into_extended_with_start([erase_scope_lifetime(self.function())], Private);
 
-                vals.push(self.function());
-                vals.extend_from_slice(values);
-
-                let task = Module::main(&frame)
-                    .submodule(&frame, "JlrsThreads")
-                    .expect("JlrsCore.Threads not available")
-                    .as_managed()
-                    .function(&frame, "scheduleasync")
-                    .expect("scheduleasync not available")
-                    .as_managed()
+                let task = JlrsCore::schedule_async(&frame)
                     .provide_keywords(self.keywords())
                     .expect("Keywords invalid")
-                    .call(&mut *frame, &mut vals);
+                    .call(&mut *frame, args.as_ref());
 
                 match task {
                     Ok(t) => Ok(t.cast_unchecked::<Task>()),

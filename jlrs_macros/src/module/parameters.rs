@@ -1,6 +1,6 @@
 use syn::{
-    punctuated::Punctuated, FnArg, GenericArgument, Ident, PatType, Path, PathArguments,
-    ReturnType, Type, TypePath,
+    parse_quote, punctuated::Punctuated, FnArg, GenericArgument, Ident, PatType, Path,
+    PathArguments, ReturnType, Type, TypePath,
 };
 
 use super::GenericEnvironment;
@@ -246,5 +246,25 @@ fn apply_parameter(path: &mut Path, parameter: &Ident, parameter_path: &Path) {
                 apply_parameter(&mut ty.path, parameter, parameter_path)
             }
         }
+    }
+}
+
+pub(super) fn as_return_as(ret_ty: &ReturnType) -> ReturnType {
+    let mut new_ty = ret_ty.clone();
+
+    if let ReturnType::Type(_, ty) = &mut new_ty {
+        let new_ty: Type = parse_quote! {
+            <#ty as ::jlrs::convert::ccall_types::CCallReturn>::ReturnAs
+        };
+        **ty = new_ty;
+    }
+
+    new_ty
+}
+
+pub(super) fn take_type(ty: ReturnType) -> Type {
+    match ty {
+        ReturnType::Default => parse_quote! { () },
+        ReturnType::Type(_, ty) => *ty,
     }
 }

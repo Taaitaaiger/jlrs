@@ -11,6 +11,7 @@ use jl_sys::{jl_method_match_t, jl_method_match_type};
 use crate::{
     data::managed::{private::ManagedPriv, simple_vector::SimpleVector, value::Value, Ref},
     impl_julia_typecheck,
+    memory::target::TargetResult,
     private::Private,
 };
 
@@ -77,10 +78,12 @@ impl<'scope> ManagedPriv<'scope, '_> for MethodMatch<'scope> {
 
     // Safety: `inner` must not have been freed yet, the result must never be
     // used after the GC might have freed it.
+    #[inline]
     unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self {
         Self(inner, PhantomData)
     }
 
+    #[inline]
     fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps> {
         self.0
     }
@@ -98,7 +101,7 @@ pub type MethodMatchRet = Ref<'static, 'static, MethodMatch<'static>>;
 impl_valid_layout!(MethodMatchRef, MethodMatch, jl_method_match_type);
 
 use super::method::Method;
-use crate::memory::target::target_type::TargetType;
+use crate::memory::target::TargetType;
 
 /// `MethodMetch` or `MethodMetchRef`, depending on the target type `T`.
 pub type MethodMatchData<'target, T> =
@@ -106,8 +109,7 @@ pub type MethodMatchData<'target, T> =
 
 /// `JuliaResult<MethodMetch>` or `JuliaResultRef<MethodMetchRef>`, depending on the target type
 /// `T`.
-pub type MethodMatchResult<'target, T> =
-    <T as TargetType<'target>>::Result<'static, MethodMatch<'target>>;
+pub type MethodMatchResult<'target, T> = TargetResult<'target, 'static, MethodMatch<'target>, T>;
 
 impl_ccall_arg_managed!(MethodMatch, 1);
 impl_into_typed!(MethodMatch);

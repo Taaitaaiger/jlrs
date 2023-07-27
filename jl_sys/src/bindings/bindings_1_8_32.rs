@@ -1638,6 +1638,9 @@ extern "C" {
     pub fn jl_tagged_gensym(str_: *const ::std::os::raw::c_char, len: usize) -> *mut jl_sym_t;
 }
 extern "C" {
+    pub fn jl_get_world_counter() -> usize;
+}
+extern "C" {
     pub fn jl_get_kwsorter(ty: *mut jl_value_t) -> *mut jl_function_t;
 }
 extern "C" {
@@ -2111,9 +2114,8 @@ pub struct _jl_task_t {
     pub ptls: jl_ptls_t,
 }
 pub const jlrs_catch_tag_t_JLRS_CATCH_OK: jlrs_catch_tag_t = 0;
-pub const jlrs_catch_tag_t_JLRS_CATCH_ERR: jlrs_catch_tag_t = 1;
-pub const jlrs_catch_tag_t_JLRS_CATCH_EXCEPTION: jlrs_catch_tag_t = 2;
-pub const jlrs_catch_tag_t_JLRS_CATCH_PANIC: jlrs_catch_tag_t = 3;
+pub const jlrs_catch_tag_t_JLRS_CATCH_EXCEPTION: jlrs_catch_tag_t = 1;
+pub const jlrs_catch_tag_t_JLRS_CATCH_PANIC: jlrs_catch_tag_t = 2;
 pub type jlrs_catch_tag_t = ::std::os::raw::c_uint;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -2125,7 +2127,6 @@ pub type jlrs_callback_caller_t = ::std::option::Option<
     unsafe extern "C" fn(
         arg1: *mut ::std::os::raw::c_void,
         arg2: *mut ::std::os::raw::c_void,
-        arg3: *mut ::std::os::raw::c_void,
     ) -> jlrs_catch_t,
 >;
 extern "C" {
@@ -2133,7 +2134,6 @@ extern "C" {
         callback: *mut ::std::os::raw::c_void,
         caller: jlrs_callback_caller_t,
         result: *mut ::std::os::raw::c_void,
-        frame_slice: *mut ::std::os::raw::c_void,
     ) -> jlrs_catch_t;
 }
 extern "C" {
@@ -2145,6 +2145,24 @@ extern "C" {
         dt: *mut jl_datatype_t,
         ptr: *const ::std::os::raw::c_void,
     );
+}
+extern "C" {
+    pub fn jlrs_gc_safe_enter(ptls: jl_ptls_t) -> i8;
+}
+extern "C" {
+    pub fn jlrs_gc_unsafe_enter(ptls: jl_ptls_t) -> i8;
+}
+extern "C" {
+    pub fn jlrs_gc_safe_leave(ptls: jl_ptls_t, state: i8);
+}
+extern "C" {
+    pub fn jlrs_gc_unsafe_leave(ptls: jl_ptls_t, state: i8);
+}
+extern "C" {
+    pub fn jlrs_dimtuple_type(rank: usize) -> *mut jl_datatype_t;
+}
+extern "C" {
+    pub fn jlrs_tuple_of(values: *mut *mut jl_value_t, n: usize) -> *mut jl_value_t;
 }
 extern "C" {
     pub fn jlrs_lock(v: *mut jl_value_t);

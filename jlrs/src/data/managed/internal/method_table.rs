@@ -22,7 +22,7 @@ use crate::{
         Ref,
     },
     impl_julia_typecheck,
-    memory::target::Target,
+    memory::target::{Target, TargetResult},
     private::Private,
 };
 
@@ -233,10 +233,12 @@ impl<'scope> ManagedPriv<'scope, '_> for MethodTable<'scope> {
 
     // Safety: `inner` must not have been freed yet, the result must never be
     // used after the GC might have freed it.
+    #[inline]
     unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self {
         Self(inner, PhantomData)
     }
 
+    #[inline]
     fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps> {
         self.0
     }
@@ -253,7 +255,7 @@ pub type MethodTableRet = Ref<'static, 'static, MethodTable<'static>>;
 
 impl_valid_layout!(MethodTableRef, MethodTable, jl_methtable_type);
 
-use crate::memory::target::target_type::TargetType;
+use crate::memory::target::TargetType;
 
 /// `MethodTable` or `MethodTableRef`, depending on the target type `T`.
 pub type MethodTableData<'target, T> =
@@ -261,8 +263,7 @@ pub type MethodTableData<'target, T> =
 
 /// `JuliaResult<MethodTable>` or `JuliaResultRef<MethodTableRef>`, depending on the target type
 /// `T`.
-pub type MethodTableResult<'target, T> =
-    <T as TargetType<'target>>::Result<'static, MethodTable<'target>>;
+pub type MethodTableResult<'target, T> = TargetResult<'target, 'static, MethodTable<'target>, T>;
 
 impl_ccall_arg_managed!(MethodTable, 1);
 impl_into_typed!(MethodTable);

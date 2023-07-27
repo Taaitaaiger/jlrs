@@ -12,7 +12,7 @@ use crate::{
         Ref,
     },
     impl_julia_typecheck,
-    memory::target::Target,
+    memory::target::{Target, TargetResult},
     private::Private,
 };
 
@@ -63,10 +63,12 @@ impl<'scope> ManagedPriv<'scope, '_> for Expr<'scope> {
 
     // Safety: `inner` must not have been freed yet, the result must never be
     // used after the GC might have freed it.
+    #[inline]
     unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self {
         Self(inner, PhantomData)
     }
 
+    #[inline]
     fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps> {
         self.0
     }
@@ -83,13 +85,13 @@ pub type ExprRet = Ref<'static, 'static, Expr<'static>>;
 
 impl_valid_layout!(ExprRef, Expr, jl_expr_type);
 
-use crate::memory::target::target_type::TargetType;
+use crate::memory::target::TargetType;
 
 /// `Expr` or `ExprRef`, depending on the target type `T`.
 pub type ExprData<'target, T> = <T as TargetType<'target>>::Data<'static, Expr<'target>>;
 
 /// `JuliaResult<Expr>` or `JuliaResultRef<ExprRef>`, depending on the target type `T`.
-pub type ExprResult<'target, T> = <T as TargetType<'target>>::Result<'static, Expr<'target>>;
+pub type ExprResult<'target, T> = TargetResult<'target, 'static, Expr<'target>, T>;
 
 impl_ccall_arg_managed!(Expr, 1);
 impl_into_typed!(Expr);

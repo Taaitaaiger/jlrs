@@ -14,8 +14,7 @@ mod tests {
             jlrs.instance(&mut frame)
                 .scope(|mut frame| {
                     let data = vec![1.0f32, 2.0f32];
-                    let arr_val = Array::from_vec(frame.as_extended_target(), data, (1, 2))?
-                        .into_jlrs_result()?;
+                    let arr_val = Array::from_vec(&mut frame, data, (1, 2))?.into_jlrs_result()?;
                     let arr = arr_val;
 
                     let data = unsafe { arr.inline_data::<f32>()? };
@@ -35,8 +34,7 @@ mod tests {
             jlrs.instance(&mut frame)
                 .scope(|mut frame| {
                     let data = vec![1.0f32, 2.0f32];
-                    let arr_val = Array::from_vec(frame.as_extended_target(), data, (1, 2))?
-                        .into_jlrs_result()?;
+                    let arr_val = Array::from_vec(&mut frame, data, (1, 2))?.into_jlrs_result()?;
                     let arr = arr_val;
 
                     let data = unsafe { arr.inline_data::<f32>()? };
@@ -58,8 +56,7 @@ mod tests {
             jlrs.instance(&mut frame)
                 .scope(|mut frame| {
                     let data = vec![1.0f32, 2.0f32];
-                    let arr_val = Array::from_vec(frame.as_extended_target(), data, (1, 2))?
-                        .into_jlrs_result()?;
+                    let arr_val = Array::from_vec(&mut frame, data, (1, 2))?.into_jlrs_result()?;
                     let arr = arr_val;
 
                     let data = unsafe { arr.inline_data::<f32>()? };
@@ -79,8 +76,7 @@ mod tests {
             jlrs.instance(&mut frame)
                 .scope(|mut frame| {
                     let data = vec![1.0f32, 2.0f32];
-                    let arr_val = Array::from_vec(frame.as_extended_target(), data, (1, 2))?
-                        .into_jlrs_result()?;
+                    let arr_val = Array::from_vec(&mut frame, data, (1, 2))?.into_jlrs_result()?;
                     let arr = arr_val;
 
                     let data = unsafe { arr.inline_data::<f32>()? };
@@ -101,8 +97,7 @@ mod tests {
             jlrs.instance(&mut frame)
                 .scope(|mut frame| {
                     let data = vec![1.0f32, 2.0f32];
-                    let arr_val = Array::from_vec(frame.as_extended_target(), data, (1, 2))?
-                        .into_jlrs_result()?;
+                    let arr_val = Array::from_vec(&mut frame, data, (1, 2))?.into_jlrs_result()?;
                     let arr = arr_val;
 
                     let data = unsafe { arr.inline_data::<f32>()? };
@@ -123,8 +118,7 @@ mod tests {
             jlrs.instance(&mut frame)
                 .scope(|mut frame| unsafe {
                     let data = vec![1.0f32, 2.0f32];
-                    let arr_val = Array::from_vec(frame.as_extended_target(), data, (1, 2))?
-                        .into_jlrs_result()?;
+                    let arr_val = Array::from_vec(&mut frame, data, (1, 2))?.into_jlrs_result()?;
                     let mut arr = arr_val;
 
                     let data = arr.bits_data_mut::<f32>()?;
@@ -143,8 +137,7 @@ mod tests {
             jlrs.instance(&mut frame)
                 .scope(|mut frame| {
                     let data = vec![1.0f32, 2.0f32];
-                    let arr_val = Array::from_vec(frame.as_extended_target(), data, (1, 2))?
-                        .into_jlrs_result()?;
+                    let arr_val = Array::from_vec(&mut frame, data, (1, 2))?.into_jlrs_result()?;
                     let mut arr = arr_val;
 
                     let mut data = unsafe { arr.bits_data_mut::<f32>()? };
@@ -170,8 +163,7 @@ mod tests {
             jlrs.instance(&mut frame)
                 .scope(|mut frame| {
                     let data = vec![1.0f32, 2.0f32];
-                    let arr_val = Array::from_vec(frame.as_extended_target(), data, (1, 2))?
-                        .into_jlrs_result()?;
+                    let arr_val = Array::from_vec(&mut frame, data, (1, 2))?.into_jlrs_result()?;
                     let mut arr = arr_val;
 
                     let data = unsafe { arr.bits_data_mut::<f32>()? };
@@ -192,8 +184,7 @@ mod tests {
             jlrs.instance(&mut frame)
                 .scope(|mut frame| {
                     let data = vec![1.0f32, 2.0f32];
-                    let arr_val = Array::from_vec(frame.as_extended_target(), data, (1, 2))?
-                        .into_jlrs_result()?;
+                    let arr_val = Array::from_vec(&mut frame, data, (1, 2))?.into_jlrs_result()?;
                     let mut arr = arr_val;
 
                     let mut data = unsafe { arr.bits_data_mut::<f32>()? };
@@ -215,8 +206,7 @@ mod tests {
             jlrs.instance(&mut frame)
                 .scope(|mut frame| {
                     let data = vec![1.0f32, 2.0f32];
-                    let arr_val = Array::from_vec(frame.as_extended_target(), data, (1, 2))?
-                        .into_jlrs_result()?;
+                    let arr_val = Array::from_vec(&mut frame, data, (1, 2))?.into_jlrs_result()?;
                     let mut arr = arr_val;
 
                     let data = unsafe { arr.bits_data_mut::<f32>()? };
@@ -237,8 +227,7 @@ mod tests {
             jlrs.instance(&mut frame)
                 .scope(|mut frame| unsafe {
                     let data = vec![1.0f32, 2.0f32];
-                    let arr_val =
-                        Array::from_vec_unchecked(frame.as_extended_target(), data, (1, 2))?;
+                    let arr_val = Array::from_vec_unchecked(&mut frame, data, (1, 2))?;
                     let mut arr = arr_val;
 
                     let data = arr.bits_data_mut::<f32>()?;

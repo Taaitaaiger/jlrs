@@ -8,22 +8,20 @@
 
 #[cfg(feature = "async")]
 use jlrs_macros::julia_version;
-use smallvec::SmallVec;
 
-#[cfg(feature = "async")]
-use crate::{call::CallAsync, memory::target::frame::AsyncGcFrame};
 use crate::{
+    args::Values,
     call::{Call, ProvideKeywords},
     convert::into_jlrs_result::IntoJlrsResult,
     data::managed::{
-        function::Function,
-        module::Module,
-        value::{Value, MAX_SIZE},
-        Managed,
+        erase_scope_lifetime, function::Function, module::Module, value::Value, Managed,
     },
     error::JlrsResult,
     memory::target::{frame::GcFrame, Target},
+    private::Private,
 };
+#[cfg(feature = "async")]
+use crate::{call::CallAsync, memory::target::frame::AsyncGcFrame};
 
 init_fn!(init_jlrs_py_plot, JLRS_PY_PLOT_JL, "JlrsPyPlot.jl");
 
@@ -45,21 +43,15 @@ impl<'scope> PyPlot<'scope> {
     /// has been closed, even if all handles have been dropped. `plot_fn` must be a plotting
     /// function from the Plots.jl package, such as `plot` or `hexbin`. The resources associated
     /// with the window are only cleaned up if one of the `PyPlot::wait` methods is called.
-    pub unsafe fn new<'value, V>(
+    pub unsafe fn new<'value, V, const N: usize>(
         frame: &mut GcFrame<'scope>,
-        plot_fn: Function<'_, 'static>,
+        plot_fn: Function<'value, 'static>,
         args: V,
     ) -> JlrsResult<Self>
     where
-        V: AsRef<[Value<'value, 'static>]>,
+        V: Values<'value, 'static, N>,
     {
-        let args = args.as_ref();
-        let mut vals: SmallVec<[Value; MAX_SIZE]> = SmallVec::with_capacity(1 + args.len());
-        vals.push(plot_fn.as_value());
-
-        for arg in args.iter().copied() {
-            vals.push(arg);
-        }
+        let values = args.into_extended_with_start([plot_fn.as_value()], Private);
 
         let plt = Module::main(&frame)
             .submodule(&frame, "JlrsPyPlot")
@@ -68,7 +60,7 @@ impl<'scope> PyPlot<'scope> {
             .function(&frame, "jlrsplot")
             .unwrap()
             .as_managed()
-            .call(frame, vals)
+            .call(frame, values.as_ref())
             .into_jlrs_result()?;
 
         Ok(PyPlot(plt))
@@ -79,22 +71,16 @@ impl<'scope> PyPlot<'scope> {
     /// plotting function from the Plots.jl package, such as `plot` or `hexbin`. The resources
     /// associated  with the window are only cleaned up if one of the `PyPlot::wait` methods is
     /// called.
-    pub unsafe fn new_with_keywords<'value, V>(
+    pub unsafe fn new_with_keywords<'value, V, const N: usize>(
         frame: &mut GcFrame<'scope>,
-        plot_fn: Function<'_, 'static>,
+        plot_fn: Function<'value, 'static>,
         args: V,
-        keywords: Value<'_, 'static>,
+        keywords: Value<'value, 'static>,
     ) -> JlrsResult<Self>
     where
-        V: AsRef<[Value<'value, 'static>]>,
+        V: Values<'value, 'static, N>,
     {
-        let args = args.as_ref();
-        let mut vals: SmallVec<[Value; MAX_SIZE]> = SmallVec::with_capacity(1 + args.len());
-        vals.push(plot_fn.as_value());
-
-        for arg in args.iter().copied() {
-            vals.push(arg);
-        }
+        let values = args.into_extended_with_start([plot_fn.as_value()], Private);
 
         let plt = Module::main(&frame)
             .submodule(&frame, "JlrsPyPlot")
@@ -104,7 +90,7 @@ impl<'scope> PyPlot<'scope> {
             .unwrap()
             .as_managed()
             .provide_keywords(keywords)?
-            .call(frame, vals)
+            .call(frame, values.as_ref())
             .into_jlrs_result()?;
 
         Ok(PyPlot(plt))
@@ -114,23 +100,16 @@ impl<'scope> PyPlot<'scope> {
     /// `plot)fn(<plot associated with self>, args...)`. If the window has already been closed an
     /// error is returned. Note that if multiple plotting windows are currently open, only the
     /// most recently created one is redrawn automatically.
-    pub unsafe fn update<'value, 'frame, V>(
+    pub unsafe fn update<'value, 'frame, V, const N: usize>(
         self,
         frame: &mut GcFrame<'scope>,
-        plot_fn: Function<'_, 'static>,
+        plot_fn: Function<'value, 'static>,
         args: V,
     ) -> JlrsResult<isize>
     where
-        V: AsRef<[Value<'value, 'static>]>,
+        V: Values<'value, 'static, N>,
     {
-        let args = args.as_ref();
-        let mut vals: SmallVec<[Value; MAX_SIZE]> = SmallVec::with_capacity(2 + args.len());
-        vals.push(self.0);
-        vals.push(plot_fn.as_value());
-
-        for arg in args.iter().copied() {
-            vals.push(arg);
-        }
+        let values = args.into_extended_with_start([plot_fn.as_value()], Private);
 
         Module::main(&frame)
             .submodule(&frame, "JlrsPyPlot")
@@ -139,7 +118,7 @@ impl<'scope> PyPlot<'scope> {
             .function(&frame, "updateplot!")
             .unwrap()
             .as_managed()
-            .call(frame, vals)
+            .call(frame, values.as_ref())
             .into_jlrs_result()?
             .unbox::<isize>()
     }
@@ -148,24 +127,18 @@ impl<'scope> PyPlot<'scope> {
     /// `plot_fn(<plot associated with self>, args...; kwargs...)`. If the window has already been
     /// closed an error is returned. Note that if multiple plotting windows are currently open,
     /// only the most recently created one is redrawn automatically.
-    pub unsafe fn update_with_keywords<'value, 'frame, V>(
+    pub unsafe fn update_with_keywords<'value, 'frame, V, const N: usize>(
         self,
         frame: &mut GcFrame<'scope>,
-        plot_fn: Function<'_, 'static>,
+        plot_fn: Function<'value, 'static>,
         args: V,
-        keywords: Value<'_, 'static>,
+        keywords: Value<'value, 'static>,
     ) -> JlrsResult<isize>
     where
-        V: AsRef<[Value<'value, 'static>]>,
+        V: Values<'value, 'static, N>,
     {
-        let args = args.as_ref();
-        let mut vals: SmallVec<[Value; MAX_SIZE]> = SmallVec::with_capacity(2 + args.len());
-        vals.push(self.0);
-        vals.push(plot_fn.as_value());
-
-        for arg in args.iter().copied() {
-            vals.push(arg);
-        }
+        let values = args
+            .into_extended_with_start([erase_scope_lifetime(self.0), plot_fn.as_value()], Private);
 
         Module::main(&frame)
             .submodule(&frame, "JlrsPyPlot")
@@ -175,7 +148,7 @@ impl<'scope> PyPlot<'scope> {
             .unwrap()
             .as_managed()
             .provide_keywords(keywords)?
-            .call(frame, vals)
+            .call(frame, values.as_ref())
             .into_jlrs_result()?
             .unbox::<isize>()
     }
@@ -227,7 +200,7 @@ impl<'scope> PyPlot<'scope> {
             Module::base(&frame)
                 .function(&frame, "wait")?
                 .as_managed()
-                .call_async_main(frame, &mut [self.0])
+                .call_async_main(frame, [self.0])
                 .await
                 .into_jlrs_result()?;
 
@@ -247,7 +220,7 @@ impl<'scope> PyPlot<'scope> {
             Module::base(&frame)
                 .function(&frame, "wait")?
                 .as_managed()
-                .call_async_interactive(frame, &mut [self.0])
+                .call_async_interactive(frame, [self.0])
                 .await
                 .into_jlrs_result()?;
 
@@ -266,7 +239,7 @@ impl<'scope> PyPlot<'scope> {
             Module::base(&frame)
                 .function(&frame, "wait")?
                 .as_managed()
-                .call_async_local(frame, &mut [self.0])
+                .call_async_local(frame, [self.0])
                 .await
                 .into_jlrs_result()?;
 
@@ -282,7 +255,7 @@ impl<'scope> PyPlot<'scope> {
             Module::base(&frame)
                 .function(&frame, "wait")?
                 .as_managed()
-                .call_async(frame, &mut [self.0])
+                .call_async(frame, [self.0])
                 .await
                 .into_jlrs_result()?;
 

@@ -6,6 +6,7 @@ use jl_sys::{jl_new_typevar, jl_tvar_t, jl_tvar_type};
 
 use super::{value::ValueData, Ref};
 use crate::{
+    catch::catch_exceptions,
     convert::to_symbol::ToSymbol,
     data::managed::{
         datatype::DataType,
@@ -15,7 +16,7 @@ use crate::{
         Managed,
     },
     impl_julia_typecheck,
-    memory::target::Target,
+    memory::target::{Target, TargetResult},
     private::Private,
 };
 
@@ -39,27 +40,20 @@ impl<'scope> TypeVar<'scope> {
         T: Target<'target>,
         N: ToSymbol,
     {
-        use std::mem::MaybeUninit;
-
-        use crate::catch::catch_exceptions;
-
         // Safety: if an exception is thrown it's caught and returned
         unsafe {
             let name = name.to_symbol_priv(Private);
             let lb = lower_bound.unwrap_or_else(|| Value::bottom_type(&target));
             let ub = upper_bound.unwrap_or_else(|| DataType::any_type(&target).as_value());
 
-            let mut callback = |result: &mut MaybeUninit<*mut jl_tvar_t>| {
-                let res =
-                    jl_new_typevar(name.unwrap(Private), lb.unwrap(Private), ub.unwrap(Private));
-                result.write(res);
+            let callback =
+                || jl_new_typevar(name.unwrap(Private), lb.unwrap(Private), ub.unwrap(Private));
 
-                Ok(())
-            };
+            let exc = |err: Value| err.unwrap_non_null(Private);
 
-            let res = match catch_exceptions(&mut callback).unwrap() {
+            let res = match catch_exceptions(callback, exc) {
                 Ok(tvar) => Ok(NonNull::new_unchecked(tvar)),
-                Err(e) => Err(e.ptr()),
+                Err(e) => Err(e),
             };
 
             target.result_from_ptr(res, Private)
@@ -72,6 +66,7 @@ impl<'scope> TypeVar<'scope> {
     ///
     /// Safety: an exception must not be thrown if this method is called from a `ccall`ed
     /// function.
+    #[inline]
     pub unsafe fn new_unchecked<'target, N, T>(
         target: T,
         name: N,
@@ -98,6 +93,7 @@ impl<'scope> TypeVar<'scope> {
     */
 
     /// The name of this `TypeVar`.
+    #[inline]
     pub fn name(self) -> Symbol<'scope> {
         // Safety: pointer points to valid data
         unsafe {
@@ -108,6 +104,7 @@ impl<'scope> TypeVar<'scope> {
     }
 
     /// The lower bound of this `TypeVar`.
+    #[inline]
     pub fn lower_bound<'target, T>(self, target: T) -> ValueData<'target, 'static, T>
     where
         T: Target<'target>,
@@ -121,6 +118,7 @@ impl<'scope> TypeVar<'scope> {
     }
 
     /// The upper bound of this `TypeVar`.
+    #[inline]
     pub fn upper_bound<'target, T>(self, target: T) -> ValueData<'target, 'static, T>
     where
         T: Target<'target>,
@@ -144,10 +142,12 @@ impl<'scope> ManagedPriv<'scope, '_> for TypeVar<'scope> {
 
     // Safety: `inner` must not have been freed yet, the result must never be
     // used after the GC might have freed it.
+    #[inline]
     unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self {
         Self(inner, PhantomData)
     }
 
+    #[inline]
     fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps> {
         self.0
     }
@@ -164,13 +164,13 @@ pub type TypeVarRet = Ref<'static, 'static, TypeVar<'static>>;
 
 impl_valid_layout!(TypeVarRef, TypeVar, jl_tvar_type);
 
-use crate::memory::target::target_type::TargetType;
+use crate::memory::target::TargetType;
 
 /// `TypeVar` or `TypeVarRef`, depending on the target type `T`.
 pub type TypeVarData<'target, T> = <T as TargetType<'target>>::Data<'static, TypeVar<'target>>;
 
 /// `JuliaResult<TypeVar>` or `JuliaResultRef<TypeVarRef>`, depending on the target type `T`.
-pub type TypeVarResult<'target, T> = <T as TargetType<'target>>::Result<'static, TypeVar<'target>>;
+pub type TypeVarResult<'target, T> = TargetResult<'target, 'static, TypeVar<'target>, T>;
 
 impl_ccall_arg_managed!(TypeVar, 1);
 impl_into_typed!(TypeVar);

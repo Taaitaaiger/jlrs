@@ -222,11 +222,11 @@
 //! If you want to embed Julia in a Rust application, you must enable a runtime and a version
 //! feature:
 //!
-//! `jlrs = {version = "0.18.0", features = ["sync-rt", "julia-1-8"]}`
+//! `jlrs = {version = "0.19.0", features = ["sync-rt", "julia-1-8"]}`
 //!
-//! `jlrs = {version = "0.18.0", features = ["tokio-rt", "julia-1-8"]}`
+//! `jlrs = {version = "0.19.0", features = ["tokio-rt", "julia-1-8"]}`
 //!
-//! `jlrs = {version = "0.18.0", features = ["async-std-rt", "julia-1-8"]}`
+//! `jlrs = {version = "0.19.0", features = ["async-std-rt", "julia-1-8"]}`
 //!
 //! When Julia is embedded in an application, it must be initialized before it can be used. The
 //! following snippet initializes the sync runtime:
@@ -427,7 +427,7 @@
 //!         // CallAsync::call_async schedules the function call on another
 //!         // thread and returns a Future that resolves when the scheduled
 //!         // function has returned or thrown an error.
-//!         unsafe { func.call_async(&mut frame, &mut [a, b]) }
+//!         unsafe { func.call_async(&mut frame, [a, b]) }
 //!             .await
 //!             .into_jlrs_result()?
 //!             .unbox::<u64>()
@@ -484,8 +484,8 @@
 //!         // A `Vec` can be moved from Rust to Julia if the element type
 //!         // implements `IntoJulia`.
 //!         let data = vec![0usize; self.n_values];
-//!         let array = TypedArray::from_vec(frame.as_extended_target(), data, self.n_values)?
-//!             .into_jlrs_result()?;
+//!         let array =
+//!             TypedArray::from_vec(&mut frame, data, self.n_values)?.into_jlrs_result()?;
 //!
 //!         Ok(AccumulatorTaskState { array, offset: 0 })
 //!     }
@@ -771,14 +771,24 @@
 
 #![forbid(rustdoc::broken_intra_doc_links)]
 
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::AtomicBool;
 
+use atomic::Ordering;
 #[cfg(feature = "sync-rt")]
 use once_cell::sync::OnceCell;
 use prelude::Managed;
 
 use crate::{
-    data::managed::{module::Module, value::Value},
+    data::{
+        managed::{
+            module::{init_global_cache, Module},
+            symbol::init_symbol_cache,
+            value::Value,
+        },
+        types::{
+            construct_type::init_constructed_type_cache, foreign_type::init_foreign_type_registry,
+        },
+    },
     memory::{
         context::{ledger::init_ledger, stack::Stack},
         stack_frame::PinnedFrame,
@@ -809,15 +819,17 @@ macro_rules! init_fn {
     };
 }
 
+pub mod args;
 #[cfg(feature = "async")]
 pub mod async_util;
 pub mod call;
-pub(crate) mod catch;
+pub mod catch;
 #[cfg(feature = "ccall")]
 pub mod ccall;
 pub mod convert;
 pub mod data;
 pub mod error;
+pub mod gc_safe;
 pub mod info;
 pub mod memory;
 #[cfg(feature = "prelude")]
@@ -938,6 +950,11 @@ pub(crate) unsafe fn init_jlrs<const N: usize>(
     if IS_INIT.swap(true, Ordering::Relaxed) {
         return;
     }
+
+    init_foreign_type_registry();
+    init_constructed_type_cache();
+    init_symbol_cache();
+    init_global_cache();
 
     let unrooted = Unrooted::new();
     install_jlrs_core.use_or_install(unrooted);

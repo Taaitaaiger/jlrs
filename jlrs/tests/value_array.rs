@@ -15,12 +15,9 @@ mod tests {
             jlrs.instance(&mut frame)
                 .scope(|mut frame| {
                     let global = frame.unrooted();
-                    let mut arr = Array::new_for(
-                        frame.as_extended_target(),
-                        4,
-                        DataType::module_type(&global).as_value(),
-                    )
-                    .into_jlrs_result()?;
+                    let mut arr =
+                        Array::new_for(&mut frame, 4, DataType::module_type(&global).as_value())
+                            .into_jlrs_result()?;
 
                     {
                         let data = unsafe { arr.value_data()? };
@@ -56,12 +53,9 @@ mod tests {
             jlrs.instance(&mut frame)
                 .scope(|mut frame| {
                     let global = frame.unrooted();
-                    let mut arr = Array::new_for(
-                        frame.as_extended_target(),
-                        4,
-                        DataType::module_type(&global).as_value(),
-                    )
-                    .into_jlrs_result()?;
+                    let mut arr =
+                        Array::new_for(&mut frame, 4, DataType::module_type(&global).as_value())
+                            .into_jlrs_result()?;
 
                     let module = Module::core(&frame).as_value();
 
@@ -113,12 +107,9 @@ mod tests {
             jlrs.instance(&mut frame)
                 .scope(|mut frame| {
                     let global = frame.unrooted();
-                    let mut arr = Array::new_for(
-                        frame.as_extended_target(),
-                        4,
-                        DataType::module_type(&global).as_value(),
-                    )
-                    .into_jlrs_result()?;
+                    let mut arr =
+                        Array::new_for(&mut frame, 4, DataType::module_type(&global).as_value())
+                            .into_jlrs_result()?;
 
                     let module = Value::nothing(&frame);
 
@@ -146,12 +137,9 @@ mod tests {
             jlrs.instance(&mut frame)
                 .scope(|mut frame| {
                     let global = frame.unrooted();
-                    let mut arr = Array::new_for(
-                        frame.as_extended_target(),
-                        4,
-                        DataType::module_type(&global).as_value(),
-                    )
-                    .into_jlrs_result()?;
+                    let mut arr =
+                        Array::new_for(&mut frame, 4, DataType::module_type(&global).as_value())
+                            .into_jlrs_result()?;
 
                     {
                         let data = unsafe { arr.value_data_mut()? };

@@ -5,6 +5,7 @@
 use half::f16;
 use jl_sys::jl_float16_type;
 
+use super::is_bits::IsBits;
 use crate::{
     convert::{into_julia::IntoJulia, unbox::Unbox},
     data::managed::{
@@ -24,6 +25,7 @@ unsafe impl Unbox for f16 {
 }
 
 unsafe impl IntoJulia for f16 {
+    #[inline]
     fn julia_type<'scope, T>(target: T) -> DataTypeData<'scope, T>
     where
         T: Target<'scope>,
@@ -35,3 +37,5 @@ unsafe impl IntoJulia for f16 {
 
 impl_ccall_arg!(f16);
 impl_construct_julia_type!(f16, jl_float16_type);
+
+unsafe impl IsBits for f16 {}

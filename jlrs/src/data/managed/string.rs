@@ -17,7 +17,7 @@ use crate::{
     data::managed::{private::ManagedPriv, value::Value},
     error::{JlrsError, JlrsResult},
     impl_julia_typecheck,
-    memory::target::Target,
+    memory::target::{Target, TargetResult},
     private::Private,
 };
 
@@ -28,6 +28,7 @@ pub struct JuliaString<'scope>(*const u8, PhantomData<&'scope ()>);
 
 impl<'scope> JuliaString<'scope> {
     /// Create a new Julia string.
+    #[inline]
     pub fn new<'target, V, T>(target: T, string: V) -> StringData<'target, T>
     where
         V: AsRef<str>,
@@ -43,6 +44,7 @@ impl<'scope> JuliaString<'scope> {
     }
 
     /// Create a new Julia string.
+    #[inline]
     pub fn new_bytes<'target, V, T>(target: T, bytes: V) -> StringData<'target, T>
     where
         V: AsRef<[u8]>,
@@ -58,6 +60,7 @@ impl<'scope> JuliaString<'scope> {
     }
 
     /// Returns the length of the string.
+    #[inline]
     pub fn len(self) -> usize {
         // Safety: the pointer points to valid data, the length of the array is stored at the
         // beginning
@@ -65,6 +68,7 @@ impl<'scope> JuliaString<'scope> {
     }
 
     /// Returns the string as a `CStr`.
+    #[inline]
     pub fn as_c_str(self) -> &'scope CStr {
         // Safety: The string is terminated with a null character.
         unsafe {
@@ -74,6 +78,7 @@ impl<'scope> JuliaString<'scope> {
     }
 
     /// Returns the string as a slice of bytes, including all null characters..
+    #[inline]
     pub fn as_bytes(self) -> &'scope [u8] {
         unsafe {
             let len = self.len();
@@ -84,6 +89,7 @@ impl<'scope> JuliaString<'scope> {
 
     /// Returns the string as a string slice, or an error if it the string contains
     /// invalid characters
+    #[inline]
     pub fn as_str(self) -> JlrsResult<&'scope str> {
         Ok(str::from_utf8(self.as_c_str().to_bytes()).map_err(JlrsError::other)?)
     }
@@ -91,6 +97,7 @@ impl<'scope> JuliaString<'scope> {
     /// Returns the string as a string slice without checking if the string is properly encoded.
     ///
     /// Safety: the string must be properly encoded.
+    #[inline]
     pub unsafe fn as_str_unchecked(self) -> &'scope str {
         str::from_utf8_unchecked(self.as_c_str().to_bytes())
     }
@@ -102,6 +109,7 @@ impl_julia_typecheck!(JuliaString<'scope>, jl_string_type, 'scope);
 
 unsafe impl Unbox for String {
     type Output = Result<String, Vec<u8>>;
+    #[inline]
     unsafe fn unbox(value: Value) -> Self::Output {
         let s = value.cast_unchecked::<JuliaString>();
         match s.as_str() {
@@ -124,10 +132,12 @@ impl<'scope> ManagedPriv<'scope, '_> for JuliaString<'scope> {
 
     // Safety: `inner` must not have been freed yet, the result must never be
     // used after the GC might have freed it.
+    #[inline]
     unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self {
         JuliaString(inner.as_ptr(), PhantomData)
     }
 
+    #[inline]
     fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps> {
         unsafe { NonNull::new_unchecked(self.0 as *mut _) }
     }
@@ -142,14 +152,13 @@ pub type StringRet = Ref<'static, 'static, JuliaString<'static>>;
 
 impl_valid_layout!(StringRef, JuliaString, jl_string_type);
 
-use crate::memory::target::target_type::TargetType;
+use crate::memory::target::TargetType;
 
 /// `JuliaString` or `StringRef`, depending on the target type `T`.
 pub type StringData<'target, T> = <T as TargetType<'target>>::Data<'static, JuliaString<'target>>;
 
 /// `JuliaResult<JuliaString>` or `JuliaResultRef<StringRef>`, depending on the target type `T`.
-pub type StringResult<'target, T> =
-    <T as TargetType<'target>>::Result<'static, JuliaString<'target>>;
+pub type StringResult<'target, T> = TargetResult<'target, 'static, JuliaString<'target>, T>;
 
 impl_ccall_arg_managed!(JuliaString, 1);
 impl_into_typed!(JuliaString);

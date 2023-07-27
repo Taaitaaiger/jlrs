@@ -5,22 +5,29 @@ use jlrs::prelude::*;
 // This function returns `nothing` if a < b, throws an `AssertionError` otherwise.
 #[no_mangle]
 pub unsafe extern "C" fn assert_less_than(a: i32, b: i32) {
-    let mut stack_frame = StackFrame::new();
-    let ccall = CCall::new(&mut stack_frame);
+    let res = CCall::local_scope::<_, _, 2>(|mut frame| {
+        if a >= b {
+            let msg = JuliaString::new(&mut frame, "a is larger than b").as_value();
 
-    if a >= b {
-        // Safe because there are no pending drops.
-        ccall.throw_exception(|frame| {
-            let msg = JuliaString::new(frame.as_mut(), "a is larger than b").as_value();
-
-            Module::core(&frame)
+            let leaked = Module::core(&frame)
                 .global(&frame, "AssertionError")
                 .expect("AssertionError does not exist in Core")
                 .as_value()
                 .cast::<DataType>()
                 .expect("AssertionError is not a DataType")
-                .instantiate_unchecked(frame.as_mut(), [msg])
-        })
+                .instantiate_unchecked(&mut frame, [msg])
+                .leak();
+
+            return Ok(Err(leaked));
+        }
+
+        Ok(Ok(()))
+    })
+    .unwrap();
+
+    // Safe: there are no pendings drops.
+    if let Err(exc) = res {
+        CCall::throw_exception(exc)
     }
 }
 

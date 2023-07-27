@@ -2,58 +2,79 @@
 //!
 //! These types can be used with the `ConstructType` trait.
 
-use std::{marker::PhantomData, ptr::NonNull};
+use std::marker::PhantomData;
 
-use jl_sys::{jl_any_type, jl_value_t};
 use jlrs_macros::julia_version;
 
 use super::construct_type::ConstructType;
 use crate::{
     data::managed::{
         datatype::DataType,
-        module::Module,
-        private::ManagedPriv,
         type_var::TypeVar,
         union_all::UnionAll,
         value::{Value, ValueData},
         Managed,
     },
-    memory::target::{ExtendedTarget, Target},
-    private::Private,
+    inline_static_ref,
+    memory::target::Target,
 };
 
 /// Marker trait that must only be implemented by type constructors that build an abstract type.
 pub unsafe trait AbstractType: ConstructType {}
 
 macro_rules! impl_construct_julia_type_abstract {
-    ($ty:ty, $mod:ident) => {
+    ($ty:ty, $path:expr) => {
         unsafe impl ConstructType for $ty {
             type Static = $ty;
 
-            fn construct_type_uncached<'target, T>(
-                target: ExtendedTarget<'target, '_, '_, T>,
-            ) -> ValueData<'target, 'static, T>
+            const CACHEABLE: bool = false;
+
+            #[inline]
+            fn construct_type_uncached<'target, Tgt>(
+                target: Tgt,
+            ) -> ValueData<'target, 'static, Tgt>
             where
-                T: Target<'target>,
+                Tgt: Target<'target>,
             {
-                let (target, _) = target.split();
-                Module::$mod(&target)
-                    .global(target, stringify!($ty))
-                    .unwrap()
+                Self::base_type(&target).unwrap().root(target)
             }
 
+            #[inline]
             fn base_type<'target, Tgt>(target: &Tgt) -> Option<Value<'target, 'static>>
             where
                 Tgt: Target<'target>,
             {
-                unsafe {
-                    Some(
-                        Module::$mod(target)
-                            .global(target, stringify!($ty))
-                            .unwrap()
-                            .as_value(),
-                    )
-                }
+                let value = inline_static_ref!(STATIC, Value, $path, target);
+                Some(value)
+            }
+        }
+    };
+}
+
+macro_rules! impl_construct_julia_type_abstract_using {
+    ($ty:ty, $path:expr) => {
+        unsafe impl ConstructType for $ty {
+            type Static = $ty;
+
+            const CACHEABLE: bool = false;
+
+            #[inline]
+            fn construct_type_uncached<'target, Tgt>(
+                target: Tgt,
+            ) -> ValueData<'target, 'static, Tgt>
+            where
+                Tgt: Target<'target>,
+            {
+                Self::base_type(&target).unwrap().root(target)
+            }
+
+            #[inline]
+            fn base_type<'target, Tgt>(target: &Tgt) -> Option<Value<'target, 'static>>
+            where
+                Tgt: Target<'target>,
+            {
+                let value = $path(target).as_value();
+                Some(value)
             }
         }
     };
@@ -63,111 +84,87 @@ macro_rules! impl_construct_julia_type_abstract {
 /// Construct a new `Core.AbstractChar` type object.
 pub struct AbstractChar;
 unsafe impl AbstractType for AbstractChar {}
-impl_construct_julia_type_abstract!(AbstractChar, core);
+impl_construct_julia_type_abstract!(AbstractChar, "Core.AbstractChar");
 
 /// Construct a new `Core.AbstractFloat` type object.
 pub struct AbstractFloat;
 unsafe impl AbstractType for AbstractFloat {}
-impl_construct_julia_type_abstract!(AbstractFloat, core);
+impl_construct_julia_type_abstract_using!(AbstractFloat, DataType::floatingpoint_type);
 
 /// Construct a new `Core.AbstractString` type object.
 pub struct AbstractString;
 unsafe impl AbstractType for AbstractString {}
-impl_construct_julia_type_abstract!(AbstractString, core);
+impl_construct_julia_type_abstract!(AbstractString, "Core.AbstractString");
 
 /// Construct a new `Core.Exception` type object.
 pub struct Exception;
 unsafe impl AbstractType for Exception {}
-impl_construct_julia_type_abstract!(Exception, core);
+impl_construct_julia_type_abstract!(Exception, "Core.Exception");
 
 /// Construct a new `Core.Function` type object.
 pub struct Function;
 unsafe impl AbstractType for Function {}
-impl_construct_julia_type_abstract!(Function, core);
+impl_construct_julia_type_abstract_using!(Function, DataType::function_type);
 
 /// Construct a new `Core.IO` type object.
 pub struct IO;
 unsafe impl AbstractType for IO {}
-impl_construct_julia_type_abstract!(IO, core);
+impl_construct_julia_type_abstract!(IO, "Core.IO");
 
 /// Construct a new `Core.Integer` type object.
 pub struct Integer;
 unsafe impl AbstractType for Integer {}
-impl_construct_julia_type_abstract!(Integer, core);
+impl_construct_julia_type_abstract!(Integer, "Core.Integer");
 
 /// Construct a new `Core.Real` type object.
 pub struct Real;
 unsafe impl AbstractType for Real {}
-impl_construct_julia_type_abstract!(Real, core);
+impl_construct_julia_type_abstract!(Real, "Core.Real");
 
 /// Construct a new `Core.Number` type object.
 pub struct Number;
 unsafe impl AbstractType for Number {}
-impl_construct_julia_type_abstract!(Number, core);
+impl_construct_julia_type_abstract_using!(Number, DataType::number_type);
 
 /// Construct a new `Core.Signed` type object.
 pub struct Signed;
 unsafe impl AbstractType for Signed {}
-impl_construct_julia_type_abstract!(Signed, core);
+impl_construct_julia_type_abstract_using!(Signed, DataType::signed_type);
 
 /// Construct a new `Core.Unsigned` type object.
 pub struct Unsigned;
 unsafe impl AbstractType for Unsigned {}
-impl_construct_julia_type_abstract!(Unsigned, core);
+impl_construct_julia_type_abstract!(Unsigned, "Core.Unsigned");
 
 /// Construct a new `Base.AbstractDisplay` type object.
 pub struct AbstractDisplay;
 unsafe impl AbstractType for AbstractDisplay {}
-impl_construct_julia_type_abstract!(AbstractDisplay, base);
+impl_construct_julia_type_abstract!(AbstractDisplay, "Base.AbstractDisplay");
 
 /// Construct a new `Base.AbstractIrrational` type object.
 pub struct AbstractIrrational;
 unsafe impl AbstractType for AbstractIrrational {}
-impl_construct_julia_type_abstract!(AbstractIrrational, base);
+impl_construct_julia_type_abstract!(AbstractIrrational, "Base.AbstractIrrational");
 
 /// Construct a new `Base.AbstractMatch` type object.
 pub struct AbstractMatch;
 unsafe impl AbstractType for AbstractMatch {}
-impl_construct_julia_type_abstract!(AbstractMatch, base);
+impl_construct_julia_type_abstract!(AbstractMatch, "Base.AbstractMatch");
 
 /// Construct a new `Base.AbstractPattern` type object.
 pub struct AbstractPattern;
 unsafe impl AbstractType for AbstractPattern {}
-impl_construct_julia_type_abstract!(AbstractPattern, base);
+impl_construct_julia_type_abstract!(AbstractPattern, "Base.AbstractPattern");
 
 /// Construct a new `Base.IndexStyle` type object.
 pub struct IndexStyle;
 unsafe impl AbstractType for IndexStyle {}
-impl_construct_julia_type_abstract!(IndexStyle, base);
+impl_construct_julia_type_abstract!(IndexStyle, "Base.IndexStyle");
 
+/// Construct a new `Core.Signed` type object.
 pub struct AnyType;
 unsafe impl AbstractType for AnyType {}
-unsafe impl ConstructType for AnyType {
-    type Static = AnyType;
-
-    fn construct_type_uncached<'target, T>(
-        target: ExtendedTarget<'target, '_, '_, T>,
-    ) -> ValueData<'target, 'static, T>
-    where
-        T: Target<'target>,
-    {
-        let (target, _) = target.split();
-        unsafe {
-            let ptr = NonNull::new_unchecked(jl_any_type.cast::<jl_value_t>());
-            target.data_from_ptr(ptr, Private)
-        }
-    }
-
-    fn base_type<'target, Tgt>(_target: &Tgt) -> Option<Value<'target, 'static>>
-    where
-        Tgt: Target<'target>,
-    {
-        unsafe {
-            let ptr = NonNull::new_unchecked(jl_any_type.cast::<jl_value_t>());
-            Some(Value::wrap_non_null(ptr, Private))
-        }
-    }
-}
+impl_construct_julia_type_abstract_using!(AnyType, DataType::any_type);
 
 /// Construct a new `AbstractArray` type object from the provided type parameters.
 pub struct AbstractArray<T: ConstructType, N: ConstructType> {
@@ -180,25 +177,21 @@ unsafe impl<T: ConstructType, N: ConstructType> AbstractType for AbstractArray<T
 unsafe impl<T: ConstructType, N: ConstructType> ConstructType for AbstractArray<T, N> {
     type Static = AbstractArray<T::Static, N::Static>;
 
-    fn construct_type_uncached<'target, Tgt>(
-        target: ExtendedTarget<'target, '_, '_, Tgt>,
-    ) -> ValueData<'target, 'static, Tgt>
+    fn construct_type_uncached<'target, Tgt>(target: Tgt) -> ValueData<'target, 'static, Tgt>
     where
         Tgt: Target<'target>,
     {
-        let (target, frame) = target.split();
-
-        frame
-            .scope(|mut frame| {
-                let ty_param = T::construct_type(frame.as_extended_target());
-                let rank_param = N::construct_type(frame.as_extended_target());
+        target
+            .with_local_scope::<_, _, 3>(|target, mut frame| {
+                let ty_param = T::construct_type(&mut frame);
+                let rank_param = N::construct_type(&mut frame);
                 let params = [ty_param, rank_param];
                 unsafe {
                     let applied = UnionAll::abstractarray_type(&frame)
                         .as_value()
                         .apply_type_unchecked(&mut frame, params);
                     Ok(UnionAll::rewrap(
-                        target.into_extended_target(&mut frame),
+                        target,
                         applied.cast_unchecked::<DataType>(),
                     ))
                 }
@@ -206,6 +199,7 @@ unsafe impl<T: ConstructType, N: ConstructType> ConstructType for AbstractArray<
             .unwrap()
     }
 
+    #[inline]
     fn base_type<'target, Tgt>(target: &Tgt) -> Option<Value<'target, 'static>>
     where
         Tgt: Target<'target>,
@@ -225,25 +219,21 @@ unsafe impl<T: ConstructType, N: ConstructType> AbstractType for DenseArray<T, N
 unsafe impl<T: ConstructType, N: ConstructType> ConstructType for DenseArray<T, N> {
     type Static = DenseArray<T::Static, N::Static>;
 
-    fn construct_type_uncached<'target, Tgt>(
-        target: ExtendedTarget<'target, '_, '_, Tgt>,
-    ) -> ValueData<'target, 'static, Tgt>
+    fn construct_type_uncached<'target, Tgt>(target: Tgt) -> ValueData<'target, 'static, Tgt>
     where
         Tgt: Target<'target>,
     {
-        let (target, frame) = target.split();
-
-        frame
-            .scope(|mut frame| {
-                let ty_param = T::construct_type(frame.as_extended_target());
-                let rank_param = N::construct_type(frame.as_extended_target());
+        target
+            .with_local_scope::<_, _, 3>(|target, mut frame| {
+                let ty_param = T::construct_type(&mut frame);
+                let rank_param = N::construct_type(&mut frame);
                 let params = [ty_param, rank_param];
                 unsafe {
                     let applied = UnionAll::densearray_type(&frame)
                         .as_value()
                         .apply_type_unchecked(&mut frame, params);
                     Ok(UnionAll::rewrap(
-                        target.into_extended_target(&mut frame),
+                        target,
                         applied.cast_unchecked::<DataType>(),
                     ))
                 }
@@ -251,6 +241,7 @@ unsafe impl<T: ConstructType, N: ConstructType> ConstructType for DenseArray<T, 
             .unwrap()
     }
 
+    #[inline]
     fn base_type<'target, Tgt>(target: &Tgt) -> Option<Value<'target, 'static>>
     where
         Tgt: Target<'target>,
@@ -269,24 +260,20 @@ unsafe impl<T: ConstructType> AbstractType for RefTypeConstructor<T> {}
 unsafe impl<T: ConstructType> ConstructType for RefTypeConstructor<T> {
     type Static = RefTypeConstructor<T::Static>;
 
-    fn construct_type_uncached<'target, Tgt>(
-        target: ExtendedTarget<'target, '_, '_, Tgt>,
-    ) -> ValueData<'target, 'static, Tgt>
+    fn construct_type_uncached<'target, Tgt>(target: Tgt) -> ValueData<'target, 'static, Tgt>
     where
         Tgt: Target<'target>,
     {
-        let (target, frame) = target.split();
-
-        frame
-            .scope(|mut frame| {
-                let ty_param = T::construct_type(frame.as_extended_target());
+        target
+            .with_local_scope::<_, _, 2>(|target, mut frame| {
+                let ty_param = T::construct_type(&mut frame);
                 let params = [ty_param];
                 unsafe {
                     let applied = UnionAll::ref_type(&frame)
                         .as_value()
                         .apply_type_unchecked(&mut frame, params);
                     Ok(UnionAll::rewrap(
-                        target.into_extended_target(&mut frame),
+                        target,
                         applied.cast_unchecked::<DataType>(),
                     ))
                 }
@@ -294,6 +281,7 @@ unsafe impl<T: ConstructType> ConstructType for RefTypeConstructor<T> {
             .unwrap()
     }
 
+    #[inline]
     fn base_type<'target, Tgt>(target: &Tgt) -> Option<Value<'target, 'static>>
     where
         Tgt: Target<'target>,
@@ -312,24 +300,20 @@ unsafe impl<T: ConstructType> AbstractType for TypeTypeConstructor<T> {}
 unsafe impl<T: ConstructType> ConstructType for TypeTypeConstructor<T> {
     type Static = TypeTypeConstructor<T::Static>;
 
-    fn construct_type_uncached<'target, Tgt>(
-        target: ExtendedTarget<'target, '_, '_, Tgt>,
-    ) -> ValueData<'target, 'static, Tgt>
+    fn construct_type_uncached<'target, Tgt>(target: Tgt) -> ValueData<'target, 'static, Tgt>
     where
         Tgt: Target<'target>,
     {
-        let (target, frame) = target.split();
-
-        frame
-            .scope(|mut frame| {
-                let ty_param = T::construct_type(frame.as_extended_target());
+        target
+            .with_local_scope::<_, _, 2>(|target, mut frame| {
+                let ty_param = T::construct_type(&mut frame);
                 let params = [ty_param];
                 unsafe {
                     let applied = UnionAll::type_type(&frame)
                         .as_value()
                         .apply_type_unchecked(&mut frame, params);
                     Ok(UnionAll::rewrap(
-                        target.into_extended_target(&mut frame),
+                        target,
                         applied.cast_unchecked::<DataType>(),
                     ))
                 }
@@ -337,6 +321,7 @@ unsafe impl<T: ConstructType> ConstructType for TypeTypeConstructor<T> {
             .unwrap()
     }
 
+    #[inline]
     fn base_type<'target, Tgt>(target: &Tgt) -> Option<Value<'target, 'static>>
     where
         Tgt: Target<'target>,
@@ -355,26 +340,21 @@ unsafe impl<T: ConstructType> AbstractType for AbstractChannel<T> {}
 unsafe impl<T: ConstructType> ConstructType for AbstractChannel<T> {
     type Static = AbstractChannel<T::Static>;
 
-    fn construct_type_uncached<'target, Tgt>(
-        target: ExtendedTarget<'target, '_, '_, Tgt>,
-    ) -> ValueData<'target, 'static, Tgt>
+    fn construct_type_uncached<'target, Tgt>(target: Tgt) -> ValueData<'target, 'static, Tgt>
     where
         Tgt: Target<'target>,
     {
-        let (target, frame) = target.split();
-
-        frame
-            .scope(|mut frame| {
-                let ty_param = T::construct_type(frame.as_extended_target());
+        target
+            .with_local_scope::<_, _, 2>(|target, mut frame| {
+                let ty_param = T::construct_type(&mut frame);
                 let params = [ty_param];
                 unsafe {
-                    let applied = Module::base(&frame)
-                        .global(&frame, "AbstractChannel")
+                    let applied = Self::base_type(&frame)
                         .unwrap()
-                        .as_value()
                         .apply_type_unchecked(&mut frame, params);
+
                     Ok(UnionAll::rewrap(
-                        target.into_extended_target(&mut frame),
+                        target,
                         applied.cast_unchecked::<DataType>(),
                     ))
                 }
@@ -382,18 +362,13 @@ unsafe impl<T: ConstructType> ConstructType for AbstractChannel<T> {
             .unwrap()
     }
 
+    #[inline]
     fn base_type<'target, Tgt>(target: &Tgt) -> Option<Value<'target, 'static>>
     where
         Tgt: Target<'target>,
     {
-        unsafe {
-            Some(
-                Module::base(target)
-                    .global(target, "AbstractChannel")
-                    .unwrap()
-                    .as_value(),
-            )
-        }
+        let value = inline_static_ref!(STATIC, Value, "Base.AbstractChannel", target);
+        Some(value)
     }
 }
 
@@ -408,27 +383,22 @@ unsafe impl<T: ConstructType, K: ConstructType> AbstractType for AbstractDict<T,
 unsafe impl<K: ConstructType, V: ConstructType> ConstructType for AbstractDict<K, V> {
     type Static = AbstractDict<K::Static, V::Static>;
 
-    fn construct_type_uncached<'target, Tgt>(
-        target: ExtendedTarget<'target, '_, '_, Tgt>,
-    ) -> ValueData<'target, 'static, Tgt>
+    fn construct_type_uncached<'target, Tgt>(target: Tgt) -> ValueData<'target, 'static, Tgt>
     where
         Tgt: Target<'target>,
     {
-        let (target, frame) = target.split();
-
-        frame
-            .scope(|mut frame| {
-                let key_param = K::construct_type(frame.as_extended_target());
-                let value_param = V::construct_type(frame.as_extended_target());
+        target
+            .with_local_scope::<_, _, 3>(|target, mut frame| {
+                let key_param = K::construct_type(&mut frame);
+                let value_param = V::construct_type(&mut frame);
                 let params = [key_param, value_param];
                 unsafe {
-                    let applied = Module::base(&frame)
-                        .global(&frame, "AbstractDict")
+                    let applied = Self::base_type(&frame)
                         .unwrap()
-                        .as_value()
                         .apply_type_unchecked(&mut frame, params);
+
                     Ok(UnionAll::rewrap(
-                        target.into_extended_target(&mut frame),
+                        target,
                         applied.cast_unchecked::<DataType>(),
                     ))
                 }
@@ -436,18 +406,13 @@ unsafe impl<K: ConstructType, V: ConstructType> ConstructType for AbstractDict<K
             .unwrap()
     }
 
+    #[inline]
     fn base_type<'target, Tgt>(target: &Tgt) -> Option<Value<'target, 'static>>
     where
         Tgt: Target<'target>,
     {
-        unsafe {
-            Some(
-                Module::base(target)
-                    .global(target, "AbstractDict")
-                    .unwrap()
-                    .as_value(),
-            )
-        }
+        let value = inline_static_ref!(STATIC, Value, "Base.AbstractDict", target);
+        Some(value)
     }
 }
 
@@ -461,26 +426,20 @@ unsafe impl<T: ConstructType> AbstractType for AbstractMatrix<T> {}
 unsafe impl<T: ConstructType> ConstructType for AbstractMatrix<T> {
     type Static = AbstractMatrix<T::Static>;
 
-    fn construct_type_uncached<'target, Tgt>(
-        target: ExtendedTarget<'target, '_, '_, Tgt>,
-    ) -> ValueData<'target, 'static, Tgt>
+    fn construct_type_uncached<'target, Tgt>(target: Tgt) -> ValueData<'target, 'static, Tgt>
     where
         Tgt: Target<'target>,
     {
-        let (target, frame) = target.split();
-
-        frame
-            .scope(|mut frame| {
-                let ty_param = T::construct_type(frame.as_extended_target());
+        target
+            .with_local_scope::<_, _, 2>(|target, mut frame| {
+                let ty_param = T::construct_type(&mut frame);
                 let params = [ty_param];
                 unsafe {
-                    let applied = Module::base(&frame)
-                        .global(&frame, "AbstractMatrix")
+                    let applied = Self::base_type(&frame)
                         .unwrap()
-                        .as_value()
                         .apply_type_unchecked(&mut frame, params);
                     Ok(UnionAll::rewrap(
-                        target.into_extended_target(&mut frame),
+                        target,
                         applied.cast_unchecked::<DataType>(),
                     ))
                 }
@@ -488,18 +447,13 @@ unsafe impl<T: ConstructType> ConstructType for AbstractMatrix<T> {
             .unwrap()
     }
 
+    #[inline]
     fn base_type<'target, Tgt>(target: &Tgt) -> Option<Value<'target, 'static>>
     where
         Tgt: Target<'target>,
     {
-        unsafe {
-            Some(
-                Module::base(target)
-                    .global(target, "AbstractMatrix")
-                    .unwrap()
-                    .as_value(),
-            )
-        }
+        let value = inline_static_ref!(STATIC, Value, "Base.AbstractMatrix", target);
+        Some(value)
     }
 }
 
@@ -513,26 +467,20 @@ unsafe impl<T: ConstructType> AbstractType for AbstractRange<T> {}
 unsafe impl<T: ConstructType> ConstructType for AbstractRange<T> {
     type Static = AbstractRange<T::Static>;
 
-    fn construct_type_uncached<'target, Tgt>(
-        target: ExtendedTarget<'target, '_, '_, Tgt>,
-    ) -> ValueData<'target, 'static, Tgt>
+    fn construct_type_uncached<'target, Tgt>(target: Tgt) -> ValueData<'target, 'static, Tgt>
     where
         Tgt: Target<'target>,
     {
-        let (target, frame) = target.split();
-
-        frame
-            .scope(|mut frame| {
-                let ty_param = T::construct_type(frame.as_extended_target());
+        target
+            .with_local_scope::<_, _, 2>(|target, mut frame| {
+                let ty_param = T::construct_type(&mut frame);
                 let params = [ty_param];
                 unsafe {
-                    let applied = Module::base(&frame)
-                        .global(&frame, "AbstractRange")
+                    let applied = Self::base_type(&frame)
                         .unwrap()
-                        .as_value()
                         .apply_type_unchecked(&mut frame, params);
                     Ok(UnionAll::rewrap(
-                        target.into_extended_target(&mut frame),
+                        target,
                         applied.cast_unchecked::<DataType>(),
                     ))
                 }
@@ -540,18 +488,13 @@ unsafe impl<T: ConstructType> ConstructType for AbstractRange<T> {
             .unwrap()
     }
 
+    #[inline]
     fn base_type<'target, Tgt>(target: &Tgt) -> Option<Value<'target, 'static>>
     where
         Tgt: Target<'target>,
     {
-        unsafe {
-            Some(
-                Module::base(target)
-                    .global(target, "AbstractRange")
-                    .unwrap()
-                    .as_value(),
-            )
-        }
+        let value = inline_static_ref!(STATIC, Value, "Base.AbstractRange", target);
+        Some(value)
     }
 }
 
@@ -565,26 +508,20 @@ unsafe impl<T: ConstructType> AbstractType for AbstractSet<T> {}
 unsafe impl<T: ConstructType> ConstructType for AbstractSet<T> {
     type Static = AbstractSet<T::Static>;
 
-    fn construct_type_uncached<'target, Tgt>(
-        target: ExtendedTarget<'target, '_, '_, Tgt>,
-    ) -> ValueData<'target, 'static, Tgt>
+    fn construct_type_uncached<'target, Tgt>(target: Tgt) -> ValueData<'target, 'static, Tgt>
     where
         Tgt: Target<'target>,
     {
-        let (target, frame) = target.split();
-
-        frame
-            .scope(|mut frame| {
-                let ty_param = T::construct_type(frame.as_extended_target());
+        target
+            .with_local_scope::<_, _, 2>(|target, mut frame| {
+                let ty_param = T::construct_type(&mut frame);
                 let params = [ty_param];
                 unsafe {
-                    let applied = Module::base(&frame)
-                        .global(&frame, "AbstractSet")
-                        .unwrap()
-                        .as_value()
+                    let applied = Self::base_type(&frame)
+                        .unwrap_unchecked()
                         .apply_type_unchecked(&mut frame, params);
                     Ok(UnionAll::rewrap(
-                        target.into_extended_target(&mut frame),
+                        target,
                         applied.cast_unchecked::<DataType>(),
                     ))
                 }
@@ -592,18 +529,13 @@ unsafe impl<T: ConstructType> ConstructType for AbstractSet<T> {
             .unwrap()
     }
 
+    #[inline]
     fn base_type<'target, Tgt>(target: &Tgt) -> Option<Value<'target, 'static>>
     where
         Tgt: Target<'target>,
     {
-        unsafe {
-            Some(
-                Module::base(target)
-                    .global(target, "AbstractSet")
-                    .unwrap()
-                    .as_value(),
-            )
-        }
+        let value = inline_static_ref!(STATIC, Value, "Base.AbstractSet", target);
+        Some(value)
     }
 }
 
@@ -621,27 +553,21 @@ unsafe impl<T: ConstructType, N: ConstructType> AbstractType for AbstractSlices<
 unsafe impl<T: ConstructType, N: ConstructType> ConstructType for AbstractSlices<T, N> {
     type Static = AbstractSlices<T::Static, N::Static>;
 
-    fn construct_type_uncached<'target, Tgt>(
-        target: ExtendedTarget<'target, '_, '_, Tgt>,
-    ) -> ValueData<'target, 'static, Tgt>
+    fn construct_type_uncached<'target, Tgt>(target: Tgt) -> ValueData<'target, 'static, Tgt>
     where
         Tgt: Target<'target>,
     {
-        let (target, frame) = target.split();
-
-        frame
-            .scope(|mut frame| {
-                let ty_param = T::construct_type(frame.as_extended_target());
-                let n_param = N::construct_type(frame.as_extended_target());
+        target
+            .with_local_scope::<_, _, 3>(|target, mut frame| {
+                let ty_param = T::construct_type(&mut frame);
+                let n_param = N::construct_type(&mut frame);
                 let params = [ty_param, n_param];
                 unsafe {
-                    let applied = Module::base(&frame)
-                        .global(&frame, "AbstractSlices")
+                    let applied = Self::base_type(&frame)
                         .unwrap()
-                        .as_value()
                         .apply_type_unchecked(&mut frame, params);
                     Ok(UnionAll::rewrap(
-                        target.into_extended_target(&mut frame),
+                        target,
                         applied.cast_unchecked::<DataType>(),
                     ))
                 }
@@ -649,18 +575,13 @@ unsafe impl<T: ConstructType, N: ConstructType> ConstructType for AbstractSlices
             .unwrap()
     }
 
+    #[inline]
     fn base_type<'target, Tgt>(target: &Tgt) -> Option<Value<'target, 'static>>
     where
         Tgt: Target<'target>,
     {
-        unsafe {
-            Some(
-                Module::base(target)
-                    .global(target, "AbstractSlices")
-                    .unwrap()
-                    .as_value(),
-            )
-        }
+        let value = inline_static_ref!(STATIC, Value, "Base.AbstractSlices", target);
+        Some(value)
     }
 }
 
@@ -672,26 +593,20 @@ pub struct AbstractUnitRange<T: ConstructType> {
 unsafe impl<T: ConstructType> ConstructType for AbstractUnitRange<T> {
     type Static = AbstractUnitRange<T::Static>;
 
-    fn construct_type_uncached<'target, Tgt>(
-        target: ExtendedTarget<'target, '_, '_, Tgt>,
-    ) -> ValueData<'target, 'static, Tgt>
+    fn construct_type_uncached<'target, Tgt>(target: Tgt) -> ValueData<'target, 'static, Tgt>
     where
         Tgt: Target<'target>,
     {
-        let (target, frame) = target.split();
-
-        frame
-            .scope(|mut frame| {
-                let ty_param = T::construct_type(frame.as_extended_target());
+        target
+            .with_local_scope::<_, _, 2>(|target, mut frame| {
+                let ty_param = T::construct_type(&mut frame);
                 let params = [ty_param];
                 unsafe {
-                    let applied = Module::base(&frame)
-                        .global(&frame, "AbstractUnitRange")
+                    let applied = Self::base_type(&frame)
                         .unwrap()
-                        .as_value()
                         .apply_type_unchecked(&mut frame, params);
                     Ok(UnionAll::rewrap(
-                        target.into_extended_target(&mut frame),
+                        target,
                         applied.cast_unchecked::<DataType>(),
                     ))
                 }
@@ -699,18 +614,13 @@ unsafe impl<T: ConstructType> ConstructType for AbstractUnitRange<T> {
             .unwrap()
     }
 
+    #[inline]
     fn base_type<'target, Tgt>(target: &Tgt) -> Option<Value<'target, 'static>>
     where
         Tgt: Target<'target>,
     {
-        unsafe {
-            Some(
-                Module::base(target)
-                    .global(target, "AbstractUnitRange")
-                    .unwrap()
-                    .as_value(),
-            )
-        }
+        let value = inline_static_ref!(STATIC, Value, "Base.AbstractUnitRange", target);
+        Some(value)
     }
 }
 
@@ -726,26 +636,20 @@ unsafe impl<T: ConstructType> AbstractType for AbstractVector<T> {}
 unsafe impl<T: ConstructType> ConstructType for AbstractVector<T> {
     type Static = AbstractVector<T::Static>;
 
-    fn construct_type_uncached<'target, Tgt>(
-        target: ExtendedTarget<'target, '_, '_, Tgt>,
-    ) -> ValueData<'target, 'static, Tgt>
+    fn construct_type_uncached<'target, Tgt>(target: Tgt) -> ValueData<'target, 'static, Tgt>
     where
         Tgt: Target<'target>,
     {
-        let (target, frame) = target.split();
-
-        frame
-            .scope(|mut frame| {
-                let ty_param = T::construct_type(frame.as_extended_target());
+        target
+            .with_local_scope::<_, _, 2>(|target, mut frame| {
+                let ty_param = T::construct_type(&mut frame);
                 let params = [ty_param];
                 unsafe {
-                    let applied = Module::base(&frame)
-                        .global(&frame, "AbstractVector")
+                    let applied = Self::base_type(&frame)
                         .unwrap()
-                        .as_value()
                         .apply_type_unchecked(&mut frame, params);
                     Ok(UnionAll::rewrap(
-                        target.into_extended_target(&mut frame),
+                        target,
                         applied.cast_unchecked::<DataType>(),
                     ))
                 }
@@ -753,18 +657,13 @@ unsafe impl<T: ConstructType> ConstructType for AbstractVector<T> {
             .unwrap()
     }
 
+    #[inline]
     fn base_type<'target, Tgt>(target: &Tgt) -> Option<Value<'target, 'static>>
     where
         Tgt: Target<'target>,
     {
-        unsafe {
-            Some(
-                Module::base(target)
-                    .global(target, "AbstractVector")
-                    .unwrap()
-                    .as_value(),
-            )
-        }
+        let value = inline_static_ref!(STATIC, Value, "Base.AbstractVector", target);
+        Some(value)
     }
 }
 
@@ -778,26 +677,20 @@ unsafe impl<T: ConstructType> AbstractType for DenseMatrix<T> {}
 unsafe impl<T: ConstructType> ConstructType for DenseMatrix<T> {
     type Static = DenseMatrix<T::Static>;
 
-    fn construct_type_uncached<'target, Tgt>(
-        target: ExtendedTarget<'target, '_, '_, Tgt>,
-    ) -> ValueData<'target, 'static, Tgt>
+    fn construct_type_uncached<'target, Tgt>(target: Tgt) -> ValueData<'target, 'static, Tgt>
     where
         Tgt: Target<'target>,
     {
-        let (target, frame) = target.split();
-
-        frame
-            .scope(|mut frame| {
-                let ty_param = T::construct_type(frame.as_extended_target());
+        target
+            .with_local_scope::<_, _, 2>(|target, mut frame| {
+                let ty_param = T::construct_type(&mut frame);
                 let params = [ty_param];
                 unsafe {
-                    let applied = Module::base(&frame)
-                        .global(&frame, "DenseMatrix")
+                    let applied = Self::base_type(&frame)
                         .unwrap()
-                        .as_value()
                         .apply_type_unchecked(&mut frame, params);
                     Ok(UnionAll::rewrap(
-                        target.into_extended_target(&mut frame),
+                        target,
                         applied.cast_unchecked::<DataType>(),
                     ))
                 }
@@ -805,18 +698,13 @@ unsafe impl<T: ConstructType> ConstructType for DenseMatrix<T> {
             .unwrap()
     }
 
+    #[inline]
     fn base_type<'target, Tgt>(target: &Tgt) -> Option<Value<'target, 'static>>
     where
         Tgt: Target<'target>,
     {
-        unsafe {
-            Some(
-                Module::base(target)
-                    .global(target, "DenseMatrix")
-                    .unwrap()
-                    .as_value(),
-            )
-        }
+        let value = inline_static_ref!(STATIC, Value, "Base.DenseMatrix", target);
+        Some(value)
     }
 }
 
@@ -830,26 +718,20 @@ unsafe impl<T: ConstructType> AbstractType for DenseVector<T> {}
 unsafe impl<T: ConstructType> ConstructType for DenseVector<T> {
     type Static = DenseVector<T::Static>;
 
-    fn construct_type_uncached<'target, Tgt>(
-        target: ExtendedTarget<'target, '_, '_, Tgt>,
-    ) -> ValueData<'target, 'static, Tgt>
+    fn construct_type_uncached<'target, Tgt>(target: Tgt) -> ValueData<'target, 'static, Tgt>
     where
         Tgt: Target<'target>,
     {
-        let (target, frame) = target.split();
-
-        frame
-            .scope(|mut frame| {
-                let ty_param = T::construct_type(frame.as_extended_target());
+        target
+            .with_local_scope::<_, _, 2>(|target, mut frame| {
+                let ty_param = T::construct_type(&mut frame);
                 let params = [ty_param];
                 unsafe {
-                    let applied = Module::base(&frame)
-                        .global(&frame, "DenseVector")
+                    let applied = Self::base_type(&frame)
                         .unwrap()
-                        .as_value()
                         .apply_type_unchecked(&mut frame, params);
                     Ok(UnionAll::rewrap(
-                        target.into_extended_target(&mut frame),
+                        target,
                         applied.cast_unchecked::<DataType>(),
                     ))
                 }
@@ -857,18 +739,13 @@ unsafe impl<T: ConstructType> ConstructType for DenseVector<T> {
             .unwrap()
     }
 
+    #[inline]
     fn base_type<'target, Tgt>(target: &Tgt) -> Option<Value<'target, 'static>>
     where
         Tgt: Target<'target>,
     {
-        unsafe {
-            Some(
-                Module::base(target)
-                    .global(target, "DenseVector")
-                    .unwrap()
-                    .as_value(),
-            )
-        }
+        let value = inline_static_ref!(STATIC, Value, "Base.DenseVector", target);
+        Some(value)
     }
 }
 
@@ -882,38 +759,32 @@ unsafe impl<T: ConstructType> AbstractType for Enum<T> {}
 unsafe impl<T: ConstructType> ConstructType for Enum<T> {
     type Static = Enum<T::Static>;
 
-    fn construct_type_uncached<'target, Tgt>(
-        target: ExtendedTarget<'target, '_, '_, Tgt>,
-    ) -> ValueData<'target, 'static, Tgt>
+    fn construct_type_uncached<'target, Tgt>(target: Tgt) -> ValueData<'target, 'static, Tgt>
     where
         Tgt: Target<'target>,
     {
-        let (target, frame) = target.split();
-
-        frame
-            .scope(|mut frame| {
-                let ty_param = T::construct_type(frame.as_extended_target());
+        target
+            .with_local_scope::<_, _, 3>(|target, mut frame| {
+                let ty_param = T::construct_type(&mut frame);
 
                 // Validate bound
                 if let Ok(tvar) = ty_param.cast::<TypeVar>() {
                     unsafe {
                         let ub = tvar.upper_bound(&frame).as_value();
-                        assert!(ub.subtype(Integer::construct_type(frame.as_extended_target())));
+                        assert!(ub.subtype(Integer::construct_type(&mut frame)));
                     }
                 } else {
-                    assert!(ty_param.subtype(Integer::construct_type(frame.as_extended_target())));
+                    assert!(ty_param.subtype(Integer::construct_type(&mut frame)));
                 }
 
                 let params = [ty_param];
 
                 unsafe {
-                    let applied = Module::base(&frame)
-                        .global(&frame, "Enum")
+                    let applied = Self::base_type(&frame)
                         .unwrap()
-                        .as_value()
                         .apply_type_unchecked(&mut frame, params);
                     Ok(UnionAll::rewrap(
-                        target.into_extended_target(&mut frame),
+                        target,
                         applied.cast_unchecked::<DataType>(),
                     ))
                 }
@@ -921,18 +792,13 @@ unsafe impl<T: ConstructType> ConstructType for Enum<T> {
             .unwrap()
     }
 
+    #[inline]
     fn base_type<'target, Tgt>(target: &Tgt) -> Option<Value<'target, 'static>>
     where
         Tgt: Target<'target>,
     {
-        unsafe {
-            Some(
-                Module::base(target)
-                    .global(target, "Enum")
-                    .unwrap()
-                    .as_value(),
-            )
-        }
+        let value = inline_static_ref!(STATIC, Value, "Base.Enum", target);
+        Some(value)
     }
 }
 
@@ -947,27 +813,21 @@ unsafe impl<T: ConstructType, S: ConstructType> AbstractType for OrdinalRange<T,
 unsafe impl<T: ConstructType, S: ConstructType> ConstructType for OrdinalRange<T, S> {
     type Static = OrdinalRange<T::Static, S::Static>;
 
-    fn construct_type_uncached<'target, Tgt>(
-        target: ExtendedTarget<'target, '_, '_, Tgt>,
-    ) -> ValueData<'target, 'static, Tgt>
+    fn construct_type_uncached<'target, Tgt>(target: Tgt) -> ValueData<'target, 'static, Tgt>
     where
         Tgt: Target<'target>,
     {
-        let (target, frame) = target.split();
-
-        frame
-            .scope(|mut frame| {
-                let ty_param = T::construct_type(frame.as_extended_target());
-                let n_param = S::construct_type(frame.as_extended_target());
+        target
+            .with_local_scope::<_, _, 3>(|target, mut frame| {
+                let ty_param = T::construct_type(&mut frame);
+                let n_param = S::construct_type(&mut frame);
                 let params = [ty_param, n_param];
                 unsafe {
-                    let applied = Module::base(&frame)
-                        .global(&frame, "OrdinalRange")
+                    let applied = Self::base_type(&frame)
                         .unwrap()
-                        .as_value()
                         .apply_type_unchecked(&mut frame, params);
                     Ok(UnionAll::rewrap(
-                        target.into_extended_target(&mut frame),
+                        target,
                         applied.cast_unchecked::<DataType>(),
                     ))
                 }
@@ -975,18 +835,13 @@ unsafe impl<T: ConstructType, S: ConstructType> ConstructType for OrdinalRange<T
             .unwrap()
     }
 
+    #[inline]
     fn base_type<'target, Tgt>(target: &Tgt) -> Option<Value<'target, 'static>>
     where
         Tgt: Target<'target>,
     {
-        unsafe {
-            Some(
-                Module::base(target)
-                    .global(target, "OrdinalRange")
-                    .unwrap()
-                    .as_value(),
-            )
-        }
+        let value = inline_static_ref!(STATIC, Value, "Base.OrdinalRange", target);
+        Some(value)
     }
 }
 

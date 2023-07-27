@@ -14,13 +14,15 @@ use jl_sys::{
 use jlrs_macros::julia_version;
 
 use super::{
+    erase_scope_lifetime,
     value::{ValueData, ValueResult},
     Managed, Ref,
 };
 use crate::{
+    catch::catch_exceptions,
     data::managed::{datatype::DataType, private::ManagedPriv, type_var::TypeVar, value::Value},
     impl_julia_typecheck,
-    memory::target::{ExtendedTarget, Target},
+    memory::target::{Target, TargetResult},
     private::Private,
 };
 
@@ -40,21 +42,14 @@ impl<'scope> UnionAll<'scope> {
     where
         T: Target<'target>,
     {
-        use std::mem::MaybeUninit;
-
-        use crate::catch::catch_exceptions;
-
         // Safety: if an exception is thrown it's caught, the result is immediately rooted
         unsafe {
-            let mut callback = |result: &mut MaybeUninit<*mut jl_value_t>| {
-                let res = jl_type_unionall(tvar.unwrap(Private), body.unwrap(Private));
-                result.write(res);
-                Ok(())
-            };
+            let callback = || jl_type_unionall(tvar.unwrap(Private), body.unwrap(Private));
+            let exc = |err: Value| err.unwrap_non_null(Private);
 
-            let res = match catch_exceptions(&mut callback).unwrap() {
+            let res = match catch_exceptions(callback, exc) {
                 Ok(ptr) => Ok(NonNull::new_unchecked(ptr)),
-                Err(e) => Err(e.ptr()),
+                Err(e) => Err(e),
             };
 
             target.result_from_ptr(res, Private)
@@ -65,6 +60,7 @@ impl<'scope> UnionAll<'scope> {
     ///
     /// Safety: an exception must not be thrown if this method is called from a `ccall`ed
     /// function.
+    #[inline]
     pub unsafe fn new_unchecked<'target, T>(
         target: T,
         tvar: TypeVar,
@@ -78,16 +74,19 @@ impl<'scope> UnionAll<'scope> {
     }
 
     /// The type at the bottom of this `UnionAll`.
+    #[inline]
     pub fn base_type(self) -> DataType<'scope> {
         let mut b = self;
 
-        // Safety: pointer points to valid data
-        while let Ok(body_ua) = b.body().cast::<UnionAll>() {
-            b = body_ua;
-        }
+        unsafe {
+            // Safety: pointer points to valid data
+            while b.body().is::<UnionAll>() {
+                b = b.body().cast_unchecked();
+            }
 
-        // Safety: type at the base must be a DataType
-        b.body().cast::<DataType>().unwrap()
+            // Safety: type at the base must be a DataType
+            b.body().cast_unchecked::<DataType>()
+        }
     }
 
     /*
@@ -98,6 +97,7 @@ impl<'scope> UnionAll<'scope> {
     */
 
     /// The body of this `UnionAll`. This is either another `UnionAll` or a `DataType`.
+    #[inline]
     pub fn body(self) -> Value<'scope, 'static> {
         // Safety: pointer points to valid data
         unsafe {
@@ -108,6 +108,7 @@ impl<'scope> UnionAll<'scope> {
     }
 
     /// The type variable associated with this "layer" of the `UnionAll`.
+    #[inline]
     pub fn var(self) -> TypeVar<'scope> {
         // Safety: pointer points to valid data
         unsafe {
@@ -126,58 +127,23 @@ impl<'scope> UnionAll<'scope> {
         V: AsRef<[Value<'params, 'static>]>,
         T: Target<'target>,
     {
-        use std::mem::MaybeUninit;
-
-        use crate::catch::catch_exceptions;
-
         let types = types.as_ref();
         let n = types.len();
         let types_ptr = types.as_ptr() as *mut *mut jl_value_t;
         unsafe {
-            let mut callback = |result: &mut MaybeUninit<*mut jl_value_t>| {
-                let v = jl_apply_type(self.as_value().unwrap(Private), types_ptr, n);
+            let callback = || jl_apply_type(self.as_value().unwrap(Private), types_ptr, n);
+            let exc = |err: Value| err.unwrap_non_null(Private);
 
-                result.write(v);
-                Ok(())
-            };
-
-            let res = match catch_exceptions(&mut callback).unwrap() {
+            let res = match catch_exceptions(callback, exc) {
                 Ok(ptr) => Ok(NonNull::new_unchecked(ptr)),
-                Err(e) => Err(e.ptr()),
+                Err(e) => Err(e),
             };
 
             target.result_from_ptr(res, Private)
         }
     }
 
-    // TODO: unsafe, document, test
-    pub fn rewrap<'target, T: Target<'target>>(
-        target: ExtendedTarget<'target, '_, '_, T>,
-        ty: DataType,
-    ) -> ValueData<'target, 'static, T> {
-        //
-        let (target, frame) = target.split();
-
-        frame
-            .scope(|mut frame| {
-                let params = ty.parameters();
-                let params = params.data().as_slice();
-                let mut body = ty.as_value();
-
-                for param in params.iter().rev().copied() {
-                    unsafe {
-                        let param = param.unwrap().as_value();
-                        if let Ok(tvar) = param.cast::<TypeVar>() {
-                            body = UnionAll::new_unchecked(&mut frame, tvar, body).as_value();
-                        }
-                    }
-                }
-
-                Ok(body.root(target))
-            })
-            .unwrap()
-    }
-
+    #[inline]
     pub unsafe fn apply_types_unchecked<'target, 'params, V, T>(
         self,
         target: T,
@@ -194,10 +160,39 @@ impl<'scope> UnionAll<'scope> {
         debug_assert!(!applied.is_null());
         target.data_from_ptr(NonNull::new_unchecked(applied), Private)
     }
+
+    // TODO: unsafe, document, test
+    pub fn rewrap<'target, Tgt: Target<'target>>(
+        target: Tgt,
+        ty: DataType,
+    ) -> ValueData<'target, 'static, Tgt> {
+        //
+        target
+            .with_local_scope::<_, _, 1>(|target, mut frame| unsafe {
+                let params = ty.parameters();
+                let params = params.data().as_slice();
+                let mut local_output = frame.local_output();
+                let mut body = erase_scope_lifetime(ty.as_value());
+
+                for param in params.iter().rev().copied() {
+                    let param = param.unwrap_unchecked().as_value();
+                    if param.is::<TypeVar>() {
+                        let tvar = param.cast_unchecked::<TypeVar>();
+                        let b = UnionAll::new_unchecked(&mut local_output, tvar, body).as_value();
+                        body = erase_scope_lifetime(b);
+                    }
+                }
+
+                Ok(body.root(target))
+            })
+            .unwrap()
+    }
 }
 
+// TODO: use in abstract_types
 impl<'base> UnionAll<'base> {
     /// The `UnionAll` `Type`.
+    #[inline]
     pub fn type_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -207,6 +202,7 @@ impl<'base> UnionAll<'base> {
     }
 
     /// `Type{T} where T<:Tuple`
+    #[inline]
     pub fn anytuple_type_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -217,6 +213,7 @@ impl<'base> UnionAll<'base> {
 
     #[julia_version(until = "1.6")]
     /// The `UnionAll` `Vararg`.
+    #[inline]
     pub fn vararg_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -226,6 +223,7 @@ impl<'base> UnionAll<'base> {
     }
 
     /// The `UnionAll` `AbstractArray`.
+    #[inline]
     pub fn abstractarray_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -236,6 +234,7 @@ impl<'base> UnionAll<'base> {
 
     #[julia_version(since = "1.7")]
     /// The `UnionAll` `OpaqueClosure`.
+    #[inline]
     pub fn opaque_closure_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -245,6 +244,7 @@ impl<'base> UnionAll<'base> {
     }
 
     /// The `UnionAll` `DenseArray`.
+    #[inline]
     pub fn densearray_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -254,6 +254,7 @@ impl<'base> UnionAll<'base> {
     }
 
     /// The `UnionAll` `Array`.
+    #[inline]
     pub fn array_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -263,6 +264,7 @@ impl<'base> UnionAll<'base> {
     }
 
     /// The `UnionAll` `Ptr`.
+    #[inline]
     pub fn pointer_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -272,6 +274,7 @@ impl<'base> UnionAll<'base> {
     }
 
     /// The `UnionAll` `LLVMPtr`.
+    #[inline]
     pub fn llvmpointer_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -281,6 +284,7 @@ impl<'base> UnionAll<'base> {
     }
 
     /// The `UnionAll` `Ref`.
+    #[inline]
     pub fn ref_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -290,6 +294,7 @@ impl<'base> UnionAll<'base> {
     }
 
     /// The `UnionAll` `NamedTuple`.
+    #[inline]
     pub fn namedtuple_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -309,10 +314,12 @@ impl<'scope> ManagedPriv<'scope, '_> for UnionAll<'scope> {
 
     // Safety: `inner` must not have been freed yet, the result must never be
     // used after the GC might have freed it.
+    #[inline]
     unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self {
         Self(inner, PhantomData)
     }
 
+    #[inline]
     fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps> {
         self.0
     }
@@ -329,14 +336,13 @@ pub type UnionAllRet = Ref<'static, 'static, UnionAll<'static>>;
 
 impl_valid_layout!(UnionAllRef, UnionAll, jl_unionall_type);
 
-use crate::memory::target::target_type::TargetType;
+use crate::memory::target::TargetType;
 
 /// `UnionAll` or `UnionAllRef`, depending on the target type `T`.
 pub type UnionAllData<'target, T> = <T as TargetType<'target>>::Data<'static, UnionAll<'target>>;
 
 /// `JuliaResult<UnionAll>` or `JuliaResultRef<UnionAllRef>`, depending on the target type `T`.
-pub type UnionAllResult<'target, T> =
-    <T as TargetType<'target>>::Result<'static, UnionAll<'target>>;
+pub type UnionAllResult<'target, T> = TargetResult<'target, 'static, UnionAll<'target>, T>;
 
 impl_ccall_arg_managed!(UnionAll, 1);
 impl_into_typed!(UnionAll);

@@ -2,6 +2,7 @@
 
 use jl_sys::jl_nothing_type;
 
+use super::is_bits::IsBits;
 use crate::{
     convert::{ccall_types::CCallReturn, into_julia::IntoJulia, unbox::Unbox},
     data::managed::{
@@ -24,6 +25,7 @@ unsafe impl Unbox for Nothing {
 }
 
 unsafe impl IntoJulia for Nothing {
+    #[inline]
     fn julia_type<'scope, T>(target: T) -> DataTypeData<'scope, T>
     where
         T: Target<'scope>,
@@ -35,6 +37,14 @@ unsafe impl IntoJulia for Nothing {
 unsafe impl CCallReturn for Nothing {
     type FunctionReturnType = Nothing;
     type CCallReturnType = Nothing;
+    type ReturnAs = Nothing;
+
+    #[inline]
+    unsafe fn return_or_throw(self) -> Self::ReturnAs {
+        self
+    }
 }
 
 impl_construct_julia_type!(Nothing, jl_nothing_type);
+
+unsafe impl IsBits for Nothing {}

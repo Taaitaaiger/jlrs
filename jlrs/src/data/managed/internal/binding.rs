@@ -12,7 +12,7 @@ use jl_sys::{jl_binding_t, jl_binding_type};
 use crate::{
     data::managed::{private::ManagedPriv, value::ValueData, Ref},
     impl_julia_typecheck,
-    memory::target::Target,
+    memory::target::{Target, TargetResult},
     private::Private,
 };
 
@@ -110,10 +110,12 @@ impl<'scope> ManagedPriv<'scope, '_> for Binding<'scope> {
 
     // Safety: `inner` must not have been freed yet, the result must never be
     // used after the GC might have freed it.
+    #[inline]
     unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self {
         Self(inner, ::std::marker::PhantomData)
     }
 
+    #[inline]
     fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps> {
         self.0
     }
@@ -130,14 +132,14 @@ pub type BindingRet = Ref<'static, 'static, Binding<'static>>;
 
 impl_valid_layout!(BindingRef, Binding, jl_binding_type);
 
-use crate::memory::target::target_type::TargetType;
+use crate::memory::target::TargetType;
 
 /// `Binding` or `BindingRef`, depending on the target type `T`.
 pub type BindingData<'target, T> = <T as TargetType<'target>>::Data<'static, Binding<'target>>;
 
 /// `JuliaResult<Binding>` or `JuliaResultRef<BindingRef>`, depending on the target type
 /// `T`.
-pub type BindingResult<'target, T> = <T as TargetType<'target>>::Result<'static, Binding<'target>>;
+pub type BindingResult<'target, T> = TargetResult<'target, 'static, Binding<'target>, T>;
 
 impl_ccall_arg_managed!(Binding, 1);
 impl_into_typed!(Binding);

@@ -16,8 +16,7 @@ mod tests {
 
             jlrs.instance(&mut frame)
                 .scope(|mut frame| {
-                    let arr_val = Array::new::<f32, _, _>(frame.as_extended_target(), (1, 2))
-                        .into_jlrs_result();
+                    let arr_val = Array::new::<f32, _, _>(&mut frame, (1, 2)).into_jlrs_result();
                     assert!(arr_val.is_ok());
                     Ok(())
                 })
@@ -67,8 +66,7 @@ mod tests {
 
             jlrs.instance(&mut frame)
                 .scope(|mut frame| {
-                    let arr_val = Array::new::<f32, _, _>(frame.as_extended_target(), (1, 2))
-                        .into_jlrs_result()?;
+                    let arr_val = Array::new::<f32, _, _>(&mut frame, (1, 2)).into_jlrs_result()?;
                     let arr = arr_val;
                     let dims = unsafe { arr.dimensions() }.into_dimensions();
                     assert_eq!(dims.as_slice(), &[1, 2]);
@@ -85,8 +83,7 @@ mod tests {
 
             jlrs.instance(&mut frame)
                 .scope(|mut frame| {
-                    let arr_val = Array::new::<f32, _, _>(frame.as_extended_target(), (1, 2))
-                        .into_jlrs_result()?;
+                    let arr_val = Array::new::<f32, _, _>(&mut frame, (1, 2)).into_jlrs_result()?;
                     let arr = arr_val;
                     assert!(arr.contains::<f32>());
                     assert!(arr.contains_inline::<f32>());
@@ -124,8 +121,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             let out = jlrs.instance(&mut frame).scope(|mut frame| {
-                let array = Array::new::<f32, _, _>(frame.as_extended_target(), (3, 1))
-                    .into_jlrs_result()?;
+                let array = Array::new::<f32, _, _>(&mut frame, (3, 1)).into_jlrs_result()?;
                 unsafe { array.copy_inline_data::<u8>() }
             });
 
@@ -140,8 +136,7 @@ mod tests {
 
             jlrs.instance(&mut frame)
                 .scope(|mut frame| {
-                    let arr_val = Array::new::<f32, _, _>(frame.as_extended_target(), (1, 2))
-                        .into_jlrs_result()?;
+                    let arr_val = Array::new::<f32, _, _>(&mut frame, (1, 2)).into_jlrs_result()?;
                     let arr = arr_val.as_value().cast::<TypedArray<f32>>();
                     assert!(arr.is_ok());
                     Ok(())
@@ -157,8 +152,7 @@ mod tests {
 
             jlrs.instance(&mut frame)
                 .scope(|mut frame| {
-                    let arr_val = Array::new::<f32, _, _>(frame.as_extended_target(), (1, 2))
-                        .into_jlrs_result()?;
+                    let arr_val = Array::new::<f32, _, _>(&mut frame, (1, 2)).into_jlrs_result()?;
                     let arr = arr_val.as_value().cast::<TypedArray<f32>>()?;
                     let dims = unsafe { arr.dimensions() }.into_dimensions();
                     assert_eq!(dims.as_slice(), &[1, 2]);
@@ -175,8 +169,7 @@ mod tests {
 
             jlrs.instance(&mut frame)
                 .scope(|mut frame| {
-                    let arr_val = Array::new::<f32, _, _>(frame.as_extended_target(), (1, 2))
-                        .into_jlrs_result()?;
+                    let arr_val = Array::new::<f32, _, _>(&mut frame, (1, 2)).into_jlrs_result()?;
                     let arr = arr_val.as_value().cast::<TypedArray<f32>>()?;
                     assert!(!arr.has_inlined_pointers());
                     assert!(arr.is_inline_array());
@@ -263,8 +256,7 @@ mod tests {
 
             jlrs.instance(&mut frame)
                 .scope(|mut frame| unsafe {
-                    let arr_val = Array::new::<f32, _, _>(frame.as_extended_target(), (1, 2))
-                        .into_jlrs_result()?;
+                    let arr_val = Array::new::<f32, _, _>(&mut frame, (1, 2)).into_jlrs_result()?;
                     assert!(arr_val.value_data().is_err());
                     Ok(())
                 })
@@ -279,8 +271,8 @@ mod tests {
 
             jlrs.instance(&mut frame)
                 .scope(|mut frame| unsafe {
-                    let mut arr_val = Array::new::<f32, _, _>(frame.as_extended_target(), (1, 2))
-                        .into_jlrs_result()?;
+                    let mut arr_val =
+                        Array::new::<f32, _, _>(&mut frame, (1, 2)).into_jlrs_result()?;
                     assert!(arr_val.value_data_mut().is_err());
                     Ok(())
                 })
@@ -295,8 +287,8 @@ mod tests {
 
             jlrs.instance(&mut frame)
                 .scope(|mut frame| unsafe {
-                    let mut arr_val = Array::new::<f32, _, _>(frame.as_extended_target(), (1, 2))
-                        .into_jlrs_result()?;
+                    let mut arr_val =
+                        Array::new::<f32, _, _>(&mut frame, (1, 2)).into_jlrs_result()?;
                     assert!(arr_val.value_data_mut().is_err());
                     Ok(())
                 })

@@ -1,36 +1,36 @@
 //! Construct Julia type objects from Rust types.
 
-use std::{any::TypeId, ffi::c_void, marker::PhantomData, ptr::NonNull, sync::RwLock};
+use std::{any::TypeId, ffi::c_void, marker::PhantomData, ptr::NonNull};
 
 use fnv::FnvHashMap;
 use jl_sys::{
-    jl_array_type, jl_bool_type, jl_bottom_type, jl_char_type, jl_float32_type, jl_float64_type,
-    jl_int16_type, jl_int32_type, jl_int64_type, jl_int8_type, jl_pointer_type, jl_uint16_type,
-    jl_uint32_type, jl_uint64_type, jl_uint8_type, jl_uniontype_type, jl_value_t,
+    jl_array_typename, jl_bool_type, jl_bottom_type, jl_char_type, jl_float32_type,
+    jl_float64_type, jl_int16_type, jl_int32_type, jl_int64_type, jl_int8_type, jl_pointer_type,
+    jl_uint16_type, jl_uint32_type, jl_uint64_type, jl_uint8_type, jl_uniontype_type, jl_value_t,
     jl_voidpointer_type,
 };
-use lazy_static::lazy_static;
 
 use super::abstract_types::AnyType;
 use crate::{
     convert::to_symbol::ToSymbol,
-    data::{
-        layout::valid_layout::ValidField,
-        managed::{
-            datatype::DataType,
-            type_var::TypeVar,
-            union::Union,
-            union_all::UnionAll,
-            value::{Value, ValueData},
-            Managed,
-        },
+    data::managed::{
+        datatype::DataType,
+        type_var::TypeVar,
+        union::Union,
+        union_all::UnionAll,
+        value::{Value, ValueData},
+        Managed,
     },
-    memory::target::{frame::GcFrame, ExtendedTarget, Target},
+    gc_safe::{GcSafeOnceLock, GcSafeRwLock},
+    memory::target::Target,
+    prelude::Tuple,
     private::Private,
 };
 
-lazy_static! {
-    static ref CONSTRUCTED_TYPE_REGISTRY: ConstructedTypes = ConstructedTypes::new();
+static CONSTRUCTED_TYPE_CACHE: GcSafeOnceLock<ConstructedTypes> = GcSafeOnceLock::new();
+
+pub(crate) unsafe fn init_constructed_type_cache() {
+    CONSTRUCTED_TYPE_CACHE.set(ConstructedTypes::new()).ok();
 }
 
 /// Associate a Julia type object with a Rust type.
@@ -50,29 +50,31 @@ pub unsafe trait ConstructType: Sized {
     const CACHEABLE: bool = true;
 
     /// Returns the `TypeId` of this type.
+    #[inline]
     fn type_id() -> TypeId {
         TypeId::of::<Self::Static>()
     }
 
     /// Construct the type object and try to cache the result. If a cached entry is available, it
     /// is returned.
-    fn construct_type<'target, T>(
-        target: ExtendedTarget<'target, '_, '_, T>,
-    ) -> ValueData<'target, 'static, T>
+    #[inline]
+    fn construct_type<'target, T>(target: T) -> ValueData<'target, 'static, T>
     where
         T: Target<'target>,
     {
         if Self::CACHEABLE {
-            CONSTRUCTED_TYPE_REGISTRY.find_or_construct::<Self, _>(target)
+            unsafe {
+                CONSTRUCTED_TYPE_CACHE
+                    .get_unchecked()
+                    .find_or_construct::<Self, _>(target)
+            }
         } else {
             Self::construct_type_uncached(target)
         }
     }
 
     /// Constructs the type object associated with this type.
-    fn construct_type_uncached<'target, T>(
-        target: ExtendedTarget<'target, '_, '_, T>,
-    ) -> ValueData<'target, 'static, T>
+    fn construct_type_uncached<'target, T>(target: T) -> ValueData<'target, 'static, T>
     where
         T: Target<'target>;
 
@@ -84,15 +86,6 @@ pub unsafe trait ConstructType: Sized {
     fn base_type<'target, T>(target: &T) -> Option<Value<'target, 'static>>
     where
         T: Target<'target>;
-
-    /// Returns `true` if `T` is a valid field layout for instances of the constructed type.
-    fn is_compatible<T>(frame: &mut GcFrame) -> bool
-    where
-        T: ValidField,
-    {
-        let ty = Self::construct_type(frame.as_extended_target());
-        T::valid_field(ty)
-    }
 }
 
 macro_rules! impl_construct_julia_type_constant {
@@ -102,16 +95,15 @@ macro_rules! impl_construct_julia_type_constant {
 
             const CACHEABLE: bool = false;
 
-            fn construct_type_uncached<'target, T>(
-                target: ExtendedTarget<'target, '_, '_, T>,
-            ) -> ValueData<'target, 'static, T>
+            #[inline]
+            fn construct_type_uncached<'target, T>(target: T) -> ValueData<'target, 'static, T>
             where
                 T: Target<'target>,
             {
-                let (target, _) = target.split();
                 Value::new(target, N)
             }
 
+            #[inline]
             fn base_type<'target, T>(_target: &T) -> Option<Value<'target, 'static>>
             where
                 T: Target<'target>,
@@ -127,19 +119,20 @@ macro_rules! impl_construct_julia_type_primitive {
         unsafe impl ConstructType for $ty {
             type Static = $ty;
 
-            fn construct_type_uncached<'target, T>(
-                target: ExtendedTarget<'target, '_, '_, T>,
-            ) -> ValueData<'target, 'static, T>
+            const CACHEABLE: bool = false;
+
+            #[inline]
+            fn construct_type_uncached<'target, T>(target: T) -> ValueData<'target, 'static, T>
             where
                 T: Target<'target>,
             {
-                let (target, _) = target.split();
                 unsafe {
                     let ptr = NonNull::new_unchecked($jl_ty.cast::<jl_value_t>());
                     target.data_from_ptr(ptr, Private)
                 }
             }
 
+            #[inline]
             fn base_type<'target, T>(_target: &T) -> Option<Value<'target, 'static>>
             where
                 T: Target<'target>,
@@ -178,6 +171,31 @@ impl_construct_julia_type_constant!(ConstantI64<N>, i64);
 pub struct ConstantIsize<const N: isize>;
 impl_construct_julia_type_constant!(ConstantIsize<N>, isize);
 
+/// Constant `isize`.
+pub struct ConstantSize<const N: usize>;
+unsafe impl<const N: usize> ConstructType for ConstantSize<N> {
+    type Static = ConstantSize<N>;
+
+    const CACHEABLE: bool = false;
+
+    #[inline]
+    fn construct_type_uncached<'target, T>(target: T) -> ValueData<'target, 'static, T>
+    where
+        T: Target<'target>,
+    {
+        Value::new(target, N as isize)
+    }
+
+    #[inline]
+    fn base_type<'target, T>(_target: &T) -> Option<Value<'target, 'static>>
+    where
+        T: Target<'target>,
+    {
+        None
+    }
+}
+
+// TODO: UInt8 and/or Int8 objects are statically allocated in Julia and can be cached.
 /// Constant `u8`.
 pub struct ConstantU8<const N: u8>;
 impl_construct_julia_type_constant!(ConstantU8<N>, u8);
@@ -230,6 +248,7 @@ pub trait TypeVarName: 'static {
 impl<const N: char> TypeVarName for Name<N> {
     type Sym = String;
 
+    #[inline]
     fn name() -> Self::Sym {
         String::from(N)
     }
@@ -238,6 +257,7 @@ impl<const N: char> TypeVarName for Name<N> {
 impl<const N: char> TypeVarName for ConstantChar<N> {
     type Sym = String;
 
+    #[inline]
     fn name() -> Self::Sym {
         String::from(N)
     }
@@ -246,6 +266,7 @@ impl<const N: char> TypeVarName for ConstantChar<N> {
 impl<T: ConstantStr> TypeVarName for T {
     type Sym = &'static str;
 
+    #[inline]
     fn name() -> Self::Sym {
         Self::STR
     }
@@ -267,18 +288,14 @@ unsafe impl<N: TypeVarName, U: ConstructType, L: ConstructType> ConstructType
 {
     type Static = TypeVarConstructor<N, U::Static, L::Static>;
 
-    fn construct_type_uncached<'target, T>(
-        target: ExtendedTarget<'target, '_, '_, T>,
-    ) -> ValueData<'target, 'static, T>
+    fn construct_type_uncached<'target, T>(target: T) -> ValueData<'target, 'static, T>
     where
         T: Target<'target>,
     {
-        let (target, frame) = target.split();
-
-        frame
-            .scope(|mut frame| {
-                let upper_bound = U::construct_type(frame.as_extended_target());
-                let lower_bound = L::construct_type(frame.as_extended_target());
+        target
+            .with_local_scope::<_, _, 2>(|target, mut frame| {
+                let upper_bound = U::construct_type(&mut frame);
+                let lower_bound = L::construct_type(&mut frame);
                 unsafe {
                     Ok(TypeVar::new_unchecked(
                         &target,
@@ -293,6 +310,7 @@ unsafe impl<N: TypeVarName, U: ConstructType, L: ConstructType> ConstructType
             .unwrap()
     }
 
+    #[inline]
     fn base_type<'target, T>(_target: &T) -> Option<Value<'target, 'static>>
     where
         T: Target<'target>,
@@ -310,41 +328,41 @@ pub struct ArrayTypeConstructor<T: ConstructType, N: ConstructType> {
 unsafe impl<T: ConstructType, N: ConstructType> ConstructType for ArrayTypeConstructor<T, N> {
     type Static = ArrayTypeConstructor<T::Static, N::Static>;
 
-    fn construct_type_uncached<'target, Tgt>(
-        target: ExtendedTarget<'target, '_, '_, Tgt>,
-    ) -> ValueData<'target, 'static, Tgt>
+    fn construct_type_uncached<'target, Tgt>(target: Tgt) -> ValueData<'target, 'static, Tgt>
     where
         Tgt: Target<'target>,
     {
-        let (target, frame) = target.split();
-
-        frame
-            .scope(|mut frame| {
-                let ty_param = T::construct_type(frame.as_extended_target());
-                let rank_param = N::construct_type(frame.as_extended_target());
-                let params = [ty_param, rank_param];
-                unsafe {
-                    let applied = UnionAll::array_type(&frame)
-                        .as_value()
+        unsafe {
+            target
+                .with_local_scope::<_, _, 3>(|target, mut frame| {
+                    let ty_param = T::construct_type(&mut frame);
+                    let rank_param = N::construct_type(&mut frame);
+                    let params = [ty_param, rank_param];
+                    let applied = Self::base_type(&frame)
+                        .unwrap_unchecked()
                         .apply_type_unchecked(&mut frame, params);
+
                     Ok(UnionAll::rewrap(
-                        target.into_extended_target(&mut frame),
+                        target,
                         applied.cast_unchecked::<DataType>(),
                     ))
-                }
-            })
-            .unwrap()
+                })
+                .unwrap_unchecked()
+        }
     }
 
+    #[inline]
     fn base_type<'target, Tgt>(_target: &Tgt) -> Option<Value<'target, 'static>>
     where
         Tgt: Target<'target>,
     {
         unsafe {
-            let ptr = NonNull::new_unchecked(jl_array_type.cast::<jl_value_t>());
+            let wrapper =
+                NonNull::new_unchecked(NonNull::new_unchecked(jl_array_typename).as_ref().wrapper);
+            // let ptr = NonNull::new_unchecked(jl_array_type.cast::<jl_value_t>());
             Some(
                 <Value as crate::data::managed::private::ManagedPriv>::wrap_non_null(
-                    ptr,
+                    wrapper,
                     crate::private::Private,
                 ),
             )
@@ -364,24 +382,21 @@ pub struct UnionTypeConstructor<L: ConstructType, R: ConstructType> {
 unsafe impl<L: ConstructType, R: ConstructType> ConstructType for UnionTypeConstructor<L, R> {
     type Static = UnionTypeConstructor<L::Static, R::Static>;
 
-    fn construct_type_uncached<'target, T>(
-        target: ExtendedTarget<'target, '_, '_, T>,
-    ) -> ValueData<'target, 'static, T>
+    fn construct_type_uncached<'target, Tgt>(target: Tgt) -> ValueData<'target, 'static, Tgt>
     where
-        T: Target<'target>,
+        Tgt: Target<'target>,
     {
-        let (target, frame) = target.split();
-
-        frame
-            .scope(|mut frame| {
-                let l = L::construct_type(frame.as_extended_target());
-                let r = R::construct_type(frame.as_extended_target());
+        target
+            .with_local_scope::<_, _, 2>(|target, mut frame| {
+                let l = L::construct_type(&mut frame);
+                let r = R::construct_type(&mut frame);
 
                 unsafe { Ok(Union::new_unchecked(target, [l, r])) }
             })
             .unwrap()
     }
 
+    #[inline]
     fn base_type<'target, Tgt>(_target: &Tgt) -> Option<Value<'target, 'static>>
     where
         Tgt: Target<'target>,
@@ -403,19 +418,17 @@ pub struct BottomType;
 unsafe impl ConstructType for BottomType {
     type Static = BottomType;
 
-    fn construct_type_uncached<'target, T>(
-        target: ExtendedTarget<'target, '_, '_, T>,
-    ) -> ValueData<'target, 'static, T>
+    fn construct_type_uncached<'target, Tgt>(target: Tgt) -> ValueData<'target, 'static, Tgt>
     where
-        T: Target<'target>,
+        Tgt: Target<'target>,
     {
-        let (target, _) = target.split();
         unsafe {
             let ptr = NonNull::new_unchecked(jl_bottom_type.cast::<jl_value_t>());
             target.data_from_ptr(ptr, Private)
         }
     }
 
+    #[inline]
     fn base_type<'target, Tgt>(_target: &Tgt) -> Option<Value<'target, 'static>>
     where
         Tgt: Target<'target>,
@@ -463,16 +476,13 @@ impl_construct_julia_type_primitive!(*mut c_void, jl_voidpointer_type);
 unsafe impl<U: ConstructType> ConstructType for *mut U {
     type Static = *mut U::Static;
 
-    fn construct_type_uncached<'target, T>(
-        target: ExtendedTarget<'target, '_, '_, T>,
-    ) -> ValueData<'target, 'static, T>
+    fn construct_type_uncached<'target, Tgt>(target: Tgt) -> ValueData<'target, 'static, Tgt>
     where
-        T: Target<'target>,
+        Tgt: Target<'target>,
     {
-        let (target, frame) = target.split();
-        frame
-            .scope(|mut frame| {
-                let ty = U::construct_type(frame.as_extended_target());
+        target
+            .with_local_scope::<_, _, 1>(|target, mut frame| {
+                let ty = U::construct_type(&mut frame);
                 unsafe {
                     Ok(UnionAll::pointer_type(&frame)
                         .as_value()
@@ -482,6 +492,7 @@ unsafe impl<U: ConstructType> ConstructType for *mut U {
             .unwrap()
     }
 
+    #[inline]
     fn base_type<'target, Tgt>(_target: &Tgt) -> Option<Value<'target, 'static>>
     where
         Tgt: Target<'target>,
@@ -499,48 +510,56 @@ unsafe impl<U: ConstructType> ConstructType for *mut U {
 }
 
 struct ConstructedTypes {
-    data: RwLock<FnvHashMap<TypeId, Value<'static, 'static>>>,
+    data: GcSafeRwLock<FnvHashMap<TypeId, Value<'static, 'static>>>,
 }
 
 impl ConstructedTypes {
     fn new() -> Self {
         ConstructedTypes {
-            data: RwLock::new(FnvHashMap::default()),
+            data: GcSafeRwLock::new(FnvHashMap::default()),
         }
     }
 
+    #[inline]
     fn find_or_construct<'target, T: ConstructType, Tgt: Target<'target>>(
         &self,
-        target: ExtendedTarget<'target, '_, '_, Tgt>,
+        target: Tgt,
     ) -> ValueData<'target, 'static, Tgt> {
         let tid = T::type_id();
-        let res = self.data.read().expect("Lock poisoned").get(&tid).cloned();
 
-        if let Some(res) = res {
-            let (target, _) = target.split();
-            res.root(target)
-        } else {
-            let (target, frame) = target.split();
-            frame
-                .scope(|mut frame| {
-                    let ty = T::construct_type_uncached(frame.as_extended_target());
-
-                    if let Ok(dt) = ty.cast::<DataType>() {
-                        if !dt.has_free_type_vars() {
-                            unsafe {
-                                self.data
-                                    .write()
-                                    .expect("Lock poisoned")
-                                    .insert(tid, ty.leak().as_value());
-                            }
-                        }
-                    }
-
-                    Ok(ty.root(target))
-                })
-                .unwrap()
+        {
+            if let Some(res) = self.data.read().get(&tid).copied() {
+                return res.root(target);
+            }
         }
+
+        do_construct::<T, _>(target, self, tid)
+    }
+}
+
+#[inline(never)]
+fn do_construct<'target, T: ConstructType, Tgt: Target<'target>>(
+    target: Tgt,
+    ct: &ConstructedTypes,
+    tid: TypeId,
+) -> ValueData<'target, 'static, Tgt> {
+    unsafe {
+        target
+            .with_local_scope::<_, _, 1>(|target, mut frame| {
+                let ty = T::construct_type_uncached(&mut frame);
+
+                if ty.is::<DataType>() {
+                    let dt = ty.cast_unchecked::<DataType>();
+                    if !dt.has_free_type_vars() && (!dt.is::<Tuple>() || dt.is_concrete_type()) {
+                        ct.data.write().insert(tid, ty.leak().as_value());
+                    }
+                }
+
+                Ok(ty.root(target))
+            })
+            .unwrap_unchecked()
     }
 }
 
 unsafe impl Sync for ConstructedTypes {}
+unsafe impl Send for ConstructedTypes {}

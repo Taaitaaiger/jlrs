@@ -11,7 +11,7 @@ use crate::{
         Ref,
     },
     impl_julia_typecheck,
-    memory::target::Target,
+    memory::target::{Target, TargetResult},
     private::Private,
 };
 
@@ -51,10 +51,12 @@ impl<'scope> ManagedPriv<'scope, '_> for WeakRef<'scope> {
 
     // Safety: `inner` must not have been freed yet, the result must never be
     // used after the GC might have freed it.
+    #[inline]
     unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self {
         Self(inner, PhantomData)
     }
 
+    #[inline]
     fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps> {
         self.0
     }
@@ -71,13 +73,13 @@ pub type WeakRefRet = Ref<'static, 'static, WeakRef<'static>>;
 
 impl_valid_layout!(WeakRefRef, WeakRef, jl_weakref_type);
 
-use crate::memory::target::target_type::TargetType;
+use crate::memory::target::TargetType;
 
 /// `WeakRef` or `WeakRefRef`, depending on the target type `T`.
 pub type WeakRefData<'target, T> = <T as TargetType<'target>>::Data<'static, WeakRef<'target>>;
 
 /// `JuliaResult<WeakRef>` or `JuliaResultRef<WeakRefRef>`, depending on the target type`T`.
-pub type WeakRefResult<'target, T> = <T as TargetType<'target>>::Result<'static, WeakRef<'target>>;
+pub type WeakRefResult<'target, T> = TargetResult<'target, 'static, WeakRef<'target>, T>;
 
 impl_ccall_arg_managed!(WeakRef, 1);
 impl_into_typed!(WeakRef);

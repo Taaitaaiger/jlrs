@@ -30,11 +30,22 @@ mod tests {
         });
     }
 
+    #[cfg(not(feature = "julia-1-10"))]
     fn syntax_error() {
         eval_string("asdf fdsa asdf fdsa", |result| {
             assert_eq!(
                 result.unwrap_err().datatype_name().unwrap(),
                 "ErrorException"
+            );
+        });
+    }
+
+    #[cfg(feature = "julia-1-10")]
+    fn syntax_error() {
+        eval_string("asdf fdsa asdf fdsa", |result| {
+            assert_eq!(
+                result.unwrap_err().datatype_name().unwrap(),
+                "UndefVarError"
             );
         });
     }

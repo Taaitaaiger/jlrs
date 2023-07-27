@@ -29,6 +29,7 @@ pub struct Tracked<'tracked, 'scope, 'data, T> {
 }
 
 impl<'tracked, 'scope, 'data, T: ValidLayout> Tracked<'tracked, 'scope, 'data, T> {
+    #[inline]
     pub(crate) unsafe fn new(value: &'tracked Value<'scope, 'data>) -> Self {
         Tracked {
             tracked: value.data_ptr().cast::<T>().as_ref(),
@@ -39,6 +40,7 @@ impl<'tracked, 'scope, 'data, T: ValidLayout> Tracked<'tracked, 'scope, 'data, T
 }
 
 impl<'scope, 'data, T: ValidLayout> Tracked<'scope, 'scope, 'data, T> {
+    #[inline]
     pub(crate) unsafe fn new_owned(value: Value<'scope, 'data>) -> Self {
         Tracked {
             tracked: value.data_ptr().cast::<T>().as_ref(),
@@ -51,6 +53,7 @@ impl<'scope, 'data, T: ValidLayout> Tracked<'scope, 'scope, 'data, T> {
 impl<'tracked, 'scope, 'data, T: ValidLayout> Deref for Tracked<'tracked, 'scope, 'data, T> {
     type Target = T;
 
+    #[inline]
     fn deref(&self) -> &Self::Target {
         self.tracked
     }
@@ -87,6 +90,7 @@ pub struct TrackedMut<'tracked, 'scope, 'data, T: ValidLayout> {
 }
 
 impl<'tracked, 'scope, 'data, T: ValidLayout> TrackedMut<'tracked, 'scope, 'data, T> {
+    #[inline]
     pub(crate) unsafe fn new(value: &'tracked mut Value<'scope, 'data>) -> Self {
         TrackedMut {
             t: value.data_ptr().cast::<T>().as_mut(),
@@ -97,6 +101,7 @@ impl<'tracked, 'scope, 'data, T: ValidLayout> TrackedMut<'tracked, 'scope, 'data
 }
 
 impl<'scope, 'data, T: ValidLayout> TrackedMut<'scope, 'scope, 'data, T> {
+    #[inline]
     pub(crate) unsafe fn new_owned(value: Value<'scope, 'data>) -> Self {
         TrackedMut {
             t: value.data_ptr().cast::<T>().as_mut(),
@@ -109,12 +114,14 @@ impl<'scope, 'data, T: ValidLayout> TrackedMut<'scope, 'scope, 'data, T> {
 impl<'tracked, 'scope, 'data, T: ValidLayout> Deref for TrackedMut<'tracked, 'scope, 'data, T> {
     type Target = T;
 
+    #[inline]
     fn deref(&self) -> &Self::Target {
         self.t
     }
 }
 
 impl<'tracked, 'scope, 'data, T: ValidLayout> DerefMut for TrackedMut<'tracked, 'scope, 'data, T> {
+    #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.t
     }
@@ -129,7 +136,7 @@ impl<T: ValidLayout> Drop for TrackedMut<'_, '_, '_, T> {
     fn drop(&mut self) {
         unsafe {
             let v = Value::wrap_non_null(
-                NonNull::new_unchecked(self.t as *const _ as *mut jl_value_t),
+                NonNull::new_unchecked(self.t as *mut _ as *mut jl_value_t),
                 Private,
             );
             Ledger::unborrow_exclusive(v).unwrap();

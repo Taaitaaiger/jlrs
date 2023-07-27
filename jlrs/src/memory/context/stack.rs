@@ -41,27 +41,6 @@ unsafe impl Send for Stack {}
 unsafe impl Sync for Stack {}
 
 unsafe impl ForeignType for Stack {
-    // #[julia_version(since = "1.10")]
-    // fn mark(ptls: PTls, data: &Self) -> usize {
-    //     // We can only get here while the GC is running, so there are no active mutable borrows,
-    //     // but this function might be called from multiple threads so an immutable reference must
-    //     // be used.
-    //     let slots = unsafe { &*data.slots.get() };
-    //
-    //     let mut n = 0;
-    //     unsafe {
-    //         for slot in slots {
-    //             if !slot.get().is_null() {
-    //                 if crate::memory::gc::mark_queue_obj(ptls, slot.get()) {
-    //                     n += 1;
-    //                 }
-    //             }
-    //         }
-    //     }
-    //
-    //     n
-    // }
-
     fn mark(ptls: PTls, data: &Self) -> usize {
         // We can only get here while the GC is running, so there are no active mutable borrows,
         // but this function might be called from multiple threads so an immutable reference must
@@ -81,6 +60,7 @@ unsafe impl ForeignType for Stack {
 
 pub(crate) struct StaticSymbol(Symbol<'static>);
 impl StaticSymbol {
+    #[inline]
     pub(crate) fn as_symbol(&self) -> Symbol {
         self.0
     }
@@ -142,6 +122,7 @@ impl Stack {
     // Push a new root to the stack.
     //
     // Safety: `root` must point to data that hasn't been freed yet.
+    #[inline]
     pub(crate) unsafe fn push_root(&self, root: NonNull<jl_value_t>) {
         {
             // We can only get here while the GC isn't running, so there are
@@ -157,6 +138,7 @@ impl Stack {
     //
     // Safety: reserved slot may only be used until the frame it belongs to
     // is popped from the stack.
+    #[inline]
     pub(crate) unsafe fn reserve_slot(&self) -> usize {
         // We can only get here while the GC isn't running, so there are
         // no active borrows.
@@ -167,6 +149,7 @@ impl Stack {
     }
 
     // Grow the stack capacity by at least `additional` slots
+    #[inline]
     pub(crate) fn reserve(&self, additional: usize) {
         unsafe {
             // We can only get here while the GC isn't running, so there are
@@ -177,6 +160,7 @@ impl Stack {
     }
 
     // Set the root at `offset`
+    #[inline]
     pub(crate) unsafe fn set_root(&self, offset: usize, root: NonNull<jl_value_t>) {
         // We can only get here while the GC isn't running, so there are
         // no active borrows.
@@ -188,6 +172,7 @@ impl Stack {
     // Pop roots from the stack, the new length is `offset`.
     //
     // Safety: must be called when a frame is popped from the stack.
+    #[inline]
     pub(crate) unsafe fn pop_roots(&self, offset: usize) {
         // We can only get here while the GC isn't running, so there are
         // no active borrows.
@@ -196,6 +181,7 @@ impl Stack {
     }
 
     // Returns the size of the stack
+    #[inline]
     pub(crate) fn size(&self) -> usize {
         unsafe {
             // We can only get here while the GC isn't running, so there are
@@ -207,6 +193,7 @@ impl Stack {
 
     // Create a new stack and move it to Julia.
     // Safety: root after allocating
+    #[inline]
     pub(crate) unsafe fn alloc() -> *mut Self {
         let global = Unrooted::new();
         let stack = Value::new(global, Stack::default());

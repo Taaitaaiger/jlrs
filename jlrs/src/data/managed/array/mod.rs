@@ -21,7 +21,6 @@
 //! a constant at compile time.
 
 use std::{
-    cell::UnsafeCell,
     ffi::c_void,
     fmt::{Debug, Formatter, Result as FmtResult},
     marker::PhantomData,
@@ -32,11 +31,9 @@ use std::{
 };
 
 use jl_sys::{
-    jl_alloc_array_1d, jl_alloc_array_2d, jl_alloc_array_3d, jl_apply_array_type,
-    jl_apply_tuple_type_v, jl_array_data, jl_array_del_beg, jl_array_del_end, jl_array_dims_ptr,
+    jl_apply_array_type, jl_array_data, jl_array_del_beg, jl_array_del_end, jl_array_dims_ptr,
     jl_array_eltype, jl_array_grow_beg, jl_array_grow_end, jl_array_ndims, jl_array_t,
-    jl_datatype_t, jl_gc_add_ptr_finalizer, jl_new_array, jl_new_struct_uninit, jl_pchar_to_array,
-    jl_ptr_to_array, jl_ptr_to_array_1d, jl_reshape_array,
+    jl_gc_add_ptr_finalizer, jl_new_struct_uninit, jl_pchar_to_array, jl_reshape_array,
 };
 
 use self::{
@@ -46,6 +43,7 @@ use self::{
         InlinePtrArrayAccessorMut, Mutable, PtrArrayAccessorI, PtrArrayAccessorMut,
         UnionArrayAccessorI, UnionArrayAccessorMut,
     },
+    dimensions::DimsExt,
     tracked::{TrackedArray, TrackedArrayMut},
 };
 use super::{
@@ -54,7 +52,7 @@ use super::{
     Ref,
 };
 use crate::{
-    catch::{catch_exceptions, catch_exceptions_with_slots},
+    catch::catch_exceptions,
     convert::{
         ccall_types::{CCallArg, CCallReturn},
         into_julia::IntoJulia,
@@ -88,8 +86,9 @@ use crate::{
     memory::{
         context::ledger::Ledger,
         get_tls,
-        target::{frame::GcFrame, private::TargetPriv, unrooted::Unrooted, ExtendedTarget, Target},
+        target::{unrooted::Unrooted, Target, TargetException, TargetResult},
     },
+    prelude::ValueData,
     private::Private,
 };
 
@@ -125,74 +124,35 @@ pub struct Array<'scope, 'data>(
 impl<'data> Array<'_, 'data> {
     /// Allocate a new n-dimensional Julia array of dimensions `dims` for data of type `T`.
     ///
-    /// This method can only be used in combination with types that implement `IntoJulia`. If you
-    /// want to create an array for a type that doesn't implement this trait you must use
-    /// [`Array::new_for`].
+    /// This method can only be used in combination with types that implement `ConstructType`.
     ///
     /// If the array size is too large, Julia will throw an error. This error is caught and
     /// returned.
-    pub fn new<'target, 'current, 'borrow, T, D, S>(
-        target: ExtendedTarget<'target, '_, '_, S>,
+    pub fn new<'target, 'current, 'borrow, T, D, Tgt>(
+        target: Tgt,
         dims: D,
-    ) -> ArrayResult<'target, 'static, S>
+    ) -> ArrayResult<'target, 'static, Tgt>
     where
-        T: IntoJulia,
-        D: Dims,
-        S: Target<'target>,
+        T: ConstructType,
+        D: DimsExt,
+        Tgt: Target<'target>,
     {
-        let (output, frame) = target.split();
-        frame
-            .scope(|mut frame| {
-                let elty_ptr = T::julia_type(&frame).ptr();
+        unsafe {
+            let callback = || {
+                let array_type = D::ArrayContructor::<T>::construct_type(&target).as_value();
+                let array = dims.alloc_array(&target, array_type);
+                array
+            };
 
-                // Safety: The array type is rooted until the array has been constructed, all C API
-                // functions are called with valid data.
-                unsafe {
-                    let mut callback =
-                        |frame: &mut GcFrame, result: &mut MaybeUninit<*mut jl_array_t>| {
-                            let array_type =
-                                jl_apply_array_type(elty_ptr.as_ptr().cast(), dims.rank());
-                            let _: Value = frame
-                                .as_mut()
-                                .data_from_ptr(NonNull::new_unchecked(array_type), Private);
+            let exc = |err: Value| err.unwrap_non_null(Private);
 
-                            let array = match dims.rank() {
-                                1 => jl_alloc_array_1d(array_type, dims.n_elements(0)),
-                                2 => jl_alloc_array_2d(
-                                    array_type,
-                                    dims.n_elements(0),
-                                    dims.n_elements(1),
-                                ),
-                                3 => jl_alloc_array_3d(
-                                    array_type,
-                                    dims.n_elements(0),
-                                    dims.n_elements(1),
-                                    dims.n_elements(2),
-                                ),
-                                n if n <= 8 => {
-                                    let tuple = small_dim_tuple(frame, &dims);
-                                    jl_new_array(array_type, tuple.unwrap(Private))
-                                }
-                                _ => {
-                                    let tuple = large_dim_tuple(frame, &dims);
-                                    jl_new_array(array_type, tuple.unwrap(Private))
-                                }
-                            };
+            let v = match catch_exceptions(callback, exc) {
+                Ok(arr) => Ok(arr.ptr()),
+                Err(e) => Err(e),
+            };
 
-                            result.write(array);
-                            Ok(())
-                        };
-
-                    let res = match catch_exceptions_with_slots(&mut frame, &mut callback).unwrap()
-                    {
-                        Ok(array_ptr) => Ok(NonNull::new_unchecked(array_ptr)),
-                        Err(e) => Err(e.ptr()),
-                    };
-
-                    Ok(output.result_from_ptr(res, Private))
-                }
-            })
-            .unwrap()
+            target.result_from_ptr(v, Private)
+        }
     }
 
     /// Allocate a new n-dimensional Julia array of dimensions `dims` for data of type `T`.
@@ -201,46 +161,17 @@ impl<'data> Array<'_, 'data> {
     ///
     /// Safety: If the array size is too large, Julia will throw an error. This error is not
     /// caught, which is UB from a `ccall`ed function.
-    pub unsafe fn new_unchecked<'target, 'current, 'borrow, T, D, S>(
-        target: ExtendedTarget<'target, '_, '_, S>,
+    pub unsafe fn new_unchecked<'target, 'current, 'borrow, T, D, Tgt>(
+        target: Tgt,
         dims: D,
-    ) -> ArrayData<'target, 'static, S>
+    ) -> ArrayData<'target, 'static, Tgt>
     where
-        T: IntoJulia,
-        D: Dims,
-        S: Target<'target>,
+        T: ConstructType,
+        D: DimsExt,
+        Tgt: Target<'target>,
     {
-        let (output, frame) = target.split();
-        frame
-            .scope(|mut frame| {
-                let elty_ptr = T::julia_type(&frame).ptr();
-                let array_type = jl_apply_array_type(elty_ptr.cast().as_ptr(), dims.rank());
-                let _: Value = frame
-                    .as_mut()
-                    .data_from_ptr(NonNull::new_unchecked(array_type), Private);
-
-                let array = match dims.rank() {
-                    1 => jl_alloc_array_1d(array_type, dims.n_elements(0)),
-                    2 => jl_alloc_array_2d(array_type, dims.n_elements(0), dims.n_elements(1)),
-                    3 => jl_alloc_array_3d(
-                        array_type,
-                        dims.n_elements(0),
-                        dims.n_elements(1),
-                        dims.n_elements(2),
-                    ),
-                    n if n <= 8 => {
-                        let tuple = small_dim_tuple(&mut frame, &dims);
-                        jl_new_array(array_type, tuple.unwrap(Private))
-                    }
-                    _ => {
-                        let tuple = large_dim_tuple(&mut frame, &dims);
-                        jl_new_array(array_type, tuple.unwrap(Private))
-                    }
-                };
-
-                Ok(output.data_from_ptr(NonNull::new_unchecked(array), Private))
-            })
-            .unwrap()
+        let array_type = D::ArrayContructor::<T>::construct_type(&target).as_value();
+        dims.alloc_array(target, array_type)
     }
 
     /// Allocate a new n-dimensional Julia array of dimensions `dims` for data of type `ty`.
@@ -249,66 +180,35 @@ impl<'data> Array<'_, 'data> {
     ///
     /// If the array size is too large or if the type is invalid, Julia will throw an error. This
     /// error is caught and returned.
-    pub fn new_for<'target, 'current, 'borrow, D, S>(
-        target: ExtendedTarget<'target, '_, '_, S>,
+    pub fn new_for<'target, 'current, 'borrow, D, Tgt>(
+        target: Tgt,
         dims: D,
         ty: Value,
-    ) -> ArrayResult<'target, 'static, S>
+    ) -> ArrayResult<'target, 'static, Tgt>
     where
-        D: Dims,
-        S: Target<'target>,
+        D: DimsExt,
+        Tgt: Target<'target>,
     {
-        let (output, frame) = target.split();
-        frame
-            .scope(|mut frame| {
-                let elty_ptr = ty.unwrap(Private);
-                // Safety: The array type is rooted until the array has been constructed, all C API
-                // functions are called with valid data.
-                unsafe {
-                    let mut callback =
-                        |frame: &mut GcFrame, result: &mut MaybeUninit<*mut jl_array_t>| {
-                            let array_type = jl_apply_array_type(elty_ptr.cast(), dims.rank());
-                            let _: Value = frame
-                                .as_mut()
-                                .data_from_ptr(NonNull::new_unchecked(array_type), Private);
+        let elty_ptr = ty.unwrap(Private);
+        // Safety: The array type is rooted until the array has been constructed, all C API
+        // functions are called with valid data.
+        unsafe {
+            let callback = || {
+                let array_type = Value::wrap_non_null(
+                    NonNull::new_unchecked(jl_apply_array_type(elty_ptr, dims.rank())),
+                    Private,
+                );
+                dims.alloc_array(&target, array_type).ptr()
+            };
 
-                            let array = match dims.rank() {
-                                1 => jl_alloc_array_1d(array_type, dims.n_elements(0)),
-                                2 => jl_alloc_array_2d(
-                                    array_type,
-                                    dims.n_elements(0),
-                                    dims.n_elements(1),
-                                ),
-                                3 => jl_alloc_array_3d(
-                                    array_type,
-                                    dims.n_elements(0),
-                                    dims.n_elements(1),
-                                    dims.n_elements(2),
-                                ),
-                                n if n <= 8 => {
-                                    let tuple = small_dim_tuple(frame, &dims);
-                                    jl_new_array(array_type, tuple.unwrap(Private))
-                                }
-                                _ => {
-                                    let tuple = large_dim_tuple(frame, &dims);
-                                    jl_new_array(array_type, tuple.unwrap(Private))
-                                }
-                            };
+            let exc = |err: Value| err.unwrap_non_null(Private);
+            let res = match catch_exceptions(callback, exc) {
+                Ok(array_ptr) => Ok(array_ptr),
+                Err(e) => Err(e),
+            };
 
-                            result.write(array);
-                            Ok(())
-                        };
-
-                    let res = match catch_exceptions_with_slots(&mut frame, &mut callback).unwrap()
-                    {
-                        Ok(array_ptr) => Ok(NonNull::new_unchecked(array_ptr)),
-                        Err(e) => Err(e.ptr()),
-                    };
-
-                    Ok(output.result_from_ptr(res, Private))
-                }
-            })
-            .unwrap()
+            target.result_from_ptr(res, Private)
+        }
     }
 
     /// Allocate a new n-dimensional Julia array of dimensions `dims` for data of type `T`.
@@ -318,45 +218,23 @@ impl<'data> Array<'_, 'data> {
     ///
     /// Safety: If the array size is too large or if the type is invalid, Julia will throw an
     /// error. This error is not caught, which is UB from a `ccall`ed function.
-    pub unsafe fn new_for_unchecked<'target, 'current, 'borrow, D, S>(
-        target: ExtendedTarget<'target, '_, '_, S>,
+    pub unsafe fn new_for_unchecked<'target, 'current, 'borrow, D, Tgt>(
+        target: Tgt,
         dims: D,
         ty: Value,
-    ) -> ArrayData<'target, 'static, S>
+    ) -> ArrayData<'target, 'static, Tgt>
     where
-        D: Dims,
-        S: Target<'target>,
+        D: DimsExt,
+        Tgt: Target<'target>,
     {
-        let (output, frame) = target.split();
-        frame
-            .scope(|mut frame| {
-                let array_type = jl_apply_array_type(ty.unwrap(Private), dims.rank());
-                let _: Value = frame
-                    .as_mut()
-                    .data_from_ptr(NonNull::new_unchecked(array_type), Private);
+        let elty_ptr = ty.unwrap(Private);
+        let array_type = Value::wrap_non_null(
+            NonNull::new_unchecked(jl_apply_array_type(elty_ptr, dims.rank())),
+            Private,
+        );
+        let array = dims.alloc_array(&target, array_type);
 
-                let array = match dims.rank() {
-                    1 => jl_alloc_array_1d(array_type, dims.n_elements(0)),
-                    2 => jl_alloc_array_2d(array_type, dims.n_elements(0), dims.n_elements(1)),
-                    3 => jl_alloc_array_3d(
-                        array_type,
-                        dims.n_elements(0),
-                        dims.n_elements(1),
-                        dims.n_elements(2),
-                    ),
-                    n if n <= 8 => {
-                        let tuple = small_dim_tuple(&mut frame, &dims);
-                        jl_new_array(array_type, tuple.unwrap(Private))
-                    }
-                    _ => {
-                        let tuple = large_dim_tuple(&mut frame, &dims);
-                        jl_new_array(array_type, tuple.unwrap(Private))
-                    }
-                };
-
-                Ok(output.data_from_ptr(NonNull::new_unchecked(array), Private))
-            })
-            .unwrap()
+        array.root(target)
     }
 
     /// Create a new n-dimensional Julia array of dimensions `dims` that borrows data from Rust.
@@ -367,15 +245,15 @@ impl<'data> Array<'_, 'data> {
     ///
     /// If the array size is too large, Julia will throw an error. This error is caught and
     /// returned.
-    pub fn from_slice<'target: 'current, 'current: 'borrow, 'borrow, T, D, S>(
-        target: ExtendedTarget<'target, '_, '_, S>,
+    pub fn from_slice<'target: 'current, 'current: 'borrow, 'borrow, T, D, Tgt>(
+        target: Tgt,
         data: &'data mut [T],
         dims: D,
-    ) -> JlrsResult<ArrayResult<'target, 'data, S>>
+    ) -> JlrsResult<ArrayResult<'target, 'data, Tgt>>
     where
-        T: IntoJulia,
-        D: Dims,
-        S: Target<'target>,
+        T: IntoJulia + ConstructType,
+        D: DimsExt,
+        Tgt: Target<'target>,
     {
         if dims.size() != data.len() {
             Err(InstantiationError::ArraySizeMismatch {
@@ -384,60 +262,24 @@ impl<'data> Array<'_, 'data> {
             })?;
         }
 
-        let (output, frame) = target.split();
-        frame.scope(|mut frame| {
-            let elty_ptr = T::julia_type(&frame).ptr().cast();
+        // Safety: The array type is rooted until the array has been constructed, all C API
+        // functions are called with valid data. The data-lifetime ensures the data can't be
+        // used from Rust after the borrow ends.
+        unsafe {
+            let callback = || {
+                let array_type = D::ArrayContructor::<T>::construct_type(&target).as_value();
+                dims.alloc_array_with_data(&target, array_type, data.as_mut_ptr().cast())
+                    .ptr()
+            };
 
-            // Safety: The array type is rooted until the array has been constructed, all C API
-            // functions are called with valid data. The data-lifetime ensures the data can't be
-            // used from Rust after the borrow ends.
-            unsafe {
-                let mut callback =
-                    |frame: &mut GcFrame, result: &mut MaybeUninit<*mut jl_array_t>| {
-                        let array_type = jl_apply_array_type(elty_ptr.as_ptr(), dims.rank());
-                        let _: Value = frame
-                            .as_mut()
-                            .data_from_ptr(NonNull::new_unchecked(array_type), Private);
+            let exc = |err: Value| err.unwrap_non_null(Private);
+            let res = match catch_exceptions(callback, exc) {
+                Ok(array_ptr) => Ok(array_ptr),
+                Err(e) => Err(e),
+            };
 
-                        let array = match dims.rank() {
-                            1 => jl_ptr_to_array_1d(
-                                array_type,
-                                data.as_mut_ptr().cast(),
-                                dims.n_elements(0),
-                                0,
-                            ),
-                            n if n <= 8 => {
-                                let tuple = small_dim_tuple(frame, &dims);
-                                jl_ptr_to_array(
-                                    array_type,
-                                    data.as_mut_ptr().cast(),
-                                    tuple.unwrap(Private),
-                                    0,
-                                )
-                            }
-                            _ => {
-                                let tuple = large_dim_tuple(frame, &dims);
-                                jl_ptr_to_array(
-                                    array_type,
-                                    data.as_mut_ptr().cast(),
-                                    tuple.unwrap(Private),
-                                    0,
-                                )
-                            }
-                        };
-
-                        result.write(array);
-                        Ok(())
-                    };
-
-                let res = match catch_exceptions_with_slots(&mut frame, &mut callback).unwrap() {
-                    Ok(array_ptr) => Ok(NonNull::new_unchecked(array_ptr)),
-                    Err(e) => Err(e.ptr()),
-                };
-
-                Ok(output.result_from_ptr(res, Private))
-            }
-        })
+            Ok(target.result_from_ptr(res, Private))
+        }
     }
 
     /// Create a new n-dimensional Julia array of dimensions `dims` that borrows data from Rust.
@@ -448,15 +290,15 @@ impl<'data> Array<'_, 'data> {
     ///
     /// Safety: If the array size is too large, Julia will throw an error. This error is not
     /// caught, which is UB from a `ccall`ed function.
-    pub unsafe fn from_slice_unchecked<'target, 'current, 'borrow, T, D, S>(
-        target: ExtendedTarget<'target, '_, '_, S>,
+    pub unsafe fn from_slice_unchecked<'target, 'current, 'borrow, T, D, Tgt>(
+        target: Tgt,
         data: &'data mut [T],
         dims: D,
-    ) -> JlrsResult<ArrayData<'target, 'data, S>>
+    ) -> JlrsResult<ArrayData<'target, 'data, Tgt>>
     where
-        T: IntoJulia,
-        D: Dims,
-        S: Target<'target>,
+        T: IntoJulia + ConstructType,
+        D: DimsExt,
+        Tgt: Target<'target>,
     {
         if dims.size() != data.len() {
             Err(InstantiationError::ArraySizeMismatch {
@@ -465,40 +307,8 @@ impl<'data> Array<'_, 'data> {
             })?;
         }
 
-        let (output, frame) = target.split();
-        frame.scope(|mut frame| {
-            let array_type =
-                jl_apply_array_type(T::julia_type(&frame).ptr().cast().as_ptr(), dims.rank());
-            let _: Value = frame
-                .as_mut()
-                .data_from_ptr(NonNull::new_unchecked(array_type), Private);
-
-            let array = match dims.rank() {
-                1 => {
-                    jl_ptr_to_array_1d(array_type, data.as_mut_ptr().cast(), dims.n_elements(0), 0)
-                }
-                n if n <= 8 => {
-                    let tuple = small_dim_tuple(&mut frame, &dims);
-                    jl_ptr_to_array(
-                        array_type,
-                        data.as_mut_ptr().cast(),
-                        tuple.unwrap(Private),
-                        0,
-                    )
-                }
-                _ => {
-                    let tuple = large_dim_tuple(&mut frame, &dims);
-                    jl_ptr_to_array(
-                        array_type,
-                        data.as_mut_ptr().cast(),
-                        tuple.unwrap(Private),
-                        0,
-                    )
-                }
-            };
-
-            Ok(output.data_from_ptr(NonNull::new_unchecked(array), Private))
-        })
+        let array_type = D::ArrayContructor::<T>::construct_type(&target).as_value();
+        Ok(dims.alloc_array_with_data(target, array_type, data.as_mut_ptr().cast()))
     }
 
     /// Create a new n-dimensional Julia array of dimensions `dims` that takes ownership of Rust
@@ -510,15 +320,15 @@ impl<'data> Array<'_, 'data> {
     ///
     /// If the array size is too large, Julia will throw an error. This error is caught and
     /// returned.
-    pub fn from_vec<'target, 'current, 'borrow, T, D, S>(
-        target: ExtendedTarget<'target, '_, '_, S>,
+    pub fn from_vec<'target, 'current, 'borrow, T, D, Tgt>(
+        target: Tgt,
         data: Vec<T>,
         dims: D,
-    ) -> JlrsResult<ArrayResult<'target, 'static, S>>
+    ) -> JlrsResult<ArrayResult<'target, 'static, Tgt>>
     where
-        T: IntoJulia,
-        D: Dims,
-        S: Target<'target>,
+        T: IntoJulia + ConstructType,
+        D: DimsExt,
+        Tgt: Target<'target>,
     {
         if dims.size() != data.len() {
             Err(InstantiationError::ArraySizeMismatch {
@@ -527,67 +337,35 @@ impl<'data> Array<'_, 'data> {
             })?;
         }
 
-        let (output, scope) = target.split();
-        scope.scope(|mut frame| {
-            let elty_ptr = T::julia_type(&frame).ptr().cast();
-            let data = Box::leak(data.into_boxed_slice());
+        let data = Box::leak(data.into_boxed_slice());
 
-            // Safety: The array type is rooted until the array has been constructed, all C API
-            // functions are called with valid data. The data-lifetime ensures the data can't be
-            // used from Rust after the borrow ends.
-            unsafe {
-                let mut callback =
-                    |frame: &mut GcFrame, result: &mut MaybeUninit<*mut jl_array_t>| {
-                        let array_type = jl_apply_array_type(elty_ptr.as_ptr(), dims.rank());
-                        let _: Value = frame
-                            .as_mut()
-                            .data_from_ptr(NonNull::new_unchecked(array_type), Private);
+        // Safety: The array type is rooted until the array has been constructed, all C API
+        // functions are called with valid data. The data-lifetime ensures the data can't be
+        // used from Rust after the borrow ends.
+        unsafe {
+            let callback = || {
+                let array_type = D::ArrayContructor::<T>::construct_type(&target).as_value();
+                let array = dims
+                    .alloc_array_with_data(&target, array_type, data.as_mut_ptr().cast())
+                    .ptr();
 
-                        let array = match dims.rank() {
-                            1 => jl_ptr_to_array_1d(
-                                array_type,
-                                data.as_mut_ptr().cast(),
-                                dims.n_elements(0),
-                                1,
-                            ),
-                            n if n <= 8 => {
-                                let tuple = small_dim_tuple(frame, &dims);
-                                jl_ptr_to_array(
-                                    array_type,
-                                    data.as_mut_ptr().cast(),
-                                    tuple.unwrap(Private),
-                                    1,
-                                )
-                            }
-                            _ => {
-                                let tuple = large_dim_tuple(frame, &dims);
-                                jl_ptr_to_array(
-                                    array_type,
-                                    data.as_mut_ptr().cast(),
-                                    tuple.unwrap(Private),
-                                    1,
-                                )
-                            }
-                        };
+                jl_gc_add_ptr_finalizer(
+                    get_tls(),
+                    array.as_ptr().cast(),
+                    droparray::<T> as *mut c_void,
+                );
 
-                        jl_gc_add_ptr_finalizer(
-                            get_tls(),
-                            array.cast(),
-                            droparray::<T> as *mut c_void,
-                        );
+                array
+            };
 
-                        result.write(array);
-                        Ok(())
-                    };
+            let exc = |err: Value| err.unwrap_non_null(Private);
+            let res = match catch_exceptions(callback, exc) {
+                Ok(array_ptr) => Ok(array_ptr),
+                Err(e) => Err(e),
+            };
 
-                let res = match catch_exceptions_with_slots(&mut frame, &mut callback).unwrap() {
-                    Ok(array_ptr) => Ok(NonNull::new_unchecked(array_ptr)),
-                    Err(e) => Err(e.ptr()),
-                };
-
-                Ok(output.result_from_ptr(res, Private))
-            }
-        })
+            Ok(target.result_from_ptr(res, Private))
+        }
     }
 
     /// Create a new n-dimensional Julia array of dimensions `dims` that takes ownership of Rust
@@ -599,15 +377,15 @@ impl<'data> Array<'_, 'data> {
     ///
     /// Safety: If the array size is too large, Julia will throw an error. This error is not
     /// caught, which is UB from a `ccall`ed function.
-    pub unsafe fn from_vec_unchecked<'target, 'current, 'borrow, T, D, S>(
-        target: ExtendedTarget<'target, '_, '_, S>,
+    pub unsafe fn from_vec_unchecked<'target, 'current, 'borrow, T, D, Tgt>(
+        target: Tgt,
         data: Vec<T>,
         dims: D,
-    ) -> JlrsResult<ArrayData<'target, 'static, S>>
+    ) -> JlrsResult<ArrayData<'target, 'static, Tgt>>
     where
-        T: IntoJulia,
-        D: Dims,
-        S: Target<'target>,
+        T: IntoJulia + ConstructType,
+        D: DimsExt,
+        Tgt: Target<'target>,
     {
         if dims.size() != data.len() {
             Err(InstantiationError::ArraySizeMismatch {
@@ -616,51 +394,26 @@ impl<'data> Array<'_, 'data> {
             })?;
         }
 
-        let (output, scope) = target.split();
-        scope.scope(|mut frame| {
-            let array_type =
-                jl_apply_array_type(T::julia_type(&frame).ptr().cast().as_ptr(), dims.rank());
-            let _: Value = frame
-                .as_mut()
-                .data_from_ptr(NonNull::new_unchecked(array_type), Private);
+        let data = Box::leak(data.into_boxed_slice());
+        let array_type = D::ArrayContructor::<T>::construct_type(&target).as_value();
+        let array = dims
+            .alloc_array_with_data(&target, array_type, data.as_mut_ptr().cast())
+            .ptr();
 
-            let array = match dims.rank() {
-                1 => jl_ptr_to_array_1d(
-                    array_type,
-                    Box::into_raw(data.into_boxed_slice()).cast(),
-                    dims.n_elements(0),
-                    1,
-                ),
-                n if n <= 8 => {
-                    let tuple = small_dim_tuple(&mut frame, &dims);
-                    jl_ptr_to_array(
-                        array_type,
-                        Box::into_raw(data.into_boxed_slice()).cast(),
-                        tuple.unwrap(Private),
-                        1,
-                    )
-                }
-                _ => {
-                    let tuple = large_dim_tuple(&mut frame, &dims);
-                    jl_ptr_to_array(
-                        array_type,
-                        Box::into_raw(data.into_boxed_slice()).cast(),
-                        tuple.unwrap(Private),
-                        1,
-                    )
-                }
-            };
-
-            jl_gc_add_ptr_finalizer(get_tls(), array.cast(), droparray::<T> as *mut c_void);
-            Ok(output.data_from_ptr(NonNull::new_unchecked(array), Private))
-        })
+        jl_gc_add_ptr_finalizer(
+            get_tls(),
+            array.as_ptr().cast(),
+            droparray::<T> as *mut c_void,
+        );
+        Ok(target.data_from_ptr(array, Private))
     }
 
     /// Convert a string to a Julia array.
-    pub fn from_string<'target, A, T>(target: T, data: A) -> ArrayData<'target, 'static, T>
+    #[inline]
+    pub fn from_string<'target, A, Tgt>(target: Tgt, data: A) -> ArrayData<'target, 'static, Tgt>
     where
         A: AsRef<str>,
-        T: Target<'target>,
+        Tgt: Target<'target>,
     {
         let string = data.as_ref();
         let nbytes = string.bytes().len();
@@ -672,7 +425,7 @@ impl<'data> Array<'_, 'data> {
         }
     }
 
-    #[inline(always)]
+    #[inline]
     pub(crate) fn data_ptr(self) -> *mut c_void {
         // Safety: the pointer points to valid data.
         unsafe { self.unwrap_non_null(Private).as_ref().data }
@@ -681,12 +434,14 @@ impl<'data> Array<'_, 'data> {
 
 impl<'scope, 'data> Array<'scope, 'data> {
     /// Returns the array's dimensions.
-    /// TODO safety
+    // TODO safety
+    #[inline]
     pub unsafe fn dimensions(self) -> ArrayDimensions<'scope> {
         ArrayDimensions::new(self)
     }
 
     /// Returns the type of this array's elements.
+    #[inline]
     pub fn element_type(self) -> Value<'scope, 'static> {
         // Safety: C API function is called valid arguments.
         unsafe {
@@ -698,12 +453,14 @@ impl<'scope, 'data> Array<'scope, 'data> {
     }
 
     /// Returns the size of this array's elements.
+    #[inline]
     pub fn element_size(self) -> usize {
         // Safety: the pointer points to valid data.
         unsafe { self.unwrap_non_null(Private).as_ref().elsize as usize }
     }
 
     /// Returns `true` if the layout of the elements is compatible with `T`.
+    #[inline]
     pub fn contains<T: ValidField>(self) -> bool {
         // Safety: C API function is called valid arguments.
         T::valid_field(self.element_type())
@@ -711,11 +468,13 @@ impl<'scope, 'data> Array<'scope, 'data> {
 
     /// Returns `true` if the layout of the elements is compatible with `T` and these elements are
     /// stored inline.
+    #[inline]
     pub fn contains_inline<T: ValidField>(self) -> bool {
         self.contains::<T>() && self.is_inline_array()
     }
 
     /// Returns `true` if the elements of the array are stored inline.
+    #[inline]
     pub fn is_inline_array(self) -> bool {
         // Safety: the pointer points to valid data.
         unsafe { self.unwrap_non_null(Private).as_ref().flags.ptrarray() == 0 }
@@ -723,12 +482,14 @@ impl<'scope, 'data> Array<'scope, 'data> {
 
     /// Returns `true` if the elements of the array are stored inline and the element type is a
     /// union type.
+    #[inline]
     pub fn is_union_array(self) -> bool {
         self.is_inline_array() && self.element_type().is::<Union>()
     }
 
     /// Returns true if the elements of the array are stored inline and at least one of the fields
     /// of the inlined type is a pointer.
+    #[inline]
     pub fn has_inlined_pointers(self) -> bool {
         // Safety: the pointer points to valid data.
         unsafe {
@@ -738,6 +499,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
     }
 
     /// Returns `true` if elements of this array are zero-initialized.
+    #[inline]
     pub fn zero_init(self) -> bool {
         // Safety: the pointer points to valid data.
         unsafe {
@@ -756,6 +518,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
     }
 
     /// Returns true if the elements of the array are stored as [`Value`]s.
+    #[inline]
     pub fn is_value_array(self) -> bool {
         !self.is_inline_array()
     }
@@ -776,12 +539,12 @@ impl<'scope, 'data> Array<'scope, 'data> {
     }
 
     /// Convert this array to a [`TypedValue`].
-    pub fn as_typed_value<T: ConstructType, const N: isize>(
+    pub fn as_typed_value<'target, T: ConstructType, Tgt: Target<'target>, const N: isize>(
         self,
-        frame: &mut GcFrame,
+        target: &Tgt,
     ) -> JlrsResult<TypedValue<'scope, 'data, ArrayType<T, N>>> {
-        frame.scope(|mut frame| {
-            let ty = T::construct_type(frame.as_extended_target());
+        unsafe {
+            let ty = T::construct_type(target).as_value();
             let elty = self.element_type();
             if ty != elty {
                 // err
@@ -791,23 +554,22 @@ impl<'scope, 'data> Array<'scope, 'data> {
                 })?;
             }
 
-            unsafe {
-                let rank = self.dimensions().rank();
-                if rank != N as _ {
-                    Err(ArrayLayoutError::RankMismatch {
-                        found: rank as isize,
-                        provided: N,
-                    })?;
-                }
-
-                Ok(TypedValue::<ArrayType<T, N>>::from_value_unchecked(
-                    self.as_value(),
-                ))
+            let rank = self.dimensions().rank();
+            if rank != N as _ {
+                Err(ArrayLayoutError::RankMismatch {
+                    found: rank as isize,
+                    provided: N,
+                })?;
             }
-        })
+
+            Ok(TypedValue::<ArrayType<T, N>>::from_value_unchecked(
+                self.as_value(),
+            ))
+        }
     }
 
     /// Convert this array to a [`TypedValue`] without checking if the layout is compatible.
+    #[inline]
     pub unsafe fn as_typed_value_unchecked<T: ConstructType, const N: isize>(
         self,
     ) -> TypedValue<'scope, 'data, ArrayType<T, N>> {
@@ -849,6 +611,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
     /// valid.
     ///
     /// Safety: `T` must be a valid representation of the data stored in the array.
+    #[inline]
     pub unsafe fn as_typed_unchecked<T>(self) -> TypedArray<'scope, 'data, T>
     where
         T: ValidField,
@@ -859,6 +622,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
     /// Track this array.
     ///
     /// While an array is tracked, it can't be exclusively tracked.
+    #[inline]
     pub fn track_shared<'borrow>(
         &'borrow self,
     ) -> JlrsResult<TrackedArray<'borrow, 'scope, 'data, Self>> {
@@ -869,6 +633,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
     /// Exclusively track this array.
     ///
     /// While an array is exclusively tracked, it can't be tracked otherwise.
+    #[inline]
     pub unsafe fn track_exclusive<'borrow>(
         &'borrow mut self,
     ) -> JlrsResult<TrackedArrayMut<'borrow, 'scope, 'data, Self>> {
@@ -902,6 +667,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
 
     // TODO docs
     // TODO safety for all
+
     /// Immutably access the contents of this array. The elements must have an `isbits` type.
     ///
     /// Returns `ArrayLayoutError::NotInline` if the data is not stored inline, `ArrayLayoutError::NotBits`
@@ -909,6 +675,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
     /// layout for the array elements.
     ///
     /// Safety: it's not checked if the content of this array are already borrowed by Rust code.
+    #[inline]
     pub unsafe fn bits_data<'borrow, T>(
         &'borrow self,
     ) -> JlrsResult<BitsArrayAccessorI<'borrow, 'scope, 'data, T>>
@@ -930,6 +697,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
     ///
     /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
     /// this value is allowed.
+    #[inline]
     pub unsafe fn bits_data_mut<'borrow, T>(
         &'borrow mut self,
     ) -> JlrsResult<BitsArrayAccessorMut<'borrow, 'scope, 'data, T>>
@@ -948,6 +716,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
     ///
     /// Returns `ArrayLayoutError::NotInline` if the data is not stored inline or
     /// `AccessError::InvalidLayout` if `T` is not a valid layout for the array elements.
+    #[inline]
     pub unsafe fn inline_data<'borrow, T>(
         &'borrow self,
     ) -> JlrsResult<InlinePtrArrayAccessorI<'borrow, 'scope, 'data, T>>
@@ -969,6 +738,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
     ///
     /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
     /// this value is allowed.
+    #[inline]
     pub unsafe fn inline_data_mut<'borrow, T>(
         &'borrow mut self,
     ) -> JlrsResult<InlinePtrArrayAccessorMut<'borrow, 'scope, 'data, T>>
@@ -987,6 +757,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
     ///
     /// Returns `ArrayLayoutError::NotPointer` if the data is stored inline or `AccessError::InvalidLayout` if `T`
     /// is not a valid layout for the array elements.
+    #[inline]
     pub unsafe fn managed_data<'borrow, T>(
         &'borrow self,
     ) -> JlrsResult<PtrArrayAccessorI<'borrow, 'scope, 'data, T>>
@@ -1009,6 +780,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
     ///
     /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
     /// this value is allowed.
+    #[inline]
     pub unsafe fn managed_data_mut<'borrow, T>(
         &'borrow mut self,
     ) -> JlrsResult<PtrArrayAccessorMut<'borrow, 'scope, 'data, T>>
@@ -1027,6 +799,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
     /// You can borrow data from multiple arrays at the same time.
     ///
     /// Returns `ArrayLayoutError::NotPointer` if the data is stored inline.
+    #[inline]
     pub unsafe fn value_data<'borrow>(
         &'borrow self,
     ) -> JlrsResult<PtrArrayAccessorI<'borrow, 'scope, 'data, ValueRef<'scope, 'data>>> {
@@ -1044,6 +817,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
     ///
     /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
     /// this value is allowed.
+    #[inline]
     pub unsafe fn value_data_mut<'borrow>(
         &'borrow mut self,
     ) -> JlrsResult<PtrArrayAccessorMut<'borrow, 'scope, 'data, ValueRef<'scope, 'data>>> {
@@ -1058,6 +832,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
     /// You can borrow data from multiple arrays at the same time.
     ///
     /// Returns `ArrayLayoutError::NotUnion` if the data is not stored as a bits union.
+    #[inline]
     pub unsafe fn union_data<'borrow>(
         &'borrow self,
     ) -> JlrsResult<UnionArrayAccessorI<'borrow, 'scope, 'data>> {
@@ -1075,6 +850,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
     ///
     /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
     /// this value is allowed.
+    #[inline]
     pub unsafe fn union_data_mut<'borrow>(
         &'borrow mut self,
     ) -> JlrsResult<UnionArrayAccessorMut<'borrow, 'scope, 'data>> {
@@ -1087,6 +863,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
     /// Immutably access the contents of this array.
     ///
     /// You can borrow data from multiple arrays at the same time.
+    #[inline]
     pub unsafe fn indeterminate_data<'borrow>(
         &'borrow self,
     ) -> IndeterminateArrayAccessorI<'borrow, 'scope, 'data> {
@@ -1099,30 +876,35 @@ impl<'scope, 'data> Array<'scope, 'data> {
     ///
     /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
     /// this value is allowed.
+    #[inline]
     pub unsafe fn indeterminate_data_mut<'borrow>(
         &'borrow mut self,
     ) -> IndeterminateArrayAccessor<'borrow, 'scope, 'data, Mutable<'borrow, u8>> {
         ArrayAccessor::new(self)
     }
 
+    #[inline]
     pub unsafe fn into_slice_unchecked<T>(self) -> &'scope [T] {
         let len = self.dimensions().size();
         let data = self.data_ptr().cast::<T>();
         std::slice::from_raw_parts(data, len)
     }
 
+    #[inline]
     pub unsafe fn as_slice_unchecked<'borrow, T>(&'borrow self) -> &'borrow [T] {
         let len = self.dimensions().size();
         let data = self.data_ptr().cast::<T>();
         std::slice::from_raw_parts(data, len)
     }
 
+    #[inline]
     pub unsafe fn into_mut_slice_unchecked<T>(self) -> &'scope mut [T] {
         let len = self.dimensions().size();
         let data = self.data_ptr().cast::<T>();
         std::slice::from_raw_parts_mut(data, len)
     }
 
+    #[inline]
     pub unsafe fn as_mut_slice_unchecked<'borrow, T>(&'borrow mut self) -> &'borrow mut [T] {
         let len = self.dimensions().size();
         let data = self.data_ptr().cast::<T>();
@@ -1134,51 +916,36 @@ impl<'scope, 'data> Array<'scope, 'data> {
     ///
     /// This method returns an exception if the old and new array have a different number of
     /// elements.
-    pub unsafe fn reshape<'target, 'current, 'borrow, D, S>(
+    pub unsafe fn reshape<'target, 'current, 'borrow, D, Tgt>(
         &self,
-        target: ExtendedTarget<'target, '_, '_, S>,
+        target: Tgt,
         dims: D,
-    ) -> ArrayResult<'target, 'data, S>
+    ) -> ArrayResult<'target, 'data, Tgt>
     where
-        D: Dims,
-        S: Target<'target>,
+        D: DimsExt,
+        Tgt: Target<'target>,
     {
-        let (output, scope) = target.split();
-        scope
-            .scope(|mut frame| {
+        target
+            .with_local_scope::<_, _, 1>(|target, mut frame| {
                 let elty_ptr = self.element_type().unwrap(Private);
 
                 // Safety: The array type is rooted until the array has been constructed, all C API
                 // functions are called with valid data. If an exception is thrown it's caught.
-                let mut callback =
-                    |frame: &mut GcFrame, result: &mut MaybeUninit<*mut jl_array_t>| {
-                        let array_type = jl_apply_array_type(elty_ptr, dims.rank());
-                        let _: Value = frame
-                            .as_mut()
-                            .data_from_ptr(NonNull::new_unchecked(array_type), Private);
+                let callback = || {
+                    let array_type = jl_apply_array_type(elty_ptr, dims.rank());
 
-                        let tuple = if dims.rank() <= 8 {
-                            small_dim_tuple(frame, &dims)
-                        } else {
-                            large_dim_tuple(frame, &dims)
-                        };
+                    let tuple = sized_dim_tuple(&mut frame, &dims);
 
-                        let array = jl_reshape_array(
-                            array_type,
-                            self.unwrap(Private),
-                            tuple.unwrap(Private),
-                        );
-
-                        result.write(array);
-                        Ok(())
-                    };
-
-                let res = match catch_exceptions_with_slots(&mut frame, &mut callback).unwrap() {
-                    Ok(array_ptr) => Ok(NonNull::new_unchecked(array_ptr)),
-                    Err(e) => Err(e.ptr()),
+                    jl_reshape_array(array_type, self.unwrap(Private), tuple.unwrap(Private))
                 };
 
-                Ok(output.result_from_ptr(res, Private))
+                let exc = |err: Value| err.unwrap_non_null(Private);
+                let res = match catch_exceptions(callback, exc) {
+                    Ok(array_ptr) => Ok(NonNull::new_unchecked(array_ptr)),
+                    Err(e) => Err(e),
+                };
+
+                Ok(target.result_from_ptr(res, Private))
             })
             .unwrap()
     }
@@ -1188,32 +955,23 @@ impl<'scope, 'data> Array<'scope, 'data> {
     ///
     /// Safety: If the dimensions are incompatible with the array size, Julia will throw an error.
     /// This error is not caught, which is UB from a `ccall`ed function.
-    pub unsafe fn reshape_unchecked<'target, 'current, 'borrow, D, S>(
+    pub unsafe fn reshape_unchecked<'target, 'current, 'borrow, D, Tgt>(
         &self,
-        target: ExtendedTarget<'target, '_, '_, S>,
+        target: Tgt,
         dims: D,
-    ) -> ArrayData<'target, 'data, S>
+    ) -> ArrayData<'target, 'data, Tgt>
     where
-        D: Dims,
-        S: Target<'target>,
+        D: DimsExt,
+        Tgt: Target<'target>,
     {
-        let (output, scope) = target.split();
-        scope
-            .scope(|mut frame| {
+        target
+            .with_local_scope::<_, _, 1>(|target, mut frame| {
                 let elty_ptr = self.element_type().unwrap(Private);
                 let array_type = jl_apply_array_type(elty_ptr.cast(), dims.rank());
-                let _: Value = frame
-                    .as_mut()
-                    .data_from_ptr(NonNull::new_unchecked(array_type), Private);
-
-                let tuple = if dims.rank() <= 8 {
-                    small_dim_tuple(&mut frame, &dims)
-                } else {
-                    large_dim_tuple(&mut frame, &dims)
-                };
+                let tuple = sized_dim_tuple(&mut frame, &dims);
 
                 let res = jl_reshape_array(array_type, self.unwrap(Private), tuple.unwrap(Private));
-                Ok(output.data_from_ptr(NonNull::new_unchecked(res), Private))
+                Ok(target.data_from_ptr(NonNull::new_unchecked(res), Private))
             })
             .unwrap()
     }
@@ -1312,21 +1070,19 @@ impl<'scope> Array<'scope, 'static> {
         &mut self,
         target: S,
         inc: usize,
-    ) -> S::Exception<'static, ()>
+    ) -> TargetException<'target, 'static, (), S>
     where
         S: Target<'target>,
     {
         // Safety: the C API function is called with valid data. If an exception is thrown it's caught.
 
-        let mut callback = |result: &mut MaybeUninit<()>| {
-            jl_array_grow_end(self.unwrap(Private), inc);
-            result.write(());
-            Ok(())
-        };
+        let callback = || jl_array_grow_end(self.unwrap(Private), inc);
 
-        let res = match catch_exceptions(&mut callback).unwrap() {
+        let exc = |err: Value| err.unwrap_non_null(Private);
+
+        let res = match catch_exceptions(callback, exc) {
             Ok(_) => Ok(()),
-            Err(e) => Err(e.ptr()),
+            Err(e) => Err(e),
         };
 
         target.exception_from_ptr(res, Private)
@@ -1337,6 +1093,7 @@ impl<'scope> Array<'scope, 'static> {
     /// Safety: the array must be 1D and not contain data borrowed or moved from Rust, otherwise
     /// Julia throws an exception. This error is not exception, which is UB from a `ccall`ed
     /// function.
+    #[inline]
     pub unsafe fn grow_end_unchecked(&mut self, inc: usize) {
         jl_array_grow_end(self.unwrap(Private), inc);
     }
@@ -1345,20 +1102,22 @@ impl<'scope> Array<'scope, 'static> {
     ///
     /// The array must be 1D, not contain data borrowed or moved from Rust, otherwise an exception
     /// is returned.
-    pub unsafe fn del_end<'target, S>(&mut self, target: S, dec: usize) -> S::Exception<'static, ()>
+    pub unsafe fn del_end<'target, S>(
+        &mut self,
+        target: S,
+        dec: usize,
+    ) -> TargetException<'target, 'static, (), S>
     where
         S: Target<'target>,
     {
         // Safety: the C API function is called with valid data. If an exception is thrown it's caught.
-        let mut callback = |result: &mut MaybeUninit<()>| {
-            jl_array_del_end(self.unwrap(Private), dec);
-            result.write(());
-            Ok(())
-        };
+        let callback = || jl_array_del_end(self.unwrap(Private), dec);
 
-        let res = match catch_exceptions(&mut callback).unwrap() {
+        let exc = |err: Value| err.unwrap_non_null(Private);
+
+        let res = match catch_exceptions(callback, exc) {
             Ok(_) => Ok(()),
-            Err(e) => Err(e.ptr()),
+            Err(e) => Err(e),
         };
 
         target.exception_from_ptr(res, Private)
@@ -1369,6 +1128,7 @@ impl<'scope> Array<'scope, 'static> {
     /// Safety: the array must be 1D and not contain data borrowed or moved from Rust, otherwise
     /// Julia throws an exception. This error is not exception, which is UB from a `ccall`ed
     /// function.
+    #[inline]
     pub unsafe fn del_end_unchecked(&mut self, dec: usize) {
         jl_array_del_end(self.unwrap(Private), dec);
     }
@@ -1381,20 +1141,17 @@ impl<'scope> Array<'scope, 'static> {
         &mut self,
         target: S,
         inc: usize,
-    ) -> S::Exception<'static, ()>
+    ) -> TargetException<'target, 'static, (), S>
     where
         S: Target<'target>,
     {
         // Safety: the C API function is called with valid data. If an exception is thrown it's caught.
-        let mut callback = |result: &mut MaybeUninit<()>| {
-            jl_array_grow_beg(self.unwrap(Private), inc);
-            result.write(());
-            Ok(())
-        };
+        let callback = || jl_array_grow_beg(self.unwrap(Private), inc);
+        let exc = |err: Value| err.unwrap_non_null(Private);
 
-        let res = match catch_exceptions(&mut callback).unwrap() {
+        let res = match catch_exceptions(callback, exc) {
             Ok(_) => Ok(()),
-            Err(e) => Err(e.ptr()),
+            Err(e) => Err(e),
         };
 
         target.exception_from_ptr(res, Private)
@@ -1405,6 +1162,7 @@ impl<'scope> Array<'scope, 'static> {
     /// Safety: the array must be 1D and not contain data borrowed or moved from Rust, otherwise
     /// Julia throws an exception. This error is not exception, which is UB from a `ccall`ed
     /// function.
+    #[inline]
     pub unsafe fn grow_begin_unchecked(&mut self, inc: usize) {
         jl_array_grow_beg(self.unwrap(Private), inc);
     }
@@ -1417,20 +1175,17 @@ impl<'scope> Array<'scope, 'static> {
         &mut self,
         target: S,
         dec: usize,
-    ) -> S::Exception<'static, ()>
+    ) -> TargetException<'target, 'static, (), S>
     where
         S: Target<'target>,
     {
         // Safety: the C API function is called with valid data. If an exception is thrown it's caught.
-        let mut callback = |result: &mut MaybeUninit<()>| {
-            jl_array_del_beg(self.unwrap(Private), dec);
-            result.write(());
-            Ok(())
-        };
+        let callback = || jl_array_del_beg(self.unwrap(Private), dec);
+        let exc = |err: Value| err.unwrap_non_null(Private);
 
-        let res = match catch_exceptions(&mut callback).unwrap() {
+        let res = match catch_exceptions(callback, exc) {
             Ok(_) => Ok(()),
-            Err(e) => Err(e.ptr()),
+            Err(e) => Err(e),
         };
 
         target.exception_from_ptr(res, Private)
@@ -1441,12 +1196,14 @@ impl<'scope> Array<'scope, 'static> {
     /// Safety: the array must be 1D and not contain data borrowed or moved from Rust, otherwise
     /// Julia throws an exception. This error is not exception, which is UB from a `ccall`ed
     /// function.
+    #[inline]
     pub unsafe fn del_begin_unchecked(&mut self, dec: usize) {
         jl_array_del_beg(self.unwrap(Private), dec);
     }
 }
 
 unsafe impl<'scope, 'data> Typecheck for Array<'scope, 'data> {
+    #[inline]
     fn typecheck(t: DataType) -> bool {
         // Safety: Array is a UnionAll. so check if the typenames match
         unsafe { t.type_name() == TypeName::of_array(&Unrooted::new()) }
@@ -1462,11 +1219,12 @@ impl<'scope, 'data> ManagedPriv<'scope, 'data> for Array<'scope, 'data> {
 
     // Safety: `inner` must not have been freed yet, the result must never be
     // used after the GC might have freed it.
+    #[inline]
     unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self {
         Self(inner, PhantomData, PhantomData)
     }
 
-    #[inline(always)]
+    #[inline]
     fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps> {
         self.0
     }
@@ -1485,21 +1243,25 @@ pub struct TypedArray<'scope, 'data, T>(
 
 impl<'scope, 'data, T> TypedArray<'scope, 'data, T> {
     /// Returns the array's dimensions.
+    #[inline]
     pub unsafe fn dimensions(self) -> ArrayDimensions<'scope> {
         self.as_array().dimensions()
     }
 
     /// Returns the type of this array's elements.
+    #[inline]
     pub fn element_type(self) -> Value<'scope, 'static> {
         self.as_array().element_type()
     }
 
     /// Returns the size of this array's elements.
+    #[inline]
     pub fn element_size(self) -> usize {
         self.as_array().element_size()
     }
 
     /// Convert `self` to `Array`.
+    #[inline]
     pub fn as_array(self) -> Array<'scope, 'data> {
         unsafe { Array::wrap_non_null(self.0, Private) }
     }
@@ -1509,6 +1271,7 @@ impl<'scope, 'data, U: ValidField> TypedArray<'scope, 'data, U> {
     /// Track this array.
     ///
     /// While an array is tracked, it can't be exclusively tracked.
+    #[inline]
     pub fn track_shared<'borrow>(
         &'borrow self,
     ) -> JlrsResult<TrackedArray<'borrow, 'scope, 'data, Self>> {
@@ -1519,6 +1282,7 @@ impl<'scope, 'data, U: ValidField> TypedArray<'scope, 'data, U> {
     /// Exclusively track this array.
     ///
     /// While an array is exclusively tracked, it can't be tracked otherwise.
+    #[inline]
     pub unsafe fn track_exclusive<'borrow>(
         &'borrow mut self,
     ) -> JlrsResult<TrackedArrayMut<'borrow, 'scope, 'data, Self>> {
@@ -1549,6 +1313,7 @@ impl<'scope, 'data, T: ConstructType> TypedArray<'scope, 'data, T> {
     }
 
     /// Convert this array to a [`TypedValue`] without checking if the layout is compatible.
+    #[inline]
     pub unsafe fn as_typed_value_unchecked<const N: isize>(
         self,
     ) -> TypedValue<'scope, 'data, ArrayType<T, N>> {
@@ -1563,6 +1328,7 @@ impl<'scope, 'data, T> Clone for TypedArray<'scope, 'data, T>
 where
     T: ValidField,
 {
+    #[inline]
     fn clone(&self) -> Self {
         unsafe { TypedArray::wrap_non_null(self.unwrap_non_null(Private), Private) }
     }
@@ -1572,7 +1338,7 @@ impl<'scope, 'data, T> Copy for TypedArray<'scope, 'data, T> where T: ValidField
 
 impl<'data, T> TypedArray<'_, 'data, T>
 where
-    T: ValidField + IntoJulia,
+    T: ValidField + IntoJulia + ConstructType,
 {
     /// Allocate a new n-dimensional Julia array of dimensions `dims` for data of type `T`.
     ///
@@ -1582,33 +1348,25 @@ where
     ///
     /// If the array size is too large, Julia will throw an error. This error is caught and
     /// returned.
-    pub fn new<'target, 'current, 'borrow, D, S>(
-        target: ExtendedTarget<'target, '_, '_, S>,
+    #[inline]
+    pub fn new<'target, 'current, 'borrow, D, Tgt>(
+        target: Tgt,
         dims: D,
-    ) -> TypedArrayResult<'target, 'static, S, T>
+    ) -> TypedArrayResult<'target, 'static, Tgt, T>
     where
-        D: Dims,
-        S: Target<'target>,
+        D: DimsExt,
+        Tgt: Target<'target>,
     {
         unsafe {
-            let (output, frame) = target.split();
-            frame
-                .scope(|mut frame| {
-                    let global = frame.unrooted();
-                    let target = frame.extended_target(global);
-                    let x = Array::new::<T, _, _>(target, dims);
+            let res = match Array::new::<T, _, _>(&target, dims) {
+                Ok(arr) => Ok(arr
+                    .as_managed()
+                    .as_typed_unchecked::<T>()
+                    .unwrap_non_null(Private)),
+                Err(e) => Err(e.as_managed().unwrap_non_null(Private)),
+            };
 
-                    let res = match x {
-                        Ok(arr) => Ok(arr
-                            .as_managed()
-                            .as_typed_unchecked::<T>()
-                            .unwrap_non_null(Private)),
-                        Err(e) => Err(e.as_managed().unwrap_non_null(Private)),
-                    };
-
-                    Ok(output.result_from_ptr(res, Private))
-                })
-                .unwrap()
+            target.result_from_ptr(res, Private)
         }
     }
 
@@ -1618,63 +1376,51 @@ where
     ///
     /// Safety: If the array size is too large, Julia will throw an error. This error is not
     /// caught, which is UB from a `ccall`ed function.
-    pub unsafe fn new_unchecked<'target, 'current, 'borrow, D, S>(
-        target: ExtendedTarget<'target, '_, '_, S>,
+    #[inline]
+    pub unsafe fn new_unchecked<'target, 'current, 'borrow, D, Tgt>(
+        target: Tgt,
         dims: D,
-    ) -> TypedArrayData<'target, 'data, S, T>
+    ) -> TypedArrayData<'target, 'data, Tgt, T>
     where
-        D: Dims,
-        S: Target<'target>,
+        D: DimsExt,
+        Tgt: Target<'target>,
     {
-        let (output, frame) = target.split();
-        frame
-            .scope(|mut frame| {
-                let inner_output = frame.unrooted();
-                let target = frame.extended_target(inner_output);
+        let res = Array::new_unchecked::<T, _, _>(&target, dims)
+            .as_managed()
+            .as_typed_unchecked::<T>();
 
-                let res = Array::new_unchecked::<T, _, _>(target, dims)
+        target.data_from_ptr(res.unwrap_non_null(Private), Private)
+    }
+
+    /// Create a new n-dimensional Julia array of dimensions `dims` that borrows data from Rust.
+    ///
+    /// This method can only be used in combination with types that implement `IntoJulia`. Because
+    /// the data is borrowed from Rust, operations that can change the size of the array (e.g.
+    /// `push!`) will fail.
+    ///
+    /// If the array size is too large, Julia will throw an error. This error is caught and
+    /// returned.
+    #[inline]
+    pub fn from_slice<'target: 'current, 'current: 'borrow, 'borrow, D, Tgt>(
+        target: Tgt,
+        data: &'data mut [T],
+        dims: D,
+    ) -> JlrsResult<TypedArrayResult<'target, 'data, Tgt, T>>
+    where
+        T: IntoJulia,
+        D: DimsExt,
+        Tgt: Target<'target>,
+    {
+        unsafe {
+            let res = match Array::from_slice::<T, _, _>(&target, data, dims)? {
+                Ok(arr) => Ok(arr
                     .as_managed()
-                    .as_typed_unchecked::<T>();
+                    .as_typed_unchecked::<T>()
+                    .unwrap_non_null(Private)),
+                Err(e) => Err(e.as_managed().unwrap_non_null(Private)),
+            };
 
-                Ok(output.data_from_ptr(res.unwrap_non_null(Private), Private))
-            })
-            .unwrap()
-    }
-
-    /// Create a new n-dimensional Julia array of dimensions `dims` that borrows data from Rust.
-    ///
-    /// This method can only be used in combination with types that implement `IntoJulia`. Because
-    /// the data is borrowed from Rust, operations that can change the size of the array (e.g.
-    /// `push!`) will fail.
-    ///
-    /// If the array size is too large, Julia will throw an error. This error is caught and
-    /// returned.
-    pub fn from_slice<'target: 'current, 'current: 'borrow, 'borrow, D, S>(
-        target: ExtendedTarget<'target, '_, '_, S>,
-        data: &'data mut [T],
-        dims: D,
-    ) -> JlrsResult<TypedArrayResult<'target, 'data, S, T>>
-    where
-        T: IntoJulia,
-        D: Dims,
-        S: Target<'target>,
-    {
-        unsafe {
-            let (output, frame) = target.split();
-            frame.scope(|mut frame| {
-                let global = frame.unrooted();
-                let target = frame.extended_target(global);
-
-                let res = match Array::from_slice::<T, _, _>(target, data, dims)? {
-                    Ok(arr) => Ok(arr
-                        .as_managed()
-                        .as_typed_unchecked::<T>()
-                        .unwrap_non_null(Private)),
-                    Err(e) => Err(e.as_managed().unwrap_non_null(Private)),
-                };
-
-                Ok(output.result_from_ptr(res, Private))
-            })
+            Ok(target.result_from_ptr(res, Private))
         }
     }
 
@@ -1686,27 +1432,22 @@ where
     ///
     /// Safety: If the array size is too large, Julia will throw an error. This error is not
     /// caught, which is UB from a `ccall`ed function.
-    pub unsafe fn from_slice_unchecked<'target, 'current, 'borrow, D, S>(
-        target: ExtendedTarget<'target, '_, '_, S>,
+    #[inline]
+    pub unsafe fn from_slice_unchecked<'target, 'current, 'borrow, D, Tgt>(
+        target: Tgt,
         data: &'data mut [T],
         dims: D,
-    ) -> JlrsResult<TypedArrayData<'target, 'data, S, T>>
+    ) -> JlrsResult<TypedArrayData<'target, 'data, Tgt, T>>
     where
         T: IntoJulia,
-        D: Dims,
-        S: Target<'target>,
+        D: DimsExt,
+        Tgt: Target<'target>,
     {
-        let (output, frame) = target.split();
-        frame.scope(|mut frame| {
-            let inner_output = frame.unrooted();
-            let target = frame.extended_target(inner_output);
+        let res = Array::from_slice_unchecked::<T, _, _>(&target, data, dims)?
+            .as_managed()
+            .as_typed_unchecked::<T>();
 
-            let res = Array::from_slice_unchecked::<T, _, _>(target, data, dims)?
-                .as_managed()
-                .as_typed_unchecked::<T>();
-
-            Ok(output.data_from_ptr(res.unwrap_non_null(Private), Private))
-        })
+        Ok(target.data_from_ptr(res.unwrap_non_null(Private), Private))
     }
 
     /// Create a new n-dimensional Julia array of dimensions `dims` that takes ownership of Rust
@@ -1718,32 +1459,27 @@ where
     ///
     /// If the array size is too large, Julia will throw an error. This error is caught and
     /// returned.
-    pub fn from_vec<'target, 'current, 'borrow, D, S>(
-        target: ExtendedTarget<'target, '_, '_, S>,
+    #[inline]
+    pub fn from_vec<'target, 'current, 'borrow, D, Tgt>(
+        target: Tgt,
         data: Vec<T>,
         dims: D,
-    ) -> JlrsResult<TypedArrayResult<'target, 'static, S, T>>
+    ) -> JlrsResult<TypedArrayResult<'target, 'static, Tgt, T>>
     where
         T: IntoJulia,
-        D: Dims,
-        S: Target<'target>,
+        D: DimsExt,
+        Tgt: Target<'target>,
     {
         unsafe {
-            let (output, frame) = target.split();
-            frame.scope(|mut frame| {
-                let global = frame.unrooted();
-                let target = frame.extended_target(global);
+            let res = match Array::from_vec::<T, _, _>(&target, data, dims)? {
+                Ok(arr) => Ok(arr
+                    .as_managed()
+                    .as_typed_unchecked::<T>()
+                    .unwrap_non_null(Private)),
+                Err(e) => Err(e.as_managed().unwrap_non_null(Private)),
+            };
 
-                let res = match Array::from_vec::<T, _, _>(target, data, dims)? {
-                    Ok(arr) => Ok(arr
-                        .as_managed()
-                        .as_typed_unchecked::<T>()
-                        .unwrap_non_null(Private)),
-                    Err(e) => Err(e.as_managed().unwrap_non_null(Private)),
-                };
-
-                Ok(output.result_from_ptr(res, Private))
-            })
+            Ok(target.result_from_ptr(res, Private))
         }
     }
 
@@ -1756,27 +1492,22 @@ where
     ///
     /// Safety: If the array size is too large, Julia will throw an error. This error is not
     /// caught, which is UB from a `ccall`ed function.
-    pub unsafe fn from_vec_unchecked<'target, 'current, 'borrow, D, S>(
-        target: ExtendedTarget<'target, '_, '_, S>,
+    #[inline]
+    pub unsafe fn from_vec_unchecked<'target, 'current, 'borrow, D, Tgt>(
+        target: Tgt,
         data: Vec<T>,
         dims: D,
-    ) -> JlrsResult<TypedArrayData<'target, 'static, S, T>>
+    ) -> JlrsResult<TypedArrayData<'target, 'static, Tgt, T>>
     where
         T: IntoJulia,
-        D: Dims,
-        S: Target<'target>,
+        D: DimsExt,
+        Tgt: Target<'target>,
     {
-        let (output, frame) = target.split();
-        frame.scope(|mut frame| {
-            let inner_output = frame.unrooted();
-            let target = frame.extended_target(inner_output);
+        let res = Array::from_vec_unchecked::<T, _, _>(&target, data, dims)?
+            .as_managed()
+            .as_typed_unchecked::<T>();
 
-            let res = Array::from_vec_unchecked::<T, _, _>(target, data, dims)?
-                .as_managed()
-                .as_typed_unchecked::<T>();
-
-            Ok(output.data_from_ptr(res.unwrap_non_null(Private), Private))
-        })
+        Ok(target.data_from_ptr(res.unwrap_non_null(Private), Private))
     }
 }
 
@@ -1790,14 +1521,14 @@ where
     ///
     /// If the array size is too large or if the type is invalid, Julia will throw an error. This
     /// error is caught and returned.
-    pub fn new_for<'target, 'current, 'borrow, D, S>(
-        target: ExtendedTarget<'target, '_, '_, S>,
+    pub fn new_for<'target, 'current, 'borrow, D, Tgt>(
+        target: Tgt,
         dims: D,
         ty: Value,
-    ) -> JlrsResult<TypedArrayResult<'target, 'static, S, T>>
+    ) -> JlrsResult<TypedArrayResult<'target, 'static, Tgt, T>>
     where
-        D: Dims,
-        S: Target<'target>,
+        D: DimsExt,
+        Tgt: Target<'target>,
     {
         if !T::valid_field(ty) {
             let value_type = ty.display_string_or(CANNOT_DISPLAY_TYPE).into();
@@ -1805,21 +1536,15 @@ where
         }
 
         unsafe {
-            let (output, frame) = target.split();
-            frame.scope(|mut frame| {
-                let global = frame.unrooted();
-                let target = frame.extended_target(global);
+            let res = match Array::new_for(&target, dims, ty) {
+                Ok(arr) => Ok(arr
+                    .as_managed()
+                    .as_typed_unchecked::<T>()
+                    .unwrap_non_null(Private)),
+                Err(e) => Err(e.as_managed().unwrap_non_null(Private)),
+            };
 
-                let res = match Array::new_for(target, dims, ty) {
-                    Ok(arr) => Ok(arr
-                        .as_managed()
-                        .as_typed_unchecked::<T>()
-                        .unwrap_non_null(Private)),
-                    Err(e) => Err(e.as_managed().unwrap_non_null(Private)),
-                };
-
-                Ok(output.result_from_ptr(res, Private))
-            })
+            Ok(target.result_from_ptr(res, Private))
         }
     }
 
@@ -1830,36 +1555,31 @@ where
     ///
     /// Safety: If the array size is too large or if the type is invalid, Julia will throw an
     /// error. This error is not caught, which is UB from a `ccall`ed function.
-    pub unsafe fn new_for_unchecked<'target, 'current, 'borrow, D, S>(
-        target: ExtendedTarget<'target, '_, '_, S>,
+    pub unsafe fn new_for_unchecked<'target, 'current, 'borrow, D, Tgt>(
+        target: Tgt,
         dims: D,
         ty: Value,
-    ) -> JlrsResult<TypedArrayData<'target, 'static, S, T>>
+    ) -> JlrsResult<TypedArrayData<'target, 'static, Tgt, T>>
     where
-        D: Dims,
-        S: Target<'target>,
+        D: DimsExt,
+        Tgt: Target<'target>,
     {
         if !T::valid_field(ty) {
             let value_type = ty.display_string_or(CANNOT_DISPLAY_TYPE).into();
             Err(AccessError::InvalidLayout { value_type })?;
         }
 
-        let (output, frame) = target.split();
-        frame.scope(|mut frame| {
-            let inner_output = frame.unrooted();
-            let target = frame.extended_target(inner_output);
+        let res = Array::new_for_unchecked(&target, dims, ty)
+            .as_managed()
+            .as_typed_unchecked::<T>();
 
-            let res = Array::new_for_unchecked(target, dims, ty)
-                .as_managed()
-                .as_typed_unchecked::<T>();
-
-            Ok(output.data_from_ptr(res.unwrap_non_null(Private), Private))
-        })
+        Ok(target.data_from_ptr(res.unwrap_non_null(Private), Private))
     }
 }
 
 impl<'data> TypedArray<'_, 'data, u8> {
     /// Convert a string to a Julia array.
+    #[inline]
     pub fn from_string<'target, A, T>(target: T, data: A) -> TypedArrayData<'target, 'static, T, u8>
     where
         A: AsRef<str>,
@@ -1882,22 +1602,26 @@ where
     T: ValidField,
 {
     /// Returns `true` if the elements of the array are stored inline.
+    #[inline]
     pub fn is_inline_array(self) -> bool {
         self.as_array().is_inline_array()
     }
 
     /// Returns true if the elements of the array are stored inline and at least one of the fields
     /// of the inlined type is a pointer.
+    #[inline]
     pub fn has_inlined_pointers(self) -> bool {
         self.as_array().has_inlined_pointers()
     }
 
     /// Returns `true` if elements of this array are zero-initialized.
+    #[inline]
     pub fn zero_init(self) -> bool {
         self.as_array().zero_init()
     }
 
     /// Returns true if the elements of the array are stored as [`Value`]s.
+    #[inline]
     pub fn is_value_array(self) -> bool {
         !self.is_inline_array()
     }
@@ -1940,6 +1664,7 @@ where
     /// Returns `ArrayLayoutError::NotInline` if the data is not stored inline, `ArrayLayoutError::NotBits`
     /// if the type is not an `isbits` type, or `AccessError::InvalidLayout` if `T` is not a valid
     /// layout for the array elements.
+    #[inline]
     pub unsafe fn bits_data<'borrow>(
         &'borrow self,
     ) -> JlrsResult<BitsArrayAccessorI<'borrow, 'scope, 'data, T>> {
@@ -1960,6 +1685,7 @@ where
     ///
     /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
     /// this value is allowed.
+    #[inline]
     pub unsafe fn bits_data_mut<'borrow>(
         &'borrow mut self,
     ) -> JlrsResult<BitsArrayAccessorMut<'borrow, 'scope, 'data, T>> {
@@ -1976,6 +1702,7 @@ where
     ///
     /// Returns `ArrayLayoutError::NotInline` if the data is not stored inline or
     /// `AccessError::InvalidLayout` if `T` is not a valid layout for the array elements.
+    #[inline]
     pub unsafe fn inline_data<'borrow>(
         &'borrow self,
     ) -> JlrsResult<InlinePtrArrayAccessorI<'borrow, 'scope, 'data, T>>
@@ -1998,6 +1725,7 @@ where
     ///
     /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
     /// this value is allowed.
+    #[inline]
     pub unsafe fn inline_data_mut<'borrow>(
         &'borrow mut self,
     ) -> JlrsResult<InlinePtrArrayAccessorMut<'borrow, 'scope, 'data, T>>
@@ -2043,6 +1771,7 @@ where
     }
 
     /// Convert `self` to `Array`.
+    #[inline]
     pub fn as_array_ref(&self) -> &Array<'scope, 'data> {
         unsafe { std::mem::transmute(self) }
     }
@@ -2052,32 +1781,25 @@ where
     ///
     /// This method returns an exception if the old and new array have a different number of
     /// elements.
-    pub unsafe fn reshape<'target, 'current, 'borrow, D, S>(
+    #[inline]
+    pub unsafe fn reshape<'target, 'current, 'borrow, D, Tgt>(
         &self,
-        target: ExtendedTarget<'target, '_, '_, S>,
+        target: Tgt,
         dims: D,
-    ) -> TypedArrayResult<'target, 'data, S, T>
+    ) -> TypedArrayResult<'target, 'data, Tgt, T>
     where
-        D: Dims,
-        S: Target<'target>,
+        D: DimsExt,
+        Tgt: Target<'target>,
     {
-        let (output, frame) = target.split();
-        frame
-            .scope(|mut frame| {
-                let global = frame.unrooted();
-                let target = frame.extended_target(global);
+        let res = match self.as_array().reshape(&target, dims) {
+            Ok(arr) => Ok(arr
+                .as_managed()
+                .as_typed_unchecked::<T>()
+                .unwrap_non_null(Private)),
+            Err(e) => Err(e.as_managed().unwrap_non_null(Private)),
+        };
 
-                let res = match self.as_array().reshape(target, dims) {
-                    Ok(arr) => Ok(arr
-                        .as_managed()
-                        .as_typed_unchecked::<T>()
-                        .unwrap_non_null(Private)),
-                    Err(e) => Err(e.as_managed().unwrap_non_null(Private)),
-                };
-
-                Ok(output.result_from_ptr(res, Private))
-            })
-            .unwrap()
+        target.result_from_ptr(res, Private)
     }
 
     /// Reshape the array, a new array is returned that has dimensions `dims`. The new array and
@@ -2085,35 +1807,30 @@ where
     ///
     /// Safety: If the dimensions are incompatible with the array size, Julia will throw an error.
     /// This error is not caught, which is UB from a `ccall`ed function.
-    pub unsafe fn reshape_unchecked<'target, 'current, 'borrow, D, S>(
+    #[inline]
+    pub unsafe fn reshape_unchecked<'target, 'current, 'borrow, D, Tgt>(
         self,
-        target: ExtendedTarget<'target, '_, '_, S>,
+        target: Tgt,
         dims: D,
-    ) -> TypedArrayData<'target, 'data, S, T>
+    ) -> TypedArrayData<'target, 'data, Tgt, T>
     where
-        D: Dims,
-        S: Target<'target>,
+        D: DimsExt,
+        Tgt: Target<'target>,
     {
-        let (output, frame) = target.split();
-        frame
-            .scope(|mut frame| {
-                let inner_output = frame.unrooted();
-                let target = frame.extended_target(inner_output);
+        let res = self
+            .as_array()
+            .reshape_unchecked(&target, dims)
+            .as_managed()
+            .as_typed_unchecked::<T>()
+            .unwrap_non_null(Private);
 
-                let res = self
-                    .as_array()
-                    .reshape_unchecked(target, dims)
-                    .as_managed()
-                    .as_typed_unchecked::<T>()
-                    .unwrap_non_null(Private);
-                Ok(output.data_from_ptr(res, Private))
-            })
-            .unwrap()
+        target.data_from_ptr(res, Private)
     }
 
     /// Immutably access the contents of this array.
     ///
     /// You can borrow data from multiple arrays at the same time.
+    #[inline]
     pub unsafe fn indeterminate_data<'borrow>(
         &'borrow self,
     ) -> IndeterminateArrayAccessor<'borrow, 'scope, 'data, Immutable<'borrow, u8>> {
@@ -2127,6 +1844,7 @@ where
     ///
     /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
     /// this value is allowed.
+    #[inline]
     pub unsafe fn indeterminate_data_mut<'borrow>(
         &'borrow mut self,
     ) -> IndeterminateArrayAccessor<'borrow, 'scope, 'data, Mutable<'borrow, u8>> {
@@ -2156,6 +1874,7 @@ where
     ///
     /// Returns `ArrayLayoutError::NotPointer` if the data is stored inline or `AccessError::InvalidLayout` if `T`
     /// is not a valid layout for the array elements.
+    #[inline]
     pub unsafe fn managed_data<'borrow>(
         &'borrow self,
     ) -> JlrsResult<PtrArrayAccessorI<'borrow, 'scope, 'data, T>> {
@@ -2175,6 +1894,7 @@ where
     ///
     /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
     /// this value is allowed.
+    #[inline]
     pub unsafe fn managed_data_mut<'borrow>(
         &'borrow mut self,
     ) -> JlrsResult<PtrArrayAccessorMut<'borrow, 'scope, 'data, T>> {
@@ -2190,6 +1910,7 @@ where
     /// You can borrow data from multiple arrays at the same time.
     ///
     /// Returns `ArrayLayoutError::NotPointer` if the data is stored inline.
+    #[inline]
     pub unsafe fn value_data<'borrow>(
         &'borrow self,
     ) -> JlrsResult<PtrArrayAccessorI<'borrow, 'scope, 'data, ValueRef<'scope, 'data>>> {
@@ -2208,6 +1929,7 @@ where
     ///
     /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
     /// this value is allowed.
+    #[inline]
     pub unsafe fn value_data_mut<'borrow>(
         &'borrow mut self,
     ) -> JlrsResult<PtrArrayAccessorMut<'borrow, 'scope, 'data, ValueRef<'scope, 'data>>> {
@@ -2253,11 +1975,12 @@ where
     ///
     /// The array must be 1D and not contain data borrowed or moved from Rust, otherwise an exception
     /// is returned.
+    #[inline]
     pub unsafe fn grow_end<'target, S>(
         &mut self,
         target: S,
         inc: usize,
-    ) -> S::Exception<'static, ()>
+    ) -> TargetException<'target, 'static, (), S>
     where
         S: Target<'target>,
     {
@@ -2269,6 +1992,7 @@ where
     /// Safety: the array must be 1D and not contain data borrowed or moved from Rust, otherwise
     /// Julia throws an exception. This error is not exception, which is UB from a `ccall`ed
     /// function.
+    #[inline]
     pub unsafe fn grow_end_unchecked(&mut self, inc: usize) {
         self.as_array().grow_end_unchecked(inc)
     }
@@ -2277,7 +2001,12 @@ where
     ///
     /// The array must be 1D, not contain data borrowed or moved from Rust, otherwise an exception
     /// is returned.
-    pub unsafe fn del_end<'target, S>(&mut self, target: S, dec: usize) -> S::Exception<'static, ()>
+    #[inline]
+    pub unsafe fn del_end<'target, S>(
+        &mut self,
+        target: S,
+        dec: usize,
+    ) -> TargetException<'target, 'static, (), S>
     where
         S: Target<'target>,
     {
@@ -2288,6 +2017,7 @@ where
     /// Safety: the array must be 1D and not contain data borrowed or moved from Rust, otherwise
     /// Julia throws an exception. This error is not exception, which is UB from a `ccall`ed
     /// function.
+    #[inline]
     pub unsafe fn del_end_unchecked(&mut self, dec: usize) {
         self.as_array().del_end_unchecked(dec)
     }
@@ -2296,11 +2026,12 @@ where
     ///
     /// The array must be 1D, not contain data borrowed or moved from Rust, otherwise an exception
     /// is returned.
+    #[inline]
     pub unsafe fn grow_begin<'target, S>(
         &mut self,
         target: S,
         inc: usize,
-    ) -> S::Exception<'static, ()>
+    ) -> TargetException<'target, 'static, (), S>
     where
         S: Target<'target>,
     {
@@ -2312,6 +2043,7 @@ where
     /// Safety: the array must be 1D and not contain data borrowed or moved from Rust, otherwise
     /// Julia throws an exception. This error is not exception, which is UB from a `ccall`ed
     /// function.
+    #[inline]
     pub unsafe fn grow_begin_unchecked(&mut self, inc: usize) {
         self.as_array().grow_begin_unchecked(inc)
     }
@@ -2320,11 +2052,12 @@ where
     ///
     /// The array must be 1D, not contain data borrowed or moved from Rust, otherwise an exception
     /// is returned.
+    #[inline]
     pub unsafe fn del_begin<'target, S>(
         &mut self,
         target: S,
         dec: usize,
-    ) -> S::Exception<'static, ()>
+    ) -> TargetException<'target, 'static, (), S>
     where
         S: Target<'target>,
     {
@@ -2336,12 +2069,14 @@ where
     /// Safety: the array must be 1D and not contain data borrowed or moved from Rust, otherwise
     /// Julia throws an exception. This error is not exception, which is UB from a `ccall`ed
     /// function.
+    #[inline]
     pub unsafe fn del_begin_unchecked(&mut self, dec: usize) {
         self.as_array().del_begin_unchecked(dec)
     }
 }
 
 unsafe impl<'scope, 'data, T: ValidField> Typecheck for TypedArray<'scope, 'data, T> {
+    #[inline]
     fn typecheck(t: DataType) -> bool {
         // Safety: borrow is only temporary
         unsafe {
@@ -2367,76 +2102,44 @@ impl<'scope, 'data, T: ValidField> ManagedPriv<'scope, 'data> for TypedArray<'sc
 
     // Safety: `inner` must not have been freed yet, the result must never be
     // used after the GC might have freed it. T must be correct
+    #[inline]
     unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self {
         Self(inner, PhantomData, PhantomData, PhantomData)
     }
 
+    #[inline]
     fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps> {
         self.0
     }
 }
 
-thread_local! {
-    // Used to convert dimensions to tuples. Safe because a thread local is initialized
-    // when `with` is first called, which happens after `Julia::init` has been called. The C API
-    // requires a mutable pointer to this array so an `UnsafeCell` is used to store it.
-    static JL_LONG_TYPE: UnsafeCell<[*mut jl_datatype_t; 8]> = unsafe {
-        let global = Unrooted::new();
-        let t = isize::julia_type(global).ptr().as_ptr();
-        UnsafeCell::new([
-            t,
-            t,
-            t,
-            t,
-            t,
-            t,
-            t,
-            t
-        ])
-    };
-}
+#[repr(transparent)]
+#[derive(Copy, Clone)]
+pub(self) struct AssumeThreadsafe<T>(T);
 
-// Safety: dims.m_dimensions() <= 8
-unsafe fn small_dim_tuple<'scope, D>(
-    frame: &mut GcFrame<'scope>,
+unsafe impl<T> Send for AssumeThreadsafe<T> {}
+unsafe impl<T> Sync for AssumeThreadsafe<T> {}
+
+#[inline]
+pub(self) fn sized_dim_tuple<'target, D, Tgt>(
+    target: Tgt,
     dims: &D,
-) -> Value<'scope, 'static>
+) -> ValueData<'target, 'static, Tgt>
 where
-    D: Dims,
+    D: DimsExt,
+    Tgt: Target<'target>,
 {
-    let n = dims.rank();
-    debug_assert!(n <= 8, "Too many dimensions for small_dim_tuple");
-    let elem_types = JL_LONG_TYPE.with(|longs| longs.get());
-    let tuple_type = jl_apply_tuple_type_v(elem_types.cast(), n);
-    let tuple = jl_new_struct_uninit(tuple_type.cast());
-    let dims = dims.into_dimensions();
-    let tup_nn = NonNull::new_unchecked(tuple);
-    let _: Value = frame.data_from_ptr(tup_nn, Private);
-
-    let usize_ptr: *mut usize = tuple.cast();
-    std::ptr::copy_nonoverlapping(dims.as_slice().as_ptr(), usize_ptr, n);
-
-    Value::wrap_non_null(tup_nn, Private)
-}
-
-fn large_dim_tuple<'scope, D>(frame: &mut GcFrame<'scope>, dims: &D) -> Value<'scope, 'static>
-where
-    D: Dims,
-{
-    // Safety: all C API functions are called with valid arguments.
     unsafe {
-        let n = dims.rank();
-        let mut elem_types = vec![isize::julia_type(&frame); n];
-        let tuple_type = jl_apply_tuple_type_v(elem_types.as_mut_ptr().cast(), n);
-        let tuple = jl_new_struct_uninit(tuple_type.cast());
-        let tup_nn = NonNull::new_unchecked(tuple);
-        let _: Value = frame.data_from_ptr(tup_nn, Private);
+        let rank = dims.rank();
+        let dims_type = dims.dimension_object(&target).as_managed();
+        let tuple = jl_new_struct_uninit(dims_type.unwrap(Private));
 
-        let usize_ptr: *mut usize = tuple.cast();
-        let dims = dims.into_dimensions();
-        std::ptr::copy_nonoverlapping(dims.as_slice().as_ptr(), usize_ptr, n);
+        {
+            let slice = std::slice::from_raw_parts_mut(tuple as *mut MaybeUninit<usize>, rank);
+            dims.fill_tuple(slice, Private);
+        }
 
-        Value::wrap_non_null(tup_nn, Private)
+        Value::wrap_non_null(NonNull::new_unchecked(tuple), Private).root(target)
     }
 }
 
@@ -2483,6 +2186,7 @@ impl ArrayUnbound {
     /// Track this array.
     ///
     /// While an array is tracked, it can't be exclusively tracked.
+    #[inline]
     pub fn track_shared_unbound(self) -> JlrsResult<TrackedArray<'static, 'static, 'static, Self>> {
         Ledger::try_borrow_shared(self.as_value())?;
         unsafe { Ok(TrackedArray::new_from_owned(self)) }
@@ -2491,6 +2195,7 @@ impl ArrayUnbound {
     /// Exclusively track this array.
     ///
     /// While an array is exclusively tracked, it can't be tracked otherwise.
+    #[inline]
     pub unsafe fn track_exclusive_unbound(
         self,
     ) -> JlrsResult<TrackedArrayMut<'static, 'static, 'static, Self>> {
@@ -2504,16 +2209,17 @@ impl ArrayUnbound {
 pub type ArrayRet = Ref<'static, 'static, Array<'static, 'static>>;
 
 unsafe impl ConstructType for Array<'_, '_> {
-    fn construct_type_uncached<'target, T>(
-        target: ExtendedTarget<'target, '_, '_, T>,
-    ) -> super::value::ValueData<'target, 'static, T>
+    #[inline]
+    fn construct_type_uncached<'target, Tgt>(
+        target: Tgt,
+    ) -> super::value::ValueData<'target, 'static, Tgt>
     where
-        T: Target<'target>,
+        Tgt: Target<'target>,
     {
-        let (target, _) = target.split();
         UnionAll::array_type(&target).as_value().root(target)
     }
 
+    #[inline]
     fn base_type<'target, Tgt>(target: &Tgt) -> Option<Value<'target, 'static>>
     where
         Tgt: Target<'target>,
@@ -2525,16 +2231,20 @@ unsafe impl ConstructType for Array<'_, '_> {
 }
 
 unsafe impl ValidLayout for ArrayRef<'_, '_> {
+    #[inline]
     fn valid_layout(v: Value) -> bool {
-        if let Ok(dt) = v.cast::<DataType>() {
+        if v.is::<DataType>() {
+            let dt = unsafe { v.cast_unchecked::<DataType>() };
             dt.is::<Array>()
-        } else if let Ok(ua) = v.cast::<UnionAll>() {
+        } else if v.is::<UnionAll>() {
+            let ua = unsafe { v.cast_unchecked::<UnionAll>() };
             ua.base_type().is::<Array>()
         } else {
             false
         }
     }
 
+    #[inline]
     fn type_object<'target, Tgt: Target<'target>>(target: &Tgt) -> Value<'target, 'static> {
         UnionAll::array_type(target).as_value()
     }
@@ -2543,10 +2253,13 @@ unsafe impl ValidLayout for ArrayRef<'_, '_> {
 }
 
 unsafe impl ValidField for Option<ArrayRef<'_, '_>> {
+    #[inline]
     fn valid_field(v: Value) -> bool {
-        if let Ok(dt) = v.cast::<DataType>() {
+        if v.is::<DataType>() {
+            let dt = unsafe { v.cast_unchecked::<DataType>() };
             dt.is::<Array>()
-        } else if let Ok(ua) = v.cast::<UnionAll>() {
+        } else if v.is::<UnionAll>() {
+            let ua = unsafe { v.cast_unchecked::<UnionAll>() };
             ua.base_type().is::<Array>()
         } else {
             false
@@ -2588,6 +2301,7 @@ impl<T: ValidField> TypedArrayUnbound<T> {
     /// Track this array.
     ///
     /// While an array is tracked, it can't be exclusively tracked.
+    #[inline]
     pub fn track_shared_unbound(self) -> JlrsResult<TrackedArray<'static, 'static, 'static, Self>> {
         Ledger::try_borrow_shared(self.as_value())?;
         unsafe { Ok(TrackedArray::new_from_owned(self)) }
@@ -2596,6 +2310,7 @@ impl<T: ValidField> TypedArrayUnbound<T> {
     /// Exclusively track this array.
     ///
     /// While an array is exclusively tracked, it can't be tracked otherwise.
+    #[inline]
     pub unsafe fn track_exclusive_unbound(
         self,
     ) -> JlrsResult<TrackedArrayMut<'static, 'static, 'static, Self>> {
@@ -2609,16 +2324,20 @@ impl<T: ValidField> TypedArrayUnbound<T> {
 pub type TypedArrayRet<T> = Ref<'static, 'static, TypedArray<'static, 'static, T>>;
 
 unsafe impl<T: ValidField> ValidLayout for TypedArrayRef<'_, '_, T> {
+    #[inline]
     fn valid_layout(v: Value) -> bool {
-        if let Ok(dt) = v.cast::<DataType>() {
+        if v.is::<DataType>() {
+            let dt = unsafe { v.cast_unchecked::<DataType>() };
             dt.is::<TypedArray<T>>()
-        } else if let Ok(ua) = v.cast::<UnionAll>() {
+        } else if v.is::<UnionAll>() {
+            let ua = unsafe { v.cast_unchecked::<UnionAll>() };
             ua.base_type().is::<TypedArray<T>>()
         } else {
             false
         }
     }
 
+    #[inline]
     fn type_object<'target, Tgt: Target<'target>>(target: &Tgt) -> Value<'target, 'static> {
         UnionAll::array_type(target).as_value()
     }
@@ -2627,10 +2346,13 @@ unsafe impl<T: ValidField> ValidLayout for TypedArrayRef<'_, '_, T> {
 }
 
 unsafe impl<T: ValidField> ValidField for Option<TypedArrayRef<'_, '_, T>> {
+    #[inline]
     fn valid_field(v: Value) -> bool {
-        if let Ok(dt) = v.cast::<DataType>() {
+        if v.is::<DataType>() {
+            let dt = unsafe { v.cast_unchecked::<DataType>() };
             dt.is::<TypedArray<T>>()
-        } else if let Ok(ua) = v.cast::<UnionAll>() {
+        } else if v.is::<UnionAll>() {
+            let ua = unsafe { v.cast_unchecked::<UnionAll>() };
             ua.base_type().is::<TypedArray<T>>()
         } else {
             false
@@ -2638,15 +2360,14 @@ unsafe impl<T: ValidField> ValidField for Option<TypedArrayRef<'_, '_, T>> {
     }
 }
 
-use crate::memory::target::target_type::TargetType;
+use crate::memory::target::TargetType;
 
 /// `Array` or `ArrayRef`, depending on the target type `T`.
 pub type ArrayData<'target, 'data, T> =
     <T as TargetType<'target>>::Data<'data, Array<'target, 'data>>;
 
 /// `JuliaResult<Array>` or `JuliaResultRef<ArrayRef>`, depending on the target type `T`.
-pub type ArrayResult<'target, 'data, T> =
-    <T as TargetType<'target>>::Result<'data, Array<'target, 'data>>;
+pub type ArrayResult<'target, 'data, T> = TargetResult<'target, 'data, Array<'target, 'data>, T>;
 
 /// `TypedArray<U>` or `TypedArrayRef<U>`, depending on the target type `T`.
 pub type TypedArrayData<'target, 'data, T, U> =
@@ -2655,7 +2376,7 @@ pub type TypedArrayData<'target, 'data, T, U> =
 /// `JuliaResult<TypedArray<U>>` or `JuliaResultRef<TypedArrayRef<U>>`, depending on the target
 /// type `T`.
 pub type TypedArrayResult<'target, 'data, T, U> =
-    <T as TargetType<'target>>::Result<'data, TypedArray<'target, 'data, U>>;
+    TargetResult<'target, 'data, TypedArray<'target, 'data, U>, T>;
 
 unsafe impl<'scope, 'data, T: ValidField + ConstructType> CCallArg
     for TypedArray<'scope, 'data, T>
@@ -2669,6 +2390,12 @@ unsafe impl<T: ValidField + ConstructType> CCallReturn for TypedArrayRet<T> {
     type CCallReturnType = Value<'static, 'static>;
     type FunctionReturnType =
         TypedValue<'static, 'static, ArrayTypeConstructor<T, TypeVarConstructor<Name<'N'>>>>;
+    type ReturnAs = Self;
+
+    #[inline]
+    unsafe fn return_or_throw(self) -> Self::ReturnAs {
+        self
+    }
 }
 
 /// An array with a definite rank.
@@ -2681,17 +2408,18 @@ pub struct RankedArray<'scope, 'data, const N: isize>(
 
 impl<'scope, 'data, const N: isize> RankedArray<'scope, 'data, N> {
     /// Convert `self` to `Array`.
+    #[inline]
     pub fn as_array(self) -> Array<'scope, 'data> {
         unsafe { Array::wrap_non_null(self.0, Private) }
     }
 
     /// Convert this array to a [`TypedValue`].
-    pub fn as_typed_value<T: ConstructType>(
+    pub fn as_typed_value<'target, T: ConstructType, Tgt: Target<'target>>(
         self,
-        frame: &mut GcFrame,
+        target: &Tgt,
     ) -> JlrsResult<TypedValue<'scope, 'data, ArrayType<T, N>>> {
-        frame.scope(|mut frame| {
-            let ty = T::construct_type(frame.as_extended_target());
+        target.local_scope::<_, _, 1>(|frame| {
+            let ty = T::construct_type(frame);
             let arr = self.as_array();
             let elty = arr.element_type();
             if ty != elty {
@@ -2711,6 +2439,7 @@ impl<'scope, 'data, const N: isize> RankedArray<'scope, 'data, N> {
     }
 
     /// Convert this array to a [`TypedValue`] without checking if the layout is compatible.
+    #[inline]
     pub unsafe fn as_typed_value_unchecked<T: ConstructType>(
         self,
     ) -> TypedValue<'scope, 'data, ArrayType<T, N>> {
@@ -2719,6 +2448,7 @@ impl<'scope, 'data, const N: isize> RankedArray<'scope, 'data, N> {
 }
 
 impl<const N: isize> Clone for RankedArray<'_, '_, N> {
+    #[inline]
     fn clone(&self) -> Self {
         RankedArray(self.0, PhantomData, PhantomData)
     }
@@ -2733,17 +2463,19 @@ impl<'scope, 'data, const N: isize> ManagedPriv<'scope, 'data> for RankedArray<'
 
     // Safety: `inner` must not have been freed yet, the result must never be
     // used after the GC might have freed it.
+    #[inline]
     unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self {
         Self(inner, PhantomData, PhantomData)
     }
 
-    #[inline(always)]
+    #[inline]
     fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps> {
         self.0
     }
 }
 
 unsafe impl<const N: isize> Typecheck for RankedArray<'_, '_, N> {
+    #[inline]
     fn typecheck(t: DataType) -> bool {
         // Safety: Array is a UnionAll. so check if the typenames match
         unsafe {
@@ -2783,16 +2515,20 @@ pub type RankedArrayRef<'scope, 'data, const N: isize> =
 pub type RankedArrayRet<const N: isize> = Ref<'static, 'static, RankedArray<'static, 'static, N>>;
 
 unsafe impl<const N: isize> ValidLayout for RankedArrayRef<'_, '_, N> {
+    #[inline]
     fn valid_layout(v: Value) -> bool {
-        if let Ok(dt) = v.cast::<DataType>() {
-            dt.is::<Array>()
-        } else if let Ok(ua) = v.cast::<UnionAll>() {
+        if v.is::<DataType>() {
+            let dt = unsafe { v.cast_unchecked::<DataType>() };
+            dt.is::<RankedArray<N>>()
+        } else if v.is::<UnionAll>() {
+            let ua = unsafe { v.cast_unchecked::<UnionAll>() };
             ua.base_type().is::<RankedArray<N>>()
         } else {
             false
         }
     }
 
+    #[inline]
     fn type_object<'target, Tgt: Target<'target>>(target: &Tgt) -> Value<'target, 'static> {
         UnionAll::array_type(target).as_value()
     }
@@ -2801,10 +2537,13 @@ unsafe impl<const N: isize> ValidLayout for RankedArrayRef<'_, '_, N> {
 }
 
 unsafe impl<const N: isize> ValidField for Option<RankedArrayRef<'_, '_, N>> {
+    #[inline]
     fn valid_field(v: Value) -> bool {
-        if let Ok(dt) = v.cast::<DataType>() {
-            dt.is::<Array>()
-        } else if let Ok(ua) = v.cast::<UnionAll>() {
+        if v.is::<DataType>() {
+            let dt = unsafe { v.cast_unchecked::<DataType>() };
+            dt.is::<RankedArray<N>>()
+        } else if v.is::<UnionAll>() {
+            let ua = unsafe { v.cast_unchecked::<UnionAll>() };
             ua.base_type().is::<RankedArray<N>>()
         } else {
             false
@@ -2818,8 +2557,14 @@ unsafe impl<'scope, 'data, const N: isize> CCallArg for RankedArray<'scope, 'dat
 }
 
 unsafe impl<'scope, 'data, const N: isize> CCallReturn for RankedArray<'scope, 'data, N> {
-    type CCallReturnType = Value<'scope, 'data>;
+    type CCallReturnType = Value<'static, 'static>;
     type FunctionReturnType = ArrayTypeConstructor<TypeVarConstructor<Name<'T'>>, ConstantIsize<N>>;
+    type ReturnAs = Self;
+
+    #[inline]
+    unsafe fn return_or_throw(self) -> Self::ReturnAs {
+        self
+    }
 }
 
 /// An array with a set element type and a definite rank.
@@ -2832,22 +2577,24 @@ pub struct TypedRankedArray<'scope, 'data, U, const N: isize>(
 );
 
 impl<'scope, 'data, U: ConstructType, const N: isize> TypedRankedArray<'scope, 'data, U, N> {
+    #[inline]
     pub fn as_typed(self) -> TypedArray<'scope, 'data, U> {
         TypedArray(self.0, PhantomData, PhantomData, PhantomData)
     }
 
     /// Convert `self` to `Array`.
+    #[inline]
     pub fn as_array(self) -> Array<'scope, 'data> {
         unsafe { Array::wrap_non_null(self.0, Private) }
     }
 
     /// Convert this array to a [`TypedValue`].
-    pub fn as_typed_value(
+    pub fn as_typed_value<'target, Tgt: Target<'target>>(
         self,
-        frame: &mut GcFrame,
+        target: &Tgt,
     ) -> JlrsResult<TypedValue<'scope, 'data, ArrayType<U, N>>> {
-        frame.scope(|mut frame| {
-            let ty = U::construct_type(frame.as_extended_target());
+        target.local_scope::<_, _, 1>(|frame| {
+            let ty = U::construct_type(frame);
             let arr = self.as_array();
             let elty = arr.element_type();
             if ty != elty {
@@ -2867,6 +2614,7 @@ impl<'scope, 'data, U: ConstructType, const N: isize> TypedRankedArray<'scope, '
     }
 
     /// Convert this array to a [`TypedValue`] without checking if the layout is compatible.
+    #[inline]
     pub unsafe fn as_typed_value_unchecked(self) -> TypedValue<'scope, 'data, ArrayType<U, N>> {
         let arr = self.as_array();
         TypedValue::<ArrayType<U, N>>::from_value_unchecked(arr.as_value())
@@ -2874,6 +2622,7 @@ impl<'scope, 'data, U: ConstructType, const N: isize> TypedRankedArray<'scope, '
 }
 
 impl<U, const N: isize> Clone for TypedRankedArray<'_, '_, U, N> {
+    #[inline]
     fn clone(&self) -> Self {
         TypedRankedArray(self.0, PhantomData, PhantomData, PhantomData)
     }
@@ -2886,20 +2635,21 @@ unsafe impl<U: ConstructType + ValidField, const N: isize> ConstructType
 {
     type Static = ArrayTypeConstructor<U::Static, ConstantIsize<N>>;
 
-    fn construct_type_uncached<'target, T>(
-        target: ExtendedTarget<'target, '_, '_, T>,
-    ) -> super::value::ValueData<'target, 'static, T>
+    // TODO
+    #[inline]
+    fn construct_type_uncached<'target, Tgt>(
+        target: Tgt,
+    ) -> super::value::ValueData<'target, 'static, Tgt>
     where
-        T: Target<'target>,
+        Tgt: Target<'target>,
     {
-        let (target, frame) = target.split();
-        frame
-            .scope(|mut frame| {
+        target
+            .with_local_scope::<_, _, 4>(|target, mut frame| {
                 let ua = UnionAll::array_type(&target);
                 unsafe {
                     let inner = ua.body();
                     let ty_var = ua.var();
-                    let elem_ty = U::construct_type(frame.as_extended_target());
+                    let elem_ty = U::construct_type(&mut frame);
                     let rank = Value::new(&mut frame, N);
                     let with_rank = inner.apply_type_unchecked(&mut frame, [rank]);
 
@@ -2914,6 +2664,7 @@ unsafe impl<U: ConstructType + ValidField, const N: isize> ConstructType
             .unwrap()
     }
 
+    #[inline]
     fn base_type<'target, Tgt>(target: &Tgt) -> Option<Value<'target, 'static>>
     where
         Tgt: Target<'target>,
@@ -2923,6 +2674,7 @@ unsafe impl<U: ConstructType + ValidField, const N: isize> ConstructType
 }
 
 unsafe impl<U: ValidField, const N: isize> Typecheck for TypedRankedArray<'_, '_, U, N> {
+    #[inline]
     fn typecheck(t: DataType) -> bool {
         // Safety: Array is a UnionAll. so check if the typenames match
         unsafe {
@@ -2962,10 +2714,12 @@ impl<'scope, 'data, U: ValidField, const N: isize> ManagedPriv<'scope, 'data>
 
     // Safety: `inner` must not have been freed yet, the result must never be
     // used after the GC might have freed it. T must be correct
+    #[inline]
     unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self {
         Self(inner, PhantomData, PhantomData, PhantomData)
     }
 
+    #[inline]
     fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps> {
         self.0
     }
@@ -2988,16 +2742,20 @@ pub type TypedRankedArrayRet<U, const N: isize> =
 pub type TypedRankedArrayUnbound<U, const N: isize> = TypedRankedArray<'static, 'static, U, N>;
 
 unsafe impl<U: ValidField, const N: isize> ValidLayout for TypedRankedArrayRef<'_, '_, U, N> {
+    #[inline]
     fn valid_layout(v: Value) -> bool {
-        if let Ok(dt) = v.cast::<DataType>() {
-            dt.is::<Array>()
-        } else if let Ok(ua) = v.cast::<UnionAll>() {
+        if v.is::<DataType>() {
+            let dt = unsafe { v.cast_unchecked::<DataType>() };
+            dt.is::<TypedRankedArray<U, N>>()
+        } else if v.is::<UnionAll>() {
+            let ua = unsafe { v.cast_unchecked::<UnionAll>() };
             ua.base_type().is::<TypedRankedArray<U, N>>()
         } else {
             false
         }
     }
 
+    #[inline]
     fn type_object<'target, Tgt: Target<'target>>(target: &Tgt) -> Value<'target, 'static> {
         UnionAll::array_type(target).as_value()
     }
@@ -3008,6 +2766,7 @@ unsafe impl<U: ValidField, const N: isize> ValidLayout for TypedRankedArrayRef<'
 unsafe impl<U: ValidField, const N: isize> ValidField
     for Option<TypedRankedArrayRef<'_, '_, U, N>>
 {
+    #[inline]
     fn valid_field(v: Value) -> bool {
         if let Ok(dt) = v.cast::<DataType>() {
             dt.is::<Array>()
@@ -3029,8 +2788,14 @@ unsafe impl<'scope, 'data, U: ValidField + ConstructType, const N: isize> CCallA
 unsafe impl<'scope, 'data, U: ValidField + ConstructType, const N: isize> CCallReturn
     for TypedRankedArrayRef<'scope, 'data, U, N>
 {
-    type CCallReturnType = TypedRankedArray<'scope, 'data, U, N>;
+    type CCallReturnType = Value<'static, 'static>;
     type FunctionReturnType = TypedRankedArray<'scope, 'data, U, N>;
+    type ReturnAs = Self;
+
+    #[inline]
+    unsafe fn return_or_throw(self) -> Self::ReturnAs {
+        self
+    }
 }
 
 // TODO: conversions

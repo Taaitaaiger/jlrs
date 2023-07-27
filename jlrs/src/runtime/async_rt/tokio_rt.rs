@@ -42,6 +42,7 @@ impl AsyncRuntime for Tokio {
     type JoinHandle = JoinHandle<()>;
     type RuntimeHandle = JoinHandle<JlrsResult<()>>;
 
+    #[inline]
     fn spawn_blocking<F>(rt_fn: F) -> Self::RuntimeHandle
     where
         F: FnOnce() -> JlrsResult<()> + Send + 'static,
@@ -49,6 +50,7 @@ impl AsyncRuntime for Tokio {
         tokio::task::spawn_blocking(rt_fn)
     }
 
+    #[inline]
     fn block_on<F>(loop_fn: F, worker_id: Option<usize>) -> JlrsResult<()>
     where
         F: Future<Output = JlrsResult<()>>,
@@ -69,6 +71,7 @@ impl AsyncRuntime for Tokio {
         local_set.block_on(&runtime, loop_fn)
     }
 
+    #[inline]
     fn spawn_local<F>(future: F) -> Self::JoinHandle
     where
         F: Future<Output = ()> + 'static,
@@ -76,10 +79,12 @@ impl AsyncRuntime for Tokio {
         tokio::task::spawn_local(future)
     }
 
+    #[inline]
     async fn yield_now() {
         tokio::task::yield_now().await
     }
 
+    #[inline]
     async fn timeout<F>(duration: Duration, future: F) -> Option<JlrsResult<Message>>
     where
         F: Future<Output = JlrsResult<Message>>,
@@ -92,6 +97,7 @@ impl<M: Send + 'static> Channel<M> for BoundedChannel<M> {
     type Sender = tokio::sync::mpsc::Sender<M>;
     type Receiver = tokio::sync::mpsc::Receiver<M>;
 
+    #[inline]
     fn channel(capacity: Option<NonZeroUsize>) -> (Self::Sender, Self::Receiver) {
         tokio::sync::mpsc::channel(capacity.map(|c| c.get()).unwrap_or_default())
     }
@@ -101,6 +107,7 @@ impl<M: Send + 'static> Channel<M> for UnboundedChannel<M> {
     type Sender = tokio::sync::mpsc::UnboundedSender<M>;
     type Receiver = tokio::sync::mpsc::UnboundedReceiver<M>;
 
+    #[inline]
     fn channel(_: Option<NonZeroUsize>) -> (Self::Sender, Self::Receiver) {
         tokio::sync::mpsc::unbounded_channel()
     }
@@ -108,10 +115,12 @@ impl<M: Send + 'static> Channel<M> for UnboundedChannel<M> {
 
 #[async_trait]
 impl<M: Send + 'static> ChannelSender<M> for tokio::sync::mpsc::Sender<M> {
+    #[inline]
     async fn send(&self, msg: M) -> Result<(), SendError<M>> {
         Ok((&*self).send(msg).await.map_err(|e| SendError(e.0))?)
     }
 
+    #[inline]
     fn try_send(&self, msg: M) -> Result<(), TrySendError<M>> {
         Ok((&*self).try_send(msg).map_err(|e| match e {
             tokio::sync::mpsc::error::TrySendError::Closed(v) => TrySendError::Closed(v),
@@ -122,6 +131,7 @@ impl<M: Send + 'static> ChannelSender<M> for tokio::sync::mpsc::Sender<M> {
 
 #[async_trait]
 impl<M: Send + 'static> ChannelReceiver<M> for tokio::sync::mpsc::Receiver<M> {
+    #[inline]
     async fn recv(&mut self) -> JlrsResult<M> {
         match self.recv().await {
             Some(m) => Ok(m),
@@ -132,10 +142,12 @@ impl<M: Send + 'static> ChannelReceiver<M> for tokio::sync::mpsc::Receiver<M> {
 
 #[async_trait]
 impl<M: Send + 'static> ChannelSender<M> for tokio::sync::mpsc::UnboundedSender<M> {
+    #[inline]
     async fn send(&self, msg: M) -> Result<(), SendError<M>> {
         Ok((&*self).send(msg).map_err(|e| SendError(e.0))?)
     }
 
+    #[inline]
     fn try_send(&self, msg: M) -> Result<(), TrySendError<M>> {
         Ok((&*self).send(msg).map_err(|e| TrySendError::Closed(e.0))?)
     }
@@ -143,6 +155,7 @@ impl<M: Send + 'static> ChannelSender<M> for tokio::sync::mpsc::UnboundedSender<
 
 #[async_trait]
 impl<M: Send + 'static> ChannelReceiver<M> for tokio::sync::mpsc::UnboundedReceiver<M> {
+    #[inline]
     async fn recv(&mut self) -> JlrsResult<M> {
         match self.recv().await {
             Some(m) => Ok(m),
@@ -152,24 +165,28 @@ impl<M: Send + 'static> ChannelReceiver<M> for tokio::sync::mpsc::UnboundedRecei
 }
 
 impl<M: Send + 'static> OneshotSender<M> for tokio::sync::oneshot::Sender<M> {
+    #[inline]
     fn send(self, msg: M) {
         self.send(msg).ok();
     }
 }
 
 impl<M: Send + 'static> OneshotSender<M> for tokio::sync::mpsc::Sender<M> {
+    #[inline]
     fn send(self, msg: M) {
         (&self).blocking_send(msg).ok();
     }
 }
 
 impl<M: Send + 'static> OneshotSender<M> for tokio::sync::broadcast::Sender<M> {
+    #[inline]
     fn send(self, msg: M) {
         (&self).send(msg).ok();
     }
 }
 
 impl<M: Send + Sync + 'static> OneshotSender<M> for tokio::sync::watch::Sender<M> {
+    #[inline]
     fn send(self, msg: M) {
         (&self).send(msg).ok();
     }

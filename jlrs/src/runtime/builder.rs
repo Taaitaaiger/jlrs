@@ -64,6 +64,7 @@ cfg_if::cfg_if! {
             ///
             /// NB: When the `nightly` or `beta` feature is enabled, this sets the number of
             /// threads allocated to the `:default` pool.
+            #[inline]
             pub fn n_threads(mut self, n: usize) -> Self {
                 self.n_threads = n;
                 self
@@ -73,6 +74,7 @@ cfg_if::cfg_if! {
             /// Set the number of threads allocated to the `:interactive` pool.
             ///
             /// If it's set to 0, the default value, no threads are allocated to this pool.
+            #[inline]
             pub fn n_interactive_threads(mut self, n: usize) -> Self {
                 self.n_threadsi = n;
                 self
@@ -83,6 +85,7 @@ cfg_if::cfg_if! {
             /// Set the number of worker threads jlrs creates in addition to the runtime thread.
             ///
             /// If it's set to 0, the default value, no worker threads are created.
+            #[inline]
             pub fn n_worker_threads(mut self, n: usize) -> Self {
                 self.n_workers = n;
                 self
@@ -91,6 +94,7 @@ cfg_if::cfg_if! {
             /// Set the capacity of the channel used to communicate with the async runtime.
             ///
             /// The default value is 16.
+            #[inline]
             pub fn channel_capacity(mut self, capacity: NonZeroUsize) -> Self {
                 self.channel_capacity = capacity;
                 self
@@ -103,6 +107,7 @@ cfg_if::cfg_if! {
             /// are processed periodically.
             ///
             /// The default value is 1 millisecond.
+            #[inline]
             pub fn recv_timeout(mut self, timeout: Duration) -> Self {
                 self.recv_timeout = timeout;
                 self
@@ -119,6 +124,7 @@ cfg_if::cfg_if! {
             ///
             /// [`PackageCompiler`]: https://julialang.github.io/PackageCompiler.jl
             // TODO: Check if these paths exist.
+            #[inline]
             pub fn image<P, Q>(mut self, julia_bindir: P, image_path: Q) -> Self
             where
                 P: AsRef<Path> + Send + 'static,
@@ -135,6 +141,7 @@ cfg_if::cfg_if! {
             ///
             /// In order to function correctly, jlrs requires that the JlrsCore package is installed. By
             /// default, this package is automatically installed if it hasn't been installed yet.
+            #[inline]
             pub fn install_jlrs(mut self, install: InstallJlrsCore) -> Self {
                 self.builder.install_jlrs_core = install;
                 self
@@ -143,6 +150,7 @@ cfg_if::cfg_if! {
             /// Initialize Julia on another thread.
             ///
             /// You must set the maximum number of concurrent tasks with the `N` const generic.
+            #[inline]
             pub unsafe fn start<const N: usize>(self) -> JlrsResult<(AsyncJulia<R>, std::thread::JoinHandle<JlrsResult<()>>)> {
                 AsyncJulia::init::<N>(self)
             }
@@ -150,10 +158,12 @@ cfg_if::cfg_if! {
             /// Initialize Julia as a blocking task.
             ///
             /// You must set the maximum number of concurrent tasks with the `N` const generic.
+            #[inline]
             pub unsafe fn start_async<const N: usize>(self) -> JlrsResult<(AsyncJulia<R>, R::RuntimeHandle)> {
                 AsyncJulia::init_async::<N>(self)
             }
 
+            #[inline]
             pub(crate) fn has_workers(&self) -> bool {
                 #[cfg(any(feature = "julia-1-10", feature = "julia-1-9"))]
                 {
@@ -171,6 +181,7 @@ cfg_if::cfg_if! {
 
 impl RuntimeBuilder {
     /// Create a new `RuntimeBuilder`.
+    #[inline]
     pub fn new() -> Self {
         RuntimeBuilder {
             image: None,
@@ -179,6 +190,7 @@ impl RuntimeBuilder {
     }
 
     #[cfg(feature = "sync-rt")]
+    #[inline]
     /// initialize Julia on the current thread.
     pub unsafe fn start(self) -> JlrsResult<PendingJulia> {
         PendingJulia::init(self)
@@ -219,6 +231,7 @@ impl RuntimeBuilder {
     /// # }
     /// ```
     #[cfg(feature = "async-rt")]
+    #[inline]
     pub fn async_runtime<R>(self) -> AsyncRuntimeBuilder<R>
     where
         R: AsyncRuntime,
@@ -246,6 +259,7 @@ impl RuntimeBuilder {
     ///
     /// [`PackageCompiler`]: https://julialang.github.io/PackageCompiler.jl
     // TODO: Check if these paths exist.
+    #[inline]
     pub fn image<P, Q>(mut self, julia_bindir: P, image_path: Q) -> Self
     where
         P: AsRef<Path> + Send + 'static,
@@ -262,6 +276,7 @@ impl RuntimeBuilder {
     ///
     /// In order to function correctly, jlrs requires that the JlrsCore package is installed. By
     /// default, this package is automatically installed if it hasn't been installed yet.
+    #[inline]
     pub fn install_jlrs(mut self, install: InstallJlrsCore) -> Self {
         self.install_jlrs_core = install;
         self

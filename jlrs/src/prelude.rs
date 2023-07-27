@@ -7,7 +7,8 @@ pub use jlrs_macros::julia_module;
 pub use jlrs_macros::julia_version;
 #[cfg(feature = "jlrs-derive")]
 pub use jlrs_macros::{
-    CCallArg, CCallReturn, ConstructType, IntoJulia, Typecheck, Unbox, ValidField, ValidLayout,
+    CCallArg, CCallReturn, ConstructType, HasLayout, IntoJulia, IsBits, Typecheck, Unbox,
+    ValidField, ValidLayout,
 };
 
 #[cfg(feature = "ccall")]
@@ -41,22 +42,13 @@ pub use crate::{
     data::{
         layout::{bool::Bool, char::Char, nothing::Nothing, tuple::*},
         managed::{
-            array::ArrayRef,
-            array::TypedArrayRef,
-            array::{Array, TypedArray},
-            datatype::DataType,
-            datatype::DataTypeRef,
-            module::Module,
-            module::ModuleRef,
-            string::JuliaString,
-            string::StringRef,
-            symbol::Symbol,
-            value::Value,
-            value::ValueRef,
-            /* Ref, */ Managed,
+            array::Array, array::ArrayRef, array::TypedArray, array::TypedArrayRef,
+            datatype::DataType, datatype::DataTypeRef, module::Module, module::ModuleRef,
+            string::JuliaString, string::StringRef, symbol::Symbol, value::Value, value::ValueData,
+            value::ValueRef, value::ValueResult, /* Ref, */ Managed, ManagedRef,
         },
     },
     error::JlrsResult,
-    memory::target::{target_type::TargetType, Target},
+    memory::target::{Target, TargetType},
     named_tuple,
 };

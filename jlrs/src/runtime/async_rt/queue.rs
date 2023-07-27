@@ -19,6 +19,7 @@ struct Queues<T> {
 }
 
 impl<T> Queues<T> {
+    #[inline]
     fn new(capacity: usize, has_workers: bool) -> Arc<Self> {
         let (worker_queue, any_queue) = if has_workers {
             (Some(Queue::new(capacity)), Some(Queue::new(capacity)))
@@ -57,6 +58,7 @@ impl<T> Clone for Sender<T> {
 }
 
 impl<T: Send> Sender<T> {
+    #[inline]
     pub(crate) async fn send(&self, item: T) {
         if let Some(ref q) = self.queues.any_queue {
             q.push(item).await
@@ -65,6 +67,7 @@ impl<T: Send> Sender<T> {
         }
     }
 
+    #[inline]
     pub(crate) fn try_send(&self, item: T) -> Option<T> {
         if let Some(ref q) = self.queues.any_queue {
             q.try_push(item).err()?;
@@ -74,6 +77,7 @@ impl<T: Send> Sender<T> {
         None
     }
 
+    #[inline]
     pub(crate) fn resize_queue<'own>(
         &'own self,
         capacity: usize,
@@ -81,15 +85,18 @@ impl<T: Send> Sender<T> {
         self.queues.any_queue.as_ref().map(|q| q.resize(capacity))
     }
 
+    #[inline]
     pub(crate) async fn send_main(&self, item: T) {
         self.queues.main_queue.push(item).await
     }
 
+    #[inline]
     pub(crate) fn try_send_main(&self, item: T) -> Option<T> {
         self.queues.main_queue.try_push(item).err()?;
         None
     }
 
+    #[inline]
     pub(crate) fn resize_main_queue<'own>(
         &'own self,
         capacity: usize,
@@ -97,6 +104,7 @@ impl<T: Send> Sender<T> {
         self.queues.main_queue.resize(capacity)
     }
 
+    #[inline]
     pub(crate) async fn send_worker(&self, item: T) {
         if let Some(ref q) = self.queues.worker_queue {
             q.push(item).await
@@ -105,6 +113,7 @@ impl<T: Send> Sender<T> {
         }
     }
 
+    #[inline]
     pub(crate) fn try_send_worker(&self, item: T) -> Option<T> {
         if let Some(ref q) = self.queues.worker_queue {
             q.try_push(item).err()?;
@@ -114,6 +123,7 @@ impl<T: Send> Sender<T> {
         None
     }
 
+    #[inline]
     pub(crate) fn resize_worker_queue<'own>(
         &'own self,
         capacity: usize,

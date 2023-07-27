@@ -171,6 +171,7 @@ impl Debug for EmptyUnion {
 }
 
 unsafe impl ValidLayout for EmptyUnion {
+    #[inline]
     fn valid_layout(ty: Value) -> bool {
         unsafe { ty.unwrap(Private) == jl_bottom_type }
     }
@@ -185,12 +186,14 @@ unsafe impl ValidLayout for EmptyUnion {
 }
 
 unsafe impl ValidField for EmptyUnion {
+    #[inline]
     fn valid_field(ty: Value) -> bool {
         unsafe { ty.unwrap(Private) == jl_bottom_type }
     }
 }
 
 unsafe impl Typecheck for EmptyUnion {
+    #[inline]
     fn typecheck(t: DataType) -> bool {
         <Self as ValidLayout>::valid_layout(t.as_value())
     }

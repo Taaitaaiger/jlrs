@@ -18,8 +18,11 @@ use syn::{
 };
 
 use self::parameters::{Apply, ResolvedParameterList};
+use crate::module::parameters::{as_return_as, take_type};
 
 type RenameFragments = Punctuated<Ident, Token![.]>;
+
+// todo: generic docs
 
 struct InitFn {
     _become_token: Token![become],
@@ -77,7 +80,7 @@ impl ExportedType {
             let ty = resolver.apply(name);
 
             parse_quote! {
-                <#ty as ::jlrs::data::types::foreign_type::ParametricVariant>::create_variant((&mut output).into_extended_target(&mut frame), sym)
+                <#ty as ::jlrs::data::types::foreign_type::ParametricVariant>::create_variant(&mut output, sym)
             }
         }).unique();
 
@@ -85,9 +88,9 @@ impl ExportedType {
             {
                 let sym = ::jlrs::data::managed::symbol::Symbol::new(&frame, #rename);
                 let module = #override_module_fragment;
-                let ty = <#ty as ::jlrs::data::types::foreign_type::ParametricBase>::create_type((&mut output).into_extended_target(&mut frame), sym, module);
+                let ty = <#ty as ::jlrs::data::types::foreign_type::ParametricBase>::create_type(&mut output, sym, module);
                 let ty = ::jlrs::data::managed::erase_scope_lifetime(ty);
-                let ty = ::jlrs::data::managed::union_all::UnionAll::rewrap((&mut output).into_extended_target(&mut frame), ty);
+                let ty = ::jlrs::data::managed::union_all::UnionAll::rewrap(&mut output, ty);
                 module.set_const_unchecked(sym, ty);
 
                 #(
@@ -130,7 +133,7 @@ impl ExportedType {
 
                 parse_quote! {
                     {
-                        let params = <#ty as ::jlrs::data::types::foreign_type::ParametricVariant>::variant_parameters((&mut output).into_extended_target(&mut frame));
+                        let params = <#ty as ::jlrs::data::types::foreign_type::ParametricVariant>::variant_parameters(&mut output);
                         let params = ::jlrs::data::managed::erase_scope_lifetime(params);
                         let param_slice = params.value_slice_unchecked();
                         let dt = ua.apply_types_unchecked(&mut output, param_slice).cast::<::jlrs::data::managed::datatype::DataType>().unwrap();
@@ -232,6 +235,7 @@ impl ExportedFunction {
         generic: &GenericEnvironment,
         env: Option<&ParameterEnvironment>,
         offset: &mut usize,
+        gc_safe: bool,
     ) -> Result<Expr> {
         let n_args = self.func.inputs.len();
         let name_ident = &self.func.ident;
@@ -264,28 +268,52 @@ impl ExportedFunction {
             let (ccall_arg_types, function_arg_types) = arg_type_fragments(&inputs)?;
             let ret_ty = resolver.apply(&self.func.output);
             let (ccall_ret_type, julia_ret_type) = return_type_fragments(&ret_ty);
+            let new_ret_ty = as_return_as(&ret_ty);
+            let ret_ty = take_type(ret_ty.clone());
 
             let ccall_arg_idx = 0..n_args;
             let julia_arg_idx = 0..n_args;
+            let args = resolver.apply(&self.func.inputs);
+
+            let names = args.iter().map(|arg| match arg {
+                FnArg::Typed(ty) => &ty.pat,
+                _ => unreachable!(),
+            });
+            let names = Punctuated::<_, Comma>::from_iter(names);
+
+            let call_expr: Expr = if gc_safe {
+                parse_quote! {  ::jlrs::memory::gc::gc_safe(|| #name_ident(#names)) }
+            } else {
+                parse_quote! { #name_ident(#names) }
+            };
+
+            let span = self.func.span();
+            let invoke_fn: ItemFn = parse_quote_spanned! {
+                span=> unsafe extern "C" fn invoke(#args) #new_ret_ty {
+                    let res = #call_expr;
+                    <#ret_ty as ::jlrs::convert::ccall_types::CCallReturn>::return_or_throw(res)
+                }
+            };
 
             let ex = parse_quote! {
                 {
                     let name = Symbol::new(&frame, #rename);
                     let type_type = ::jlrs::data::managed::union_all::UnionAll::type_type(&frame).as_value();
-                    // Ensure a compile error happens if the signatures of the function don't match.
-                    let func: unsafe extern "C" fn(#inputs) #ret_ty = #name_ident;
-                    let func = Value::new(&mut frame, func as *mut ::std::ffi::c_void);
+
+                    #invoke_fn
+
+                    let func = Value::new(&mut frame, invoke as *mut ::std::ffi::c_void);
 
                     unsafe {
                         let mut ccall_arg_types = ::jlrs::data::managed::array::Array::new_for_unchecked(
-                            frame.as_extended_target(),
+                            &mut frame,
                             #n_args,
                             type_type);
 
                         let mut ccall_arg_types_ref = ccall_arg_types.value_data_mut().unwrap();
 
                         let mut julia_arg_types = ::jlrs::data::managed::array::Array::new_for_unchecked(
-                            frame.as_extended_target(),
+                            &mut frame,
                             #n_args,
                             type_type);
 
@@ -300,6 +328,7 @@ impl ExportedFunction {
                         let julia_return_type = #julia_ret_type;
 
                         let module = #override_module_fragment;
+                        let nothing = ::jlrs::data::managed::value::Value::nothing(&frame);
 
                         let false_v = ::jlrs::data::managed::value::Value::false_v(&frame);
                         function_info_ty.instantiate_unchecked(&mut frame, [
@@ -349,7 +378,6 @@ impl ExportedFunction {
 }
 
 struct ExportedMethod {
-    // attrs: Vec<Attribute>,
     _in_token: Token![in],
     parent: Type,
     func: Signature,
@@ -397,6 +425,8 @@ impl ExportedMethod {
         generic: &GenericEnvironment,
         env: Option<&ParameterEnvironment>,
         offset: &mut usize,
+        untracked_self: bool,
+        gc_safe: bool,
     ) -> Result<Expr> {
         let n_args = self.func.inputs.len();
         let name_ident = &self.func.ident;
@@ -431,7 +461,7 @@ impl ExportedMethod {
             let ccall_arg_idx = 0..n_args;
             let julia_arg_idx = 0..n_args;
 
-            let (ccall_arg_types, julia_arg_types, invoke_fn) = method_arg_type_fragments_in_env(self, &resolver);
+            let (ccall_arg_types, julia_arg_types, invoke_fn) = method_arg_type_fragments_in_env(self, &resolver, untracked_self, gc_safe);
 
             let ex = parse_quote! {
                 {
@@ -445,14 +475,14 @@ impl ExportedMethod {
 
                     unsafe {
                         let mut ccall_arg_types = ::jlrs::data::managed::array::Array::new_for_unchecked(
-                            frame.as_extended_target(),
+                            &mut frame,
                             #n_args,
                             type_type);
 
                         let mut ccall_arg_types_ref = ccall_arg_types.value_data_mut().unwrap();
 
                         let mut julia_arg_types = ::jlrs::data::managed::array::Array::new_for_unchecked(
-                            frame.as_extended_target(),
+                            &mut frame,
                             #n_args,
                             type_type);
 
@@ -467,6 +497,7 @@ impl ExportedMethod {
                         let julia_return_type = #julia_ret_type;
 
                         let module = #override_module_fragment;
+                        let nothing = ::jlrs::data::managed::value::Value::nothing(&frame);
 
                         let false_v = ::jlrs::data::managed::value::Value::false_v(&frame);
                         function_info_ty.instantiate_unchecked(&mut frame, [
@@ -596,14 +627,14 @@ impl ExportedAsyncCallback {
             let julia_arg_idx = 0..n_args;
 
             let ccall_ret_type: Expr = parse_quote! {
-                <::jlrs::ccall::AsyncCCall as ::jlrs::data::types::construct_type::ConstructType>::construct_type(frame.as_extended_target())
+                <::jlrs::ccall::AsyncCCall as ::jlrs::data::types::construct_type::ConstructType>::construct_type(&mut frame)
             };
             let julia_ret_type: Expr = parse_quote! {
-                <#inner_ret_ty as ::jlrs::data::types::construct_type::ConstructType>::construct_type(frame.as_extended_target())
+                <#inner_ret_ty as ::jlrs::data::types::construct_type::ConstructType>::construct_type(&mut frame)
             };
 
             let first_arg: Expr = syn::parse_quote! {
-                <*mut ::std::ffi::c_void as ::jlrs::data::types::construct_type::ConstructType>::construct_type(frame.as_extended_target())
+                <*mut ::std::ffi::c_void as ::jlrs::data::types::construct_type::ConstructType>::construct_type(&mut frame)
             };
 
             let ex = parse_quote! {
@@ -618,14 +649,14 @@ impl ExportedAsyncCallback {
 
                     unsafe {
                         let mut ccall_arg_types = ::jlrs::data::managed::array::Array::new_for_unchecked(
-                            frame.as_extended_target(),
+                            &mut frame,
                             #n_args + 1,
                             type_type);
 
                         let mut ccall_arg_types_ref = ccall_arg_types.value_data_mut().unwrap();
 
                         let mut julia_arg_types = ::jlrs::data::managed::array::Array::new_for_unchecked(
-                            frame.as_extended_target(),
+                            &mut frame,
                             #n_args,
                             type_type);
 
@@ -641,6 +672,7 @@ impl ExportedAsyncCallback {
                         let julia_return_type = #julia_ret_type;
 
                         let module = #override_module_fragment;
+                        let nothing = ::jlrs::data::managed::value::Value::nothing(&frame);
 
                         let true_v = ::jlrs::data::managed::value::Value::true_v(&frame);
                         function_info_ty.instantiate_unchecked(&mut frame, [
@@ -779,15 +811,34 @@ struct ItemWithAttrs {
 }
 
 impl ItemWithAttrs {
+    fn has_docstr(&self) -> bool {
+        for attr in self.attrs.iter() {
+            match attr.style {
+                AttrStyle::Outer => (),
+                _ => continue,
+            }
+
+            match &attr.meta {
+                Meta::NameValue(kv) => {
+                    if kv.path.is_ident("doc") {
+                        return true;
+                    } else {
+                        continue;
+                    }
+                }
+                _ => continue,
+            };
+        }
+
+        false
+    }
+
     fn get_docstr(&self) -> Result<String> {
         let mut doc = String::new();
         for attr in self.attrs.iter() {
             match attr.style {
                 AttrStyle::Outer => (),
-                _ => Err(syn::Error::new_spanned(
-                    attr.to_token_stream(),
-                    "expected `#[doc = \"docs...\"]`",
-                ))?,
+                _ => continue,
             }
 
             let line = match &attr.meta {
@@ -797,22 +848,13 @@ impl ItemWithAttrs {
                             Expr::Lit(ExprLit {
                                 lit: Lit::Str(s), ..
                             }) => s.value(),
-                            _ => Err(syn::Error::new_spanned(
-                                attr.to_token_stream(),
-                                "expected `#[doc = \"docs...\"]`",
-                            ))?,
+                            _ => continue,
                         }
                     } else {
-                        Err(syn::Error::new_spanned(
-                            attr.to_token_stream(),
-                            "expected `#[doc = \"docs...\"]`",
-                        ))?
+                        continue;
                     }
                 }
-                _ => Err(syn::Error::new_spanned(
-                    attr.to_token_stream(),
-                    "expected `#[doc = \"docs...\"]`",
-                ))?,
+                _ => continue,
             };
 
             match doc.len() {
@@ -977,7 +1019,13 @@ impl<'a> GenericEnvironment<'a> {
             .copied()
             .filter(|it| it.is_exported_fn())
             .map(|it| it.get_exported_fn())
-            .map(|it| it.init_with_env(self, env, offset))
+            .map(|it| {
+                let mut gc_safe = false;
+                if let Some(attrs) = it.1 {
+                    gc_safe = has_outer_path_attr(attrs, "gc_safe");
+                }
+                it.0.init_with_env(self, env, offset, gc_safe)
+            })
             .collect::<Result<Vec<_>>>()?;
 
         let ex = parse_quote! {
@@ -1009,7 +1057,15 @@ impl<'a> GenericEnvironment<'a> {
             .copied()
             .filter(|it| it.is_exported_method())
             .map(|it| it.get_exported_method())
-            .map(|it| it.init_with_env(self, env, offset))
+            .map(|it| {
+                let mut untracked_self = false;
+                let mut gc_safe = false;
+                if let Some(attrs) = it.1 {
+                    untracked_self = has_outer_path_attr(attrs, "untracked_self");
+                    gc_safe = has_outer_path_attr(attrs, "gc_safe");
+                }
+                it.0.init_with_env(self, env, offset, untracked_self, gc_safe)
+            }) // TODO: attrs
             .collect::<Result<Vec<_>>>()?;
 
         let ex = parse_quote! {
@@ -1116,11 +1172,11 @@ impl ModuleItem {
         }
     }
 
-    fn get_exported_fn(&self) -> &ExportedFunction {
+    fn get_exported_fn(&self) -> (&ExportedFunction, Option<&[Attribute]>) {
         match self {
-            ModuleItem::ExportedFunction(ref exported_fn) => exported_fn,
-            ModuleItem::ItemWithAttrs(ItemWithAttrs { item, .. }) if item.is_exported_fn() => {
-                item.get_exported_fn()
+            ModuleItem::ExportedFunction(ref exported_fn) => (exported_fn, None),
+            ModuleItem::ItemWithAttrs(ItemWithAttrs { item, attrs }) if item.is_exported_fn() => {
+                (item.get_exported_fn().0, Some(attrs))
             }
             _ => panic!(),
         }
@@ -1136,11 +1192,13 @@ impl ModuleItem {
         }
     }
 
-    fn get_exported_method(&self) -> &ExportedMethod {
+    fn get_exported_method(&self) -> (&ExportedMethod, Option<&[Attribute]>) {
         match self {
-            ModuleItem::ExportedMethod(ref exported_method) => exported_method,
-            ModuleItem::ItemWithAttrs(ItemWithAttrs { item, .. }) if item.is_exported_method() => {
-                item.get_exported_method()
+            ModuleItem::ExportedMethod(ref exported_method) => (exported_method, None),
+            ModuleItem::ItemWithAttrs(ItemWithAttrs { item, ref attrs })
+                if item.is_exported_method() =>
+            {
+                (item.get_exported_method().0, Some(attrs.as_ref()))
             }
             _ => panic!(),
         }
@@ -1256,17 +1314,38 @@ impl ModuleItem {
         }
     }
 
-    fn has_attrs(&self) -> bool {
+    fn get_all_with_docs(&self) -> Vec<&ItemWithAttrs> {
+        let mut items = vec![];
         match self {
-            ModuleItem::ItemWithAttrs(_) => true,
-            _ => false,
+            ModuleItem::ExportedGenerics(ref exported_generics) => {
+                for item in exported_generics.items.iter() {
+                    item.get_all_with_docs_inner(&mut items);
+                }
+            }
+            ModuleItem::ItemWithAttrs(item) => {
+                if item.has_docstr() {
+                    items.push(item)
+                }
+            }
+            _ => (),
         }
+
+        items
     }
 
-    fn get_attrs(&self) -> &ItemWithAttrs {
+    fn get_all_with_docs_inner<'a>(&'a self, items: &mut Vec<&'a ItemWithAttrs>) {
         match self {
-            ModuleItem::ItemWithAttrs(ref item) => item,
-            _ => panic!(),
+            ModuleItem::ExportedGenerics(ref exported_generics) => {
+                for item in exported_generics.items.iter() {
+                    item.get_all_with_docs_inner(items);
+                }
+            }
+            ModuleItem::ItemWithAttrs(item) => {
+                if item.has_docstr() {
+                    items.push(item)
+                }
+            }
+            _ => (),
         }
     }
 }
@@ -1361,35 +1440,19 @@ impl JuliaModule {
         let doc_init_fn = doc_fragments.init_docs_fn;
         let doc_init_fn_ident = doc_fragments.init_docs_fn_ident;
 
-        let invoke_type_init: Expr = if type_reinit_fn_ident.is_none() {
-            parse_quote! {
-                {
-                    #type_init_fn_ident(&mut frame, module);
-                }
-            }
-        } else {
-            parse_quote! {
-                if precompiling == 1 {
-                    #type_init_fn_ident(&mut frame, module);
-                } else {
-                    #type_reinit_fn_ident(&mut frame, module);
-                }
+        let invoke_type_init: Expr = parse_quote! {
+            if precompiling == 1 {
+                #type_init_fn_ident(&mut frame, module);
+            } else {
+                #type_reinit_fn_ident(&mut frame, module);
             }
         };
 
-        let invoke_generic_type_init: Expr = if generic_type_reinit_fn_ident.is_none() {
-            parse_quote! {
-                {
-                    #generic_type_init_fn_ident(&mut frame, module);
-                }
-            }
-        } else {
-            parse_quote! {
-                if precompiling == 1 {
-                    #generic_type_init_fn_ident(&mut frame, module);
-                } else {
-                    #generic_type_reinit_fn_ident(&mut frame, module);
-                }
+        let invoke_generic_type_init: Expr = parse_quote! {
+            if precompiling == 1 {
+                #generic_type_init_fn_ident(&mut frame, module);
+            } else {
+                #generic_type_reinit_fn_ident(&mut frame, module);
             }
         };
 
@@ -1481,7 +1544,7 @@ impl JuliaModule {
                     #invoke_const_init;
                     #invoke_global_init;
 
-                    let mut arr = ::jlrs::data::managed::array::Array::new_for_unchecked(frame.as_extended_target(), 0, function_info_ty.as_value());
+                    let mut arr = ::jlrs::data::managed::array::Array::new_for_unchecked(&mut frame, 0, function_info_ty.as_value());
                     #function_init_fn_ident(&mut frame, &mut arr, module, function_info_ty);
                     #generic_function_init_fn_ident(&mut frame, &mut arr, module, function_info_ty);
                     #method_init_fn_ident(&mut frame, &mut arr, module, function_info_ty);
@@ -1489,7 +1552,7 @@ impl JuliaModule {
                     #async_callback_init_fn_ident(&mut frame, &mut arr, module, function_info_ty);
                     #generic_async_callback_init_fn_ident(&mut frame, &mut arr, module, function_info_ty);
 
-                    let mut doc_items = ::jlrs::data::managed::array::Array::new_for_unchecked(frame.as_extended_target(), 0, doc_item_ty.as_value());
+                    let mut doc_items = ::jlrs::data::managed::array::Array::new_for_unchecked(&mut frame, 0, doc_item_ty.as_value());
                     if precompiling == 1 {
                         #doc_init_fn_ident(&mut frame, &mut doc_items, module, doc_item_ty);
                     }
@@ -1518,14 +1581,18 @@ impl JuliaModule {
         Ok(init_fn)
     }
 
-    fn get_exported_functions(&self) -> impl Iterator<Item = &ExportedFunction> {
+    fn get_exported_functions(
+        &self,
+    ) -> impl Iterator<Item = (&ExportedFunction, Option<&[Attribute]>)> {
         self.items
             .iter()
             .filter(|it| it.is_exported_fn())
             .map(|it| it.get_exported_fn())
     }
 
-    fn get_exported_methods(&self) -> impl Iterator<Item = &ExportedMethod> {
+    fn get_exported_methods(
+        &self,
+    ) -> impl Iterator<Item = (&ExportedMethod, Option<&[Attribute]>)> {
         self.items
             .iter()
             .filter(|it| it.is_exported_method())
@@ -1567,11 +1634,12 @@ impl JuliaModule {
             .map(|it| it.get_exported_generics())
     }
 
-    fn get_items_with_attrs(&self) -> impl Iterator<Item = &ItemWithAttrs> {
+    fn get_items_with_docs(&self) -> impl Iterator<Item = &ItemWithAttrs> {
         self.items
             .iter()
-            .filter(|it| it.has_attrs())
-            .map(|it| it.get_attrs())
+            .map(|it| it.get_all_with_docs())
+            .concat()
+            .into_iter()
     }
 }
 
@@ -1583,10 +1651,10 @@ struct DocFragments {
 impl DocFragments {
     fn generate(module: &JuliaModule, init_fn: &InitFn) -> Result<Self> {
         let init_docs_fn_ident = format_ident!("{}_docs", init_fn.init_fn);
-        let n_docs = module.get_items_with_attrs().count();
+        let n_docs = module.get_items_with_docs().count();
 
         let doc_init_fragments = module
-            .get_items_with_attrs()
+            .get_items_with_docs()
             .enumerate()
             .map(doc_info_fragment);
 
@@ -1865,8 +1933,8 @@ impl AsyncCallbackFragments {
 struct TypeFragments {
     type_init_fn: ItemFn,
     type_init_ident: Ident,
-    type_reinit_fn: Option<ItemFn>,
-    type_reinit_ident: Option<Ident>,
+    type_reinit_fn: ItemFn,
+    type_reinit_ident: Ident,
 }
 
 impl TypeFragments {
@@ -1914,8 +1982,8 @@ impl TypeFragments {
         TypeFragments {
             type_init_fn,
             type_init_ident: init_types_fn_ident,
-            type_reinit_fn: Some(type_reinit_fn),
-            type_reinit_ident: Some(reinit_types_fn_ident),
+            type_reinit_fn,
+            type_reinit_ident: reinit_types_fn_ident,
         }
     }
 
@@ -1969,8 +2037,8 @@ impl TypeFragments {
         TypeFragments {
             type_init_fn,
             type_init_ident: init_types_fn_ident,
-            type_reinit_fn: Some(type_reinit_fn),
-            type_reinit_ident: Some(reinit_types_fn_ident),
+            type_reinit_fn,
+            type_reinit_ident: reinit_types_fn_ident,
         }
     }
 }
@@ -2245,7 +2313,9 @@ fn doc_info_fragment((index, info): (usize, &ItemWithAttrs)) -> Result<Expr> {
     }
 }
 
-fn function_info_fragment((index, info): (usize, &ExportedFunction)) -> Result<Expr> {
+fn function_info_fragment(
+    (index, (info, attrs)): (usize, (&ExportedFunction, Option<&[Attribute]>)),
+) -> Result<Expr> {
     let n_args = info.func.inputs.len();
     let name_ident = &info.func.ident;
 
@@ -2262,13 +2332,9 @@ fn function_info_fragment((index, info): (usize, &ExportedFunction)) -> Result<E
         rename.push('!')
     }
 
-    let tys = info.func.inputs.iter().map(|x| match x {
-        FnArg::Typed(pat) => &pat.ty,
-        _ => unreachable!(),
-    });
-
-    let punctuated_tys = Punctuated::<_, Comma>::from_iter(tys);
     let ret_ty = &info.func.output;
+    let new_ret_ty = as_return_as(&ret_ty);
+    let ret_ty = take_type(ret_ty.clone());
 
     let (ccall_ret_type, julia_ret_type) = return_type_fragments(&info.func.output);
 
@@ -2276,6 +2342,32 @@ fn function_info_fragment((index, info): (usize, &ExportedFunction)) -> Result<E
     let julia_arg_idx = 0..n_args;
 
     let (ccall_arg_types, julia_arg_types) = arg_type_fragments(&info.func.inputs)?;
+    let args = &info.func.inputs;
+
+    let names = args.iter().map(|arg| match arg {
+        FnArg::Typed(ty) => &ty.pat,
+        _ => unreachable!(),
+    });
+    let names = Punctuated::<_, Comma>::from_iter(names);
+
+    let mut gc_safe = false;
+    if let Some(attrs) = attrs {
+        gc_safe = has_outer_path_attr(attrs, "gc_safe");
+    }
+
+    let call_expr: Expr = if gc_safe {
+        parse_quote! {  ::jlrs::memory::gc::gc_safe(|| #name_ident(#names)) }
+    } else {
+        parse_quote! { #name_ident(#names) }
+    };
+
+    let span = info.func.span();
+    let invoke_fn: ItemFn = parse_quote_spanned! {
+        span=> unsafe extern "C" fn invoke(#args) #new_ret_ty {
+            let res = #call_expr;
+            <#ret_ty as ::jlrs::convert::ccall_types::CCallReturn>::return_or_throw(res)
+        }
+    };
 
     let expr = parse_quote! {
         {
@@ -2283,19 +2375,21 @@ fn function_info_fragment((index, info): (usize, &ExportedFunction)) -> Result<E
                 let name = Symbol::new(&frame, #rename);
                 let type_type = ::jlrs::data::managed::union_all::UnionAll::type_type(&frame).as_value();
                 // Ensure a compile error happens if the signatures of the function don't match.
-                let func: unsafe extern "C" fn(#punctuated_tys) #ret_ty = #name_ident;
-                let func = Value::new(&mut frame, func as *mut ::std::ffi::c_void);
+
+                #invoke_fn
+
+                let func = Value::new(&mut frame, invoke as *mut ::std::ffi::c_void);
 
                 unsafe {
                     let mut ccall_arg_types = ::jlrs::data::managed::array::Array::new_for_unchecked(
-                        frame.as_extended_target(),
+                        &mut frame,
                         #n_args,
                         type_type);
 
                     let mut ccall_arg_types_ref = ccall_arg_types.value_data_mut().unwrap();
 
                     let mut julia_arg_types = ::jlrs::data::managed::array::Array::new_for_unchecked(
-                        frame.as_extended_target(),
+                        &mut frame,
                         #n_args,
                         type_type);
 
@@ -2310,6 +2404,7 @@ fn function_info_fragment((index, info): (usize, &ExportedFunction)) -> Result<E
                     let julia_return_type = #julia_ret_type;
 
                     let module = #override_module_fragment;
+                    let nothing = ::jlrs::data::managed::value::Value::nothing(&frame);
 
                     let false_v = ::jlrs::data::managed::value::Value::false_v(&frame);
                     let instance = function_info_ty.instantiate_unchecked(&mut frame, [
@@ -2382,10 +2477,10 @@ fn return_type_fragments(ret_ty: &ReturnType) -> (Expr, Expr) {
         ReturnType::Type(_, ref ty) => {
             let span = ty.span();
             let ccall_ret_type = parse_quote_spanned! {
-                span=> <<#ty as ::jlrs::convert::ccall_types::CCallReturn>::CCallReturnType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(frame.as_extended_target())
+                span=> <<#ty as ::jlrs::convert::ccall_types::CCallReturn>::CCallReturnType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(&mut frame)
             };
             let julia_ret_type = parse_quote_spanned! {
-                span=> <<#ty as ::jlrs::convert::ccall_types::CCallReturn>::FunctionReturnType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(frame.as_extended_target())
+                span=> <<#ty as ::jlrs::convert::ccall_types::CCallReturn>::FunctionReturnType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(&mut frame)
             };
 
             (ccall_ret_type, julia_ret_type)
@@ -2394,7 +2489,6 @@ fn return_type_fragments(ret_ty: &ReturnType) -> (Expr, Expr) {
 }
 
 // FIXME
-
 fn extract_return_type_from_impl_trait(timplt: &TypeImplTrait) -> Option<Type> {
     for bound in timplt.bounds.iter() {
         match bound {
@@ -2481,7 +2575,7 @@ fn arg_type_fragments<'a>(
         })
         .map(|ty| {
             parse_quote! {
-                <<#ty as ::jlrs::convert::ccall_types::CCallArg>::CCallArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(frame.as_extended_target())
+                <<#ty as ::jlrs::convert::ccall_types::CCallArg>::CCallArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(&mut frame)
             }
         });
 
@@ -2493,7 +2587,7 @@ fn arg_type_fragments<'a>(
         })
         .map(|ty| {
             parse_quote! {
-                <<#ty as ::jlrs::convert::ccall_types::CCallArg>::FunctionArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(frame.as_extended_target())
+                <<#ty as ::jlrs::convert::ccall_types::CCallArg>::FunctionArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(&mut frame)
             }
         });
 
@@ -2518,7 +2612,7 @@ fn init_type_fragment(info: &ExportedType) -> Expr {
         {
             let sym = ::jlrs::data::managed::symbol::Symbol::new(&frame, #rename);
             let module = #override_module_fragment;
-            let ty = <#ty as ::jlrs::data::types::foreign_type::OpaqueType>::create_type((&mut output).into_extended_target(&mut frame), sym, module);
+            let ty = <#ty as ::jlrs::data::types::foreign_type::OpaqueType>::create_type(&mut output, sym, module);
             module.set_const_unchecked(sym, <::jlrs::data::managed::datatype::DataType as ::jlrs::data::managed::Managed>::as_value(ty));
         }
     }
@@ -2556,9 +2650,19 @@ fn reinit_type_fragment(info: &ExportedType) -> Expr {
     }
 }
 
-fn method_info_fragment((index, info): (usize, &ExportedMethod)) -> Expr {
+fn method_info_fragment<'a>(
+    (index, (info, attrs)): (usize, (&'a ExportedMethod, Option<&'a [Attribute]>)),
+) -> Expr {
     let n_args = info.func.inputs.len();
     let name_ident = &info.func.ident;
+
+    let mut untracked_self = false;
+    let mut gc_safe = false;
+
+    if let Some(attrs) = attrs {
+        untracked_self = has_outer_path_attr(attrs, "untracked_self");
+        gc_safe = has_outer_path_attr(attrs, "gc_safe");
+    }
 
     let override_module_fragment = override_module_fragment(&info.name_override);
     let mut rename = info
@@ -2579,7 +2683,8 @@ fn method_info_fragment((index, info): (usize, &ExportedMethod)) -> Expr {
     let ccall_arg_idx = 0..n_args;
     let julia_arg_idx = 0..n_args;
 
-    let (ccall_arg_types, julia_arg_types, invoke_fn) = method_arg_type_fragments(info);
+    let (ccall_arg_types, julia_arg_types, invoke_fn) =
+        method_arg_type_fragments(info, untracked_self, gc_safe);
 
     parse_quote! {
         {
@@ -2594,14 +2699,14 @@ fn method_info_fragment((index, info): (usize, &ExportedMethod)) -> Expr {
 
                 unsafe {
                     let mut ccall_arg_types = ::jlrs::data::managed::array::Array::new_for_unchecked(
-                        frame.as_extended_target(),
+                        &mut frame,
                         #n_args,
                         type_type);
 
                     let mut ccall_arg_types_ref = ccall_arg_types.value_data_mut().unwrap();
 
                     let mut julia_arg_types = ::jlrs::data::managed::array::Array::new_for_unchecked(
-                        frame.as_extended_target(),
+                        &mut frame,
                         #n_args,
                         type_type);
 
@@ -2616,6 +2721,7 @@ fn method_info_fragment((index, info): (usize, &ExportedMethod)) -> Expr {
                     let julia_return_type = #julia_ret_type;
 
                     let module = #override_module_fragment;
+                    let nothing = ::jlrs::data::managed::value::Value::nothing(&frame);
 
                     let false_v = ::jlrs::data::managed::value::Value::false_v(&frame);
                     let instance = function_info_ty.instantiate_unchecked(&mut frame, [
@@ -2668,17 +2774,17 @@ fn async_callback_info_fragment((index, info): (usize, &ExportedAsyncCallback)) 
 
     let inner_ret_ty = inner_ret_ty.unwrap();
     let ccall_ret_type: Expr = parse_quote! {
-        <::jlrs::ccall::AsyncCCall as ::jlrs::data::types::construct_type::ConstructType>::construct_type(frame.as_extended_target())
+        <::jlrs::ccall::AsyncCCall as ::jlrs::data::types::construct_type::ConstructType>::construct_type(&mut frame)
     };
     let julia_ret_type: Expr = parse_quote! {
-        <#inner_ret_ty as ::jlrs::data::types::construct_type::ConstructType>::construct_type(frame.as_extended_target())
+        <#inner_ret_ty as ::jlrs::data::types::construct_type::ConstructType>::construct_type(&mut frame)
     };
 
     let (ccall_arg_types, julia_arg_types, invoke_fn) =
         async_callback_arg_type_fragments(info, &inner_ret_ty)?;
 
     let first_arg: Expr = syn::parse_quote! {
-        <*mut ::std::ffi::c_void as ::jlrs::data::types::construct_type::ConstructType>::construct_type(frame.as_extended_target())
+        <*mut ::std::ffi::c_void as ::jlrs::data::types::construct_type::ConstructType>::construct_type(&mut frame)
     };
 
     let ccall_arg_idx = 0..n_args;
@@ -2697,14 +2803,14 @@ fn async_callback_info_fragment((index, info): (usize, &ExportedAsyncCallback)) 
 
                 unsafe {
                     let mut ccall_arg_types = ::jlrs::data::managed::array::Array::new_for_unchecked(
-                        frame.as_extended_target(),
+                        &mut frame,
                         #n_args + 1,
                         type_type);
 
                     let mut ccall_arg_types_ref = ccall_arg_types.value_data_mut().unwrap();
 
                     let mut julia_arg_types = ::jlrs::data::managed::array::Array::new_for_unchecked(
-                        frame.as_extended_target(),
+                        &mut frame,
                         #n_args,
                         type_type);
 
@@ -2722,6 +2828,8 @@ fn async_callback_info_fragment((index, info): (usize, &ExportedAsyncCallback)) 
                     let module = #override_module_fragment;
 
                     let true_v = ::jlrs::data::managed::value::Value::true_v(&frame);
+                    let nothing = ::jlrs::data::managed::value::Value::nothing(&frame);
+
                     let instance = function_info_ty.instantiate_unchecked(&mut frame, [
                         name.as_value(),
                         ccall_arg_types.as_value(),
@@ -2792,10 +2900,12 @@ fn global_info_fragment(info: &ExportedGlobal) -> Expr {
 
 fn method_arg_type_fragments<'a>(
     info: &'a ExportedMethod,
+    untracked_self: bool,
+    gc_safe: bool,
 ) -> (
     impl 'a + Iterator<Item = Expr>,
     impl 'a + Iterator<Item = Expr>,
-    Option<ItemFn>,
+    ItemFn,
 ) {
     let inputs = &info.func.inputs;
 
@@ -2805,10 +2915,10 @@ fn method_arg_type_fragments<'a>(
     };
 
     let invoke_fn = match takes_self {
-        None => Some(invoke_fn_no_self_method_fragment(info)),
-        Some((true, true)) => Some(invoke_fn_mut_self_method_fragment(info)),
-        Some((false, true)) => Some(invoke_fn_ref_self_method_fragment(info)),
-        Some((_, false)) => Some(invoke_fn_move_self_method_fragment(info)),
+        None => invoke_fn_no_self_method_fragment(info, gc_safe),
+        Some((true, true)) => invoke_fn_mut_self_method_fragment(info, untracked_self, gc_safe),
+        Some((false, true)) => invoke_fn_ref_self_method_fragment(info, untracked_self, gc_safe),
+        Some((_, false)) => invoke_fn_move_self_method_fragment(info, untracked_self, gc_safe),
     };
 
     let parent = &info.parent;
@@ -2820,13 +2930,13 @@ fn method_arg_type_fragments<'a>(
                     let ty = &ty.ty;
                     let span = ty.span();
                     parse_quote_spanned! {
-                        span=> <<#ty as ::jlrs::convert::ccall_types::CCallArg>::CCallArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(frame.as_extended_target())
+                        span=> <<#ty as ::jlrs::convert::ccall_types::CCallArg>::CCallArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(&mut frame)
                     }
                 },
                 _ => {
                     let span = parent.span();
                     parse_quote_spanned! {
-                        span=> <<TypedValue::<#parent> as ::jlrs::convert::ccall_types::CCallArg>::CCallArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(frame.as_extended_target())
+                        span=> <<TypedValue::<#parent> as ::jlrs::convert::ccall_types::CCallArg>::CCallArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(&mut frame)
                     }
                 },
             }
@@ -2840,13 +2950,13 @@ fn method_arg_type_fragments<'a>(
                     let ty = &ty.ty;
                     let span = ty.span();
                     parse_quote_spanned! {
-                        span=> <<#ty as ::jlrs::convert::ccall_types::CCallArg>::FunctionArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(frame.as_extended_target())
+                        span=> <<#ty as ::jlrs::convert::ccall_types::CCallArg>::FunctionArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(&mut frame)
                     }
                 },
                 _ => {
                     let span = parent.span();
                     parse_quote_spanned! {
-                        span=> <<::jlrs::data::managed::value::typed::TypedValue<#parent> as ::jlrs::convert::ccall_types::CCallArg>::FunctionArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(frame.as_extended_target())
+                        span=> <<::jlrs::data::managed::value::typed::TypedValue<#parent> as ::jlrs::convert::ccall_types::CCallArg>::FunctionArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(&mut frame)
                     }
                 },
             }
@@ -2858,10 +2968,12 @@ fn method_arg_type_fragments<'a>(
 fn method_arg_type_fragments_in_env<'a>(
     info: &'a ExportedMethod,
     resolver: &'a ResolvedParameterList,
+    untracked_self: bool,
+    gc_safe: bool,
 ) -> (
     impl 'a + Iterator<Item = Expr>,
     impl 'a + Iterator<Item = Expr>,
-    Option<ItemFn>,
+    ItemFn,
 ) {
     let inputs = &info.func.inputs;
 
@@ -2871,10 +2983,16 @@ fn method_arg_type_fragments_in_env<'a>(
     };
 
     let invoke_fn = match takes_self {
-        None => Some(invoke_fn_no_self_method_fragment_in_env(info, resolver)),
-        Some((true, true)) => Some(invoke_fn_mut_self_method_fragment_in_env(info, resolver)),
-        Some((false, true)) => Some(invoke_fn_ref_self_method_fragment_in_env(info, resolver)),
-        Some((_, false)) => Some(invoke_fn_move_self_method_fragment_in_env(info, resolver)),
+        None => invoke_fn_no_self_method_fragment_in_env(info, resolver, gc_safe),
+        Some((true, true)) => {
+            invoke_fn_mut_self_method_fragment_in_env(info, resolver, untracked_self, gc_safe)
+        }
+        Some((false, true)) => {
+            invoke_fn_ref_self_method_fragment_in_env(info, resolver, untracked_self, gc_safe)
+        }
+        Some((_, false)) => {
+            invoke_fn_move_self_method_fragment_in_env(info, resolver, untracked_self, gc_safe)
+        }
     };
 
     let parent = resolver.apply(&info.parent);
@@ -2888,13 +3006,13 @@ fn method_arg_type_fragments_in_env<'a>(
                     let ty = resolver.apply(ty.ty.as_ref());
                     let span = ty.span();
                     parse_quote_spanned! {
-                        span=> <<#ty as ::jlrs::convert::ccall_types::CCallArg>::CCallArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(frame.as_extended_target())
+                        span=> <<#ty as ::jlrs::convert::ccall_types::CCallArg>::CCallArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(&mut frame)
                     }
                 },
                 _ => {
                     let span = parent.span();
                     parse_quote_spanned! {
-                        span=> <<TypedValue::<#parent> as ::jlrs::convert::ccall_types::CCallArg>::CCallArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(frame.as_extended_target())
+                        span=> <<TypedValue::<#parent> as ::jlrs::convert::ccall_types::CCallArg>::CCallArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(&mut frame)
                     }
                 },
             }
@@ -2908,13 +3026,13 @@ fn method_arg_type_fragments_in_env<'a>(
                     let ty = resolver.apply(ty.ty.as_ref());
                     let span = ty.span();
                     parse_quote_spanned! {
-                        span=> <<#ty as ::jlrs::convert::ccall_types::CCallArg>::FunctionArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(frame.as_extended_target())
+                        span=> <<#ty as ::jlrs::convert::ccall_types::CCallArg>::FunctionArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(&mut frame)
                     }
                 },
                 _ => {
                     let span = parent2.span();
                     parse_quote_spanned! {
-                        span=> <<::jlrs::data::managed::value::typed::TypedValue<#parent2> as ::jlrs::convert::ccall_types::CCallArg>::FunctionArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(frame.as_extended_target())
+                        span=> <<::jlrs::data::managed::value::typed::TypedValue<#parent2> as ::jlrs::convert::ccall_types::CCallArg>::FunctionArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(&mut frame)
                     }
                 },
             }
@@ -2929,7 +3047,7 @@ fn async_callback_arg_type_fragments<'a>(
 ) -> Result<(
     impl 'a + Iterator<Item = Expr>,
     impl 'a + Iterator<Item = Expr>,
-    Option<ItemFn>,
+    ItemFn,
 )> {
     let inputs = &info.func.inputs;
     let n_args = inputs.len();
@@ -2952,7 +3070,7 @@ fn async_callback_arg_type_fragments<'a>(
                 FnArg::Typed(ty) => {
                     let ty = &ty.ty;
                     parse_quote! {
-                        <<#ty as ::jlrs::convert::ccall_types::CCallArg>::CCallArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(frame.as_extended_target())
+                        <<#ty as ::jlrs::convert::ccall_types::CCallArg>::CCallArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(&mut frame)
                     }
                 },
                 _ => unreachable!()
@@ -2966,14 +3084,14 @@ fn async_callback_arg_type_fragments<'a>(
                 FnArg::Typed(ty) => {
                     let ty = &ty.ty;
                     parse_quote! {
-                        <<#ty as ::jlrs::convert::ccall_types::CCallArg>::FunctionArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(frame.as_extended_target())
+                        <<#ty as ::jlrs::convert::ccall_types::CCallArg>::FunctionArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(&mut frame)
                     }
                 },
                 _ => unreachable!()
             }
         });
 
-    Ok((ccall_arg_types, julia_arg_types, Some(invoke_fn)))
+    Ok((ccall_arg_types, julia_arg_types, invoke_fn))
 }
 
 fn async_callback_arg_type_fragments_in_env<'a>(
@@ -2983,7 +3101,7 @@ fn async_callback_arg_type_fragments_in_env<'a>(
     Type,
     impl 'a + Iterator<Item = Expr>,
     impl 'a + Iterator<Item = Expr>,
-    Option<ItemFn>,
+    ItemFn,
 )> {
     let inputs = resolver.apply(&info.func.inputs);
     let n_args = inputs.len();
@@ -3019,7 +3137,7 @@ fn async_callback_arg_type_fragments_in_env<'a>(
                 FnArg::Typed(ty) => {
                     let ty = &ty.ty;
                     parse_quote! {
-                        <<#ty as ::jlrs::convert::ccall_types::CCallArg>::CCallArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(frame.as_extended_target())
+                        <<#ty as ::jlrs::convert::ccall_types::CCallArg>::CCallArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(&mut frame)
                     }
                 },
                 _ => unreachable!()
@@ -3033,21 +3151,17 @@ fn async_callback_arg_type_fragments_in_env<'a>(
                 FnArg::Typed(ty) => {
                     let ty = &ty.ty;
                     parse_quote! {
-                        <<#ty as ::jlrs::convert::ccall_types::CCallArg>::FunctionArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(frame.as_extended_target())
+                        <<#ty as ::jlrs::convert::ccall_types::CCallArg>::FunctionArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(&mut frame)
                     }
                 },
                 _ => unreachable!()
             }
         });
 
-    Ok((
-        inner_ret_ty,
-        ccall_arg_types,
-        julia_arg_types,
-        Some(invoke_fn),
-    ))
+    Ok((inner_ret_ty, ccall_arg_types, julia_arg_types, invoke_fn))
 }
 
+// TODO: invoke fix exc
 // FIXME: require impl AsyncCallback
 fn invoke_async_callback(info: &ExportedAsyncCallback, ret_ty: &Type) -> ItemFn {
     let name = &info.func.ident;
@@ -3072,7 +3186,7 @@ fn invoke_async_callback(info: &ExportedAsyncCallback, ret_ty: &Type) -> ItemFn 
                 Ok(callback) => {
                     ::jlrs::ccall::CCall::dispatch_to_pool(move |dispatch_handle| {
                         let handle = jlrs_async_condition_handle;
-                        let res = callback();
+                        let res: ::jlrs::error::JlrsResult<#ret_ty> = callback();
                         unsafe { dispatch_handle.set(res); }
                         ::jlrs::ccall::CCall::uv_async_send(handle.0);
                     })
@@ -3091,13 +3205,10 @@ fn invoke_async_callback(info: &ExportedAsyncCallback, ret_ty: &Type) -> ItemFn 
 
             unsafe extern "C" fn join_func(
                 handle: *mut ::jlrs::ccall::DispatchHandle<#ret_ty>
-            ) -> ::jlrs::data::managed::rust_result::RustResultRet<#ret_ty> {
+            ) -> #ret_ty {
                 let handle = ::std::sync::Arc::from_raw(handle);
-                ::jlrs::ccall::CCall::invoke_fallible(|mut frame| {
-                    let unrooted = frame.unrooted();
-                    let res = ::jlrs::data::managed::value::typed::TypedValue::new(&mut frame, handle.join()?);
-                    Ok(::jlrs::data::managed::rust_result::RustResult::ok(unrooted.into_extended_target(&mut frame), res).leak())
-                })
+                let res = handle.join();
+                <::jlrs::error::JlrsResult<#ret_ty> as ::jlrs::convert::ccall_types::CCallReturn>::return_or_throw(res)
             }
 
             ::jlrs::ccall::AsyncCCall {
@@ -3152,13 +3263,10 @@ fn invoke_async_callback_in_env<'a>(
 
             unsafe extern "C" fn join_func(
                 handle: *mut ::jlrs::ccall::DispatchHandle<#ret_ty>
-            ) -> ::jlrs::data::managed::rust_result::RustResultRet<#ret_ty> {
+            ) -> #ret_ty {
                 let handle = ::std::sync::Arc::from_raw(handle);
-                ::jlrs::ccall::CCall::invoke_fallible(|mut frame| {
-                    let unrooted = frame.unrooted();
-                    let res = ::jlrs::data::managed::value::typed::TypedValue::new(&mut frame, handle.join()?);
-                    Ok(::jlrs::data::managed::rust_result::RustResult::ok(unrooted.into_extended_target(&mut frame), res).leak())
-                })
+                let res = handle.join();
+                <::jlrs::error::JlrsResult<#ret_ty> as ::jlrs::convert::ccall_types::CCallReturn>::return_or_throw(res)
             }
 
             ::jlrs::ccall::AsyncCCall {
@@ -3169,11 +3277,14 @@ fn invoke_async_callback_in_env<'a>(
     }
 }
 
-fn invoke_fn_no_self_method_fragment(info: &ExportedMethod) -> ItemFn {
+fn invoke_fn_no_self_method_fragment(info: &ExportedMethod, gc_safe: bool) -> ItemFn {
     let name = &info.func.ident;
     let span = info.func.ident.span();
     let ty = &info.parent;
     let ret_ty = &info.func.output;
+    let new_ret_ty = as_return_as(&ret_ty);
+    let ret_ty = take_type(ret_ty.clone());
+
     let args = &info.func.inputs;
     let names = args.iter().map(|arg| match arg {
         FnArg::Typed(ty) => &ty.pat,
@@ -3182,9 +3293,20 @@ fn invoke_fn_no_self_method_fragment(info: &ExportedMethod) -> ItemFn {
 
     let names = Punctuated::<_, Comma>::from_iter(names);
 
+    let call_expr: Expr = if gc_safe {
+        parse_quote! {
+            ::jlrs::memory::gc::gc_safe(|| {
+                <#ty>::#name(#names)
+            })
+        }
+    } else {
+        parse_quote! { <#ty>::#name(#names) }
+    };
+
     parse_quote_spanned! {
-        span=> unsafe extern "C" fn invoke(#args) #ret_ty {
-            <#ty>::#name(#names)
+        span=> unsafe extern "C" fn invoke(#args) #new_ret_ty {
+            let res = #call_expr;
+            <#ret_ty as ::jlrs::convert::ccall_types::CCallReturn>::return_or_throw(res)
         }
     }
 }
@@ -3192,11 +3314,15 @@ fn invoke_fn_no_self_method_fragment(info: &ExportedMethod) -> ItemFn {
 fn invoke_fn_no_self_method_fragment_in_env(
     info: &ExportedMethod,
     resolver: &ResolvedParameterList,
+    gc_safe: bool,
 ) -> ItemFn {
     let name = &info.func.ident;
     let span = info.func.ident.span();
     let ty = resolver.apply(&info.parent);
     let ret_ty = resolver.apply(&info.func.output);
+    let new_ret_ty = as_return_as(&ret_ty);
+    let ret_ty = take_type(ret_ty);
+
     let args = resolver.apply(&info.func.inputs);
     let names: Punctuated<_, Comma> = args
         .iter()
@@ -3206,18 +3332,36 @@ fn invoke_fn_no_self_method_fragment_in_env(
         })
         .collect();
 
+    let call_expr: Expr = if gc_safe {
+        parse_quote! {
+            ::jlrs::memory::gc::gc_safe(|| {
+                <#ty>::#name(#names)
+            })
+        }
+    } else {
+        parse_quote! { <#ty>::#name(#names) }
+    };
+
     parse_quote_spanned! {
-        span=> unsafe extern "C" fn invoke(#args) #ret_ty {
-            <#ty>::#name(#names)
+        span=> unsafe extern "C" fn invoke(#args) #new_ret_ty {
+            let res = #call_expr;
+            <#ret_ty as ::jlrs::convert::ccall_types::CCallReturn>::return_or_throw(res)
         }
     }
 }
 
-fn invoke_fn_ref_self_method_fragment(info: &ExportedMethod) -> ItemFn {
+fn invoke_fn_ref_self_method_fragment(
+    info: &ExportedMethod,
+    untracked_self: bool,
+    gc_safe: bool,
+) -> ItemFn {
     let name = &info.func.ident;
     let span = info.func.ident.span();
     let ty = &info.parent;
     let ret_ty = &info.func.output;
+    let new_ret_ty = as_return_as(&ret_ty);
+    let ret_ty = take_type(ret_ty.clone());
+
     let args = &info.func.inputs;
     let mut cloned_args = args.clone();
     let first = cloned_args.first_mut().unwrap();
@@ -3235,11 +3379,30 @@ fn invoke_fn_ref_self_method_fragment(info: &ExportedMethod) -> ItemFn {
 
     let names = Punctuated::<_, Comma>::from_iter(names);
 
+    let to_ref_expr: Expr = if untracked_self {
+        parse_quote! { ::std::result::Result::<_, ()>::Ok((&this).data_ptr().cast::<#ty>().as_ref()) }
+    } else {
+        parse_quote! { (&this).track_shared() }
+    };
+
+    let call_expr: Expr = if gc_safe {
+        parse_quote! {
+            ::jlrs::memory::gc::gc_safe(|| {
+                this.#name(#names)
+            })
+        }
+    } else {
+        parse_quote! { this.#name(#names) }
+    };
+
     parse_quote_spanned! {
-        span=> unsafe extern "C" fn invoke(#args_self_renamed) #ret_ty {
-            match (&this).track_shared() {
-                Ok(this) => this.#name(#names),
-                Err(_) => ::jlrs::data::managed::rust_result::RustResult::borrow_error_internal()
+        span=> unsafe extern "C" fn invoke(#args_self_renamed) #new_ret_ty {
+            match #to_ref_expr {
+                Ok(this) => {
+                    let res = #call_expr;
+                    <#ret_ty as ::jlrs::convert::ccall_types::CCallReturn>::return_or_throw(res)
+                },
+                Err(_) => ::jlrs::ccall::CCall::throw_borrow_exception()
             }
         }
     }
@@ -3248,11 +3411,16 @@ fn invoke_fn_ref_self_method_fragment(info: &ExportedMethod) -> ItemFn {
 fn invoke_fn_ref_self_method_fragment_in_env(
     info: &ExportedMethod,
     resolver: &ResolvedParameterList,
+    untracked_self: bool,
+    gc_safe: bool,
 ) -> ItemFn {
     let name = &info.func.ident;
     let span = info.func.ident.span();
     let ty = resolver.apply(&info.parent);
     let ret_ty = resolver.apply(&info.func.output);
+    let new_ret_ty = as_return_as(&ret_ty);
+    let ret_ty = take_type(ret_ty.clone());
+
     let args = &info.func.inputs;
     let mut cloned_args = args.clone();
     let first = cloned_args.first_mut().unwrap();
@@ -3270,21 +3438,47 @@ fn invoke_fn_ref_self_method_fragment_in_env(
 
     let names = Punctuated::<_, Comma>::from_iter(names);
 
+    let to_ref_expr: Expr = if untracked_self {
+        parse_quote! { ::std::result::Result::<_, ()>::Ok((&this).data_ptr().cast::<#ty>().as_ref()) }
+    } else {
+        parse_quote! { (&this).track_shared() }
+    };
+
+    let call_expr: Expr = if gc_safe {
+        parse_quote! {
+            ::jlrs::memory::gc::gc_safe(|| {
+                this.#name(#names)
+            })
+        }
+    } else {
+        parse_quote! { this.#name(#names) }
+    };
+
     parse_quote_spanned! {
-        span=> unsafe extern "C" fn invoke(#args_self_renamed) #ret_ty {
-            match (&this).track_shared() {
-                Ok(this) => this.#name(#names),
-                Err(_) => ::jlrs::data::managed::rust_result::RustResult::borrow_error_internal()
+        span=> unsafe extern "C" fn invoke(#args_self_renamed) #new_ret_ty {
+            match #to_ref_expr {
+                Ok(this) => {
+                    let res = #call_expr;
+                    <#ret_ty as ::jlrs::convert::ccall_types::CCallReturn>::return_or_throw(res)
+                },
+                Err(_) => ::jlrs::ccall::CCall::throw_borrow_exception()
             }
         }
     }
 }
 
-fn invoke_fn_move_self_method_fragment(info: &ExportedMethod) -> ItemFn {
+fn invoke_fn_move_self_method_fragment(
+    info: &ExportedMethod,
+    untracked_self: bool,
+    gc_safe: bool,
+) -> ItemFn {
     let name = &info.func.ident;
     let span = info.func.ident.span();
     let ty = &info.parent;
     let ret_ty = &info.func.output;
+    let new_ret_ty = as_return_as(&ret_ty);
+    let ret_ty = take_type(ret_ty.clone());
+
     let args = &info.func.inputs;
     let mut cloned_args = args.clone();
     let first = cloned_args.first_mut().unwrap();
@@ -3302,11 +3496,30 @@ fn invoke_fn_move_self_method_fragment(info: &ExportedMethod) -> ItemFn {
 
     let names = Punctuated::<_, Comma>::from_iter(names);
 
+    let to_ref_expr: Expr = if untracked_self {
+        parse_quote! { ::std::result::Result::<_, ()>::Ok((&this).data_ptr().cast::<#ty>().as_ref()) }
+    } else {
+        parse_quote! { (&this).track_shared() }
+    };
+
+    let call_expr: Expr = if gc_safe {
+        parse_quote! {
+            ::jlrs::memory::gc::gc_safe(|| {
+                this.clone().#name(#names)
+            })
+        }
+    } else {
+        parse_quote! { this.clone().#name(#names) }
+    };
+
     parse_quote_spanned! {
-        span=> unsafe extern "C" fn invoke(#args_self_renamed) #ret_ty {
-            match (&this).track_shared() {
-                Ok(this) => this.clone().#name(#names),
-                Err(_) => ::jlrs::data::managed::rust_result::RustResult::borrow_error_internal()
+        span=> unsafe extern "C" fn invoke(#args_self_renamed) #new_ret_ty {
+            match #to_ref_expr {
+                Ok(this) => {
+                    let res = #call_expr;
+                    <#ret_ty as ::jlrs::convert::ccall_types::CCallReturn>::return_or_throw(res)
+                },
+                Err(_) => ::jlrs::ccall::CCall::throw_borrow_exception()
             }
         }
     }
@@ -3315,11 +3528,16 @@ fn invoke_fn_move_self_method_fragment(info: &ExportedMethod) -> ItemFn {
 fn invoke_fn_move_self_method_fragment_in_env(
     info: &ExportedMethod,
     resolver: &ResolvedParameterList,
+    untracked_self: bool,
+    gc_safe: bool,
 ) -> ItemFn {
     let name = &info.func.ident;
     let span = info.func.ident.span();
     let ty = resolver.apply(&info.parent);
     let ret_ty = resolver.apply(&info.func.output);
+    let new_ret_ty = as_return_as(&ret_ty);
+    let ret_ty = take_type(ret_ty.clone());
+
     let args = &info.func.inputs;
     let mut cloned_args = args.clone();
     let first = cloned_args.first_mut().unwrap();
@@ -3337,17 +3555,40 @@ fn invoke_fn_move_self_method_fragment_in_env(
 
     let names = Punctuated::<_, Comma>::from_iter(names);
 
+    let to_ref_expr: Expr = if untracked_self {
+        parse_quote! { ::std::result::Result::<_, ()>::Ok((&this).data_ptr().cast::<#ty>().as_ref()) }
+    } else {
+        parse_quote! { (&this).track_shared() }
+    };
+
+    let call_expr: Expr = if gc_safe {
+        parse_quote! {
+            ::jlrs::memory::gc::gc_safe(|| {
+                this.clone().#name(#names)
+            })
+        }
+    } else {
+        parse_quote! { this.clone().#name(#names) }
+    };
+
     parse_quote_spanned! {
-        span=> unsafe extern "C" fn invoke(#args_self_renamed) #ret_ty {
-            match (&this).track_shared() {
-                Ok(this) => this.clone().#name(#names),
-                Err(_) => ::jlrs::data::managed::rust_result::RustResult::borrow_error_internal()
+        span=> unsafe extern "C" fn invoke(#args_self_renamed) #new_ret_ty {
+            match #to_ref_expr {
+                Ok(this) => {
+                    let res = #call_expr;
+                    <#ret_ty as ::jlrs::convert::ccall_types::CCallReturn>::return_or_throw(res)
+                },
+                Err(_) => ::jlrs::ccall::CCall::throw_borrow_exception()
             }
         }
     }
 }
 
-fn invoke_fn_mut_self_method_fragment(info: &ExportedMethod) -> ItemFn {
+fn invoke_fn_mut_self_method_fragment(
+    info: &ExportedMethod,
+    untracked_self: bool,
+    gc_safe: bool,
+) -> ItemFn {
     let name = &info.func.ident;
     let span = info.func.ident.span();
     let ty = &info.parent;
@@ -3355,6 +3596,8 @@ fn invoke_fn_mut_self_method_fragment(info: &ExportedMethod) -> ItemFn {
     let args = &info.func.inputs;
     let mut cloned_args = args.clone();
     let first = cloned_args.first_mut().unwrap();
+    let new_ret_ty = as_return_as(&ret_ty);
+    let ret_ty = take_type(ret_ty.clone());
 
     *first = parse_quote! {
         mut this: ::jlrs::data::managed::value::typed::TypedValue<#ty>
@@ -3369,11 +3612,31 @@ fn invoke_fn_mut_self_method_fragment(info: &ExportedMethod) -> ItemFn {
 
     let names = Punctuated::<_, Comma>::from_iter(names);
 
+    let to_ref_expr: Expr = if untracked_self {
+        parse_quote! { ::std::result::Result::<_, ()>::Ok((&mut this).data_ptr().cast::<#ty>().as_mut()) }
+    } else {
+        parse_quote! { (&mut this).track_exclusive() }
+    };
+
+    let call_expr: Expr = if gc_safe {
+        parse_quote! {
+            ::jlrs::memory::gc::gc_safe(|| {
+                this.#name(#names)
+            })
+        }
+    } else {
+        parse_quote! { this.#name(#names) }
+    };
+
     parse_quote_spanned! {
-        span=> unsafe extern "C" fn invoke(#args_self_renamed) #ret_ty {
-            match (&mut this).track_exclusive() {
-                Ok(mut this) => this.#name(#names),
-                Err(_) => ::jlrs::data::managed::rust_result::RustResult::borrow_error_internal()
+        span=> unsafe extern "C" fn invoke(#args_self_renamed) #new_ret_ty {
+            match #to_ref_expr {
+                #[allow(unused_mut)]
+                Ok(mut this) => {
+                    let res = #call_expr;
+                    <#ret_ty as ::jlrs::convert::ccall_types::CCallReturn>::return_or_throw(res)
+                },
+                Err(_) => ::jlrs::ccall::CCall::throw_borrow_exception()
             }
         }
     }
@@ -3382,11 +3645,15 @@ fn invoke_fn_mut_self_method_fragment(info: &ExportedMethod) -> ItemFn {
 fn invoke_fn_mut_self_method_fragment_in_env(
     info: &ExportedMethod,
     resolver: &ResolvedParameterList,
+    untracked_self: bool,
+    gc_safe: bool,
 ) -> ItemFn {
     let name = &info.func.ident;
     let span = info.func.ident.span();
     let ty = resolver.apply(&info.parent);
     let ret_ty = resolver.apply(&info.func.output);
+    let new_ret_ty = as_return_as(&ret_ty);
+    let ret_ty = take_type(ret_ty.clone());
     let args = &info.func.inputs;
     let mut cloned_args = args.clone();
     let first = cloned_args.first_mut().unwrap();
@@ -3404,12 +3671,52 @@ fn invoke_fn_mut_self_method_fragment_in_env(
 
     let names = Punctuated::<_, Comma>::from_iter(names);
 
+    let to_ref_expr: Expr = if untracked_self {
+        parse_quote! { ::std::result::Result::<_, ()>::Ok((&mut this).data_ptr().cast::<#ty>().as_mut()) }
+    } else {
+        parse_quote! { (&mut this).track_exclusive() }
+    };
+
+    let call_expr: Expr = if gc_safe {
+        parse_quote! {
+            ::jlrs::memory::gc::gc_safe(|| {
+                this.#name(#names)
+            })
+        }
+    } else {
+        parse_quote! { this.#name(#names) }
+    };
+
     parse_quote_spanned! {
-        span=> unsafe extern "C" fn invoke(#args_self_renamed) #ret_ty {
-            match (&mut this).track_exclusive() {
-                Ok(mut this) => this.#name(#names),
-                Err(_) => ::jlrs::data::managed::rust_result::RustResult::borrow_error_internal()
+        span=> unsafe extern "C" fn invoke(#args_self_renamed) #new_ret_ty {
+            match #to_ref_expr {
+                #[allow(unused_mut)]
+                Ok(mut this) => {
+                    let res = #call_expr;
+                    <#ret_ty as ::jlrs::convert::ccall_types::CCallReturn>::return_or_throw(res)
+                },
+                Err(_) => ::jlrs::ccall::CCall::throw_borrow_exception()
             }
         }
     }
+}
+
+fn has_outer_path_attr(attrs: &[Attribute], name: &str) -> bool {
+    for attr in attrs {
+        match attr.style {
+            AttrStyle::Outer => (),
+            _ => continue,
+        }
+
+        match attr.meta {
+            Meta::Path(ref p) => {
+                if p.is_ident(name) {
+                    return true;
+                }
+            }
+            _ => continue,
+        }
+    }
+
+    false
 }

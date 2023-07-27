@@ -227,11 +227,11 @@ enabling the `full` feature.
 If you want to embed Julia in a Rust application, you must enable a runtime and a version
 feature:
 
-`jlrs = {version = "0.18.0", features = ["sync-rt", "julia-1-8"]}`
+`jlrs = {version = "0.19.0", features = ["sync-rt", "julia-1-8"]}`
 
-`jlrs = {version = "0.18.0", features = ["tokio-rt", "julia-1-8"]}`
+`jlrs = {version = "0.19.0", features = ["tokio-rt", "julia-1-8"]}`
 
-`jlrs = {version = "0.18.0", features = ["async-std-rt", "julia-1-8"]}`
+`jlrs = {version = "0.19.0", features = ["async-std-rt", "julia-1-8"]}`
 
 When Julia is embedded in an application, it must be initialized before it can be used. The
 following snippet initializes the sync runtime:
@@ -483,7 +483,7 @@ impl PersistentTask for AccumulatorTask {
         // A `Vec` can be moved from Rust to Julia if the element type
         // implements `IntoJulia`.
         let data = vec![0usize; self.n_values];
-        let array = TypedArray::from_vec(frame.as_extended_target(), data, self.n_values)?
+        let array = TypedArray::from_vec(&mut frame, data, self.n_values)?
             .into_jlrs_result()?;
 
         Ok(AccumulatorTaskState { array, offset: 0 })

@@ -1,4 +1,4 @@
-//! A raw, stack-allocated GC frame.
+//! Raw, inactive GC frame.
 
 use std::{
     cell::Cell,
@@ -19,13 +19,14 @@ use crate::{
 
 const ROOT: Cell<*mut c_void> = Cell::new(null_mut());
 
-/// A raw, stack-allocated GC frame.
+/// A raw, inactive GC frame.
 ///
 /// When the [sync runtime] or [`CCall`] is used a `StackFrame` must be provided so the GC can
-/// find all references to Julia data that exist in Rust code.
+/// find all data rooted in active [`GcFrame`]s.
 ///
 /// [sync runtime]: crate::runtime::sync_rt::Julia
 /// [`CCall`]: crate::ccall::CCall
+/// [`GcFrame`]: crate::memory::target::frame::GcFrame
 #[repr(C)]
 pub struct StackFrame<const N: usize> {
     len: *mut c_void,
@@ -36,12 +37,14 @@ pub struct StackFrame<const N: usize> {
 
 impl StackFrame<0> {
     /// Returns a new `StackFrame`.
+    #[inline]
     pub fn new() -> Self {
         Self::new_n()
     }
 }
 
 impl<const N: usize> StackFrame<N> {
+    #[inline]
     pub(crate) fn new_n() -> Self {
         StackFrame {
             len: ((N + 1) << 2) as *mut c_void,
@@ -53,6 +56,7 @@ impl<const N: usize> StackFrame<N> {
 
     // Safety: Must only be called once, if a new frame is pushed it must be popped before
     // this one is.
+    #[inline]
     pub(crate) unsafe fn pin<'scope>(&'scope mut self) -> PinnedFrame<'scope, N> {
         PinnedFrame::new(self)
     }
@@ -64,13 +68,17 @@ pub(crate) struct PinnedFrame<'scope, const N: usize> {
 
 impl<'scope, const N: usize> PinnedFrame<'scope, N> {
     #[julia_version(until = "1.6")]
+    #[inline]
     unsafe fn new(raw: &'scope mut StackFrame<N>) -> Self {
         let ptls = jl_sys::jl_get_ptls_states();
-        let mut pgcstack = NonNull::new_unchecked(jl_sys::jlrs_pgcstack(ptls));
-        let gcstack_ref: &mut *mut c_void = pgcstack.as_mut();
+        let pgcstack = NonNull::new_unchecked(jl_sys::jlrs_pgcstack(ptls));
+        let gcstack_ref: &mut *mut c_void = pgcstack.cast().as_mut();
 
         #[cfg(feature = "mem-debug")]
-        eprintln!("Push raw frame: {:p} -> {:p}", gcstack_ref, raw);
+        eprintln!(
+            "Push raw frame: {:p} -> {:p}",
+            *gcstack_ref as *const _, raw
+        );
         raw.prev = *gcstack_ref;
         *gcstack_ref = raw as *mut _ as *mut _;
 
@@ -78,6 +86,7 @@ impl<'scope, const N: usize> PinnedFrame<'scope, N> {
     }
 
     #[julia_version(since = "1.7")]
+    #[inline]
     unsafe fn new(raw: &'scope mut StackFrame<N>) -> Self {
         let task = NonNull::new_unchecked(jl_get_current_task().cast::<jl_task_t>()).as_mut();
         raw.prev = task.gcstack.cast();
@@ -89,16 +98,19 @@ impl<'scope, const N: usize> PinnedFrame<'scope, N> {
         PinnedFrame { raw: Pin::new(raw) }
     }
 
+    #[inline]
     pub(crate) unsafe fn stack_frame<'inner>(
         &'inner mut self,
     ) -> JlrsStackFrame<'scope, 'inner, N> {
         JlrsStackFrame::new(self)
     }
 
+    #[inline]
     pub(crate) unsafe fn set_sync_root(&self, root: *mut c_void) {
         self.raw.sync.set(root);
     }
 
+    #[inline]
     pub(crate) unsafe fn clear_roots(&self) {
         self.raw.sync.set(null_mut());
         for r in self.raw.roots.as_ref() {
@@ -112,8 +124,8 @@ impl<'scope, const N: usize> Drop for PinnedFrame<'scope, N> {
     fn drop(&mut self) {
         unsafe {
             let ptls = jl_sys::jl_get_ptls_states();
-            let mut pgcstack = NonNull::new_unchecked(jl_sys::jlrs_pgcstack(ptls));
-            let gcstack_ref: &mut *mut c_void = pgcstack.as_mut();
+            let pgcstack = NonNull::new_unchecked(jl_sys::jlrs_pgcstack(ptls));
+            let gcstack_ref: &mut *mut c_void = pgcstack.cast().as_mut();
 
             #[cfg(feature = "mem-debug")]
             eprintln!("Pop raw frame: {:p} -> {:p}", gcstack_ref, self.raw.prev);
@@ -141,6 +153,7 @@ pub(crate) struct JlrsStackFrame<'scope, 'inner, const N: usize> {
 }
 
 impl<'scope, 'inner, const N: usize> JlrsStackFrame<'scope, 'inner, N> {
+    #[inline]
     unsafe fn new(pinned: &'inner mut PinnedFrame<'scope, N>) -> Self {
         if !Self::is_init(&pinned) {
             {
@@ -156,6 +169,7 @@ impl<'scope, 'inner, const N: usize> JlrsStackFrame<'scope, 'inner, N> {
         JlrsStackFrame { pinned }
     }
 
+    #[inline]
     pub(crate) unsafe fn sync_stack(&self) -> &'scope Stack {
         NonNull::new_unchecked(self.pinned.raw.sync.get())
             .cast()
@@ -163,12 +177,14 @@ impl<'scope, 'inner, const N: usize> JlrsStackFrame<'scope, 'inner, N> {
     }
 
     #[cfg(feature = "async")]
+    #[inline]
     pub(crate) unsafe fn nth_stack(&self, n: usize) -> &'scope Stack {
         NonNull::new_unchecked(self.pinned.raw.roots[n].get())
             .cast()
             .as_ref()
     }
 
+    #[inline]
     fn is_init(pinned: &PinnedFrame<'_, N>) -> bool {
         let ptr = pinned.raw.sync.get();
         if !ptr.is_null() {

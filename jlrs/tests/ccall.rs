@@ -66,8 +66,7 @@ mod tests {
                 .scope(|mut frame| unsafe {
                     let fn_ptr = Value::new(&mut frame, doesnt_use_scope as *mut std::ffi::c_void);
                     let mut arr_data = vec![0.0f64, 1.0f64];
-                    let arr =
-                        Array::from_slice_unchecked(frame.as_extended_target(), &mut arr_data, 2)?;
+                    let arr = Array::from_slice_unchecked(&mut frame, &mut arr_data, 2)?;
                     let func = Module::main(&frame)
                         .submodule(&frame, "JlrsTests")?
                         .as_managed()
@@ -92,8 +91,7 @@ mod tests {
                 .scope(|mut frame| unsafe {
                     let fn_ptr = Value::new(&mut frame, uses_scope as *mut std::ffi::c_void);
                     let mut arr_data = vec![0.0f64, 1.0f64];
-                    let arr =
-                        Array::from_slice_unchecked(frame.as_extended_target(), &mut arr_data, 2)?;
+                    let arr = Array::from_slice_unchecked(&mut frame, &mut arr_data, 2)?;
                     let func = Module::main(&frame)
                         .submodule(&frame, "JlrsTests")?
                         .as_managed()
@@ -121,8 +119,7 @@ mod tests {
                         uses_scope_with_realloced_slots as *mut std::ffi::c_void,
                     );
                     let mut arr_data = vec![0.0f64, 1.0f64];
-                    let arr =
-                        Array::from_slice_unchecked(frame.as_extended_target(), &mut arr_data, 2)?;
+                    let arr = Array::from_slice_unchecked(&mut frame, &mut arr_data, 2)?;
                     let func = Module::main(&frame)
                         .submodule(&frame, "JlrsTests")?
                         .as_managed()

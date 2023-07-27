@@ -107,6 +107,8 @@ pub enum AccessError {
     InvalidLayout { value_type: String },
     #[error("no value named {name} in {module}")]
     GlobalNotFound { name: String, module: String },
+    #[error("module named {module} not found")]
+    ModuleNotFound { module: String },
     #[error("the current value is locked")]
     Locked,
     #[error("{tag} is not a valid tag for {union_type}")]
@@ -186,21 +188,25 @@ pub enum JlrsError {
 
 impl JlrsError {
     /// Convert an arbitrary error to `JlrsError::Other`.
+    #[inline]
     pub fn other<E: StdErr + 'static + Send + Sync>(reason: E) -> Self {
         JlrsError::Other(Box::new(reason))
     }
 
     /// Convert an error message to `JlrsError::Exception`.
+    #[inline]
     pub fn exception<S: Into<String>>(msg: S) -> Self {
         JlrsError::Exception(Exception { msg: msg.into() })
     }
 
     /// Convert an arbitrary error to `Err(JlrsError::Other)`.
+    #[inline]
     pub fn other_error<T, E: StdErr + 'static + Send + Sync>(reason: E) -> Result<T, Self> {
         Err(Self::other(reason))
     }
 
     /// Convert an error message to `Err(JlrsError::Exception)`.
+    #[inline]
     pub fn exception_error<T>(msg: String) -> Result<T, Self> {
         Err(JlrsError::exception(msg))
     }
@@ -209,12 +215,14 @@ impl JlrsError {
 macro_rules! impl_from {
     ($type:ident) => {
         impl From<$type> for JlrsError {
+            #[inline]
             fn from(e: $type) -> Self {
                 JlrsError::$type(e)
             }
         }
 
         impl From<$type> for Box<JlrsError> {
+            #[inline]
             fn from(e: $type) -> Self {
                 Box::new(JlrsError::from(e))
             }

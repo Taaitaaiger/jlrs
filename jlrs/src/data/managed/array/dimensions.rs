@@ -7,24 +7,35 @@
 //! if you want to access the third column of the second row of an array, you can use both
 //! `[1, 2]` or `(1, 2)`. Note that unlike Julia, array indexing starts at 0.
 
+// TODO: IntoDimensions traiit
+// TODO: clean up
 use std::{
+    ffi::c_void,
     fmt::{Debug, Display, Formatter, Result as FmtResult},
     marker::PhantomData,
+    mem::MaybeUninit,
+    ptr::NonNull,
 };
 
-use jl_sys::{jl_array_dims_ptr, jl_array_ndims};
+use jl_sys::{
+    jl_alloc_array_1d, jl_alloc_array_2d, jl_alloc_array_3d, jl_array_dims_ptr, jl_array_ndims,
+    jl_array_t, jl_new_array, jl_ptr_to_array, jl_ptr_to_array_1d, jl_value_t, jlrs_dimtuple_type,
+};
 
+use self::private::DimsPriv;
+use super::ArrayData;
 use crate::{
-    data::managed::{array::Array, private::ManagedPriv as _},
+    data::{
+        managed::{array::Array, datatype::DataTypeData, private::ManagedPriv as _},
+        types::construct_type::{ArrayTypeConstructor, ConstantIsize, ConstantSize, ConstructType},
+    },
     error::{AccessError, JlrsResult},
+    prelude::{DataType, Managed, NTuple, Target, Tuple0, Tuple1, Tuple2, Tuple3, Tuple4, Value},
     private::Private,
 };
 
-/// Trait implemented by types that can be used as n-dimensional indices.
 pub trait Dims: Sized + Debug {
-    const SIZE: isize;
-
-    /// Returns the number of dimensions.
+    /// Returns the rank if this index.
     fn rank(&self) -> usize;
 
     /// Returns the number of elements of the nth dimension. Indexing starts at 0.
@@ -32,13 +43,9 @@ pub trait Dims: Sized + Debug {
 
     /// The total number of elements in the arry, i.e. the product of the number of elements of
     /// each dimension.
+    #[inline]
     fn size(&self) -> usize {
-        let mut acc = 1;
-        for i in 0..self.rank() {
-            acc *= self.n_elements(i);
-        }
-
-        acc
+        (0..self.rank()).map(|i| self.n_elements(i)).product()
     }
 
     /// Calculate the linear index for `dim_index` in an array with dimensions `self`.
@@ -82,6 +89,107 @@ pub trait Dims: Sized + Debug {
     }
 }
 
+/// Trait implemented by types that can be used as n-dimensional indices.
+pub trait DimsExt: DimsPriv + Dims {
+    /// The rank of array that can use this type as an index.
+    ///
+    /// This constant is -1 if the rank is not known at compile-time.
+    const RANK: isize;
+
+    type DimTupleConstructor: ConstructType;
+
+    /// The type constructor for an array type with these dimesions.
+    ///
+    /// This constructor may only be used if `Self::Rank` is not equal to `-1`.
+    type ArrayContructor<T: ConstructType>: ConstructType;
+
+    #[doc(hidden)]
+    fn fill_tuple(&self, tup: &mut [MaybeUninit<usize>], _: Private);
+
+    #[doc(hidden)]
+    #[inline]
+    unsafe fn alloc_array<'target, Tgt>(
+        &self,
+        target: Tgt,
+        array_type: Value,
+    ) -> ArrayData<'target, 'static, Tgt>
+    where
+        Tgt: Target<'target>,
+    {
+        let array_type = array_type.unwrap(Private);
+
+        let arr = match self.rank() {
+            1 => jl_alloc_array_1d(array_type, self.n_elements(0)),
+            2 => jl_alloc_array_2d(array_type, self.n_elements(0), self.n_elements(1)),
+            3 => jl_alloc_array_3d(
+                array_type,
+                self.n_elements(0),
+                self.n_elements(1),
+                self.n_elements(2),
+            ),
+            _ => self.alloc_large(array_type, &target),
+        };
+
+        Array::wrap_non_null(NonNull::new_unchecked(arr), Private).root(target)
+    }
+
+    #[cold]
+    #[doc(hidden)]
+    #[inline(never)]
+    unsafe fn alloc_large<'target, Tgt>(
+        &self,
+        array_type: *mut jl_value_t,
+        target: &Tgt,
+    ) -> *mut jl_array_t
+    where
+        Tgt: Target<'target>,
+    {
+        target
+            .local_scope::<_, _, 1>(|mut frame| {
+                let tuple = super::sized_dim_tuple(&frame, self);
+                tuple.root(&mut frame);
+                Ok(jl_new_array(array_type, tuple.ptr().as_ptr()))
+            })
+            .unwrap_unchecked()
+    }
+
+    #[doc(hidden)]
+    #[inline]
+    unsafe fn alloc_array_with_data<'target, 'data, Tgt: Target<'target>>(
+        &self,
+        target: Tgt,
+        array_type: Value,
+        data: *mut c_void,
+    ) -> ArrayData<'target, 'data, Tgt> {
+        let array_type = array_type.unwrap(Private);
+
+        let arr = match self.rank() {
+            1 => jl_ptr_to_array_1d(array_type, data, self.n_elements(0), 0),
+            _ => target
+                .local_scope::<_, _, 1>(|frame| {
+                    let tuple = super::sized_dim_tuple(frame, self);
+                    Ok(jl_ptr_to_array(array_type, data, tuple.unwrap(Private), 0))
+                })
+                .unwrap_unchecked(),
+        };
+
+        target.data_from_ptr(NonNull::new_unchecked(arr), Private)
+    }
+
+    #[doc(hidden)]
+    #[inline]
+    fn dimension_object<'target, Tgt: Target<'target>>(
+        &self,
+        target: Tgt,
+    ) -> DataTypeData<'target, Tgt> {
+        let rank = self.rank();
+        unsafe {
+            let raw = jlrs_dimtuple_type(rank as _);
+            target.data_from_ptr(NonNull::new_unchecked(raw), Private)
+        }
+    }
+}
+
 /// Dimensions of a Julia array.
 #[derive(Copy, Clone, Debug)]
 pub struct ArrayDimensions<'scope> {
@@ -91,6 +199,7 @@ pub struct ArrayDimensions<'scope> {
 }
 
 impl<'scope> ArrayDimensions<'scope> {
+    #[inline]
     pub(crate) fn new(array: Array<'scope, '_>) -> Self {
         let array_ptr = array.unwrap(Private);
         // Safety: The array's dimensions exists as long as the array does.
@@ -116,12 +225,12 @@ impl<'scope> ArrayDimensions<'scope> {
 }
 
 impl<'scope> Dims for ArrayDimensions<'scope> {
-    const SIZE: isize = -1;
-
+    #[inline]
     fn rank(&self) -> usize {
         self.n
     }
 
+    #[inline]
     fn n_elements(&self, dimension: usize) -> usize {
         if dimension >= self.n {
             return 0;
@@ -132,25 +241,133 @@ impl<'scope> Dims for ArrayDimensions<'scope> {
     }
 }
 
-impl Dims for () {
-    const SIZE: isize = 0;
+impl DimsExt for () {
+    const RANK: isize = 0;
 
+    type DimTupleConstructor = Tuple0;
+
+    type ArrayContructor<T: ConstructType> = ArrayTypeConstructor<T, ConstantIsize<0>>;
+
+    #[inline]
+    fn fill_tuple(&self, _tup: &mut [MaybeUninit<usize>], _: Private) {}
+
+    #[inline]
+    unsafe fn alloc_array<'target, Tgt>(
+        &self,
+        target: Tgt,
+        array_type: Value,
+    ) -> ArrayData<'target, 'static, Tgt>
+    where
+        Tgt: Target<'target>,
+    {
+        unsafe {
+            target
+                .with_local_scope::<_, _, 1>(|target, mut frame| {
+                    let array_type = array_type.unwrap(Private);
+                    let tuple = super::sized_dim_tuple(&target, self);
+                    tuple.root(&mut frame);
+                    let arr = jl_new_array(array_type, tuple.ptr().as_ptr());
+                    Ok(Array::wrap_non_null(NonNull::new_unchecked(arr), Private).root(target))
+                })
+                .unwrap()
+        }
+    }
+
+    #[inline]
+    unsafe fn alloc_array_with_data<'target, 'data, Tgt: Target<'target>>(
+        &self,
+        target: Tgt,
+        array_type: Value,
+        data: *mut c_void,
+    ) -> ArrayData<'target, 'data, Tgt> {
+        let array_type = array_type.unwrap(Private);
+        let tuple = Value::emptytuple(&target);
+        let arr = jl_ptr_to_array(array_type, data, tuple.unwrap(Private), 0);
+        target.data_from_ptr(NonNull::new_unchecked(arr), Private)
+    }
+
+    #[inline]
+    fn dimension_object<'target, Tgt: Target<'target>>(
+        &self,
+        target: Tgt,
+    ) -> DataTypeData<'target, Tgt> {
+        DataType::emptytuple_type(&target).root(target)
+    }
+}
+
+impl Dims for () {
+    #[inline]
     fn rank(&self) -> usize {
         0
     }
 
+    #[inline]
     fn n_elements(&self, _: usize) -> usize {
         0
     }
 }
 
-impl Dims for usize {
-    const SIZE: isize = 1;
+impl DimsExt for usize {
+    const RANK: isize = 1;
 
+    type DimTupleConstructor = Tuple1<usize>;
+
+    type ArrayContructor<T: ConstructType> = ArrayTypeConstructor<T, ConstantIsize<1>>;
+
+    #[inline]
+    fn fill_tuple(&self, tup: &mut [MaybeUninit<usize>], _: Private) {
+        tup[0].write(*self);
+    }
+
+    #[inline]
+    unsafe fn alloc_array<'target, Tgt>(
+        &self,
+        target: Tgt,
+        array_type: Value,
+    ) -> ArrayData<'target, 'static, Tgt>
+    where
+        Tgt: Target<'target>,
+    {
+        unsafe {
+            let array_type = array_type.unwrap(Private);
+            let arr = jl_alloc_array_1d(array_type, *self);
+            Array::wrap_non_null(NonNull::new_unchecked(arr), Private).root(target)
+        }
+    }
+
+    #[inline]
+    unsafe fn alloc_array_with_data<'target, 'data, Tgt: Target<'target>>(
+        &self,
+        target: Tgt,
+        array_type: Value,
+        data: *mut c_void,
+    ) -> ArrayData<'target, 'data, Tgt> {
+        let array_type = array_type.unwrap(Private);
+        let arr = jl_ptr_to_array_1d(array_type, data, *self, 0);
+        target.data_from_ptr(NonNull::new_unchecked(arr), Private)
+    }
+
+    #[inline]
+    fn dimension_object<'target, Tgt: Target<'target>>(
+        &self,
+        target: Tgt,
+    ) -> DataTypeData<'target, Tgt> {
+        unsafe {
+            NTuple::<isize, 1>::construct_type(&target)
+                .as_managed()
+                .cast_unchecked::<DataType>()
+                .root(target)
+        }
+    }
+}
+
+impl Dims for usize {
+    #[inline]
     fn rank(&self) -> usize {
         1
     }
 
+    #[inline]
     fn n_elements(&self, dimension: usize) -> usize {
         if dimension == 0 {
             *self
@@ -160,13 +377,67 @@ impl Dims for usize {
     }
 }
 
-impl Dims for (usize,) {
-    const SIZE: isize = 1;
+impl DimsExt for (usize,) {
+    const RANK: isize = 1;
 
+    type DimTupleConstructor = Tuple1<usize>;
+
+    type ArrayContructor<T: ConstructType> = ArrayTypeConstructor<T, ConstantIsize<1>>;
+
+    #[inline]
+    fn fill_tuple(&self, tup: &mut [MaybeUninit<usize>], _: Private) {
+        tup[0].write(self.0);
+    }
+
+    #[inline]
+    unsafe fn alloc_array<'target, Tgt>(
+        &self,
+        target: Tgt,
+        array_type: Value,
+    ) -> ArrayData<'target, 'static, Tgt>
+    where
+        Tgt: Target<'target>,
+    {
+        unsafe {
+            let array_type = array_type.unwrap(Private);
+            let arr = jl_alloc_array_1d(array_type, self.0);
+            Array::wrap_non_null(NonNull::new_unchecked(arr), Private).root(target)
+        }
+    }
+
+    #[inline]
+    unsafe fn alloc_array_with_data<'target, 'data, Tgt: Target<'target>>(
+        &self,
+        target: Tgt,
+        array_type: Value,
+        data: *mut c_void,
+    ) -> ArrayData<'target, 'data, Tgt> {
+        let array_type = array_type.unwrap(Private);
+        let arr = jl_ptr_to_array_1d(array_type, data, self.0, 0);
+        target.data_from_ptr(NonNull::new_unchecked(arr), Private)
+    }
+
+    #[inline]
+    fn dimension_object<'target, Tgt: Target<'target>>(
+        &self,
+        target: Tgt,
+    ) -> DataTypeData<'target, Tgt> {
+        unsafe {
+            NTuple::<isize, 1>::construct_type(&target)
+                .as_managed()
+                .cast_unchecked::<DataType>()
+                .root(target)
+        }
+    }
+}
+
+impl Dims for (usize,) {
+    #[inline]
     fn rank(&self) -> usize {
         1
     }
 
+    #[inline]
     fn n_elements(&self, dimension: usize) -> usize {
         if dimension == 0 {
             self.0
@@ -176,13 +447,74 @@ impl Dims for (usize,) {
     }
 }
 
-impl Dims for (usize, usize) {
-    const SIZE: isize = 2;
+impl DimsExt for (usize, usize) {
+    const RANK: isize = 2;
 
+    type DimTupleConstructor = Tuple2<usize, usize>;
+
+    type ArrayContructor<T: ConstructType> = ArrayTypeConstructor<T, ConstantIsize<2>>;
+
+    #[inline]
+    fn fill_tuple(&self, tup: &mut [MaybeUninit<usize>], _: Private) {
+        tup[0].write(self.0);
+        tup[1].write(self.1);
+    }
+
+    #[inline]
+    unsafe fn alloc_array<'target, Tgt>(
+        &self,
+        target: Tgt,
+        array_type: Value,
+    ) -> ArrayData<'target, 'static, Tgt>
+    where
+        Tgt: Target<'target>,
+    {
+        unsafe {
+            let array_type = array_type.unwrap(Private);
+            let arr = jl_alloc_array_2d(array_type, self.0, self.1);
+            Array::wrap_non_null(NonNull::new_unchecked(arr), Private).root(target)
+        }
+    }
+
+    #[inline]
+    unsafe fn alloc_array_with_data<'target, 'data, Tgt: Target<'target>>(
+        &self,
+        target: Tgt,
+        array_type: Value,
+        data: *mut c_void,
+    ) -> ArrayData<'target, 'data, Tgt> {
+        target
+            .with_local_scope::<_, _, 1>(|target, frame| {
+                let array_type = array_type.unwrap(Private);
+                let tuple = super::sized_dim_tuple(frame, self);
+                let arr = jl_ptr_to_array(array_type, data, tuple.unwrap(Private), 0);
+
+                Ok(target.data_from_ptr(NonNull::new_unchecked(arr), Private))
+            })
+            .unwrap_unchecked()
+    }
+
+    #[inline]
+    fn dimension_object<'target, Tgt: Target<'target>>(
+        &self,
+        target: Tgt,
+    ) -> DataTypeData<'target, Tgt> {
+        unsafe {
+            NTuple::<isize, 2>::construct_type(&target)
+                .as_managed()
+                .cast_unchecked::<DataType>()
+                .root(target)
+        }
+    }
+}
+
+impl Dims for (usize, usize) {
+    #[inline]
     fn rank(&self) -> usize {
         2
     }
 
+    #[inline]
     fn n_elements(&self, dimension: usize) -> usize {
         match dimension {
             0 => self.0,
@@ -192,13 +524,75 @@ impl Dims for (usize, usize) {
     }
 }
 
-impl Dims for (usize, usize, usize) {
-    const SIZE: isize = 3;
+impl DimsExt for (usize, usize, usize) {
+    const RANK: isize = 3;
 
+    type DimTupleConstructor = Tuple3<usize, usize, usize>;
+
+    type ArrayContructor<T: ConstructType> = ArrayTypeConstructor<T, ConstantIsize<3>>;
+
+    #[inline]
+    fn fill_tuple(&self, tup: &mut [MaybeUninit<usize>], _: Private) {
+        tup[0].write(self.0);
+        tup[1].write(self.1);
+        tup[2].write(self.2);
+    }
+
+    #[inline]
+    unsafe fn alloc_array<'target, Tgt>(
+        &self,
+        target: Tgt,
+        array_type: Value,
+    ) -> ArrayData<'target, 'static, Tgt>
+    where
+        Tgt: Target<'target>,
+    {
+        unsafe {
+            let array_type = array_type.unwrap(Private);
+            let arr = jl_alloc_array_3d(array_type, self.0, self.1, self.2);
+            Array::wrap_non_null(NonNull::new_unchecked(arr), Private).root(target)
+        }
+    }
+
+    #[inline]
+    unsafe fn alloc_array_with_data<'target, 'data, Tgt: Target<'target>>(
+        &self,
+        target: Tgt,
+        array_type: Value,
+        data: *mut c_void,
+    ) -> ArrayData<'target, 'data, Tgt> {
+        target
+            .with_local_scope::<_, _, 1>(|target, frame| {
+                let array_type = array_type.unwrap(Private);
+                let tuple = super::sized_dim_tuple(frame, self);
+                let arr = jl_ptr_to_array(array_type, data, tuple.unwrap(Private), 0);
+
+                Ok(target.data_from_ptr(NonNull::new_unchecked(arr), Private))
+            })
+            .unwrap_unchecked()
+    }
+
+    #[inline]
+    fn dimension_object<'target, Tgt: Target<'target>>(
+        &self,
+        target: Tgt,
+    ) -> DataTypeData<'target, Tgt> {
+        unsafe {
+            NTuple::<isize, 3>::construct_type(&target)
+                .as_managed()
+                .cast_unchecked::<DataType>()
+                .root(target)
+        }
+    }
+}
+
+impl Dims for (usize, usize, usize) {
+    #[inline]
     fn rank(&self) -> usize {
         3
     }
 
+    #[inline]
     fn n_elements(&self, dimension: usize) -> usize {
         match dimension {
             0 => self.0,
@@ -209,13 +603,73 @@ impl Dims for (usize, usize, usize) {
     }
 }
 
-impl Dims for (usize, usize, usize, usize) {
-    const SIZE: isize = 4;
+impl DimsExt for (usize, usize, usize, usize) {
+    const RANK: isize = 4;
 
+    type DimTupleConstructor = Tuple4<usize, usize, usize, usize>;
+
+    type ArrayContructor<T: ConstructType> = ArrayTypeConstructor<T, ConstantIsize<4>>;
+
+    #[inline]
+    fn fill_tuple(&self, tup: &mut [MaybeUninit<usize>], _: Private) {
+        tup[0].write(self.0);
+        tup[1].write(self.1);
+        tup[2].write(self.2);
+        tup[3].write(self.3);
+    }
+
+    #[inline]
+    unsafe fn alloc_array<'target, Tgt>(
+        &self,
+        target: Tgt,
+        array_type: Value,
+    ) -> ArrayData<'target, 'static, Tgt>
+    where
+        Tgt: Target<'target>,
+    {
+        let ptr = self.alloc_large(array_type.unwrap(Private), &target);
+        target.data_from_ptr(NonNull::new_unchecked(ptr), Private)
+    }
+
+    #[inline]
+    unsafe fn alloc_array_with_data<'target, 'data, Tgt: Target<'target>>(
+        &self,
+        target: Tgt,
+        array_type: Value,
+        data: *mut c_void,
+    ) -> ArrayData<'target, 'data, Tgt> {
+        target
+            .with_local_scope::<_, _, 1>(|target, frame| {
+                let array_type = array_type.unwrap(Private);
+                let tuple = super::sized_dim_tuple(frame, self);
+                let arr = jl_ptr_to_array(array_type, data, tuple.unwrap(Private), 0);
+
+                Ok(target.data_from_ptr(NonNull::new_unchecked(arr), Private))
+            })
+            .unwrap_unchecked()
+    }
+
+    #[inline]
+    fn dimension_object<'target, Tgt: Target<'target>>(
+        &self,
+        target: Tgt,
+    ) -> DataTypeData<'target, Tgt> {
+        unsafe {
+            NTuple::<isize, 4>::construct_type(&target)
+                .as_managed()
+                .cast_unchecked::<DataType>()
+                .root(target)
+        }
+    }
+}
+
+impl Dims for (usize, usize, usize, usize) {
+    #[inline]
     fn rank(&self) -> usize {
         4
     }
 
+    #[inline]
     fn n_elements(&self, dimension: usize) -> usize {
         match dimension {
             0 => self.0,
@@ -227,13 +681,41 @@ impl Dims for (usize, usize, usize, usize) {
     }
 }
 
-impl<const N: usize> Dims for &[usize; N] {
-    const SIZE: isize = N as isize;
+impl<const N: usize> DimsExt for &[usize; N] {
+    const RANK: isize = N as isize;
 
+    type DimTupleConstructor = NTuple<usize, N>;
+
+    type ArrayContructor<T: ConstructType> = ArrayTypeConstructor<T, ConstantSize<N>>;
+
+    #[inline]
+    fn fill_tuple(&self, tup: &mut [MaybeUninit<usize>], _: Private) {
+        for i in 0..N {
+            tup[i].write(self[i]);
+        }
+    }
+
+    #[inline]
+    fn dimension_object<'target, Tgt: Target<'target>>(
+        &self,
+        target: Tgt,
+    ) -> DataTypeData<'target, Tgt> {
+        unsafe {
+            NTuple::<isize, N>::construct_type(&target)
+                .as_managed()
+                .cast_unchecked::<DataType>()
+                .root(target)
+        }
+    }
+}
+
+impl<const N: usize> Dims for &[usize; N] {
+    #[inline]
     fn rank(&self) -> usize {
         N
     }
 
+    #[inline]
     fn n_elements(&self, dim: usize) -> usize {
         if dim < N {
             self[dim]
@@ -243,13 +725,41 @@ impl<const N: usize> Dims for &[usize; N] {
     }
 }
 
-impl<const N: usize> Dims for [usize; N] {
-    const SIZE: isize = N as isize;
+impl<const N: usize> DimsExt for [usize; N] {
+    const RANK: isize = N as isize;
 
+    type DimTupleConstructor = NTuple<usize, N>;
+
+    type ArrayContructor<T: ConstructType> = ArrayTypeConstructor<T, ConstantSize<N>>;
+
+    #[inline]
+    fn fill_tuple(&self, tup: &mut [MaybeUninit<usize>], _: Private) {
+        for i in 0..N {
+            tup[i].write(self[i]);
+        }
+    }
+
+    #[inline]
+    fn dimension_object<'target, Tgt: Target<'target>>(
+        &self,
+        target: Tgt,
+    ) -> DataTypeData<'target, Tgt> {
+        unsafe {
+            NTuple::<isize, N>::construct_type(&target)
+                .as_managed()
+                .cast_unchecked::<DataType>()
+                .root(target)
+        }
+    }
+}
+
+impl<const N: usize> Dims for [usize; N] {
+    #[inline]
     fn rank(&self) -> usize {
         N
     }
 
+    #[inline]
     fn n_elements(&self, dim: usize) -> usize {
         if dim < N {
             self[dim]
@@ -260,12 +770,12 @@ impl<const N: usize> Dims for [usize; N] {
 }
 
 impl Dims for &[usize] {
-    const SIZE: isize = -1;
-
+    #[inline]
     fn rank(&self) -> usize {
         self.len()
     }
 
+    #[inline]
     fn n_elements(&self, dim: usize) -> usize {
         if dim < self.len() {
             self[dim]
@@ -310,6 +820,7 @@ impl Dimensions {
     }
 
     /// Returns the dimensions as a slice.
+    #[inline]
     pub fn as_slice(&self) -> &[usize] {
         match self {
             Dimensions::Few(ref v) => &v[1..v[0] as usize + 1],
@@ -319,8 +830,7 @@ impl Dimensions {
 }
 
 impl Dims for Dimensions {
-    const SIZE: isize = -1;
-
+    #[inline]
     fn rank(&self) -> usize {
         match self {
             Dimensions::Few([n, _, _, _]) => *n,
@@ -328,6 +838,7 @@ impl Dims for Dimensions {
         }
     }
 
+    #[inline]
     fn n_elements(&self, dim: usize) -> usize {
         if dim < self.rank() {
             match self {
@@ -339,6 +850,7 @@ impl Dims for Dimensions {
         }
     }
 
+    #[inline]
     fn size(&self) -> usize {
         if self.rank() == 0 {
             return 0;
@@ -374,6 +886,26 @@ impl Display for Dimensions {
 
         f.finish()
     }
+}
+
+pub(crate) mod private {
+    pub trait DimsPriv {}
+
+    impl DimsPriv for () {}
+
+    impl DimsPriv for usize {}
+
+    impl DimsPriv for (usize,) {}
+
+    impl DimsPriv for (usize, usize) {}
+
+    impl DimsPriv for (usize, usize, usize) {}
+
+    impl DimsPriv for (usize, usize, usize, usize) {}
+
+    impl<const N: usize> DimsPriv for [usize; N] {}
+
+    impl<const N: usize> DimsPriv for &[usize; N] {}
 }
 
 #[cfg(test)]

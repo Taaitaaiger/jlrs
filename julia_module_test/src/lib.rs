@@ -6,8 +6,10 @@ use jlrs::{
         managed::{
             array::{ArrayRet, TypedArrayUnbound},
             ccall_ref::CCallRef,
-            rust_result::{RustResult, RustResultRet},
-            value::typed::{TypedValue, TypedValueRef, TypedValueRet},
+            value::{
+                typed::{TypedValue, TypedValueRet},
+                ValueRet,
+            },
         },
         types::{
             abstract_types::{AnyType, Number},
@@ -21,21 +23,26 @@ use jlrs::{
     prelude::*,
 };
 
-unsafe extern "C" fn freestanding_func_trivial() {}
+#[inline]
+fn freestanding_func_trivial() {}
 
-unsafe extern "C" fn freestanding_func_noargs() -> usize {
+#[inline]
+fn freestanding_func_noargs() -> usize {
     0
 }
 
-unsafe extern "C" fn freestanding_func_bitsarg(a: usize) -> usize {
+#[inline]
+fn freestanding_func_bitsarg(a: usize) -> usize {
     a + 1
 }
 
-unsafe extern "C" fn freestanding_func_ref_bitsarg(usize_ref: CCallRef<usize>) -> usize {
+#[inline]
+fn freestanding_func_ref_bitsarg(usize_ref: CCallRef<usize>) -> usize {
     usize_ref.as_ref().unwrap() + 1
 }
 
-unsafe extern "C" fn freestanding_func_arrayarg(a: Array) -> usize {
+#[inline]
+fn freestanding_func_arrayarg(a: Array) -> usize {
     let elty = a.element_type();
 
     if let Ok(elty) = elty.cast::<DataType>() {
@@ -45,50 +52,49 @@ unsafe extern "C" fn freestanding_func_arrayarg(a: Array) -> usize {
     }
 }
 
-unsafe extern "C" fn freestanding_func_ref_mutarg(module_ref: CCallRef<Module>) -> usize {
+#[inline]
+fn freestanding_func_ref_mutarg(module_ref: CCallRef<Module>) -> usize {
     let _module = module_ref.as_managed().unwrap();
     //let target = module.unrooted_target();
     //module.set_global_unchecked("MyGlobal", Value::nothing(&target));
     0
 }
 
-unsafe extern "C" fn freestanding_func_ref_any(value_ref: CCallRef<AnyType>) -> usize {
+#[inline]
+fn freestanding_func_ref_any(value_ref: CCallRef<AnyType>) -> usize {
     let _dt = value_ref.as_value_ref().datatype();
     //println!("freestanding_func_ref_any {:?}", value.datatype());
     0
 }
 
-unsafe extern "C" fn freestanding_func_ref_abstract(value_ref: CCallRef<Number>) -> usize {
+#[inline]
+fn freestanding_func_ref_abstract(value_ref: CCallRef<Number>) -> usize {
     let _dt = value_ref.as_value().unwrap().datatype();
     //println!("freestanding_func_ref_abstract {:?}", value.datatype());
     0
 }
 
-unsafe extern "C" fn freestanding_func_typevaluearg(a: TypedValue<usize>) -> usize {
+#[inline]
+unsafe fn freestanding_func_typevaluearg(a: TypedValue<usize>) -> usize {
     a.unbox_unchecked::<usize>()
 }
 
-unsafe extern "C" fn freestanding_func_ret_array(dt: DataType) -> ArrayRet {
-    CCall::invoke(|mut frame| {
-        Array::new_for::<_, _>(frame.as_extended_target(), (2, 2), dt.as_value())
+#[inline]
+unsafe fn freestanding_func_ret_array(dt: DataType) -> ArrayRet {
+    CCall::stackless_invoke(|unrooted| {
+        Array::new_for::<_, _>(unrooted, (2, 2), dt.as_value())
             .unwrap()
             .leak()
     })
 }
 
-unsafe extern "C" fn freestanding_func_ret_rust_result(throw_err: Bool) -> RustResultRet<i32> {
-    CCall::invoke(|mut frame| {
-        if throw_err.as_bool() {
-            RustResult::jlrs_error(
-                frame.as_extended_target(),
-                jlrs::error::JlrsError::exception("Error"),
-            )
-        } else {
-            let v = TypedValue::new(&mut frame, 3);
-            RustResult::ok(frame.as_extended_target(), v)
-        }
-        .leak()
-    })
+#[inline]
+fn freestanding_func_ret_rust_result(throw_err: Bool) -> JlrsResult<i32> {
+    if throw_err.as_bool() {
+        Err(jlrs::error::JlrsError::exception("Error"))?
+    } else {
+        Ok(3)
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -99,39 +105,26 @@ struct OpaqueInt {
 unsafe impl OpaqueType for OpaqueInt {}
 
 impl OpaqueInt {
+    #[inline]
     fn new(value: i32) -> TypedValueRet<OpaqueInt> {
         unsafe {
-            CCall::invoke(|mut frame| TypedValue::new(&mut frame, OpaqueInt { a: value }).leak())
+            CCall::stackless_invoke(|unrooted| TypedValue::new(unrooted, OpaqueInt { a: value }).leak())
         }
     }
 
-    fn increment(&mut self) -> RustResultRet<Nothing> {
+    #[inline]
+    fn increment(&mut self) {
         self.a += 1;
-
-        unsafe {
-            CCall::invoke(|mut frame| {
-                let nothing = Value::nothing(&frame).as_typed_unchecked::<Nothing>();
-                RustResult::ok(frame.as_extended_target(), nothing).leak()
-            })
-        }
     }
 
-    fn get(&self) -> RustResultRet<i32> {
-        unsafe {
-            CCall::invoke(|mut frame| {
-                let data = TypedValue::new(&mut frame, self.a);
-                RustResult::ok(frame.as_extended_target(), data).leak()
-            })
-        }
+    #[inline]
+    fn get(&self) -> i32 {
+        self.a
     }
 
-    fn get_cloned(self) -> RustResultRet<i32> {
-        unsafe {
-            CCall::invoke(|mut frame| {
-                let data = TypedValue::new(&mut frame, self.a);
-                RustResult::ok(frame.as_extended_target(), data).leak()
-            })
-        }
+    #[inline]
+    fn get_cloned(self) -> i32 {
+        self.a
     }
 }
 
@@ -144,6 +137,7 @@ impl<T> POpaque<T>
 where
     T: 'static + Send + ConstructType + AddAssign + Copy + jlrs::convert::into_julia::IntoJulia,
 {
+    #[inline]
     fn new(value: T) -> TypedValueRet<Self> {
         unsafe {
             CCall::invoke(|mut frame| {
@@ -153,32 +147,19 @@ where
         }
     }
 
-    fn get(&self) -> RustResultRet<T> {
-        unsafe {
-            CCall::invoke(|mut frame| {
-                let data = TypedValue::new(&mut frame, self.value);
-                RustResult::ok(frame.as_extended_target(), data).leak()
-            })
-        }
+    #[inline]
+    fn get(&self) -> T {
+        self.value
     }
 
-    fn get_cloned(self) -> RustResultRet<T> {
-        unsafe {
-            CCall::invoke(|mut frame| {
-                let data = TypedValue::new(&mut frame, self.value);
-                RustResult::ok(frame.as_extended_target(), data).leak()
-            })
-        }
+    #[inline]
+    fn get_cloned(self) -> T {
+        self.value
     }
 
-    fn set(&mut self, value: T) -> RustResultRet<Nothing> {
-        unsafe {
-            CCall::invoke(|mut frame| {
-                self.value = value;
-                let nothing = Value::nothing(&frame).as_typed_unchecked::<Nothing>();
-                RustResult::ok(frame.as_extended_target(), nothing).leak()
-            })
-        }
+    #[inline]
+    fn set(&mut self, value: T) {
+        self.value = value;
     }
 }
 
@@ -208,31 +189,24 @@ where
     T: 'static + Send + ConstructType + AddAssign + Copy + jlrs::convert::into_julia::IntoJulia,
     U: 'static + Send + ConstructType + AddAssign + Copy + jlrs::convert::into_julia::IntoJulia,
 {
+    #[inline]
     fn new(value: T, value2: U) -> TypedValueRet<Self> {
         unsafe {
-            CCall::invoke(|mut frame| {
+            CCall::stackless_invoke(|unrooted| {
                 let data = POpaqueTwo { value, value2 };
-                TypedValue::new(&mut frame, data).leak()
+                TypedValue::new(unrooted, data).leak()
             })
         }
     }
 
-    fn get_v1(&self) -> RustResultRet<T> {
-        unsafe {
-            CCall::invoke(|mut frame| {
-                let data = TypedValue::new(&mut frame, self.value);
-                RustResult::ok(frame.as_extended_target(), data).leak()
-            })
-        }
+    #[inline]
+    fn get_v1(&self) -> T {
+        self.value
     }
 
-    fn get_v2(&self) -> RustResultRet<U> {
-        unsafe {
-            CCall::invoke(|mut frame| {
-                let data = TypedValue::new(&mut frame, self.value2);
-                RustResult::ok(frame.as_extended_target(), data).leak()
-            })
-        }
+    #[inline]
+    fn get_v2(&self) -> U {
+        self.value2
     }
 }
 
@@ -256,17 +230,19 @@ where
 unsafe impl Send for ForeignThing {}
 
 unsafe impl ForeignType for ForeignThing {
+    #[inline]
     fn mark(ptls: jlrs::memory::PTls, data: &Self) -> usize {
         unsafe { mark_queue_obj(ptls, data.a) as usize }
     }
 }
 
 impl ForeignThing {
+    #[inline]
     fn new(value: Value) -> TypedValueRet<ForeignThing> {
         unsafe {
-            CCall::invoke(|mut frame| {
+            CCall::stackless_invoke(|unrooted| {
                 TypedValue::new(
-                    &mut frame,
+                    &unrooted,
                     ForeignThing {
                         a: value.assume_owned().leak(),
                     },
@@ -276,23 +252,16 @@ impl ForeignThing {
         }
     }
 
-    fn get(&self) -> RustResultRet<AnyType> {
-        unsafe {
-            let leaked = self.a.assume_owned().leak();
-            let typed = TypedValueRef::<AnyType>::from_value_ref(leaked).as_managed();
-            CCall::invoke(|mut frame| RustResult::ok(frame.as_extended_target(), typed).leak())
-        }
+    #[inline]
+    fn get(&self) -> ValueRet {
+        unsafe { self.a.assume_owned().leak() }
     }
 
-    fn set(&mut self, value: Value) -> RustResultRet<Nothing> {
+    #[inline]
+    fn set(&mut self, value: Value) {
         unsafe {
             self.a = value.assume_owned().leak();
             write_barrier(self, value);
-
-            CCall::invoke(|mut frame| {
-                let nothing = Value::nothing(&frame).as_typed_unchecked::<Nothing>();
-                RustResult::ok(frame.as_extended_target(), nothing).leak()
-            })
         }
     }
 }
@@ -300,24 +269,30 @@ impl ForeignThing {
 struct UnexportedType;
 
 impl UnexportedType {
+    #[inline]
     fn assoc_func() -> isize {
         1
     }
 }
 
+#[inline]
 fn async_callback(arr: TypedArrayUnbound<isize>) -> JlrsResult<impl AsyncCallback<isize>> {
     let arr = arr.track_shared_unbound()?;
     Ok(move || Ok(arr.as_slice().iter().sum()))
 }
 
+#[inline]
 fn async_callback_init_err() -> JlrsResult<impl AsyncCallback<isize>> {
     Err(JlrsError::exception("Err"))?;
     Ok(move || Ok(0))
 }
 
+#[inline]
 fn async_callback_callback_err() -> JlrsResult<impl AsyncCallback<isize>> {
     Ok(move || Err(JlrsError::exception("Err"))?)
 }
+
+#[inline]
 fn generic_async_callback<T>(t: T) -> JlrsResult<impl AsyncCallback<T>>
 where
     T: jlrs::convert::into_julia::IntoJulia
@@ -327,11 +302,13 @@ where
     Ok(move || Ok(t))
 }
 
-unsafe extern "C" fn has_generic<T>(t: T) -> T {
+#[inline]
+fn has_generic<T>(t: T) -> T {
     t
 }
 
-unsafe extern "C" fn has_two_generics<T, U>(t: T, _u: U) -> T {
+#[inline]
+fn has_two_generics<T, U>(t: T, _u: U) -> T {
     t
 }
 
@@ -343,6 +320,7 @@ julia_module! {
 
     fn freestanding_func_trivial();
     fn freestanding_func_noargs() -> usize;
+
     fn freestanding_func_bitsarg(a: usize) -> usize;
     fn freestanding_func_arrayarg(a: Array) -> usize;
     fn freestanding_func_ref_bitsarg(usize_ref: CCallRef<usize>) -> usize;
@@ -351,18 +329,28 @@ julia_module! {
     fn freestanding_func_ref_abstract(value_ref: CCallRef<Number>) -> usize;
     fn freestanding_func_typevaluearg(a: TypedValue<usize>) -> usize;
     fn freestanding_func_ret_array(dt: DataType) -> ArrayRet;
-    fn freestanding_func_ret_rust_result(throw_err: Bool) -> RustResultRet<i32>;
+    fn freestanding_func_ret_rust_result(throw_err: Bool) -> JlrsResult<i32>;
 
     struct OpaqueInt;
     in OpaqueInt fn new(value: i32) -> TypedValueRet<OpaqueInt> as OpaqueInt;
-    in OpaqueInt fn increment(&mut self) -> RustResultRet<Nothing> as increment!;
-    in OpaqueInt fn get(&self) -> RustResultRet<i32> as unbox_opaque;
-    in OpaqueInt fn get_cloned(self) -> RustResultRet<i32>;
+    in OpaqueInt fn increment(&mut self) as increment!;
+    #[untracked_self]
+    in OpaqueInt fn increment(&mut self) as increment_unchecked!;
+    
+    #[untracked_self]
+    #[gc_safe]
+    in OpaqueInt fn increment(&mut self) as increment_unchecked_nogc!;
+    in OpaqueInt fn get(&self) -> i32 as unbox_opaque;
+
+    #[untracked_self]
+    in OpaqueInt fn get(&self) -> i32 as unbox_opaque_untracked;
+    in OpaqueInt fn get_cloned(self) -> i32;
 
     struct ForeignThing;
     in ForeignThing fn new(value: Value) -> TypedValueRet<ForeignThing> as ForeignThing;
-    in ForeignThing fn get(&self) -> RustResultRet<AnyType> as extract_inner;
-    in ForeignThing fn set(&mut self, value: Value) -> RustResultRet<Nothing> as set_inner!;
+
+    in ForeignThing fn get(&self) -> ValueRet as extract_inner;
+    in ForeignThing fn set(&mut self, value: Value) as set_inner!;
 
     in UnexportedType fn assoc_func() -> isize;
 
@@ -379,19 +367,21 @@ julia_module! {
         struct POpaque<T>;
 
         in POpaque<T> fn new(value: T) -> TypedValueRet<POpaque<T>> as POpaque;
-        #[jlrs(untracked)]
-        in POpaque<T> fn get(&self) -> RustResultRet<T> as popaque_get;
-        in POpaque<T> fn get_cloned(self) -> RustResultRet<T> as popaque_get_cloned;
-        in POpaque<T> fn set(&mut self, value: T) -> RustResultRet<Nothing> as popaque_set;
+        in POpaque<T> fn get(&self) -> T as popaque_get;
+        in POpaque<T> fn get_cloned(self) -> T as popaque_get_cloned;
+        in POpaque<T> fn set(&mut self, value: T) as popaque_set;
 
+        #[doc = "    generic_async_callback{T}(t::T)::T"]
+        #[doc = ""]
+        #[doc = "...docs for generic_async_callback"]
         async fn generic_async_callback<T>(t: T) -> JlrsResult<impl AsyncCallback<T>>;
 
         for U in [T, i32] {
             struct POpaqueTwo<T, U>;
 
             in POpaqueTwo<T, U> fn new(value: T, value2: U) -> TypedValueRet<POpaqueTwo<T, U>> as POpaqueTwo;
-            in POpaqueTwo<T, U> fn get_v1(&self) -> RustResultRet<T> as get_v1;
-            in POpaqueTwo<T, U> fn get_v2(&self) -> RustResultRet<U> as get_v2;
+            in POpaqueTwo<T, U> fn get_v1(&self) -> T as get_v1;
+            in POpaqueTwo<T, U> fn get_v2(&self) -> U as get_v2;
 
             fn has_two_generics<T, U>(t: T, u: U) -> T;
         }

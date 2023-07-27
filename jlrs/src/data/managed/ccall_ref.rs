@@ -37,10 +37,8 @@ use crate::{
         },
     },
     error::{JlrsError, JlrsResult, TypeError, CANNOT_DISPLAY_TYPE},
-    memory::target::{
-        frame::{BorrowedFrame, GcFrame},
-        unrooted::Unrooted,
-    },
+    memory::target::unrooted::Unrooted,
+    prelude::Target,
 };
 
 #[repr(C)]
@@ -95,12 +93,12 @@ where
     /// `T` must be an immutable, concrete type. Unlike [`CCallRef::as_ref`] this method
     /// constructs the type associated with `T` to check if the layout is correct.
     #[inline]
-    pub fn as_ref_check_constructed<'current>(
-        &self,
-        frame: BorrowedFrame<'_, 'current, GcFrame<'current>>,
-    ) -> JlrsResult<&'scope T> {
-        frame.scope(|mut frame| unsafe {
-            let ty = T::construct_type(frame.as_extended_target());
+    pub fn as_ref_check_constructed<'target, Tgt>(&self, target: &Tgt) -> JlrsResult<&'scope T>
+    where
+        Tgt: Target<'target>,
+    {
+        target.with_local_scope::<_, _, 1>(|_, mut frame| unsafe {
+            let ty = T::construct_type(&mut frame);
 
             if ty.is::<DataType>() {
                 let base_dt = ty.cast_unchecked::<DataType>();
@@ -183,12 +181,12 @@ where
     /// `T` must be an immutable, concrete type. Unlike [`CCallRef::as_ref_to`] this method
     /// constructs the type associated with `T` to check if the layout is correct.
     #[inline]
-    pub fn as_ref_to_check_constructed<'current, U: ValidLayout>(
+    pub fn as_ref_to_check_constructed<'target, U: ValidLayout, Tgt: Target<'target>>(
         &self,
-        frame: BorrowedFrame<'_, 'current, GcFrame<'current>>,
+        target: Tgt,
     ) -> JlrsResult<&U> {
-        frame.scope(|mut frame| unsafe {
-            let ty = T::construct_type(frame.as_extended_target());
+        target.with_local_scope::<_, _, 1>(|_, mut frame| unsafe {
+            let ty = T::construct_type(&mut frame);
 
             if ty.is::<DataType>() {
                 let base_dt = ty.cast_unchecked::<DataType>();
@@ -211,7 +209,6 @@ where
     /// Access the referenced data as a `Value`.
     ///
     /// Only the base type of `T` is used to check if the data is passed as a `Value`.
-    #[inline]
     pub fn as_value(&self) -> JlrsResult<Value<'scope, 'static>> {
         unsafe {
             let unrooted = Unrooted::new();
@@ -249,13 +246,12 @@ where
     ///
     /// Unlike [`CCallRef::as_value`] this method constructs the type associated with `T` to check
     /// if the layout is correct.
-    #[inline]
-    pub fn as_value_check_constructed<'current>(
+    pub fn as_value_check_constructed<'target, Tgt: Target<'target>>(
         &self,
-        frame: BorrowedFrame<'_, 'current, GcFrame<'current>>,
+        target: &Tgt,
     ) -> JlrsResult<Value<'scope, 'static>> {
-        frame.scope(|mut frame| unsafe {
-            let ty = T::construct_type(frame.as_extended_target());
+        target.with_local_scope::<_, _, 1>(|_, mut frame| unsafe {
+            let ty = T::construct_type(&mut frame);
 
             if ty.is::<DataType>() {
                 let base_dt = ty.cast_unchecked::<DataType>();
