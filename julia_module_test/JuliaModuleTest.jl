@@ -112,6 +112,9 @@ end
 
     p64 = JuliaModuleTest.POpaque(Float64(1.0))
     @test JuliaModuleTest.popaque_get(p64) === Float64(1.0)
+
+    p64 = JuliaModuleTest.POpaque64(Float64(1.0))
+    @test JuliaModuleTest.popaque_get(p64) === Float64(1.0)
 end
 
 @testset "has_generic" begin

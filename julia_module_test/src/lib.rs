@@ -336,7 +336,7 @@ julia_module! {
     in OpaqueInt fn increment(&mut self) as increment!;
     #[untracked_self]
     in OpaqueInt fn increment(&mut self) as increment_unchecked!;
-    
+
     #[untracked_self]
     #[gc_safe]
     in OpaqueInt fn increment(&mut self) as increment_unchecked_nogc!;
@@ -391,4 +391,7 @@ julia_module! {
     static CONST_U8: u8 as STATIC_CONST_U8;
     const STATIC_U8: u8 as CONST_STATIC_U8;
     static STATIC_U8: u8;
+
+    type POpaque64 = POpaque<f64>;
+    in POpaque<f64> fn new(value: f64) -> TypedValueRet<POpaque<f64>> as POpaque64
 }

@@ -22,8 +22,6 @@ use crate::module::parameters::{as_return_as, take_type};
 
 type RenameFragments = Punctuated<Ident, Token![.]>;
 
-// todo: generic docs
-
 struct InitFn {
     _become_token: Token![become],
     init_fn: Ident,
@@ -805,6 +803,29 @@ impl Parse for ExportedGlobal {
     }
 }
 
+struct ExportedAlias {
+    _type_token: Token![type],
+    name: Ident,
+    _is: Token![=],
+    ty: Type,
+}
+
+impl Parse for ExportedAlias {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let type_token = input.parse()?;
+        let name = input.parse()?;
+        let is = input.parse()?;
+        let ty = input.parse()?;
+
+        Ok(ExportedAlias {
+            _type_token: type_token,
+            name,
+            _is: is,
+            ty,
+        })
+    }
+}
+
 struct ItemWithAttrs {
     attrs: Vec<Attribute>,
     item: Box<ModuleItem>,
@@ -1147,6 +1168,7 @@ enum ModuleItem {
     ExportedGlobal(ExportedGlobal),
     ItemWithAttrs(ItemWithAttrs),
     ExportedGenerics(ExportedGenerics),
+    ExportedAlias(ExportedAlias),
 }
 
 impl ModuleItem {
@@ -1270,6 +1292,26 @@ impl ModuleItem {
         }
     }
 
+    fn is_exported_alias(&self) -> bool {
+        match self {
+            ModuleItem::ExportedAlias(_) => true,
+            ModuleItem::ItemWithAttrs(ItemWithAttrs { item, .. }) if item.is_exported_alias() => {
+                true
+            }
+            _ => false,
+        }
+    }
+
+    fn get_exported_alias(&self) -> &ExportedAlias {
+        match self {
+            ModuleItem::ExportedAlias(ref exported_alias) => exported_alias,
+            ModuleItem::ItemWithAttrs(ItemWithAttrs { item, .. }) if item.is_exported_alias() => {
+                item.get_exported_alias()
+            }
+            _ => panic!(),
+        }
+    }
+
     fn is_exported_global(&self) -> bool {
         match self {
             ModuleItem::ExportedGlobal(_) => true,
@@ -1365,6 +1407,8 @@ impl Parse for ModuleItem {
             input.parse().map(ModuleItem::ExportedAsyncCallback)
         } else if lookahead.peek(Token![const]) {
             input.parse().map(ModuleItem::ExportedConst)
+        } else if lookahead.peek(Token![type]) {
+            input.parse().map(ModuleItem::ExportedAlias)
         } else if lookahead.peek(Token![static]) {
             input.parse().map(ModuleItem::ExportedGlobal)
         } else if lookahead.peek(Token![#]) {
@@ -1408,6 +1452,7 @@ impl JuliaModule {
         let type_fragments = TypeFragments::generate(&self, init_fn);
         let generic_type_fragments = TypeFragments::generate_generic(&self, init_fn);
         let const_fragments = ConstFragments::generate(&self, init_fn);
+        let alias_fragments = AliasFragments::generate(&self, init_fn);
         let global_fragments = GlobalFragments::generate(&self, init_fn);
         let doc_fragments = DocFragments::generate(&self, init_fn)?;
 
@@ -1435,6 +1480,8 @@ impl JuliaModule {
             generic_async_callback_fragments.init_async_callbacks_fn_ident;
         let const_init_fn = const_fragments.const_init_fn;
         let const_init_fn_ident = const_fragments.const_init_ident;
+        let alias_init_fn = alias_fragments.alias_init_fn;
+        let alias_init_fn_ident = alias_fragments.alias_init_ident;
         let global_init_fn = global_fragments.global_init_fn;
         let global_init_fn_ident = global_fragments.global_init_ident;
         let doc_init_fn = doc_fragments.init_docs_fn;
@@ -1459,6 +1506,12 @@ impl JuliaModule {
         let invoke_const_init: Expr = parse_quote! {
             if precompiling == 1 {
                 #const_init_fn_ident(&mut frame, module);
+            }
+        };
+
+        let invoke_alias_init: Expr = parse_quote! {
+            if precompiling == 1 {
+                #alias_init_fn_ident(&frame, module);
             }
         };
 
@@ -1496,6 +1549,8 @@ impl JuliaModule {
                 #generic_async_callback_init_fn
 
                 #const_init_fn
+
+                #alias_init_fn
 
                 #global_init_fn
 
@@ -1543,6 +1598,7 @@ impl JuliaModule {
                     #invoke_generic_type_init;
                     #invoke_const_init;
                     #invoke_global_init;
+                    #invoke_alias_init;
 
                     let mut arr = ::jlrs::data::managed::array::Array::new_for_unchecked(&mut frame, 0, function_info_ty.as_value());
                     #function_init_fn_ident(&mut frame, &mut arr, module, function_info_ty);
@@ -1618,6 +1674,13 @@ impl JuliaModule {
             .iter()
             .filter(|it| it.is_exported_const())
             .map(|it| it.get_exported_const())
+    }
+
+    fn get_exported_aliases(&self) -> impl Iterator<Item = &ExportedAlias> {
+        self.items
+            .iter()
+            .filter(|it| it.is_exported_alias())
+            .map(|it| it.get_exported_alias())
     }
 
     fn get_exported_globals(&self) -> impl Iterator<Item = &ExportedGlobal> {
@@ -2072,6 +2135,35 @@ impl ConstFragments {
     }
 }
 
+struct AliasFragments {
+    alias_init_fn: ItemFn,
+    alias_init_ident: Ident,
+}
+
+impl AliasFragments {
+    fn generate(module: &JuliaModule, init_fn: &InitFn) -> Self {
+        let alias_init_ident = format_ident!("{}_aliases", init_fn.init_fn);
+
+        let const_init_fragments = module.get_exported_aliases().map(alias_info_fragment);
+
+        let alias_init_fn = parse_quote! {
+            unsafe fn #alias_init_ident(
+                frame: &::jlrs::memory::target::frame::GcFrame,
+                module: ::jlrs::data::managed::module::Module,
+            ) {
+                #(
+                    #const_init_fragments
+                )*
+            }
+        };
+
+        AliasFragments {
+            alias_init_ident,
+            alias_init_fn,
+        }
+    }
+}
+
 struct GlobalFragments {
     global_init_fn: ItemFn,
     global_init_ident: Ident,
@@ -2308,6 +2400,10 @@ fn doc_info_fragment((index, info): (usize, &ItemWithAttrs)) -> Result<Expr> {
 
             Ok(q)
         }
+        ModuleItem::ExportedAlias(a) => Err(syn::Error::new_spanned(
+            a.name.to_token_stream(),
+            "type alias cannot be documented",
+        ))?,
         ModuleItem::ItemWithAttrs(_) => unreachable!(),
         ModuleItem::ExportedGenerics(_) => unreachable!(),
     }
@@ -2872,6 +2968,20 @@ fn const_info_fragment(info: &ExportedConst) -> Expr {
                 Ok(())
 
             }).unwrap();
+        }
+    }
+}
+
+fn alias_info_fragment(info: &ExportedAlias) -> Expr {
+    let name = &info.name.to_string();
+    let ty = &info.ty;
+
+    parse_quote! {
+        {
+            unsafe {
+                let value = <#ty as ::jlrs::data::types::construct_type::ConstructType>::construct_type(&frame).as_value();
+                module.set_const_unchecked(#name, value);
+            }
         }
     }
 }

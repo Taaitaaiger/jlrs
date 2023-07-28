@@ -1,14 +1,14 @@
+#[julia_version(windows_lts = false)]
+use std::ptr::NonNull;
 use std::{
     any::Any,
     ffi::c_void,
     hint::unreachable_unchecked,
     mem::MaybeUninit,
     panic::{catch_unwind, AssertUnwindSafe},
-    ptr::{null_mut, NonNull},
+    ptr::null_mut,
 };
 
-#[julia_version(windows_lts = true)]
-use jl_sys::jl_current_exception;
 #[julia_version(windows_lts = false)]
 use jl_sys::jlrs_catch_tag_t_JLRS_CATCH_EXCEPTION;
 use jl_sys::{
@@ -19,14 +19,16 @@ use jlrs_macros::julia_version;
 
 #[julia_version(windows_lts = true)]
 use crate::{
+    call::Call,
     data::managed::module::JlrsCore,
     prelude::{Target, Value},
 };
-use crate::{data::managed::private::ManagedPriv, prelude::Managed, private::Private};
 #[julia_version(windows_lts = false)]
 use crate::{
+    data::managed::{Managed, private::ManagedPriv},
     memory::target::unrooted::Unrooted,
     prelude::{Target, Value},
+    private::Private,
 };
 
 /// Call `func`, if an exception is thrown it is caught and `exception_handler` is called. The
@@ -93,44 +95,40 @@ where
 
     // The JL_TRY and JL_CATCH macros don't work when Julia 1.6 is used on Windows, so we're
     // going to jump back to Rust code from Julia rather than C.
-    let caller = *(JlrsCore::call_catch_wrapper_c(&unrooted)
-        .data_ptr()
-        .cast::<unsafe extern "C-unwind" fn(
-            *mut c_void,
-            *mut c_void,
-            *mut c_void,
-            *mut c_void,
-        ) -> jlrs_catch_t>()
-        .as_ptr());
-
+    let caller = JlrsCore::call_catch_wrapper(&unrooted);
     let trampoline = std::mem::transmute::<_, *mut c_void>(trampoline);
 
-    let result_ref = &mut result;
-    let res = caller(
-        jlrs_catch_wrapper as *mut c_void,
-        func as *mut _ as *mut c_void,
-        trampoline,
-        result_ref as *mut _ as *mut _,
-    );
+    let res = unrooted
+        .with_local_scope::<_, _, 4>(|target, mut frame| {
+            let result = &mut result;
 
-    let exc = jl_current_exception();
+            let catch_wrapper = Value::new(&mut frame, jlrs_catch_wrapper as *mut c_void);
+            let func = Value::new(&mut frame, func as *mut _ as *mut c_void);
+            let trampoline = Value::new(&mut frame, trampoline);
+            let result = Value::new(&mut frame, result as *mut _ as *mut c_void);
 
-    if exc.is_null() {
-        match res.tag {
-            x if x == jlrs_catch_tag_t_JLRS_CATCH_OK => Ok(result.assume_init()),
-            x if x == jlrs_catch_tag_t_JLRS_CATCH_PANIC => {
-                let err: Box<Box<dyn Any + Send>> = Box::from_raw(res.error.cast());
-                std::panic::resume_unwind(err)
+            Ok(caller.call(target, [catch_wrapper, func, trampoline, result]))
+        })
+        .unwrap_unchecked();
+
+    match res {
+        Ok(res) => {
+            let res = res.ptr().cast::<jlrs_catch_t>().as_ref();
+            match res.tag {
+                x if x == jlrs_catch_tag_t_JLRS_CATCH_OK => Ok(result.assume_init()),
+                x if x == jlrs_catch_tag_t_JLRS_CATCH_PANIC => {
+                    let err: Box<Box<dyn Any + Send>> = Box::from_raw(res.error.cast());
+                    std::panic::resume_unwind(err)
+                }
+                _ => unreachable_unchecked(),
             }
-            _ => unreachable_unchecked(),
         }
-    } else {
-        unrooted
+        Err(exc) => unrooted
             .local_scope::<_, _, 1>(|frame| {
-                let value = Value::wrap_non_null(NonNull::new_unchecked(exc), Private).root(frame);
+                let value = exc.root(frame);
                 Ok(Err(exception_handler(value)))
             })
-            .unwrap_unchecked()
+            .unwrap_unchecked(),
     }
 }
 
