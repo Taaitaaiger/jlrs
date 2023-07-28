@@ -219,7 +219,8 @@ In addition to these runtimes, the following utility features are available:
   Flag that must be enabled when compiling with BinaryBuilder.
 
 You can enable all features except `debug`, `i686`, `windows`, `no-link` and `yggdrasil` by
-enabling the `full` feature.
+enabling the `full` feature. If you don't want to enable any runtimes either, you can use
+`full-no-rt`.
 
 
 ## Using this crate
@@ -587,6 +588,8 @@ to your crate's `Cargo.toml`. It's also recommended to abort on panic:
 panic = "abort"
 ```
 
+You must not enable any runtime features.
+
 The easiest way to export Rust functions like `call_me` from the previous example is by
 using the `julia_module` macro. The content of the macro is converted to an initialization
 function that can be called from Julia to generate the module.
@@ -622,7 +625,7 @@ function:
 @assert CallMe.call_me(false) == -1
 ```
 
-This macro has many more capabilities than just exporting extern "C" functions, for more
+This macro has many more capabilities than just exporting functions, for more
 information see the [documentation](https://docs.rs/jlrs-macros/latest/jlrs_macros/macro.julia_module.html). A practical example that uses this macro is the
 [rustfft-jl](https://github.com/Taaitaaiger/rustfft-jl) crate, which uses this macro to expose RustFFT to Julia. The recipe for
 BinaryBuilder can be found [here](https://github.com/JuliaPackaging/Yggdrasil/tree/master/R/rustfft).

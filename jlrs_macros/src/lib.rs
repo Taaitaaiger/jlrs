@@ -63,7 +63,13 @@ use self::version::emit_if_compatible;
 ///     //
 ///     // If a method takes `self` in some way, it is tracked by default. You can opt out of this
 ///     // behavior with the `#[untracked_self]` attribute.
+///     #[untracked_self]
 ///     in MyType fn add(&mut self, incr: u32) -> RustResultRet<u32>  as increment!;
+/// 
+///     // Exports the alias `MyTypeAlias` for `MyType`.
+///     //
+///     // This is exposes as `const MyTypeAlias = MyType`.
+///     type MyTypeAlias = MyType;
 ///
 ///     // Exports the function `long_running_func`, the returned closure is executed on another
 ///     // thread.
@@ -78,6 +84,8 @@ use self::version::emit_if_compatible;
 ///     // for `(Typed)Value` and `(Typed)Array` with static lifetimes. The generated Julia
 ///     // function guarantees all data passed as an argument lives at least until the closure has
 ///     // finished, the tracked data must only be shared with that closure.
+///     //
+///     // In practice calling a function annotated with `#[gc_safe]` is much more performant.
 ///     async fn long_running_func(
 ///         array: ArrayUnbound
 ///     ) -> JlrsResult<impl AsyncCallback<i32>>;

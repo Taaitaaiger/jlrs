@@ -214,7 +214,8 @@
 //!   Flag that must be enabled when compiling with BinaryBuilder.
 //!
 //! You can enable all features except `debug`, `i686`, `windows`, `no-link` and `yggdrasil` by
-//! enabling the `full` feature.
+//! enabling the `full` feature. If you don't want to enable any runtimes either, you can use
+//! `full-no-rt`.
 //!
 //!
 //! # Using this crate
@@ -589,6 +590,8 @@
 //! [profile.release]
 //! panic = "abort"
 //! ```
+//!
+//! You must not enable any runtime features.
 //!
 //! The easiest way to export Rust functions like `call_me` from the previous example is by
 //! using the [`julia_module`] macro. The content of the macro is converted to an initialization

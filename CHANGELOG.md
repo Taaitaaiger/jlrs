@@ -42,6 +42,10 @@
 
 - `Call::call_unchecked` has been added to call a Julia function without catching the exception if one is thrown.
 
+- Type aliases can be defined with the `julia_module` macro.
+
+- The `full-no-rt` feature has been added to allow selecting all features except runtimes.
+
 
 #### v0.18
 

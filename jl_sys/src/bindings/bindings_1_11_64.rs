@@ -1,4 +1,4 @@
-/* generated from julia version 1.11.0-DEV (Commit: ff14eafd80 2023-07-26 13:34 UTC) */
+/* generated from julia version 1.11.0-DEV (Commit: 62605cc40f 2023-07-27 17:35 UTC) */
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct __BindgenBitfieldUnit<Storage> {

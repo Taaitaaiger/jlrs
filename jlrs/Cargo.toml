@@ -22,6 +22,8 @@ default = ["prelude"]
 # Enable all features except any version features
 full = ["prelude", "sync-rt", "tokio-rt", "async-std-rt", "jlrs-ndarray", "f16", "pyplot", "internal-types", "uv", "jlrs-derive"]
 
+# Enable all features except any version features or runtimes
+full-no-rt = ["prelude", "async", "jlrs-ndarray", "f16", "pyplot", "internal-types", "uv", "jlrs-derive"]
 
 # Runtimes
 
@@ -73,6 +75,8 @@ julia-1-8 = ["jl-sys/julia-1-8", "jlrs-macros/julia-1-8"]
 julia-1-9 = ["jl-sys/julia-1-9", "jlrs-macros/julia-1-9"]
 # Link Julia 1.10
 julia-1-10 = ["jl-sys/julia-1-10", "jlrs-macros/julia-1-10"]
+# Link Julia 1.11
+julia-1-11 = ["jl-sys/julia-1-11", "jlrs-macros/julia-1-11"]
 
 
 # Target or link a specific Julia build or arch.
@@ -100,8 +104,8 @@ docs = ["jl-sys/docs", "full", "julia-1-10"]
 
 [dependencies]
 cfg-if = "1"
-jl-sys = { version = "0.21", path = "../jl_sys" }
-jlrs-macros = { version = "0.1", path = "../jlrs_macros" }
+jl-sys = { version = "0.22", path = "../jl_sys" }
+jlrs-macros = { version = "0.2", path = "../jlrs_macros" }
 smallvec = {version = "1", features = ["const_generics"]}
 thiserror = "1"
 atomic = "0.5"
@@ -109,8 +113,8 @@ hashers = "1"
 once_cell = "1"
 parking_lot = "0.12"
 fxhash = "0.2"
-spin = {version = "0.9", features = ["rwlock"]}
-lock_api = {version = "0.4", features = []}
+lock_api = "0.4"
+fnv = "1"
 
 threadpool = { version = "1", optional = true }
 async-std = { version = "1.12", features = ["unstable"], optional = true }
@@ -122,8 +126,6 @@ ndarray = { version = "0.15", optional = true }
 tokio = { version = "1", optional = true, features = ["rt", "time", "sync"]}
 deadqueue = { version = "0.2", optional = true, features = ["resizable"]}
 futures-concurrency = { version = "7", optional = true }
-lazy_static = "1"
-fnv = "1"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "rt", "time", "sync"]}

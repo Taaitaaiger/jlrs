@@ -80,7 +80,7 @@ function print_help() {
     echo "When the beta flag is set, the following is expected:"
     echo ""
     echo -e "\033[1m        Version             Default path${spacing}Override\033[0m"
-    echo "    Linux 64-bit 1.10   $HOME/julia-1.10.0-alpha1     JULIA_1_10_DIR"
+    echo "    Linux 64-bit 1.10   $HOME/julia-1.10.0-beta1      JULIA_1_10_DIR"
     echo ""
     echo ""
     echo "All dependencies must have been installed before running this script. The"
@@ -125,7 +125,7 @@ fi
 
 if [ "${BETA}" = "y" -o "${ALL}" = "y" ]; then
     if [ -z "$JULIA_BETA_DIR" ]; then
-        JULIA_BETA_DIR=${HOME}/julia-1.10.0-alpha1
+        JULIA_BETA_DIR=${HOME}/julia-1.10.0-beta1
     fi
     if [ ! -d "$JULIA_BETA_DIR" ]; then
         echo "Error: $JULIA_BETA_DIR does not exist" >&2
