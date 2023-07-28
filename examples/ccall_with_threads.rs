@@ -16,6 +16,7 @@ use thread::JoinHandle;
 #[repr(transparent)]
 pub struct UvHandle(*mut c_void);
 unsafe impl Send for UvHandle {}
+unsafe impl Sync for UvHandle {}
 
 /// This function spawns a new thread, sleeps for a second, stores a result, and wakes Julia.
 ///

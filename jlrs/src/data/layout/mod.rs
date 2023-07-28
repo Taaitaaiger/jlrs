@@ -29,13 +29,15 @@ macro_rules! impl_ccall_arg {
 macro_rules! impl_construct_julia_type {
     ($ty:ty, $jl_ty:ident) => {
         unsafe impl $crate::data::types::construct_type::ConstructType for $ty {
-            fn construct_type<'target, T>(
-                target: $crate::memory::target::ExtendedTarget<'target, '_, '_, T>,
-            ) -> $crate::data::managed::value::ValueData<'target, 'static, T>
+            type Static = $ty;
+
+            #[inline]
+            fn construct_type_uncached<'target, Tgt>(
+                target: Tgt,
+            ) -> $crate::data::managed::value::ValueData<'target, 'static, Tgt>
             where
-                T: $crate::memory::target::Target<'target>,
+                Tgt: $crate::memory::target::Target<'target>,
             {
-                let (target, _) = target.split();
                 unsafe {
                     let ptr =
                         ::std::ptr::NonNull::new_unchecked($jl_ty.cast::<::jl_sys::jl_value_t>());
@@ -43,6 +45,7 @@ macro_rules! impl_construct_julia_type {
                 }
             }
 
+            #[inline]
             fn base_type<'target, Tgt>(_target: &Tgt) -> Option<$crate::data::managed::value::Value<'target, 'static>>
             where
                 Tgt: $crate::memory::target::Target<'target>,
@@ -61,9 +64,11 @@ pub mod bool;
 pub mod char;
 #[cfg(feature = "f16")]
 pub mod f16;
+pub mod is_bits;
 pub mod nothing;
 #[cfg(feature = "internal-types")]
 pub mod ssa_value;
 pub mod tuple;
+pub mod typed_layout;
 pub mod union;
 pub mod valid_layout;

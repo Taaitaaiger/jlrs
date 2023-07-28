@@ -58,7 +58,7 @@ use crate::{
 ///         let b = Value::new(&mut frame, self.b);
 ///
 ///         let func = Module::base(&frame).function(&mut frame, "+")?;
-///         unsafe { func.call_async(&mut frame, &mut [a, b]) }
+///         unsafe { func.call_async(&mut frame, [a, b]) }
 ///             .await
 ///             .into_jlrs_result()?
 ///             .unbox::<u64>()
@@ -149,8 +149,8 @@ pub trait AsyncTask: 'static + Send {
 ///         // A `Vec` can be moved from Rust to Julia if the element type
 ///         // implements `IntoJulia`.
 ///         let data = vec![0usize; self.n_values];
-///         let array = TypedArray::from_vec(frame.as_extended_target(), data, self.n_values)?
-///             .into_jlrs_result()?;
+///         let array =
+///             TypedArray::from_vec(&mut frame, data, self.n_values)?.into_jlrs_result()?;
 ///
 ///         Ok(AccumulatorTaskState { array, offset: 0 })
 ///     }
@@ -270,102 +270,11 @@ pub trait PersistentTask: 'static + Send {
     }
 }
 
-/*
-/// The thread-affinity of a task.
-///
-/// If the affinity of a task is set to `Main` the task is always scheduled on the main runtime
-/// thread. If no worker threads are used the affinity is irrelevant.
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub enum Affinity {
-    Main,
-    Any,
-}
-
-#[cfg(feature = "async-rt")]
-impl Affinity {
-    pub(crate) async fn schedule(
-        self,
-        sender: &Sender<Message>,
-        msg: Box<dyn PendingTaskEnvelope>,
-    ) {
-        match self {
-            Affinity::Any => sender.send(MessageInner::Task(msg).wrap()).await,
-            Affinity::Main => sender.send_main(MessageInner::Task(msg).wrap()).await,
-        }
-    }
-
-    pub(crate) fn try_schedule(
-        self,
-        sender: &Sender<Message>,
-        msg: Box<dyn PendingTaskEnvelope>,
-    ) -> JlrsResult<()> {
-        match self {
-            Affinity::Any => sender.try_send(MessageInner::Task(msg).wrap()),
-            Affinity::Main => sender.try_send_main(MessageInner::Task(msg).wrap()),
-        }
-    }
-
-    pub(crate) async fn schedule_blocking(
-        self,
-        sender: &Sender<Message>,
-        msg: Box<dyn BlockingTaskEnvelope>,
-    ) {
-        match self {
-            Affinity::Any => sender.send(MessageInner::BlockingTask(msg).wrap()).await,
-            Affinity::Main => {
-                sender
-                    .send_main(MessageInner::BlockingTask(msg).wrap())
-                    .await
-            }
-        }
-    }
-
-    pub(crate) fn try_schedule_blocking(
-        self,
-        sender: &Sender<Message>,
-        msg: Box<dyn BlockingTaskEnvelope>,
-    ) -> JlrsResult<()> {
-        match self {
-            Affinity::Any => sender.try_send(MessageInner::BlockingTask(msg).wrap()),
-            Affinity::Main => sender.try_send_main(MessageInner::BlockingTask(msg).wrap()),
-        }
-    }
-
-    pub(crate) async fn schedule_post_blocking(
-        self,
-        sender: &Sender<Message>,
-        msg: Box<dyn BlockingTaskEnvelope>,
-    ) {
-        match self {
-            Affinity::Any => {
-                sender
-                    .send(MessageInner::PostBlockingTask(msg).wrap())
-                    .await
-            }
-            Affinity::Main => {
-                sender
-                    .send_main(MessageInner::PostBlockingTask(msg).wrap())
-                    .await
-            }
-        }
-    }
-
-    pub(crate) fn try_schedule_post_blocking(
-        self,
-        sender: &Sender<Message>,
-        msg: Box<dyn BlockingTaskEnvelope>,
-    ) -> JlrsResult<()> {
-        match self {
-            Affinity::Any => sender.try_send(MessageInner::PostBlockingTask(msg).wrap()),
-            Affinity::Main => sender.try_send_main(MessageInner::PostBlockingTask(msg).wrap()),
-        }
-    }
-}
- */
 /// Yield the current Julia task.
 ///
 /// Calling this function allows Julia to switch to another Julia task scheduled on the same
 /// thread.
+#[inline]
 pub fn yield_task(_: &mut AsyncGcFrame) {
     // Safety: this function can only be called from a thread known to Julia.
     unsafe {
@@ -384,15 +293,13 @@ pub fn sleep<'scope, 'data, T: Target<'scope>>(target: &T, duration: Duration) {
             return;
         }
 
+        let func = Module::typed_global_cached::<Value, _, _>(target, "Base.sleep")
+            .expect("sleep not found");
+
         // Is rooted when sleep is called.
         let secs = duration.as_millis() as usize as f64 / 1000.;
         let secs = Value::new(target, secs).as_value();
 
-        Module::base(target)
-            .global(target, "sleep")
-            .expect("sleep not found")
-            .as_value()
-            .call1(target, secs)
-            .expect("sleep threw an exception");
+        func.call1(target, secs).expect("sleep threw an exception");
     }
 }

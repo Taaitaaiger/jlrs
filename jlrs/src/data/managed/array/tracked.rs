@@ -15,7 +15,7 @@ use super::{
         },
         copied::CopiedArray,
     },
-    dimensions::{ArrayDimensions, Dims},
+    dimensions::{ArrayDimensions, DimsExt},
     Array, ArrayData, ArrayResult, TypedArray, TypedArrayData, TypedArrayResult,
 };
 use crate::{
@@ -27,7 +27,7 @@ use crate::{
     error::JlrsResult,
     memory::{
         context::ledger::Ledger,
-        target::{ExtendedTarget, Target},
+        target::{Target, TargetException},
     },
 };
 
@@ -180,14 +180,14 @@ impl<'tracked, 'scope, 'data> TrackedArray<'tracked, 'scope, 'data, Array<'scope
     ///
     /// Returns a new array with the provided dimensions, the content of the array is shared with
     /// the original array. The old and new dimensions must have an equal number of elements.
-    pub fn reshape<'target, 'current, 'borrow, D, S>(
+    pub fn reshape<'target, 'current, 'borrow, D, Tgt>(
         &self,
-        target: ExtendedTarget<'target, '_, '_, S>,
+        target: Tgt,
         dims: D,
-    ) -> ArrayResult<'target, 'data, S>
+    ) -> ArrayResult<'target, 'data, Tgt>
     where
-        D: Dims,
-        S: Target<'target>,
+        D: DimsExt,
+        Tgt: Target<'target>,
     {
         unsafe { self.data.reshape(target, dims) }
     }
@@ -198,14 +198,14 @@ impl<'tracked, 'scope, 'data> TrackedArray<'tracked, 'scope, 'data, Array<'scope
     /// the original array. The old and new dimensions must have an equal number of elements.
     ///
     /// Safety: if an exception is thrown it isn't caught.
-    pub unsafe fn reshape_unchecked<'target, 'current, 'borrow, D, S>(
+    pub unsafe fn reshape_unchecked<'target, 'current, 'borrow, D, Tgt>(
         &self,
-        target: ExtendedTarget<'target, '_, '_, S>,
+        target: Tgt,
         dims: D,
-    ) -> ArrayData<'target, 'data, S>
+    ) -> ArrayData<'target, 'data, Tgt>
     where
-        D: Dims,
-        S: Target<'target>,
+        D: DimsExt,
+        Tgt: Target<'target>,
     {
         self.data.reshape_unchecked(target, dims)
     }
@@ -263,14 +263,14 @@ where
     ///
     /// Returns a new array with the provided dimensions, the content of the array is shared with
     /// the original array. The old and new dimensions must have an equal number of elements.
-    pub fn reshape<'target, 'current, 'borrow, D, S>(
+    pub fn reshape<'target, 'current, 'borrow, D, Tgt>(
         &self,
-        target: ExtendedTarget<'target, '_, '_, S>,
+        target: Tgt,
         dims: D,
-    ) -> TypedArrayResult<'target, 'data, S, T>
+    ) -> TypedArrayResult<'target, 'data, Tgt, T>
     where
-        D: Dims,
-        S: Target<'target>,
+        D: DimsExt,
+        Tgt: Target<'target>,
     {
         unsafe { self.data.reshape(target, dims) }
     }
@@ -281,14 +281,14 @@ where
     /// the original array. The old and new dimensions must have an equal number of elements.
     ///
     /// Safety: if an exception is thrown it isn't caught.
-    pub unsafe fn reshape_unchecked<'target, 'current, 'borrow, D, S>(
+    pub unsafe fn reshape_unchecked<'target, 'current, 'borrow, D, Tgt>(
         &self,
-        target: ExtendedTarget<'target, '_, '_, S>,
+        target: Tgt,
         dims: D,
-    ) -> TypedArrayData<'target, 'data, S, T>
+    ) -> TypedArrayData<'target, 'data, Tgt, T>
     where
-        D: Dims,
-        S: Target<'target>,
+        D: DimsExt,
+        Tgt: Target<'target>,
     {
         self.data.reshape_unchecked(target, dims)
     }
@@ -431,13 +431,13 @@ impl<'tracked, 'scope> TrackedArrayMut<'tracked, 'scope, 'static, Array<'scope, 
     /// type.
     ///
     /// Safety: Mutating things that should absolutely not be mutated is not prevented.
-    pub unsafe fn grow_end<'target, S>(
+    pub unsafe fn grow_end<'target, Tgt>(
         &mut self,
-        target: S,
+        target: Tgt,
         inc: usize,
-    ) -> S::Exception<'static, ()>
+    ) -> TargetException<'target, 'static, (), Tgt>
     where
-        S: Target<'target>,
+        Tgt: Target<'target>,
     {
         self.tracked.data.grow_end(target, inc)
     }
@@ -455,9 +455,13 @@ impl<'tracked, 'scope> TrackedArrayMut<'tracked, 'scope, 'static, Array<'scope, 
     /// the array isn't one-dimensional an exception is thrown.
     ///
     /// Safety: Mutating things that should absolutely not be mutated is not prevented.
-    pub unsafe fn del_end<'target, S>(&mut self, target: S, dec: usize) -> S::Exception<'static, ()>
+    pub unsafe fn del_end<'target, Tgt>(
+        &mut self,
+        target: Tgt,
+        dec: usize,
+    ) -> TargetException<'target, 'static, (), Tgt>
     where
-        S: Target<'target>,
+        Tgt: Target<'target>,
     {
         self.tracked.data.del_end(target, dec)
     }
@@ -475,13 +479,13 @@ impl<'tracked, 'scope> TrackedArrayMut<'tracked, 'scope, 'static, Array<'scope, 
     /// one-dimensional. If the array isn't one-dimensional an exception is thrown.
     ///
     /// Safety: Mutating things that should absolutely not be mutated is not prevented.
-    pub unsafe fn grow_begin<'target, S>(
+    pub unsafe fn grow_begin<'target, Tgt>(
         &mut self,
-        target: S,
+        target: Tgt,
         inc: usize,
-    ) -> S::Exception<'static, ()>
+    ) -> TargetException<'target, 'static, (), Tgt>
     where
-        S: Target<'target>,
+        Tgt: Target<'target>,
     {
         self.tracked.data.grow_begin(target, inc)
     }
@@ -499,13 +503,13 @@ impl<'tracked, 'scope> TrackedArrayMut<'tracked, 'scope, 'static, Array<'scope, 
     /// the array isn't one-dimensional an exception is thrown.
     ///
     /// Safety: Mutating things that should absolutely not be mutated is not prevented.
-    pub unsafe fn del_begin<'target, S>(
+    pub unsafe fn del_begin<'target, Tgt>(
         &mut self,
-        target: S,
+        target: Tgt,
         dec: usize,
-    ) -> S::Exception<'static, ()>
+    ) -> TargetException<'target, 'static, (), Tgt>
     where
-        S: Target<'target>,
+        Tgt: Target<'target>,
     {
         self.tracked.data.del_begin(target, dec)
     }
@@ -604,13 +608,13 @@ where
     /// one-dimensional. If the array isn't one-dimensional an exception is thrown.
     ///
     /// Safety: Mutating things that should absolutely not be mutated is not prevented.
-    pub unsafe fn grow_end<'target, S>(
+    pub unsafe fn grow_end<'target, Tgt>(
         &mut self,
-        target: S,
+        target: Tgt,
         inc: usize,
-    ) -> S::Exception<'static, ()>
+    ) -> TargetException<'target, 'static, (), Tgt>
     where
-        S: Target<'target>,
+        Tgt: Target<'target>,
     {
         self.tracked.data.grow_end(target, inc)
     }
@@ -628,9 +632,13 @@ where
     /// the array isn't one-dimensional an exception is thrown.
     ///
     /// Safety: Mutating things that should absolutely not be mutated is not prevented.
-    pub unsafe fn del_end<'target, S>(&mut self, target: S, dec: usize) -> S::Exception<'static, ()>
+    pub unsafe fn del_end<'target, Tgt>(
+        &mut self,
+        target: Tgt,
+        dec: usize,
+    ) -> TargetException<'target, 'static, (), Tgt>
     where
-        S: Target<'target>,
+        Tgt: Target<'target>,
     {
         self.tracked.data.del_end(target, dec)
     }
@@ -648,13 +656,13 @@ where
     /// one-dimensional. If the array isn't one-dimensional an exception is thrown.
     ///
     /// Safety: Mutating things that should absolutely not be mutated is not prevented.
-    pub unsafe fn grow_begin<'target, S>(
+    pub unsafe fn grow_begin<'target, Tgt>(
         &mut self,
-        target: S,
+        target: Tgt,
         inc: usize,
-    ) -> S::Exception<'static, ()>
+    ) -> TargetException<'target, 'static, (), Tgt>
     where
-        S: Target<'target>,
+        Tgt: Target<'target>,
     {
         self.tracked.data.grow_begin(target, inc)
     }
@@ -672,13 +680,13 @@ where
     /// the array isn't one-dimensional an exception is thrown.
     ///
     /// Safety: Mutating things that should absolutely not be mutated is not prevented.
-    pub unsafe fn del_begin<'target, S>(
+    pub unsafe fn del_begin<'target, Tgt>(
         &mut self,
-        target: S,
+        target: Tgt,
         dec: usize,
-    ) -> S::Exception<'static, ()>
+    ) -> TargetException<'target, 'static, (), Tgt>
     where
-        S: Target<'target>,
+        Tgt: Target<'target>,
     {
         self.tracked.data.del_begin(target, dec)
     }

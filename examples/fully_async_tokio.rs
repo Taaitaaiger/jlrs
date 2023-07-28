@@ -23,10 +23,9 @@ impl AsyncTask for MyTask {
         unsafe {
             let path = PathBuf::from("MyModule.jl");
             if path.exists() {
-                Value::include(frame.as_extended_target(), "MyModule.jl")?.into_jlrs_result()?;
+                Value::include(&mut frame, "MyModule.jl")?.into_jlrs_result()?;
             } else {
-                Value::include(frame.as_extended_target(), "examples/MyModule.jl")?
-                    .into_jlrs_result()?;
+                Value::include(&mut frame, "examples/MyModule.jl")?.into_jlrs_result()?;
             }
         }
         Ok(())
@@ -51,7 +50,7 @@ impl AsyncTask for MyTask {
                 .as_managed()
                 .function(&frame, "complexfunc")?
                 .as_managed()
-                .call_async(&mut frame, &mut [dims, iters])
+                .call_async(&mut frame, [dims, iters])
                 .await
                 .into_jlrs_result()?
                 .unbox::<f64>()

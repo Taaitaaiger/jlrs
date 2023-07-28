@@ -1,14 +1,15 @@
 use std::{cell::RefCell, collections::VecDeque, rc::Rc, time::Duration};
 
-use jl_sys::{jl_adopt_thread, jl_gc_safepoint};
+use jl_sys::{jl_adopt_thread, jl_gc_safepoint, jlrs_gc_safe_enter, jlrs_gc_safe_leave};
 
 use super::{queue::Receiver, AsyncRuntime, Message, MessageInner};
 use crate::{
     async_util::task::sleep,
     error::JlrsResult,
-    memory::{stack_frame::StackFrame, target::unrooted::Unrooted},
+    memory::{get_tls, stack_frame::StackFrame, target::unrooted::Unrooted},
 };
 
+#[inline]
 pub(crate) unsafe fn init_worker<R: AsyncRuntime, const N: usize>(
     worker_id: usize,
     recv_timeout: Duration,
@@ -17,6 +18,7 @@ pub(crate) unsafe fn init_worker<R: AsyncRuntime, const N: usize>(
     R::spawn_thread(move || run_async::<R, N>(worker_id, recv_timeout, receiver))
 }
 
+#[inline]
 fn run_async<R: AsyncRuntime, const N: usize>(
     worker_id: usize,
     recv_timeout: Duration,
@@ -59,14 +61,27 @@ async unsafe fn run_inner<R: AsyncRuntime, const N: usize>(
     };
 
     loop {
-        if free_stacks.borrow().len() == 0 {
+        let n_free = free_stacks.borrow().len();
+        if n_free == 0 {
             sleep(&Unrooted::new(), recv_timeout);
             R::yield_now().await;
             jl_gc_safepoint();
             continue;
         }
 
-        match R::timeout(recv_timeout, receiver.recv_worker()).await {
+        let msg = if n_free == N {
+            // No tasks are running so we block until there is work to do. Enter a GC-safe state
+            // to indicate garbage can be collected while we wait.
+            let ptls = get_tls();
+            let state = jlrs_gc_safe_enter(ptls);
+            let msg = receiver.recv_worker().await;
+            jlrs_gc_safe_leave(ptls, state);
+            Some(msg)
+        } else {
+            R::timeout(recv_timeout, receiver.recv_worker()).await
+        };
+
+        match msg {
             None => jl_gc_safepoint(),
             Some(Ok(msg)) => match msg.inner {
                 MessageInner::Task(task) => {

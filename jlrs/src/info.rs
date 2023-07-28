@@ -19,38 +19,45 @@ pub struct Info;
 
 impl Info {
     /// Number of threads the CPU supports.
+    #[inline]
     pub fn n_cpu_threads() -> usize {
         unsafe { jl_cpu_threads() as usize }
     }
 
     #[julia_version(until = "1.8")]
+    #[inline]
     /// Number of threads Julia can use.
     pub fn n_threads() -> usize {
         unsafe { jl_n_threads as usize }
     }
 
     #[julia_version(since = "1.9")]
+    #[inline]
     /// Number of threads Julia can use.
     pub fn n_threads() -> usize {
         unsafe { jl_n_threads.load(::std::sync::atomic::Ordering::Relaxed) as usize }
     }
 
     /// The page size used by the garbage collector.
+    #[inline]
     pub fn page_size() -> usize {
         unsafe { jl_getpagesize() as usize }
     }
 
     /// The allocation granularity.
+    #[inline]
     pub fn allocation_granularity() -> usize {
         unsafe { jl_getallocationgranularity() as usize }
     }
 
     /// Returns `true` if a debug build of Julia is used.
+    #[inline]
     pub fn is_debugbuild() -> bool {
         unsafe { jl_is_debugbuild() != 0 }
     }
 
     /// Name and information of the kernel.
+    #[inline]
     pub fn uname() -> StrOrBytes<'static> {
         unsafe {
             let cstr =
@@ -65,6 +72,7 @@ impl Info {
     }
 
     /// The CPU architecture.
+    #[inline]
     pub fn arch() -> StrOrBytes<'static> {
         unsafe {
             let cstr =
@@ -79,26 +87,31 @@ impl Info {
     }
 
     /// The major version of Julia.
+    #[inline]
     pub fn major_version() -> isize {
         unsafe { jl_ver_major() as isize }
     }
 
     /// The minor version of Julia.
+    #[inline]
     pub fn minor_version() -> isize {
         unsafe { jl_ver_minor() as isize }
     }
 
     /// The patch version of Julia.
+    #[inline]
     pub fn patch_version() -> isize {
         unsafe { jl_ver_patch() as isize }
     }
 
     /// Returns true if a release version of Julia is used.
+    #[inline]
     pub fn is_release() -> bool {
         unsafe { jl_ver_is_release() != 0 }
     }
 
     /// Returns the git branch that was used to compile the used version of Julia.
+    #[inline]
     pub fn git_branch() -> StrOrBytes<'static> {
         unsafe {
             let cstr = CStr::from_ptr(jl_git_branch());
@@ -112,11 +125,13 @@ impl Info {
     }
 
     /// Returns the git commit that was used to compile the used version of Julia.
+    #[inline]
     pub fn git_commit() -> &'static str {
         unsafe { CStr::from_ptr(jl_git_commit()).to_str().unwrap() }
     }
 
     /// Returns the version string of the used version of Julia.
+    #[inline]
     pub fn version_string() -> &'static str {
         unsafe { CStr::from_ptr(jl_ver_string()).to_str().unwrap() }
     }

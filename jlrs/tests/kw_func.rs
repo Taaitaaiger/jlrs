@@ -19,10 +19,7 @@ mod tests {
                         .function(&frame, "funcwithkw")?
                         .as_managed();
 
-                    let v = func
-                        .call(&mut frame, &mut [a_value])
-                        .unwrap()
-                        .unbox::<isize>()?;
+                    let v = func.call(&mut frame, [a_value]).unwrap().unbox::<isize>()?;
 
                     assert_eq!(v, 2);
                     Ok(())
@@ -46,7 +43,7 @@ mod tests {
                         .function(&frame, "funcwithkw")?
                         .as_managed();
 
-                    let kw = named_tuple!(frame.as_extended_target(), "b" => b_value);
+                    let kw = named_tuple!(&mut frame, "b" => b_value);
                     let v = func
                         .provide_keywords(kw)?
                         .call1(&mut frame, a_value)
@@ -74,7 +71,7 @@ mod tests {
                         .function(&frame, "funcwithkw")?
                         .as_managed();
 
-                    let kw = named_tuple!(frame.as_extended_target(), "b" => b_value);
+                    let kw = named_tuple!(&mut frame, "b" => b_value);
                     let v = func
                         .provide_keywords(kw)?
                         .call0(&mut frame)
@@ -103,7 +100,7 @@ mod tests {
                         .function(&frame, "funcwithkw")?
                         .as_managed();
 
-                    let kw = named_tuple!(frame.as_extended_target(), "b" => b_value);
+                    let kw = named_tuple!(&mut frame, "b" => b_value);
                     let v = func
                         .provide_keywords(kw)?
                         .call1(&mut frame, a_value)
@@ -133,7 +130,7 @@ mod tests {
                         .function(&frame, "funcwithkw")?
                         .as_managed();
 
-                    let kw = named_tuple!(frame.as_extended_target(), "b" => b_value);
+                    let kw = named_tuple!(&mut frame, "b" => b_value);
                     let v = func
                         .provide_keywords(kw)?
                         .call2(&mut frame, a_value, c_value)
@@ -163,7 +160,7 @@ mod tests {
                         .function(&frame, "funcwithkw")?
                         .as_managed();
 
-                    let kw = named_tuple!(frame.as_extended_target(), "b" => b_value);
+                    let kw = named_tuple!(&mut frame, "b" => b_value);
                     let v = func
                         .provide_keywords(kw)?
                         .call2(&mut frame, a_value, c_value)
@@ -194,7 +191,7 @@ mod tests {
                         .function(&frame, "funcwithkw")?
                         .as_managed();
 
-                    let kw = named_tuple!(frame.as_extended_target(), "b" => b_value);
+                    let kw = named_tuple!(&mut frame, "b" => b_value);
                     let v = func
                         .provide_keywords(kw)?
                         .call3(&mut frame, a_value, c_value, d_value)
@@ -226,10 +223,10 @@ mod tests {
                         .function(&frame, "funcwithkw")?
                         .as_managed();
 
-                    let kw = named_tuple!(frame.as_extended_target(), "b" => b_value);
+                    let kw = named_tuple!(&mut frame, "b" => b_value);
                     let v = func
                         .provide_keywords(kw)?
-                        .call(&mut frame, &mut [a_value, c_value, d_value, e_value])
+                        .call(&mut frame, [a_value, c_value, d_value, e_value])
                         .unwrap()
                         .unbox::<isize>()?;
 
@@ -255,7 +252,7 @@ mod tests {
                         .function(&frame, "funcwithabstractkw")?
                         .as_managed();
 
-                    let kw = named_tuple!(frame.as_extended_target(), "b" => b_value);
+                    let kw = named_tuple!(&mut frame, "b" => b_value);
                     let v = func
                         .provide_keywords(kw)?
                         .call1(&mut frame, a_value)
@@ -284,7 +281,7 @@ mod tests {
                         .function(&frame, "funcwithabstractkw")?
                         .as_managed();
 
-                    let kw = named_tuple!(frame.as_extended_target(), "b" => b_value);
+                    let kw = named_tuple!(&mut frame, "b" => b_value);
                     let v = func
                         .provide_keywords(kw)?
                         .call1(&mut frame, a_value)

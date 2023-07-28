@@ -14,6 +14,7 @@ pub trait ToSymbol: private::ToSymbolPriv {
     /// Convert `self` to a `Symbol`.
     ///
     /// This method only needs a reference to a target because `Symbol` are globally rooted.
+    #[inline]
     fn to_symbol<'target, T: Target<'target>>(&self, _: &T) -> Symbol<'target> {
         // Safety: Requiring a reference to a target guarantees this method can only be called
         // from a thread known to Julia.
@@ -26,12 +27,9 @@ impl ToSymbol for Symbol<'_> {}
 impl ToSymbol for JuliaString<'_> {}
 
 pub(crate) mod private {
-    use std::ptr::NonNull;
-
-    use jl_sys::{jl_symbol, jl_symbol_n};
-
     use crate::{
         data::managed::{private::ManagedPriv, string::JuliaString, symbol::Symbol},
+        memory::target::unrooted::Unrooted,
         private::Private,
     };
 
@@ -43,18 +41,17 @@ pub(crate) mod private {
     impl<T: AsRef<str>> ToSymbolPriv for T {
         #[inline]
         unsafe fn to_symbol_priv<'symbol>(&self, _: Private) -> Symbol<'symbol> {
-            let symbol_ptr = self.as_ref().as_ptr().cast();
-            let symbol = jl_symbol_n(symbol_ptr, self.as_ref().len());
-            Symbol::wrap_non_null(NonNull::new_unchecked(symbol), Private)
+            let unrooted = Unrooted::new();
+            Symbol::new(&unrooted, self)
         }
     }
 
     impl ToSymbolPriv for JuliaString<'_> {
         #[inline]
         unsafe fn to_symbol_priv<'symbol>(&self, _: Private) -> Symbol<'symbol> {
-            let symbol_ptr = self.as_c_str();
-            let symbol = jl_symbol(symbol_ptr.as_ptr());
-            Symbol::wrap_non_null(NonNull::new_unchecked(symbol), Private)
+            let symbol_ptr = self.as_bytes();
+            let unrooted = Unrooted::new();
+            Symbol::new_bytes(&unrooted, symbol_ptr).unwrap()
         }
     }
 

@@ -3,7 +3,7 @@
     not(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8")),
 ))]
 #[cfg(test)]
-mod util;
+mod async_util;
 
 #[cfg(all(
     feature = "async-std-rt",
@@ -16,7 +16,7 @@ mod tests {
     use jlrs::prelude::*;
     use once_cell::sync::OnceCell;
 
-    use super::util::{async_tasks::*, ASYNC_TESTS_JL};
+    use super::async_util::{async_tasks::*, ASYNC_TESTS_JL};
 
     fn init() -> Arc<AsyncJulia<AsyncStd>> {
         unsafe {

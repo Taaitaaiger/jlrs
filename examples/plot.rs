@@ -34,11 +34,10 @@ impl PersistentTask for MyTask {
             let plot_fn = Module::plots(&frame).function(&frame, "plot")?.as_managed();
 
             let ylabel_str = JuliaString::new(&mut frame, &self.ylabel);
-            let ylabel =
-                Tuple::new_unchecked(frame.as_extended_target(), &mut [ylabel_str.as_value()]);
-            let kws = named_tuple!(frame.as_extended_target(), "yaxis" => ylabel);
+            let ylabel = Tuple::new_unchecked(&mut frame, &mut [ylabel_str.as_value()]);
+            let kws = named_tuple!(&mut frame, "yaxis" => ylabel);
 
-            let plot = PyPlot::new_with_keywords(&mut *frame, plot_fn, &mut [], kws)?;
+            let plot = PyPlot::new_with_keywords(&mut *frame, plot_fn, [], kws)?;
 
             Ok((plot, kws))
         }
@@ -64,7 +63,7 @@ impl PersistentTask for MyTask {
 
             state
                 .0
-                .update_with_keywords(&mut frame, plot_fn, &mut [data], state.1)?;
+                .update_with_keywords(&mut frame, plot_fn, [data], state.1)?;
         }
 
         Ok(())

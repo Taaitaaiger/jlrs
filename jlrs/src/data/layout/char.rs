@@ -7,6 +7,7 @@ use std::fmt::{Debug, Formatter, Result as FmtResult, Write};
 
 use jl_sys::{jl_char_type, jl_unbox_uint32};
 
+use super::is_bits::IsBits;
 use crate::{
     convert::unbox::Unbox,
     data::managed::{private::ManagedPriv, value::Value},
@@ -20,19 +21,19 @@ use crate::{
 pub struct Char(u32);
 
 impl Char {
-    #[inline(always)]
+    #[inline]
     pub fn new(val: char) -> Self {
         Char(val as u32)
     }
 
     /// Returns the value of the `Char` as a `u32`.
-    #[inline(always)]
+    #[inline]
     pub fn as_u32(self) -> u32 {
         self.0
     }
 
     /// Returns the value of the `Char` as a `char` if it's valid, `None` if it isn't.
-    #[inline(always)]
+    #[inline]
     pub fn try_as_char(self) -> Option<char> {
         char::from_u32(self.0)
     }
@@ -40,7 +41,7 @@ impl Char {
     /// Returns the value of the `Char` as a `char`.
     ///
     /// Safety: the `Char` must be a valid `char`.
-    #[inline(always)]
+    #[inline]
     pub unsafe fn try_as_char_unchecked(self) -> char {
         char::from_u32_unchecked(self.0)
     }
@@ -57,11 +58,11 @@ impl<'scope> Debug for Char {
 }
 
 impl_julia_typecheck!(Char, jl_char_type);
-impl_valid_layout!(Char);
+impl_valid_layout!(Char, jl_char_type);
 
 unsafe impl Unbox for Char {
     type Output = Self;
-    #[inline(always)]
+    #[inline]
     unsafe fn unbox(value: Value) -> Char {
         Char(jl_unbox_uint32(value.unwrap(Private).cast()))
     }
@@ -69,7 +70,7 @@ unsafe impl Unbox for Char {
 
 unsafe impl Unbox for char {
     type Output = Char;
-    #[inline(always)]
+    #[inline]
     unsafe fn unbox(value: Value) -> Char {
         Char(jl_unbox_uint32(value.unwrap(Private).cast()))
     }
@@ -77,3 +78,5 @@ unsafe impl Unbox for char {
 
 impl_ccall_arg!(Char);
 impl_construct_julia_type!(Char, jl_char_type);
+
+unsafe impl IsBits for Char {}

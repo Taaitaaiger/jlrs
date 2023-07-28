@@ -20,6 +20,7 @@ use std::{
     ffi::c_void,
     fmt::{Debug, Formatter, Result as FmtResult},
     mem::MaybeUninit,
+    ptr::NonNull,
 };
 
 use jl_sys::jl_bottom_type;
@@ -170,20 +171,29 @@ impl Debug for EmptyUnion {
 }
 
 unsafe impl ValidLayout for EmptyUnion {
+    #[inline]
     fn valid_layout(ty: Value) -> bool {
         unsafe { ty.unwrap(Private) == jl_bottom_type }
     }
 
     const IS_REF: bool = true;
+
+    fn type_object<'target, Tgt: crate::prelude::Target<'target>>(
+        _target: &Tgt,
+    ) -> Value<'target, 'static> {
+        unsafe { Value::wrap_non_null(NonNull::new_unchecked(jl_bottom_type), Private) }
+    }
 }
 
 unsafe impl ValidField for EmptyUnion {
+    #[inline]
     fn valid_field(ty: Value) -> bool {
         unsafe { ty.unwrap(Private) == jl_bottom_type }
     }
 }
 
 unsafe impl Typecheck for EmptyUnion {
+    #[inline]
     fn typecheck(t: DataType) -> bool {
         <Self as ValidLayout>::valid_layout(t.as_value())
     }

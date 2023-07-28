@@ -477,9 +477,7 @@ mod tests {
                 let arg1 = Value::new(&mut frame, 2u32);
                 let arg2 = Value::new(&mut frame, 3u32);
                 let arg3 = Value::new(&mut frame, 4u32);
-                let out = func
-                    .call(&mut frame, &mut [arg0, arg1, arg2, arg3])
-                    .unwrap();
+                let out = func.call(&mut frame, [arg0, arg1, arg2, arg3]).unwrap();
                 out.unbox::<u32>()
             });
 
@@ -498,7 +496,7 @@ mod tests {
                 let arg1 = Value::new(&mut frame, 2u32);
                 let arg2 = Value::new(&mut frame, 3u32);
                 let arg3 = Value::new(&mut frame, 4u32);
-                let out = func.call(&frame, &mut [arg0, arg1, arg2, arg3]).unwrap();
+                let out = func.call(&frame, [arg0, arg1, arg2, arg3]).unwrap();
                 out.as_managed().unbox::<u32>()
             });
 
@@ -521,7 +519,7 @@ mod tests {
                         let arg2 = Value::new(&mut frame, 3u32);
                         let arg3 = Value::new(&mut frame, 4u32);
 
-                        Ok(func.call(output, &mut [arg0, arg1, arg2, arg3]))
+                        Ok(func.call(output, [arg0, arg1, arg2, arg3]))
                     })?
                     .unwrap()
                     .unbox::<u32>()
@@ -546,7 +544,7 @@ mod tests {
                         let arg2 = Value::new(&mut frame, 3u32);
                         let arg3 = Value::new(&mut frame, 4u32);
 
-                        Ok(func.call(output, &mut [arg0, arg1, arg2, arg3]))
+                        Ok(func.call(output, [arg0, arg1, arg2, arg3]))
                     })?
                     .unwrap()
                     .unbox::<u32>()
@@ -571,7 +569,7 @@ mod tests {
                         let arg2 = Value::new(&mut frame, 3u32);
                         let arg3 = Value::new(&mut frame, 4u32);
 
-                        Ok(func.clone().call(output, &mut [arg0, arg1, arg2, arg3]))
+                        Ok(func.clone().call(output, [arg0, arg1, arg2, arg3]))
                     })?
                     .unwrap()
                     .unbox::<u32>()

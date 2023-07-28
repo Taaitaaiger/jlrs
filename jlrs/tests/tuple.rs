@@ -53,10 +53,28 @@ mod tests {
         })
     }
 
+    fn create_tuple_from_values() {
+        JULIA.with(|j| {
+            let mut frame = StackFrame::new();
+            let mut jlrs = j.borrow_mut();
+            jlrs.instance(&mut frame)
+                .scope(|mut frame| {
+                    let v1 = Value::new(&mut frame, 1u64);
+                    let v2 = Value::new(&mut frame, -3i32);
+                    let t = Tuple::new(&mut frame, [v1, v2]).unwrap();
+                    assert!(t.is::<Tuple2<u64, i32>>());
+                    assert!(t.unbox::<Tuple2<u64, i32>>().is_ok());
+                    Ok(())
+                })
+                .unwrap();
+        })
+    }
+
     #[test]
     fn tuple_tests() {
         create_cast_tuple0();
         create_cast_tuple1();
         create_cast_tuple2();
+        create_tuple_from_values();
     }
 }

@@ -58,6 +58,7 @@ trait AsyncTaskEnvelope: Send {
 #[async_trait(?Send)]
 impl<A: AsyncTask> AsyncTaskEnvelope for A {
     type A = Self;
+    #[inline]
     async fn call_run<'inner>(
         &'inner mut self,
         frame: AsyncGcFrame<'static>,
@@ -90,6 +91,7 @@ where
 {
     type P = Self;
 
+    #[inline]
     async fn call_init<'inner>(
         &'inner mut self,
         frame: AsyncGcFrame<'static>,
@@ -135,10 +137,12 @@ where
     type Input = I;
     type Output = O;
 
+    #[inline]
     fn respond(self: Box<Self>, result: JlrsResult<Self::Output>) {
         Box::new(self.sender).send(result)
     }
 
+    #[inline]
     fn input(&mut self) -> Self::Input {
         self.input.take().unwrap()
     }
@@ -156,6 +160,7 @@ where
     P: PersistentTask,
     O: OneshotSender<JlrsResult<PersistentHandle<P>>>,
 {
+    #[inline]
     pub(crate) fn new(sender: O) -> Self {
         PersistentComms {
             sender,
@@ -171,6 +176,7 @@ where
     P: PersistentTask,
     O: OneshotSender<JlrsResult<PersistentHandle<P>>>,
 {
+    #[inline]
     pub(crate) fn new(task: P, sender: PersistentComms<C, P, O>) -> Self {
         PendingTask {
             task: Some(task),
@@ -179,6 +185,7 @@ where
         }
     }
 
+    #[inline]
     fn split(self) -> (P, PersistentComms<C, P, O>) {
         (self.task.unwrap(), self.sender)
     }
@@ -195,6 +202,7 @@ where
     O: OneshotSender<JlrsResult<A::Output>>,
     A: AsyncTask,
 {
+    #[inline]
     pub(crate) fn new(task: A, sender: O) -> Self {
         PendingTask {
             task: Some(task),
@@ -203,6 +211,7 @@ where
         }
     }
 
+    #[inline]
     fn split(self) -> (A, O) {
         (self.task.unwrap(), self.sender)
     }
@@ -213,6 +222,7 @@ where
     O: OneshotSender<JlrsResult<()>>,
     A: AsyncTask,
 {
+    #[inline]
     pub(crate) fn new(sender: O) -> Self {
         PendingTask {
             task: None,
@@ -221,6 +231,7 @@ where
         }
     }
 
+    #[inline]
     fn sender(self) -> O {
         self.sender
     }
@@ -231,6 +242,7 @@ where
     O: OneshotSender<JlrsResult<()>>,
     P: PersistentTask,
 {
+    #[inline]
     pub(crate) fn new(sender: O) -> Self {
         PendingTask {
             task: None,
@@ -239,6 +251,7 @@ where
         }
     }
 
+    #[inline]
     fn sender(self) -> O {
         self.sender
     }
@@ -377,6 +390,7 @@ where
     O: OneshotSender<JlrsResult<T>>,
     T: Send + 'static,
 {
+    #[inline]
     pub(crate) fn new(func: F, sender: O) -> Self {
         Self {
             func,
@@ -385,6 +399,7 @@ where
         }
     }
 
+    #[inline]
     fn call<'scope>(self: Box<Self>, frame: GcFrame<'scope>) -> (JlrsResult<T>, O) {
         // Safety: this method is called from a thread known to Julia, the lifetime is limited to
         // 'scope.
@@ -458,10 +473,12 @@ impl<O> IncludeTask<O>
 where
     O: OneshotSender<JlrsResult<()>>,
 {
+    #[inline]
     pub(crate) fn new(path: PathBuf, sender: O) -> Self {
         Self { path, sender }
     }
 
+    #[inline]
     unsafe fn call_inner<'scope>(mut frame: GcFrame<'scope>, path: PathBuf) -> JlrsResult<()> {
         match path.to_str() {
             Some(path) => {
@@ -521,10 +538,12 @@ impl<O> SetErrorColorTask<O>
 where
     O: OneshotSender<JlrsResult<()>>,
 {
+    #[inline]
     pub(crate) fn new(enable: bool, sender: O) -> Self {
         Self { enable, sender }
     }
 
+    #[inline]
     unsafe fn call_inner<'scope>(frame: GcFrame<'scope>, enable: bool) -> JlrsResult<()> {
         let unrooted = frame.unrooted();
 

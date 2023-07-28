@@ -24,13 +24,13 @@ use crate::{
         module::Module, private::ManagedPriv, simple_vector::SimpleVector, symbol::Symbol,
     },
     impl_julia_typecheck,
-    memory::target::Target,
+    memory::target::{Target, TargetResult},
     private::Private,
 };
 
 cfg_if! {
     if #[cfg(feature = "extra-fields")] {
-        use crate::data::managed::{value::Value, simple_vector::{SimpleVectorRef, SimpleVectorData}};
+        use crate::data::managed::{simple_vector::{SimpleVectorRef, SimpleVectorData}};
     }
 }
 
@@ -38,7 +38,7 @@ cfg_if! {
 cfg_if! {
     if #[cfg(feature = "extra-fields")] {
         use std::sync::atomic::Ordering;
-        use crate::data::managed::value::{ValueData, ValueRef};
+        use crate::data::managed::value::{ValueData, Value, ValueRef};
     }
 }
 
@@ -70,6 +70,7 @@ impl<'scope> TypeName<'scope> {
     */
 
     /// The `name` field.
+    #[inline]
     pub fn name(self) -> Symbol<'scope> {
         // Safety: the pointer points to valid data
         unsafe {
@@ -80,6 +81,7 @@ impl<'scope> TypeName<'scope> {
     }
 
     /// The `module` field.
+    #[inline]
     pub fn module(self) -> Module<'scope> {
         // Safety: the pointer points to valid data
         unsafe {
@@ -90,6 +92,7 @@ impl<'scope> TypeName<'scope> {
     }
 
     /// Field names.
+    #[inline]
     pub fn names(self) -> SimpleVector<'scope> {
         // Safety: the pointer points to valid data
         unsafe {
@@ -101,6 +104,7 @@ impl<'scope> TypeName<'scope> {
 
     #[julia_version(since = "1.7")]
     /// The `atomicfields` field.
+    #[inline]
     pub fn atomicfields(self) -> *const u32 {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().atomicfields }
@@ -108,14 +112,16 @@ impl<'scope> TypeName<'scope> {
 
     #[julia_version(since = "1.8")]
     /// The `atomicfields` field.
+    #[inline]
     pub fn constfields(self) -> *const u32 {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().constfields }
     }
 
-    #[cfg(feature = "extra-fields")]
     /// Either the only instantiation of the type (if no parameters) or a `UnionAll` accepting
     /// parameters to make an instantiation.
+    #[cfg(feature = "extra-fields")]
+    #[inline]
     pub fn wrapper(self) -> Value<'scope, 'static> {
         // Safety: the pointer points to valid data
         unsafe {
@@ -148,6 +154,7 @@ impl<'scope> TypeName<'scope> {
     #[cfg(feature = "extra-fields")]
     #[julia_version(until = "1.6")]
     /// Sorted array.
+    #[inline]
     pub fn cache<'target, T>(self, target: T) -> SimpleVectorData<'target, T>
     where
         T: Target<'target>,
@@ -163,6 +170,7 @@ impl<'scope> TypeName<'scope> {
     #[cfg(feature = "extra-fields")]
     #[julia_version(since = "1.7")]
     /// Sorted array.
+    #[inline]
     pub fn cache<'target, T>(self, target: T) -> SimpleVectorData<'target, T>
     where
         T: Target<'target>,
@@ -182,6 +190,7 @@ impl<'scope> TypeName<'scope> {
     #[julia_version(until = "1.6")]
     #[cfg(feature = "extra-fields")]
     /// Unsorted array.
+    #[inline]
     pub fn linear_cache<'target, T>(self, target: T) -> SimpleVectorData<'target, T>
     where
         T: Target<'target>,
@@ -197,6 +206,7 @@ impl<'scope> TypeName<'scope> {
     #[julia_version(since = "1.7")]
     #[cfg(feature = "extra-fields")]
     /// Unsorted array.
+    #[inline]
     pub fn linear_cache<'target, T>(self, target: T) -> SimpleVectorData<'target, T>
     where
         T: Target<'target>,
@@ -215,6 +225,7 @@ impl<'scope> TypeName<'scope> {
 
     /// The `mt` field.
     #[cfg(feature = "extra-fields")]
+    #[inline]
     pub fn mt<'target, T>(self, target: T) -> ValueData<'target, 'static, T>
     where
         T: Target<'target>,
@@ -229,6 +240,7 @@ impl<'scope> TypeName<'scope> {
 
     /// Incomplete instantiations of this type.
     #[cfg(feature = "extra-fields")]
+    #[inline]
     pub fn partial<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
     where
         T: Target<'target>,
@@ -242,6 +254,7 @@ impl<'scope> TypeName<'scope> {
     }
 
     /// The `hash` field.
+    #[inline]
     pub fn hash(self) -> isize {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().hash }
@@ -249,6 +262,7 @@ impl<'scope> TypeName<'scope> {
 
     #[julia_version(since = "1.7")]
     /// The `n_uninitialized` field.
+    #[inline]
     pub fn n_uninitialized(self) -> i32 {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().n_uninitialized }
@@ -256,6 +270,7 @@ impl<'scope> TypeName<'scope> {
 
     #[julia_version(since = "1.7")]
     /// The `abstract` field.
+    #[inline]
     pub fn is_abstract(self) -> bool {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().abstract_() != 0 }
@@ -263,6 +278,7 @@ impl<'scope> TypeName<'scope> {
 
     #[julia_version(since = "1.7")]
     /// The `mutabl` field.
+    #[inline]
     pub fn is_mutable(self) -> bool {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().mutabl() != 0 }
@@ -270,6 +286,7 @@ impl<'scope> TypeName<'scope> {
 
     #[julia_version(since = "1.7")]
     /// The `mayinlinealloc` field.
+    #[inline]
     pub fn mayinlinealloc(self) -> bool {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().mayinlinealloc() != 0 }
@@ -278,6 +295,7 @@ impl<'scope> TypeName<'scope> {
 
 impl<'base> TypeName<'base> {
     /// The typename of the `UnionAll` `Type`.
+    #[inline]
     pub fn of_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -287,6 +305,7 @@ impl<'base> TypeName<'base> {
     }
 
     /// The typename of the `DataType` `Tuple`.
+    #[inline]
     pub fn of_tuple<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -296,6 +315,7 @@ impl<'base> TypeName<'base> {
     }
 
     /// The typename of the `UnionAll` `VecElement`.
+    #[inline]
     pub fn of_vecelement<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -306,6 +326,7 @@ impl<'base> TypeName<'base> {
 
     #[julia_version(until = "1.6")]
     /// The typename of the `UnionAll` `Vararg`.
+    #[inline]
     pub fn of_vararg<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -315,6 +336,7 @@ impl<'base> TypeName<'base> {
     }
 
     /// The typename of the `UnionAll` `Array`.
+    #[inline]
     pub fn of_array<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -325,6 +347,7 @@ impl<'base> TypeName<'base> {
 
     #[julia_version(since = "1.7")]
     /// The typename of the `UnionAll` `Ptr`.
+    #[inline]
     pub fn of_opaque_closure<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -334,6 +357,7 @@ impl<'base> TypeName<'base> {
     }
 
     /// The typename of the `UnionAll` `Ptr`.
+    #[inline]
     pub fn of_pointer<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -343,6 +367,7 @@ impl<'base> TypeName<'base> {
     }
 
     /// The typename of the `UnionAll` `LLVMPtr`.
+    #[inline]
     pub fn of_llvmpointer<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -352,6 +377,7 @@ impl<'base> TypeName<'base> {
     }
 
     /// The typename of the `UnionAll` `NamedTuple`.
+    #[inline]
     pub fn of_namedtuple<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -371,16 +397,18 @@ impl<'scope> ManagedPriv<'scope, '_> for TypeName<'scope> {
 
     // Safety: `inner` must not have been freed yet, the result must never be
     // used after the GC might have freed it.
+    #[inline]
     unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self {
         Self(inner, PhantomData)
     }
 
+    #[inline]
     fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps> {
         self.0
     }
 }
 
-impl_construct_type_managed!(TypeName<'_>, jl_typename_type);
+impl_construct_type_managed!(TypeName, 1, jl_typename_type);
 
 /// A reference to a [`TypeName`] that has not been explicitly rooted.
 pub type TypeNameRef<'scope> = Ref<'scope, 'static, TypeName<'scope>>;
@@ -389,16 +417,15 @@ pub type TypeNameRef<'scope> = Ref<'scope, 'static, TypeName<'scope>>;
 /// `ccall`able functions that return a [`TypeName`].
 pub type TypeNameRet = Ref<'static, 'static, TypeName<'static>>;
 
-impl_valid_layout!(TypeNameRef, TypeName);
+impl_valid_layout!(TypeNameRef, TypeName, jl_typename_type);
 
-use crate::memory::target::target_type::TargetType;
+use crate::memory::target::TargetType;
 
 /// `TypeName` or `TypeNameRef`, depending on the target type `T`.
 pub type TypeNameData<'target, T> = <T as TargetType<'target>>::Data<'static, TypeName<'target>>;
 
 /// `JuliaResult<TypeName>` or `JuliaResultRef<TypeNameRef>`, depending on the target type `T`.
-pub type TypeNameResult<'target, T> =
-    <T as TargetType<'target>>::Result<'static, TypeName<'target>>;
+pub type TypeNameResult<'target, T> = TargetResult<'target, 'static, TypeName<'target>, T>;
 
 impl_ccall_arg_managed!(TypeName, 1);
 impl_into_typed!(TypeName);

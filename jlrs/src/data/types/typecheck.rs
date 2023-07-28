@@ -11,6 +11,7 @@
 //! [`Unbox`]: crate::convert::unbox::Unbox
 use std::ffi::c_void;
 
+// TODO: Unify with abstract types
 #[julia_version(until = "1.9")]
 use jl_sys::jl_typedslot_type;
 use jl_sys::{
@@ -50,7 +51,7 @@ pub unsafe trait Typecheck {
 macro_rules! impl_julia_typecheck {
     ($type:ty, $jl_type:expr, $($lt:lifetime),+) => {
         unsafe impl<$($lt),+> crate::data::types::typecheck::Typecheck for $type {
-            #[inline(always)]
+            #[inline]
             fn typecheck(t: $crate::data::managed::datatype::DataType) -> bool {
                 unsafe {
                     <$crate::data::managed::datatype::DataType as $crate::data::managed::private::ManagedPriv>::unwrap(t, crate::private::Private) == $jl_type
@@ -60,7 +61,7 @@ macro_rules! impl_julia_typecheck {
     };
     ($type:ty, $jl_type:expr) => {
         unsafe impl crate::data::types::typecheck::Typecheck for $type {
-            #[inline(always)]
+            #[inline]
             fn typecheck(t: $crate::data::managed::datatype::DataType) -> bool {
                 unsafe {
                     <$crate::data::managed::datatype::DataType as $crate::data::managed::private::ManagedPriv>::unwrap(t, crate::private::Private) == $jl_type
@@ -70,7 +71,7 @@ macro_rules! impl_julia_typecheck {
     };
     ($type:ty) => {
         unsafe impl crate::data::types::typecheck::Typecheck for $type {
-            #[inline(always)]
+            #[inline]
             fn typecheck(t: crate::data::managed::datatype::DataType) -> bool {
                 unsafe {
                     let global = $crate::memory::target::unrooted::Unrooted::new();
@@ -98,6 +99,7 @@ impl_julia_typecheck!(char);
 impl_julia_typecheck!(*mut c_void);
 
 unsafe impl<T: IntoJulia> Typecheck for *mut T {
+    #[inline]
     fn typecheck(t: DataType) -> bool {
         unsafe {
             let global = Unrooted::new();
@@ -110,7 +112,7 @@ unsafe impl<T: IntoJulia> Typecheck for *mut T {
             let params = t.parameters();
             let params = params.data().as_slice();
             let inner_ty = T::julia_type(global);
-            if params[0].unwrap().as_value() != inner_ty.as_value() {
+            if params[0].unwrap_unchecked().as_value() != inner_ty.as_value() {
                 return false;
             }
 
@@ -124,7 +126,7 @@ unsafe impl<T: IntoJulia> Typecheck for *mut T {
 /// `DataType`, a `UnionAll`, a `Union` or a `Union{}`.
 pub struct Type;
 unsafe impl Typecheck for Type {
-    #[inline(always)]
+    #[inline]
     fn typecheck(t: DataType) -> bool {
         t.as_value().is_kind()
     }
@@ -134,7 +136,7 @@ unsafe impl Typecheck for Type {
 /// the `DataType` (or the `DataType` of the `Value`) is a bits type.
 pub struct Bits;
 unsafe impl Typecheck for Bits {
-    #[inline(always)]
+    #[inline]
     fn typecheck(t: DataType) -> bool {
         t.is_bits()
     }
@@ -144,7 +146,7 @@ unsafe impl Typecheck for Bits {
 /// the `DataType` is abstract. If it's invoked through `Value::is` it will always return false.
 pub struct Abstract;
 unsafe impl Typecheck for Abstract {
-    #[inline(always)]
+    #[inline]
     fn typecheck(t: DataType) -> bool {
         t.is_abstract()
     }
@@ -169,7 +171,7 @@ unsafe impl Typecheck for AbstractRef {
 /// the value is a `VecElement`.
 pub struct VecElement;
 unsafe impl Typecheck for VecElement {
-    #[inline(always)]
+    #[inline]
     fn typecheck(t: DataType) -> bool {
         unsafe { t.type_name() == TypeName::of_vecelement(&Unrooted::new()) }
     }
@@ -194,7 +196,7 @@ unsafe impl Typecheck for TypeType {
 /// the value is a dispatch tuple.
 pub struct DispatchTuple;
 unsafe impl Typecheck for DispatchTuple {
-    #[inline(always)]
+    #[inline]
     fn typecheck(t: DataType) -> bool {
         t.is_dispatch_tuple()
     }
@@ -204,7 +206,7 @@ unsafe impl Typecheck for DispatchTuple {
 /// a value of this type is a named tuple.
 pub struct NamedTuple;
 unsafe impl Typecheck for NamedTuple {
-    #[inline(always)]
+    #[inline]
     fn typecheck(t: DataType) -> bool {
         unsafe { t.unwrap_non_null(Private).as_ref().name == jl_namedtuple_typename }
     }
@@ -214,7 +216,7 @@ unsafe impl Typecheck for NamedTuple {
 /// the fields of a value of this type can be modified.
 pub struct Mutable;
 unsafe impl Typecheck for Mutable {
-    #[inline(always)]
+    #[inline]
     fn typecheck(t: DataType) -> bool {
         t.mutable()
     }
@@ -224,7 +226,7 @@ unsafe impl Typecheck for Mutable {
 /// the fields of a value of this type cannot be modified.
 pub struct Immutable;
 unsafe impl Typecheck for Immutable {
-    #[inline(always)]
+    #[inline]
     fn typecheck(t: DataType) -> bool {
         !t.mutable()
     }
@@ -248,7 +250,7 @@ unsafe impl Typecheck for PrimitiveType {
 /// a value of this type is a struct type.
 pub struct StructType;
 unsafe impl Typecheck for StructType {
-    #[inline(always)]
+    #[inline]
     fn typecheck(t: DataType) -> bool {
         !t.is_abstract() && !t.is::<PrimitiveType>()
     }
@@ -258,7 +260,7 @@ unsafe impl Typecheck for StructType {
 /// a value of this type is a struct type.
 pub struct Singleton;
 unsafe impl Typecheck for Singleton {
-    #[inline(always)]
+    #[inline]
     fn typecheck(t: DataType) -> bool {
         t.instance().is_some()
     }
@@ -270,7 +272,7 @@ pub struct Slot;
 
 #[julia_version(until = "1.9")]
 unsafe impl Typecheck for Slot {
-    #[inline(always)]
+    #[inline]
     fn typecheck(t: DataType) -> bool {
         unsafe { t.unwrap(Private) == jl_slotnumber_type || t.unwrap(Private) == jl_typedslot_type }
     }
@@ -278,7 +280,7 @@ unsafe impl Typecheck for Slot {
 
 #[julia_version(since = "1.10")]
 unsafe impl Typecheck for Slot {
-    #[inline(always)]
+    #[inline]
     fn typecheck(t: DataType) -> bool {
         unsafe { t.unwrap(Private) == jl_slotnumber_type }
     }
@@ -340,7 +342,7 @@ impl_julia_typecheck!(String, jl_string_type);
 /// a value of this type is a pointer to data not owned by Julia.
 pub struct Pointer;
 unsafe impl Typecheck for Pointer {
-    #[inline(always)]
+    #[inline]
     fn typecheck(t: DataType) -> bool {
         unsafe { t.type_name() == TypeName::of_pointer(&Unrooted::new()) }
     }
@@ -350,7 +352,7 @@ unsafe impl Typecheck for Pointer {
 /// a value of this type is an LLVM pointer.
 pub struct LLVMPointer;
 unsafe impl Typecheck for LLVMPointer {
-    #[inline(always)]
+    #[inline]
     fn typecheck(t: DataType) -> bool {
         unsafe { t.type_name() == TypeName::of_llvmpointer(&Unrooted::new()) }
     }
@@ -365,7 +367,7 @@ impl_julia_typecheck!(Intrinsic, jl_intrinsic_type);
 /// instances of the type can be created.
 pub struct Concrete;
 unsafe impl Typecheck for Concrete {
-    #[inline(always)]
+    #[inline]
     fn typecheck(t: DataType) -> bool {
         t.is_concrete_type()
     }

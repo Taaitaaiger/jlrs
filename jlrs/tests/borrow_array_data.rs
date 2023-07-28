@@ -21,8 +21,8 @@ mod tests {
                     jlrs.scope(|mut frame| unsafe {
                         let data: Vec<$value_type> = (1..=24).map(|x| x as $value_type).collect();
 
-                        let array = Array::from_vec(frame.as_extended_target(), data, (2, 3, 4))?
-                            .into_jlrs_result()?;
+                        let array =
+                            Array::from_vec(&mut frame, data, (2, 3, 4))?.into_jlrs_result()?;
                         let d = array.inline_data::<$value_type>()?;
 
                         let mut out = 1 as $value_type;
@@ -51,7 +51,7 @@ mod tests {
                                         let v = gi
                                             .call(
                                                 &mut frame,
-                                                &mut [array.as_value(), *first, *second, *third],
+                                                [array.as_value(), *first, *second, *third],
                                             )
                                             .unwrap();
                                         assert_eq!(v.unbox::<$value_type>()?, out);
@@ -81,8 +81,7 @@ mod tests {
                                 (1..=24).map(|x| x as $value_type).collect();
 
                             let mut array =
-                                Array::from_vec(frame.as_extended_target(), data, (2, 3, 4))?
-                                    .into_jlrs_result()?;
+                                Array::from_vec(&mut frame, data, (2, 3, 4))?.into_jlrs_result()?;
                             let mut d = array.bits_data_mut::<$value_type>()?;
 
                             for third in &[0, 1, 2, 3] {
@@ -108,12 +107,7 @@ mod tests {
                                             let v = gi
                                                 .call(
                                                     &mut frame,
-                                                    &mut [
-                                                        array.as_value(),
-                                                        *first,
-                                                        *second,
-                                                        *third,
-                                                    ],
+                                                    [array.as_value(), *first, *second, *third],
                                                 )
                                                 .unwrap();
                                             assert_eq!(v.unbox::<$value_type>()?, out);
@@ -140,12 +134,8 @@ mod tests {
                             let data: Vec<$value_type> =
                                 (1..=24).map(|x| x as $value_type).collect();
 
-                            let array = Array::from_vec(
-                                frame.as_extended_target(),
-                                data.clone(),
-                                (2, 3, 4),
-                            )?
-                            .into_jlrs_result()?;
+                            let array = Array::from_vec(&mut frame, data.clone(), (2, 3, 4))?
+                                .into_jlrs_result()?;
                             let d = array.inline_data::<$value_type>()?;
 
                             for (a, b) in data.iter().zip(d.as_slice()) {
@@ -168,12 +158,8 @@ mod tests {
                             let data: Vec<$value_type> =
                                 (1..=24).map(|x| x as $value_type).collect();
 
-                            let mut array = Array::from_vec(
-                                frame.as_extended_target(),
-                                data.clone(),
-                                (2, 3, 4),
-                            )?
-                            .into_jlrs_result()?;
+                            let mut array = Array::from_vec(&mut frame, data.clone(), (2, 3, 4))?
+                                .into_jlrs_result()?;
                             let mut d = array.bits_data_mut::<$value_type>()?;
 
                             for (a, b) in data.iter().zip(d.as_mut_slice()) {
@@ -268,8 +254,7 @@ mod tests {
                 .scope(|mut frame| unsafe {
                     let data: Vec<u8> = (1..=24).map(|x| x as u8).collect();
 
-                    let array = Array::from_vec(frame.as_extended_target(), data, (2, 3, 4))?
-                        .into_jlrs_result()?;
+                    let array = Array::from_vec(&mut frame, data, (2, 3, 4))?.into_jlrs_result()?;
 
                     frame.scope(|mut frame| {
                         let d = { array.inline_data::<u8>()? };
@@ -300,7 +285,7 @@ mod tests {
                                         let v = gi
                                             .call(
                                                 &mut frame,
-                                                &mut [array.as_value(), *first, *second, *third],
+                                                [array.as_value(), *first, *second, *third],
                                             )
                                             .unwrap();
                                         assert_eq!(v.unbox::<u8>()?, out);
@@ -325,8 +310,7 @@ mod tests {
 
             jlrs.instance(&mut frame)
                 .scope(|mut frame| {
-                    let arr_val = Array::new::<f32, _, _>(frame.as_extended_target(), (1, 2))
-                        .into_jlrs_result()?;
+                    let arr_val = Array::new::<f32, _, _>(&mut frame, (1, 2)).into_jlrs_result()?;
                     let arr = arr_val;
 
                     let data = unsafe { arr.inline_data::<f32>()? };
@@ -345,8 +329,7 @@ mod tests {
 
             jlrs.instance(&mut frame)
                 .scope(|mut frame| {
-                    let arr_val = Array::new::<f32, _, _>(frame.as_extended_target(), (1, 2))
-                        .into_jlrs_result()?;
+                    let arr_val = Array::new::<f32, _, _>(&mut frame, (1, 2)).into_jlrs_result()?;
                     let mut arr = arr_val;
 
                     let data = unsafe { arr.inline_data_mut::<f32>()? };

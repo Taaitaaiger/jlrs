@@ -1,3 +1,52 @@
+#### v0.19
+
+- A GC-safe `GcSafeRwLock`, `GcSafeMutex`, `GcSafeFairMutex`, and `GcSafeOnceLock` have been added. These synchronization primitives allow for garbage to be collected while waiting for access to be granted.
+
+- The `ConstructType` trait has gained an associated type and constant, and two new trait methods. The associated `Static` type provides a unique, static Rust type for the type constructor, which must be `Self` with static lifetimes. The associated constant `CACHEABLE` indicates whether the constructed type should be cached if it's a leaf type. The `construct_type` method uses the cached entry if it's available, or construct and cache it when supported otherwise. The `construct_type_uncached` method always constructs the type without checking if a cached entry exists. The `type_id` method returns the type id of the associated `Static` type, which is used internally as a key for the cache.
+
+- `Value`s can be instantiated from a layout and a type constructor with `Value::try_new_with`. This method copies the provided layout from Rust to Julia if the provided type constructor is compatible with the provided layout. This method is also available for `TypedValue`.
+
+- The `ValidLayout` trait has gained a `type_object` method. This method must return the Julia type object associated with this type. Its main use is correctly handling unions in `Value::try_new_with`.
+
+- The `ParametricBase` and `ParametricVariant` traits have been added which let you create opaque types with type parameters.
+
+- Opaque types, functions, methods and async functions with type parameters can be exported by iterating over an array of types with a `for` loop in `julia_module`. These loops can be nested, types provided by outer loops can be used in inner loops. Duplicate implentations are filtered as long as the item is only exported once.
+
+- Constantly-sized frames can be allocated on the stack by creating a local scope, all targets allow creating a new local scope. This construct is used for all functions that used to take an `ExtendedTarget`, they now only need a `Target`. This involves three new targets: `LocalGcFrame`, `LocalOutput`, and `LocalReusableSlot`. Trying to reserve a new slot when the frame is full causes a `panic`.
+
+- Functions and methods exported by the `julia_module` macro no longer need to return a `RustResultRet` to throw an exception. The exception can now be thrown directly from Rust. The return type of the exported function no longer needs to account for exceptions if they can only occur due to tracking `self`. If a function should throw an exception, the function can return either a `JlrsResult<RetTy>` or a `Result<RetTy, ValueRet>`. Such a result will either be converted to the output type or thrown as an exception.
+
+- The `c-unwind` feature has been added. When this feature is enabled, all C functions use the `C-unwind` ABI rather than the `C` ABI.
+
+- `Symbol`s and constructed types are cached. Accessing a global in a module can also be cached with `Module::typed_global_cached`.
+
+- Exceptions can be caught by calling `catch_exceptions`.
+
+- Exported functions and methods can be declared to be GC-safe with the `#[gc_safe]` attribute.
+
+- Exported methods that take `self` can skip tracking with the `#[untracked_self]` attribute.
+
+- Types that have no pointer fields can implement `IsBits`. This trait is automatically derived if appropriate by `JlrsCore.Reflect.reflect`.
+
+- Type constructors can be associated with their layout by implementing `HasLayout`. This trait is automatically derived if appropriate by `JlrsCore.Reflect.reflect`, or implemented by blanket implementation if the type constructor and layout are the same type.
+
+- `Value::new_named_tuple` takes a sized array of key-value pairs to avoid heap-allocations.
+
+- A `DimsExt` trait has been added to optimize creating new arrays. While `Dims` can be implemented by crates that use jlrs, `DimsExt` is sealed.
+
+- When a runtime feature is enabled fast TLS is enabled. Crates like rustfft-jl that don't embed Julia must not enable any runtime features.
+
+- Exported functions and methods that should throw can do so by returning a `JlrsResult` or `Result<_, ValueRet>`. `RustResult` has been deprecated in favor of returning one of these types.
+
+- Some functions need to insert additional arguments before the provided arguments. Examples include calling functions with keyword arguments and functions that call a Julia function asynchronously. These functions now take their arguments as an implementation of `Values`, which can add the extra arguments without having to allocate space for them on the heap if the number of arguments is known at compile-time.
+
+- `Call::call_unchecked` has been added to call a Julia function without catching the exception if one is thrown.
+
+- Type aliases can be defined with the `julia_module` macro.
+
+- The `full-no-rt` feature has been added to allow selecting all features except runtimes.
+
+
 #### v0.18
 
  - jlrs is compatible with Julia 1.7 again, but this version isn't actively tested or supported. Version features have been added to select a particular version of Julia, picking a specific version is required.

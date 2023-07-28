@@ -19,7 +19,7 @@ use crate::{
         Ref,
     },
     impl_julia_typecheck,
-    memory::target::Target,
+    memory::target::{Target, TargetResult},
     private::Private,
 };
 
@@ -292,16 +292,18 @@ impl<'scope> ManagedPriv<'scope, '_> for CodeInstance<'scope> {
 
     // Safety: `inner` must not have been freed yet, the result must never be
     // used after the GC might have freed it.
+    #[inline]
     unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self {
         Self(inner, ::std::marker::PhantomData)
     }
 
+    #[inline]
     fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps> {
         self.0
     }
 }
 
-impl_construct_type_managed!(CodeInstance<'_>, jl_code_instance_type);
+impl_construct_type_managed!(CodeInstance, 1, jl_code_instance_type);
 
 /// A reference to a [`CodeInstance`] that has not been explicitly rooted.
 pub type CodeInstanceRef<'scope> = Ref<'scope, 'static, CodeInstance<'scope>>;
@@ -310,10 +312,10 @@ pub type CodeInstanceRef<'scope> = Ref<'scope, 'static, CodeInstance<'scope>>;
 /// `ccall`able functions that return a [`CodeInstance`].
 pub type CodeInstanceRet = Ref<'static, 'static, CodeInstance<'static>>;
 
-impl_valid_layout!(CodeInstanceRef, CodeInstance);
+impl_valid_layout!(CodeInstanceRef, CodeInstance, jl_code_instance_type);
 
 use super::method_instance::MethodInstance;
-use crate::memory::target::target_type::TargetType;
+use crate::memory::target::TargetType;
 
 /// `CodeInstance` or `CodeInstanceRef`, depending on the target type `T`.
 pub type CodeInstanceData<'target, T> =
@@ -321,8 +323,7 @@ pub type CodeInstanceData<'target, T> =
 
 /// `JuliaResult<CodeInstance>` or `JuliaResultRef<CodeInstanceRef>`, depending on the target type
 /// `T`.
-pub type CodeInstanceResult<'target, T> =
-    <T as TargetType<'target>>::Result<'static, CodeInstance<'target>>;
+pub type CodeInstanceResult<'target, T> = TargetResult<'target, 'static, CodeInstance<'target>, T>;
 
 impl_ccall_arg_managed!(CodeInstance, 1);
 impl_into_typed!(CodeInstance);

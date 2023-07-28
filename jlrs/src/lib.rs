@@ -1,8 +1,8 @@
 //! jlrs is a crate that provides access to most of the Julia C API, it can be used to embed Julia
 //! in Rust applications and to use functionality it provides when writing `ccall`able
 //! functions in Rust. Currently this crate is only tested in combination with Julia 1.6 and 1.9,
-//! but also supports Julia 1.7 and 1.8. Using the current stable version is highly recommended.
-//! The minimum supported Rust version is currently 1.65.
+//! but also supports Julia 1.7, 1.8 and 1.10. Using the current stable version is highly 
+//! recommended. The minimum supported Rust version is currently 1.65.
 //!
 //! The documentation assumes you're already familiar with the Julia and Rust programming
 //! languages.
@@ -35,7 +35,7 @@
 //! # Prerequisites
 //!
 //! Julia must be installed before jlrs can be used, jlrs is compatible with Julia 1.6 up to and
-//! including Julia 1.9. The JlrsCore package must also have been installed, if this is not the
+//! including Julia 1.10. The JlrsCore package must also have been installed, if this is not the
 //! case it will automatically be added when jlrs is initialized by default. jlrs has not been
 //! tested with juliaup yet on Linux and macOS.
 //!
@@ -94,6 +94,7 @@
 //!  - `julia-1-7`
 //!  - `julia-1-8`
 //!  - `julia-1-9`
+//!  - `julia-1-10`
 //!
 //! Exactly one version feature must be enabled. If no version is enabled, or multiple are, jl-sys
 //! will fail to compile.
@@ -107,6 +108,7 @@
 //! julia-1-7 = ["jlrs/julia-1-7"]
 //! julia-1-8 = ["jlrs/julia-1-8"]
 //! julia-1-9 = ["jlrs/julia-1-9"]
+//! julia-1-10 = ["jlrs/julia-1-10"]
 //! ```
 //!
 //! In this case you must provide this feature when you build or run your crate:
@@ -214,7 +216,8 @@
 //!   Flag that must be enabled when compiling with BinaryBuilder.
 //!
 //! You can enable all features except `debug`, `i686`, `windows`, `no-link` and `yggdrasil` by
-//! enabling the `full` feature.
+//! enabling the `full` feature. If you don't want to enable any runtimes either, you can use
+//! `full-no-rt`.
 //!
 //!
 //! # Using this crate
@@ -222,11 +225,11 @@
 //! If you want to embed Julia in a Rust application, you must enable a runtime and a version
 //! feature:
 //!
-//! `jlrs = {version = "0.18.0", features = ["sync-rt", "julia-1-8"]}`
+//! `jlrs = {version = "0.19.0", features = ["sync-rt", "julia-1-8"]}`
 //!
-//! `jlrs = {version = "0.18.0", features = ["tokio-rt", "julia-1-8"]}`
+//! `jlrs = {version = "0.19.0", features = ["tokio-rt", "julia-1-8"]}`
 //!
-//! `jlrs = {version = "0.18.0", features = ["async-std-rt", "julia-1-8"]}`
+//! `jlrs = {version = "0.19.0", features = ["async-std-rt", "julia-1-8"]}`
 //!
 //! When Julia is embedded in an application, it must be initialized before it can be used. The
 //! following snippet initializes the sync runtime:
@@ -427,7 +430,7 @@
 //!         // CallAsync::call_async schedules the function call on another
 //!         // thread and returns a Future that resolves when the scheduled
 //!         // function has returned or thrown an error.
-//!         unsafe { func.call_async(&mut frame, &mut [a, b]) }
+//!         unsafe { func.call_async(&mut frame, [a, b]) }
 //!             .await
 //!             .into_jlrs_result()?
 //!             .unbox::<u64>()
@@ -484,8 +487,8 @@
 //!         // A `Vec` can be moved from Rust to Julia if the element type
 //!         // implements `IntoJulia`.
 //!         let data = vec![0usize; self.n_values];
-//!         let array = TypedArray::from_vec(frame.as_extended_target(), data, self.n_values)?
-//!             .into_jlrs_result()?;
+//!         let array =
+//!             TypedArray::from_vec(&mut frame, data, self.n_values)?.into_jlrs_result()?;
 //!
 //!         Ok(AccumulatorTaskState { array, offset: 0 })
 //!     }
@@ -589,6 +592,8 @@
 //! [profile.release]
 //! panic = "abort"
 //! ```
+//!
+//! You must not enable any runtime features.
 //!
 //! The easiest way to export Rust functions like `call_me` from the previous example is by
 //! using the [`julia_module`] macro. The content of the macro is converted to an initialization
@@ -771,14 +776,24 @@
 
 #![forbid(rustdoc::broken_intra_doc_links)]
 
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::AtomicBool;
 
+use atomic::Ordering;
 #[cfg(feature = "sync-rt")]
 use once_cell::sync::OnceCell;
 use prelude::Managed;
 
 use crate::{
-    data::managed::{module::Module, value::Value},
+    data::{
+        managed::{
+            module::{init_global_cache, Module},
+            symbol::init_symbol_cache,
+            value::Value,
+        },
+        types::{
+            construct_type::init_constructed_type_cache, foreign_type::init_foreign_type_registry,
+        },
+    },
     memory::{
         context::{ledger::init_ledger, stack::Stack},
         stack_frame::PinnedFrame,
@@ -809,15 +824,17 @@ macro_rules! init_fn {
     };
 }
 
+pub mod args;
 #[cfg(feature = "async")]
 pub mod async_util;
 pub mod call;
-pub(crate) mod catch;
+pub mod catch;
 #[cfg(feature = "ccall")]
 pub mod ccall;
 pub mod convert;
 pub mod data;
 pub mod error;
+pub mod gc_safe;
 pub mod info;
 pub mod memory;
 #[cfg(feature = "prelude")]
@@ -946,6 +963,11 @@ pub(crate) unsafe fn init_jlrs<const N: usize>(
     if IS_INIT.swap(true, Ordering::Relaxed) {
         return;
     }
+
+    init_foreign_type_registry();
+    init_constructed_type_cache();
+    init_symbol_cache();
+    init_global_cache();
 
     let unrooted = Unrooted::new();
     install_jlrs_core.use_or_install(unrooted);

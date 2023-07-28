@@ -9,9 +9,10 @@ use super::{
     Ref,
 };
 use crate::{
+    catch::catch_exceptions,
     data::managed::{private::ManagedPriv, value::Value, Managed},
     impl_julia_typecheck,
-    memory::target::Target,
+    memory::target::{Target, TargetResult},
     private::Private,
 };
 
@@ -35,25 +36,16 @@ impl<'scope> Union<'scope> {
         V: AsRef<[Value<'scope, 'static>]>,
         T: Target<'target>,
     {
-        use std::mem::MaybeUninit;
-
-        use jl_sys::jl_value_t;
-
-        use crate::catch::catch_exceptions;
-
         // Safety: if an exception is thrown it's caught, the result is immediately rooted
         unsafe {
             let types = types.as_ref();
 
-            let mut callback = |result: &mut MaybeUninit<*mut jl_value_t>| {
-                let res = jl_type_union(types.as_ptr() as *mut _, types.len());
-                result.write(res);
-                Ok(())
-            };
+            let callback = || jl_type_union(types.as_ptr() as *mut _, types.len());
+            let exc = |err: Value| err.unwrap_non_null(Private);
 
-            let res = match catch_exceptions(&mut callback).unwrap() {
+            let res = match catch_exceptions(callback, exc) {
                 Ok(ptr) => Ok(NonNull::new_unchecked(ptr)),
-                Err(e) => Err(e.ptr()),
+                Err(e) => Err(e),
             };
 
             target.result_from_ptr(res, Private)
@@ -71,6 +63,7 @@ impl<'scope> Union<'scope> {
     ///
     /// [`Union`]: crate::data::managed::union::Union
     /// [`DataType`]: crate::data::managed::datatype::DataType
+    #[inline]
     pub unsafe fn new_unchecked<'target, V, T>(
         target: T,
         types: V,
@@ -85,6 +78,7 @@ impl<'scope> Union<'scope> {
     }
 
     /// Returns true if the bits-union optimization applies to this union type.
+    #[inline]
     pub fn is_bits_union(self) -> bool {
         let v: Value = self.as_value();
         // Safety: The C API function is called with valid arguments
@@ -94,6 +88,7 @@ impl<'scope> Union<'scope> {
     /// Returns true if the bits-union optimization applies to this union type and calculates
     /// the size and aligment if it does. If this method returns false, the calculated size and
     /// alignment are invalid.
+    #[inline]
     pub fn isbits_size_align(self, size: &mut usize, align: &mut usize) -> bool {
         let v: Value = self.as_value();
         // Safety: The C API function is called with valid arguments
@@ -102,6 +97,7 @@ impl<'scope> Union<'scope> {
 
     /// Returns the size of a field that is of this `Union` type excluding the flag that is used
     /// in bits-unions.
+    #[inline]
     pub fn size(self) -> usize {
         let mut sz = 0;
         if !self.isbits_size_align(&mut sz, &mut 0) {
@@ -112,6 +108,7 @@ impl<'scope> Union<'scope> {
     }
 
     /// Returns a vector of all type variants this union can have.
+    #[inline]
     pub fn variants(self) -> Vec<Value<'scope, 'static>> {
         let mut comps = vec![];
         collect(self.as_value(), &mut comps);
@@ -126,6 +123,7 @@ impl<'scope> Union<'scope> {
 
     /// Unions are stored as binary trees, the arguments are stored as its leaves. This method
     /// returns one of its branches.
+    #[inline]
     pub fn a(self) -> Value<'scope, 'static> {
         // Safety: the pointer points to valid data
         unsafe {
@@ -137,6 +135,7 @@ impl<'scope> Union<'scope> {
 
     /// Unions are stored as binary trees, the arguments are stored as its leaves. This method
     /// returns one of its branches.
+    #[inline]
     pub fn b(self) -> Value<'scope, 'static> {
         // Safety: the pointer points to valid data
         unsafe {
@@ -157,10 +156,12 @@ impl<'scope> ManagedPriv<'scope, '_> for Union<'scope> {
 
     // Safety: `inner` must not have been freed yet, the result must never be
     // used after the GC might have freed it.
+    #[inline]
     unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self {
         Self(inner, PhantomData)
     }
 
+    #[inline]
     fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps> {
         self.0
     }
@@ -171,63 +172,57 @@ pub(crate) fn nth_union_component<'scope, 'data>(
     pi: &mut i32,
 ) -> Option<Value<'scope, 'data>> {
     // Safety: both a and b are never null
-    match v.cast::<Union>() {
-        Ok(un) => {
-            let a = nth_union_component(un.a(), pi);
-            if a.is_some() {
-                a
-            } else {
-                *pi -= 1;
-                return nth_union_component(un.b(), pi);
-            }
+    if v.is::<Union>() {
+        let un = unsafe { v.cast_unchecked::<Union>() };
+        let a = nth_union_component(un.a(), pi);
+        if a.is_some() {
+            a
+        } else {
+            *pi -= 1;
+            return nth_union_component(un.b(), pi);
         }
-        Err(_) => {
-            if *pi == 0 {
-                Some(v)
-            } else {
-                None
-            }
+    } else {
+        if *pi == 0 {
+            Some(v)
+        } else {
+            None
         }
     }
 }
 
 fn collect<'scope>(value: Value<'scope, 'static>, comps: &mut Vec<Value<'scope, 'static>>) {
     // Safety: both a and b are never null
-    match value.cast::<Union>() {
-        Ok(u) => {
-            collect(u.a(), comps);
-            collect(u.b(), comps);
-        }
-        Err(_) => {
-            comps.push(value);
-        }
+    if value.is::<Union>() {
+        let u = unsafe { value.cast_unchecked::<Union>() };
+        collect(u.a(), comps);
+        collect(u.b(), comps);
+    } else {
+        comps.push(value);
     }
 }
 
 pub(crate) fn find_union_component(haystack: Value, needle: Value, nth: &mut u32) -> bool {
     // Safety: both a and b are never null
-    match haystack.cast::<Union>() {
-        Ok(hs) => {
-            if find_union_component(hs.a(), needle, nth) {
-                true
-            } else if find_union_component(hs.b(), needle, nth) {
-                true
-            } else {
-                false
-            }
+    if haystack.is::<Union>() {
+        let hs = unsafe { haystack.cast_unchecked::<Union>() };
+        if find_union_component(hs.a(), needle, nth) {
+            true
+        } else if find_union_component(hs.b(), needle, nth) {
+            true
+        } else {
+            false
         }
-        Err(_) => {
-            if needle.unwrap_non_null(Private) == haystack.unwrap_non_null(Private) {
-                return true;
-            } else {
-                *nth += 1;
-                false
-            }
+    } else {
+        if needle.unwrap_non_null(Private) == haystack.unwrap_non_null(Private) {
+            return true;
+        } else {
+            *nth += 1;
+            false
         }
     }
 }
 
-impl_construct_type_managed!(Union<'_>, jl_uniontype_type);
+impl_construct_type_managed!(Union, 1, jl_uniontype_type);
 
 /// A reference to a [`Union`] that has not been explicitly rooted.
 pub type UnionRef<'scope> = Ref<'scope, 'static, Union<'scope>>;
@@ -236,15 +231,15 @@ pub type UnionRef<'scope> = Ref<'scope, 'static, Union<'scope>>;
 /// `ccall`able functions that return a [`Union`].
 pub type UnionRet = Ref<'static, 'static, Union<'static>>;
 
-impl_valid_layout!(UnionRef, Union);
+impl_valid_layout!(UnionRef, Union, jl_uniontype_type);
 
-use crate::memory::target::target_type::TargetType;
+use crate::memory::target::TargetType;
 
 /// `Union` or `UnionRef`, depending on the target type `T`.
 pub type UnionData<'target, T> = <T as TargetType<'target>>::Data<'static, Union<'target>>;
 
 /// `JuliaResult<Union>` or `JuliaResultRef<UnionRef>`, depending on the target type `T`.
-pub type UnionResult<'target, T> = <T as TargetType<'target>>::Result<'static, Union<'target>>;
+pub type UnionResult<'target, T> = TargetResult<'target, 'static, Union<'target>, T>;
 
 impl_ccall_arg_managed!(Union, 1);
 impl_into_typed!(Union);

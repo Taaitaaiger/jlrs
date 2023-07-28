@@ -53,7 +53,7 @@ impl<T: ValidLayout> CompatibleCast for T {
     type Inner = T;
     type Output<U: Sized> = U;
 
-    #[inline(always)]
+    #[inline]
     fn compatible_cast<U>(&self) -> &Self::Output<U>
     where
         T: Compatible<U>,
@@ -63,7 +63,7 @@ impl<T: ValidLayout> CompatibleCast for T {
         unsafe { std::mem::transmute(self) }
     }
 
-    #[inline(always)]
+    #[inline]
     fn compatible_cast_mut<U>(&mut self) -> &mut Self::Output<U>
     where
         T: Compatible<U>,
@@ -78,7 +78,7 @@ impl<T: ValidLayout> CompatibleCast for [T] {
     type Inner = T;
     type Output<U: Sized> = [U];
 
-    #[inline(always)]
+    #[inline]
     fn compatible_cast<U>(&self) -> &Self::Output<U>
     where
         T: Compatible<U>,
@@ -88,7 +88,7 @@ impl<T: ValidLayout> CompatibleCast for [T] {
         unsafe { std::mem::transmute(self) }
     }
 
-    #[inline(always)]
+    #[inline]
     fn compatible_cast_mut<U>(&mut self) -> &mut Self::Output<U>
     where
         T: Compatible<U>,
@@ -103,7 +103,7 @@ impl<T: ValidLayout, const N: usize> CompatibleCast for [T; N] {
     type Inner = T;
     type Output<U: Sized> = [U; N];
 
-    #[inline(always)]
+    #[inline]
     fn compatible_cast<U>(&self) -> &Self::Output<U>
     where
         T: Compatible<U>,
@@ -113,7 +113,7 @@ impl<T: ValidLayout, const N: usize> CompatibleCast for [T; N] {
         unsafe { std::mem::transmute(self) }
     }
 
-    #[inline(always)]
+    #[inline]
     fn compatible_cast_mut<U>(&mut self) -> &mut Self::Output<U>
     where
         T: Compatible<U>,
@@ -155,6 +155,12 @@ mod tests {
 
     unsafe impl ValidLayout for A {
         fn valid_layout(_: Value) -> bool {
+            unimplemented!()
+        }
+
+        fn type_object<'target, Tgt: crate::prelude::Target<'target>>(
+            _target: &Tgt,
+        ) -> Value<'target, 'static> {
             unimplemented!()
         }
     }

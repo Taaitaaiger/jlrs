@@ -7,6 +7,7 @@ use std::fmt::{Debug, Formatter, Result as FmtResult};
 
 use jl_sys::{jl_bool_type, jl_unbox_int8};
 
+use super::is_bits::IsBits;
 use crate::{
     convert::unbox::Unbox,
     data::managed::{private::ManagedPriv, value::Value},
@@ -20,18 +21,18 @@ use crate::{
 pub struct Bool(i8);
 
 impl Bool {
-    #[inline(always)]
+    #[inline]
     pub fn new(val: bool) -> Self {
         Bool(val as i8)
     }
 
-    #[inline(always)]
+    #[inline]
     /// Returns the value of the `Bool` as a `i8`.
     pub fn as_i8(self) -> i8 {
         self.0
     }
 
-    #[inline(always)]
+    #[inline]
     /// Returns the value of the `Bool` as a `bool` if it's 0 or 1, `None` if it isn't.
     pub fn try_as_bool(self) -> Option<bool> {
         match self.0 {
@@ -42,7 +43,7 @@ impl Bool {
     }
 
     /// Returns the value of the `Bool` as a `bool`.
-    #[inline(always)]
+    #[inline]
     pub fn as_bool(self) -> bool {
         self.0 != 0
     }
@@ -59,12 +60,12 @@ impl<'scope> Debug for Bool {
 }
 
 impl_julia_typecheck!(Bool, jl_bool_type);
-impl_valid_layout!(Bool);
+impl_valid_layout!(Bool, jl_bool_type);
 
 unsafe impl Unbox for Bool {
     type Output = Self;
 
-    #[inline(always)]
+    #[inline]
     unsafe fn unbox(value: Value) -> Bool {
         Bool(jl_unbox_int8(value.unwrap(Private).cast()))
     }
@@ -73,7 +74,7 @@ unsafe impl Unbox for Bool {
 unsafe impl Unbox for bool {
     type Output = Bool;
 
-    #[inline(always)]
+    #[inline]
     unsafe fn unbox(value: Value) -> Bool {
         Bool(jl_unbox_int8(value.unwrap(Private).cast()))
     }
@@ -81,3 +82,5 @@ unsafe impl Unbox for bool {
 
 impl_ccall_arg!(Bool);
 impl_construct_julia_type!(Bool, jl_bool_type);
+
+unsafe impl IsBits for Bool {}

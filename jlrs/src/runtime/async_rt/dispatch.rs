@@ -21,6 +21,7 @@ impl<'a, D> Debug for Dispatch<'a, D> {
 }
 
 impl<'a, D: Affinity> Dispatch<'a, D> {
+    #[inline]
     pub(super) fn new(sender: &'a Sender<Message>, msg: Message) -> Self {
         Dispatch {
             msg,
@@ -35,6 +36,7 @@ impl<'a, D: ToAny> Dispatch<'a, D> {
     ///
     /// The dispatched task can be handled by either the main thread or any of the worker threads.
     /// This method doesn't resolve until the task has been successfully dispatched.
+    #[inline]
     pub async fn dispatch_any(self) {
         self.sender.send(self.msg).await
     }
@@ -43,6 +45,7 @@ impl<'a, D: ToAny> Dispatch<'a, D> {
     ///
     /// The dispatched task can be handled by either the main thread or any of the worker threads.
     /// If the backing queue is full, the dispatcher is returned to allow retrying.
+    #[inline]
     pub fn try_dispatch_any(self) -> Result<(), Self> {
         if let Some(msg) = self.sender.try_send(self.msg) {
             Err(Dispatch {
@@ -61,6 +64,7 @@ impl<'a, D: ToMain> Dispatch<'a, D> {
     ///
     /// The dispatched task is guaranteed to be handled by the main thread. This method doesn't
     /// resolve until the task has been successfully dispatched.
+    #[inline]
     pub async fn dispatch_main(self) {
         self.sender.send_main(self.msg).await
     }
@@ -69,6 +73,7 @@ impl<'a, D: ToMain> Dispatch<'a, D> {
     ///
     /// The dispatched task is guaranteed to be handled by the main thread. If the backing queue
     /// is full, the dispatcher is returned to allow retrying.
+    #[inline]
     pub fn try_dispatch_main(self) -> Result<(), Self> {
         if let Some(msg) = self.sender.try_send_main(self.msg) {
             Err(Dispatch {
@@ -88,6 +93,7 @@ impl<'a, D: ToWorker> Dispatch<'a, D> {
     /// The dispatched task is guaranteed to be handled by a worker thread if they're used,
     /// otherwise it's handled by the main thread. This method doesn't resolve until the task has
     /// been successfully dispatched.
+    #[inline]
     pub async fn dispatch_worker(self) {
         self.sender.send_worker(self.msg).await
     }
@@ -97,6 +103,7 @@ impl<'a, D: ToWorker> Dispatch<'a, D> {
     /// The dispatched task is guaranteed to be handled by a worker thread if they're used,
     /// otherwise it's handled by the main thread.  If the backing queue is full, the dispatcher
     /// is returned to allow retrying.
+    #[inline]
     pub fn try_dispatch_worker(self) -> Result<(), Self> {
         if let Some(msg) = self.sender.try_send_worker(self.msg) {
             Err(Dispatch {

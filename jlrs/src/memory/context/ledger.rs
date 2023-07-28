@@ -9,15 +9,15 @@
 
 use std::ffi::c_void;
 
-use once_cell::sync::OnceCell;
-
 use crate::{
-    data::managed::{module::Module, value::Value},
+    data::managed::{module::Module, private::ManagedPriv, value::Value},
     error::{JlrsError, JlrsResult},
+    gc_safe::GcSafeOnceLock,
     memory::target::unrooted::Unrooted,
+    private::Private,
 };
 
-const API_VERSION: usize = 1;
+const API_VERSION: usize = 2;
 
 #[derive(PartialEq, Eq, Debug)]
 #[repr(u8)]
@@ -26,10 +26,9 @@ pub(crate) enum LedgerResult {
     OkFalse = 0u8,
     OkTrue = 1u8,
     Err = 2u8,
-    Poison = 3u8,
 }
 
-pub(crate) static LEDGER: OnceCell<Ledger> = OnceCell::new();
+pub(crate) static LEDGER: GcSafeOnceLock<Ledger> = GcSafeOnceLock::new();
 
 pub(crate) struct Ledger {
     api_version: unsafe extern "C" fn() -> usize,
@@ -160,94 +159,95 @@ pub(crate) unsafe extern "C" fn init_ledger() {
 }
 
 impl Ledger {
+    #[inline]
     pub(crate) fn api_version() -> usize {
         unsafe { (LEDGER.get_unchecked().api_version)() }
     }
 
+    #[inline]
     pub(crate) fn is_borrowed_shared(data: Value) -> JlrsResult<bool> {
         unsafe {
             match (LEDGER.get_unchecked().is_borrowed_shared)(data.data_ptr().as_ptr()) {
                 LedgerResult::OkFalse => Ok(false),
                 LedgerResult::OkTrue => Ok(true),
                 LedgerResult::Err => Err(JlrsError::exception("unexpected error"))?,
-                LedgerResult::Poison => Err(JlrsError::exception("poisoned mutex"))?,
             }
         }
     }
 
+    #[inline]
     pub(crate) fn is_borrowed_exclusive(data: Value) -> JlrsResult<bool> {
         unsafe {
-            match (LEDGER.get_unchecked().is_borrowed_exclusive)(data.data_ptr().as_ptr()) {
+            match (LEDGER.get_unchecked().is_borrowed_exclusive)(data.unwrap(Private).cast()) {
                 LedgerResult::OkFalse => Ok(false),
                 LedgerResult::OkTrue => Ok(true),
                 LedgerResult::Err => Err(JlrsError::exception("unexpected error"))?,
-                LedgerResult::Poison => Err(JlrsError::exception("poisoned mutex"))?,
             }
         }
     }
 
+    #[inline]
     pub(crate) fn is_borrowed(data: Value) -> JlrsResult<bool> {
         unsafe {
             match (LEDGER.get_unchecked().is_borrowed)(data.data_ptr().as_ptr()) {
                 LedgerResult::OkFalse => Ok(false),
                 LedgerResult::OkTrue => Ok(true),
                 LedgerResult::Err => Err(JlrsError::exception("unexpected error"))?,
-                LedgerResult::Poison => Err(JlrsError::exception("poisoned mutex"))?,
             }
         }
     }
 
+    #[inline]
     pub(crate) fn try_borrow_shared(data: Value) -> JlrsResult<bool> {
         unsafe {
             match (LEDGER.get_unchecked().try_borrow_shared)(data.data_ptr().as_ptr()) {
                 LedgerResult::OkFalse => Ok(false),
                 LedgerResult::OkTrue => Ok(true),
                 LedgerResult::Err => Err(JlrsError::exception("already exclusively borrowed"))?,
-                LedgerResult::Poison => Err(JlrsError::exception("poisoned mutex"))?,
             }
         }
     }
 
+    #[inline]
     pub(crate) fn try_borrow_exclusive(data: Value) -> JlrsResult<bool> {
         unsafe {
             match (LEDGER.get_unchecked().try_borrow_exclusive)(data.data_ptr().as_ptr()) {
                 LedgerResult::OkFalse => Ok(false),
                 LedgerResult::OkTrue => Ok(true),
                 LedgerResult::Err => Err(JlrsError::exception("already exclusively borrowed"))?,
-                LedgerResult::Poison => Err(JlrsError::exception("poisoned mutex"))?,
             }
         }
     }
 
+    #[inline]
     pub(crate) unsafe fn borrow_shared_unchecked(data: Value) -> JlrsResult<bool> {
         unsafe {
             match (LEDGER.get_unchecked().borrow_shared_unchecked)(data.data_ptr().as_ptr()) {
                 LedgerResult::OkFalse => Ok(false),
                 LedgerResult::OkTrue => Ok(true),
                 LedgerResult::Err => Err(JlrsError::exception("already exclusively borrowed"))?,
-                LedgerResult::Poison => Err(JlrsError::exception("poisoned mutex"))?,
             }
         }
     }
 
+    #[inline]
     pub(crate) unsafe fn unborrow_shared(data: Value) -> JlrsResult<bool> {
         unsafe {
             match (LEDGER.get_unchecked().unborrow_shared)(data.data_ptr().as_ptr()) {
                 LedgerResult::OkFalse => Ok(false),
                 LedgerResult::OkTrue => Ok(true),
                 LedgerResult::Err => Err(JlrsError::exception("not borrowed"))?,
-                LedgerResult::Poison => Err(JlrsError::exception("poisoned mutex"))?,
             }
         }
     }
 
+    #[inline]
     pub(crate) unsafe fn unborrow_exclusive(data: Value) -> JlrsResult<bool> {
         unsafe {
             match (LEDGER.get_unchecked().unborrow_exclusive)(data.data_ptr().as_ptr()) {
                 LedgerResult::OkFalse => Ok(false),
                 LedgerResult::OkTrue => Ok(true),
                 LedgerResult::Err => Err(JlrsError::exception("not borrowed"))?,
-                LedgerResult::Poison => Err(JlrsError::exception("poisoned mutex"))?,
             }
         }
     }

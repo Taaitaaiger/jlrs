@@ -20,7 +20,7 @@ use crate::{
         Ref,
     },
     impl_julia_typecheck,
-    memory::target::Target,
+    memory::target::{Target, TargetResult},
     private::Private,
 };
 
@@ -212,16 +212,18 @@ impl<'scope> ManagedPriv<'scope, '_> for MethodInstance<'scope> {
 
     // Safety: `inner` must not have been freed yet, the result must never be
     // used after the GC might have freed it.
+    #[inline]
     unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self {
         Self(inner, PhantomData)
     }
 
+    #[inline]
     fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps> {
         self.0
     }
 }
 
-impl_construct_type_managed!(MethodInstance<'_>, jl_method_instance_type);
+impl_construct_type_managed!(MethodInstance, 1, jl_method_instance_type);
 
 /// A reference to a [`MethodInstance`] that has not been explicitly rooted.
 pub type MethodInstanceRef<'scope> = Ref<'scope, 'static, MethodInstance<'scope>>;
@@ -230,10 +232,10 @@ pub type MethodInstanceRef<'scope> = Ref<'scope, 'static, MethodInstance<'scope>
 /// `ccall`able functions that return a [`MethodInstance`].
 pub type MethodInstanceRet = Ref<'static, 'static, MethodInstance<'static>>;
 
-impl_valid_layout!(MethodInstanceRef, MethodInstance);
+impl_valid_layout!(MethodInstanceRef, MethodInstance, jl_method_instance_type);
 
 use super::code_instance::CodeInstanceData;
-use crate::memory::target::target_type::TargetType;
+use crate::memory::target::TargetType;
 
 /// `MethodInstance` or `MethodInstanceRef`, depending on the target type `T`.
 pub type MethodInstanceData<'target, T> =
@@ -242,7 +244,7 @@ pub type MethodInstanceData<'target, T> =
 /// `JuliaResult<MethodInstance>` or `JuliaResultRef<MethodInstanceRef>`, depending on the target
 /// type `T`.
 pub type MethodInstanceResult<'target, T> =
-    <T as TargetType<'target>>::Result<'static, MethodInstance<'target>>;
+    TargetResult<'target, 'static, MethodInstance<'target>, T>;
 
 impl_ccall_arg_managed!(MethodInstance, 1);
 impl_into_typed!(MethodInstance);

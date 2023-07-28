@@ -25,13 +25,13 @@ mod tests {
 
             jlrs.instance(&mut frame)
                 .scope(|mut frame| {
-                    let ty = <ArrayTypeConstructor<AbstractChar, ConstantIsize<2>> as ConstructType>::construct_type(frame.as_extended_target());
+                    let ty = <ArrayTypeConstructor<AbstractChar, ConstantIsize<2>> as ConstructType>::construct_type(&mut frame);
                     assert!(ty.is::<DataType>());
                     let inner_ty = unsafe {ty.cast_unchecked::<DataType>()};
                     assert!(inner_ty.is::<Array>());
 
                     let elem_param = inner_ty.parameter(&mut frame, 0).unwrap();
-                    assert_eq!(elem_param, AbstractChar::construct_type(frame.as_extended_target()));
+                    assert_eq!(elem_param, AbstractChar::construct_type(&mut frame));
                     assert!(elem_param.cast::<DataType>().unwrap().is_abstract());
 
                     let rank_param = inner_ty.parameter(&mut frame, 1).unwrap();
@@ -49,12 +49,12 @@ mod tests {
 
             jlrs.instance(&mut frame)
                 .scope(|mut frame| {
-                    let ty = <ArrayTypeConstructor<AbstractChar, TypeVarConstructor<Name<'N'>>> as ConstructType>::construct_type(frame.as_extended_target());
+                    let ty = <ArrayTypeConstructor<AbstractChar, TypeVarConstructor<Name<'N'>>> as ConstructType>::construct_type(&mut frame);
                     let ua = ty.cast::<UnionAll>().unwrap();
                     let base = ua.base_type();
 
                     let elem_param = base.parameter(&mut frame, 0).unwrap();
-                    assert_eq!(elem_param, AbstractChar::construct_type(frame.as_extended_target()));
+                    assert_eq!(elem_param, AbstractChar::construct_type(&mut frame));
 
                     let rank_param = base.parameter(&mut frame, 1).unwrap();
                     assert!(rank_param.is::<TypeVar>());
@@ -71,7 +71,7 @@ mod tests {
 
             jlrs.instance(&mut frame)
                 .scope(|mut frame| {
-                    let ty = <ArrayTypeConstructor<TypeVarConstructor<Name<'T'>>, ConstantIsize<1>> as ConstructType>::construct_type(frame.as_extended_target());
+                    let ty = <ArrayTypeConstructor<TypeVarConstructor<Name<'T'>>, ConstantIsize<1>> as ConstructType>::construct_type(&mut frame);
                     let ua = ty.cast::<UnionAll>().unwrap();
                     let base = ua.base_type();
 
@@ -96,9 +96,7 @@ mod tests {
                     let ty = <ArrayTypeConstructor<
                         TypeVarConstructor<Name<'T'>, AbstractChar>,
                         ConstantIsize<1>,
-                    > as ConstructType>::construct_type(
-                        frame.as_extended_target()
-                    );
+                    > as ConstructType>::construct_type(&mut frame);
                     let ua = ty.cast::<UnionAll>().unwrap();
                     let base = ua.base_type();
 
@@ -120,13 +118,13 @@ mod tests {
 
             jlrs.instance(&mut frame)
                 .scope(|mut frame| {
-                    let ty = <UnionTypeConstructor<AbstractChar, Integer> as ConstructType>::construct_type(frame.as_extended_target());
+                    let ty = <UnionTypeConstructor<AbstractChar, Integer> as ConstructType>::construct_type(&mut frame);
                     let un = ty.cast::<Union>().unwrap();
                     let variants = un.variants();
                     assert_eq!(variants.len(), 2);
 
-                    let abstr_char_ty = AbstractChar::construct_type(frame.as_extended_target());
-                    let integer_ty = Integer::construct_type(frame.as_extended_target());
+                    let abstr_char_ty = AbstractChar::construct_type(&mut frame);
+                    let integer_ty = Integer::construct_type(&mut frame);
 
                     if variants[0] == abstr_char_ty {
                         assert!(variants[1] == integer_ty);
@@ -151,9 +149,7 @@ mod tests {
                     let ty = <UnionTypeConstructor<
                         AbstractChar,
                         UnionTypeConstructor<AbstractString, Real>,
-                    > as ConstructType>::construct_type(
-                        frame.as_extended_target()
-                    );
+                    > as ConstructType>::construct_type(&mut frame);
                     let un = ty.cast::<Union>().unwrap();
                     let variants = un.variants();
                     assert_eq!(variants.len(), 3);
@@ -174,9 +170,7 @@ mod tests {
                     let ty = <UnionTypeConstructor<
                         Integer,
                         UnionTypeConstructor<AbstractChar, Real>,
-                    > as ConstructType>::construct_type(
-                        frame.as_extended_target()
-                    );
+                    > as ConstructType>::construct_type(&mut frame);
                     let un = ty.cast::<Union>().unwrap();
                     let variants = un.variants();
                     assert_eq!(variants.len(), 2); // Integer <: Real

@@ -158,6 +158,7 @@ where
     ///
     /// No tasks are dropped if the queue is shrunk. This method return a future that doesn´t
     /// resolve until the queue can be resized without dropping any tasks.
+    #[inline]
     pub fn resize_queue<'own>(
         &'own self,
         capacity: usize,
@@ -169,6 +170,7 @@ where
     ///
     /// See [`AsyncJulia::resize_queue`] for more info, the only difference is that this is an
     /// async method.
+    #[inline]
     pub async fn resize_queue_async(&self, capacity: usize) -> Option<()> {
         if let Some(fut) = self.resize_queue(capacity) {
             Some(fut.await)
@@ -181,6 +183,7 @@ where
     ///
     /// No tasks are dropped if the queue is shrunk. This method return a future that doesn´t
     /// resolve until the queue can be resized without dropping any tasks.
+    #[inline]
     pub fn resize_main_queue<'own>(&'own self, capacity: usize) -> impl 'own + Future<Output = ()> {
         self.sender.resize_main_queue(capacity)
     }
@@ -189,6 +192,7 @@ where
     ///
     /// See [`AsyncJulia::resize_main_queue`] for more info, the only difference is that this is an
     /// async method.
+    #[inline]
     pub async fn resize_main_queue_async(&self, capacity: usize) {
         self.resize_main_queue(capacity).await
     }
@@ -197,6 +201,7 @@ where
     ///
     /// No tasks are dropped if the queue is shrunk. This method return a future that doesn´t
     /// resolve until the queue can be resized without dropping any tasks.
+    #[inline]
     pub fn resize_worker_queue<'own>(
         &'own self,
         capacity: usize,
@@ -208,6 +213,7 @@ where
     ///
     /// See [`AsyncJulia::resize_main_queue`] for more info, the only difference is that this is an
     /// async method.
+    #[inline]
     pub async fn resize_worker_queue_async(&self, capacity: usize) -> Option<()> {
         if let Some(fut) = self.resize_worker_queue(capacity) {
             Some(fut.await)
@@ -658,6 +664,7 @@ impl fmt::Debug for Message {
 unsafe impl Sync for Message {}
 
 impl MessageInner {
+    #[inline]
     pub(crate) fn wrap(self) -> Message {
         Message { inner: self }
     }

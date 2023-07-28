@@ -26,8 +26,7 @@ mod tests {
                         )
                         .into_jlrs_result()?;
 
-                    let mut arr = Array::new_for(frame.as_extended_target(), 4, union_ty)
-                        .into_jlrs_result()?;
+                    let mut arr = Array::new_for(&mut frame, 4, union_ty).into_jlrs_result()?;
 
                     {
                         let data = unsafe { arr.union_data()? };
@@ -64,8 +63,7 @@ mod tests {
                         )
                         .into_jlrs_result()?;
 
-                    let mut arr = Array::new_for(frame.as_extended_target(), 4, union_ty)
-                        .into_jlrs_result()?;
+                    let mut arr = Array::new_for(&mut frame, 4, union_ty).into_jlrs_result()?;
 
                     {
                         let mut data = arr.union_data_mut()?;
@@ -113,8 +111,7 @@ mod tests {
                         )
                         .into_jlrs_result()?;
 
-                    let mut arr = Array::new_for(frame.as_extended_target(), 4, union_ty)
-                        .into_jlrs_result()?;
+                    let mut arr = Array::new_for(&mut frame, 4, union_ty).into_jlrs_result()?;
 
                     {
                         let mut data = arr.union_data_mut()?;
@@ -154,8 +151,7 @@ mod tests {
                         )
                         .into_jlrs_result()?;
 
-                    let mut arr = Array::new_for(frame.as_extended_target(), 4, union_ty)
-                        .into_jlrs_result()?;
+                    let mut arr = Array::new_for(&mut frame, 4, union_ty).into_jlrs_result()?;
 
                     unsafe {
                         let mut data = arr.union_data_mut()?;

@@ -31,6 +31,9 @@ bindings_for!(bindings_1_9_32, "julia-1-9", "32");
 bindings_for!(bindings_1_10_64, "julia-1-10", "64");
 bindings_for!(bindings_1_10_32, "julia-1-10", "32");
 
+bindings_for!(bindings_1_11_64, "julia-1-11", "64");
+bindings_for!(bindings_1_11_32, "julia-1-11", "32");
+
 #[cfg(target_os = "windows")]
 mod bindings_ext_windows;
 

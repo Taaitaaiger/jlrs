@@ -1,4 +1,5 @@
 
 [workspace]
+# members = ["benches", "examples", "jl_sys", "jlrs", "jlrs_macros", "julia_module_test"]
 members = ["examples", "jl_sys", "jlrs", "jlrs_macros"]
-exclude = ["julia_module_test"]
+exclude = ["julia_module_test", "benches"]

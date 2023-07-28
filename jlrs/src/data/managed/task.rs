@@ -14,7 +14,10 @@ use jl_sys::{jl_task_t, jl_task_type};
 use jlrs_macros::julia_version;
 
 use super::Ref;
-use crate::{data::managed::private::ManagedPriv, impl_julia_typecheck, private::Private};
+use crate::{
+    data::managed::private::ManagedPriv, impl_julia_typecheck, memory::target::TargetResult,
+    private::Private,
+};
 #[cfg(feature = "extra-fields")]
 use crate::{
     data::managed::value::{ValueData, ValueRef},
@@ -49,6 +52,7 @@ impl<'scope> Task<'scope> {
 
     /// Invasive linked list for scheduler
     #[cfg(feature = "extra-fields")]
+    #[inline]
     pub fn next<'target, T>(self, target: T) -> ValueData<'target, 'static, T>
     where
         T: Target<'target>,
@@ -63,6 +67,7 @@ impl<'scope> Task<'scope> {
 
     /// Invasive linked list for scheduler
     #[cfg(feature = "extra-fields")]
+    #[inline]
     pub fn queue<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
     where
         T: Target<'target>,
@@ -77,6 +82,7 @@ impl<'scope> Task<'scope> {
 
     /// The `tls` field, called `Task.storage` in Julia.
     #[cfg(feature = "extra-fields")]
+    #[inline]
     pub fn storage<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
     where
         T: Target<'target>,
@@ -91,6 +97,7 @@ impl<'scope> Task<'scope> {
 
     /// The `donenotify` field.
     #[cfg(feature = "extra-fields")]
+    #[inline]
     pub fn done_notify<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
     where
         T: Target<'target>,
@@ -105,6 +112,7 @@ impl<'scope> Task<'scope> {
 
     /// The `result` field.
     #[cfg(feature = "extra-fields")]
+    #[inline]
     pub fn result<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
     where
         T: Target<'target>,
@@ -119,6 +127,7 @@ impl<'scope> Task<'scope> {
 
     /// The `logstate` field.
     #[cfg(feature = "extra-fields")]
+    #[inline]
     pub fn log_state<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
     where
         T: Target<'target>,
@@ -133,6 +142,7 @@ impl<'scope> Task<'scope> {
 
     /// The `start` field.
     #[cfg(feature = "extra-fields")]
+    #[inline]
     pub fn start<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
     where
         T: Target<'target>,
@@ -148,6 +158,7 @@ impl<'scope> Task<'scope> {
     #[cfg(feature = "extra-fields")]
     #[julia_version(until = "1.6")]
     /// The `_state` field.
+    #[inline]
     pub fn state(self) -> u8 {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref()._state }
@@ -156,6 +167,7 @@ impl<'scope> Task<'scope> {
     #[cfg(feature = "extra-fields")]
     #[julia_version(since = "1.7")]
     /// The `_state` field.
+    #[inline]
     pub fn state(self) -> u8 {
         // Safety: the pointer points to valid data
         unsafe {
@@ -168,6 +180,7 @@ impl<'scope> Task<'scope> {
 
     /// Record whether this Task can be migrated to a new thread
     #[cfg(feature = "extra-fields")]
+    #[inline]
     pub fn sticky(self) -> bool {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().sticky != 0 }
@@ -176,6 +189,7 @@ impl<'scope> Task<'scope> {
     #[cfg(feature = "extra-fields")]
     #[julia_version(until = "1.6")]
     /// set if `result` is an exception to throw or that we exited with
+    #[inline]
     pub fn is_exception(self) -> bool {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref()._isexception != 0 }
@@ -184,6 +198,7 @@ impl<'scope> Task<'scope> {
     #[cfg(feature = "extra-fields")]
     #[julia_version(since = "1.7")]
     /// set if `result` is an exception to throw or that we exited with
+    #[inline]
     pub fn is_exception(self) -> bool {
         // Safety: the pointer points to valid data
         unsafe {
@@ -206,16 +221,18 @@ impl<'scope> ManagedPriv<'scope, '_> for Task<'scope> {
 
     // Safety: `inner` must not have been freed yet, the result must never be
     // used after the GC might have freed it.
+    #[inline]
     unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self {
         Self(inner, PhantomData)
     }
 
+    #[inline]
     fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps> {
         self.0
     }
 }
 
-impl_construct_type_managed!(Task<'_>, jl_task_type);
+impl_construct_type_managed!(Task, 1, jl_task_type);
 
 /// A reference to a [`Task`] that has not been explicitly rooted.
 pub type TaskRef<'scope> = Ref<'scope, 'static, Task<'scope>>;
@@ -224,15 +241,15 @@ pub type TaskRef<'scope> = Ref<'scope, 'static, Task<'scope>>;
 /// `ccall`able functions that return a [`Task`].
 pub type TaskRet = Ref<'static, 'static, Task<'static>>;
 
-impl_valid_layout!(TaskRef, Task);
+impl_valid_layout!(TaskRef, Task, jl_task_type);
 
-use crate::memory::target::target_type::TargetType;
+use crate::memory::target::TargetType;
 
 /// `Task` or `TaskRef`, depending on the target type `T`.
 pub type TaskData<'target, T> = <T as TargetType<'target>>::Data<'static, Task<'target>>;
 
 /// `JuliaResult<Task>` or `JuliaResultRef<TaskRef>`, depending on the target type `T`.
-pub type TaskResult<'target, T> = <T as TargetType<'target>>::Result<'static, Task<'target>>;
+pub type TaskResult<'target, T> = TargetResult<'target, 'static, Task<'target>, T>;
 
 impl_ccall_arg_managed!(Task, 1);
 impl_into_typed!(Task);

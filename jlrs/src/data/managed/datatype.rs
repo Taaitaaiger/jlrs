@@ -35,6 +35,7 @@ use jlrs_macros::julia_version;
 
 use super::{simple_vector::SimpleVectorData, type_name::TypeName, value::ValueData, Ref};
 use crate::{
+    catch::catch_exceptions,
     convert::to_symbol::ToSymbol,
     data::{
         managed::{
@@ -47,9 +48,9 @@ use crate::{
         },
         types::typecheck::Typecheck,
     },
-    error::{AccessError, JlrsResult, CANNOT_DISPLAY_TYPE},
+    error::{AccessError, InstantiationError, JlrsResult, CANNOT_DISPLAY_TYPE},
     impl_julia_typecheck,
-    memory::target::Target,
+    memory::target::{Target, TargetResult},
     private::Private,
 };
 
@@ -79,6 +80,7 @@ impl<'scope> DataType<'scope> {
     */
 
     /// Returns the `TypeName` of this type.
+    #[inline]
     pub fn type_name(self) -> TypeName<'scope> {
         // Safety: the pointer points to valid data, and the typename of a type never changes
         unsafe {
@@ -89,6 +91,7 @@ impl<'scope> DataType<'scope> {
     }
 
     /// Returns the super-type of this type.
+    #[inline]
     pub fn super_type(self) -> DataType<'scope> {
         // Safety: the pointer points to valid data, and the super-type of a type never changes
         unsafe {
@@ -99,6 +102,7 @@ impl<'scope> DataType<'scope> {
     }
 
     /// Returns the type parameters of this type.
+    #[inline]
     pub fn parameters(self) -> SimpleVector<'scope> {
         // Safety: the pointer points to valid data and this data is const
         unsafe {
@@ -109,12 +113,14 @@ impl<'scope> DataType<'scope> {
     }
 
     /// Returns the number of type parameters.
+    #[inline]
     pub fn n_parameters(self) -> usize {
         // Safety: the pointer points to valid data, the parameters field is never null
         self.parameters().len()
     }
 
     /// Returns the type parameter at position `idx`, or `None` if the index is out of bounds.
+    #[inline]
     pub fn parameter<'target, T>(
         self,
         target: T,
@@ -137,6 +143,7 @@ impl<'scope> DataType<'scope> {
     }
 
     /// Returns the field types of this type.
+    #[inline]
     pub fn field_types<'target, T>(self, target: T) -> SimpleVectorData<'target, T>
     where
         T: Target<'target>,
@@ -151,6 +158,7 @@ impl<'scope> DataType<'scope> {
 
     /// Returns the field type of the field at position `idx`, or `None` if the index is out of
     /// bounds.
+    #[inline]
     pub fn field_type<'target, T>(
         self,
         target: T,
@@ -176,6 +184,7 @@ impl<'scope> DataType<'scope> {
     /// Returns the field type of the field at position `idx` without performing a bounds check.
     ///
     /// Safety: `idx` must be in-bounds.
+    #[inline]
     pub unsafe fn field_type_unchecked<'target, T>(
         self,
         target: T,
@@ -196,6 +205,7 @@ impl<'scope> DataType<'scope> {
     }
 
     /// Returns the field type of the field at position `idx`.
+    #[inline]
     pub fn field_type_concrete<'target, T>(
         self,
         target: T,
@@ -220,6 +230,7 @@ impl<'scope> DataType<'scope> {
     }
 
     /// Returns the field names of this type.
+    #[inline]
     pub fn field_names(self) -> SimpleVector<'scope> {
         // Safety: the pointer points to valid data, so it must have a TypeName.
         self.type_name().names()
@@ -267,6 +278,7 @@ impl<'scope> DataType<'scope> {
     }
 
     /// Returns the name of the field at position `idx`.
+    #[inline]
     pub fn field_name_str(self, idx: usize) -> Option<&'scope str> {
         if let Some(sym) = self.field_name(idx) {
             return sym.as_str().ok();
@@ -276,6 +288,7 @@ impl<'scope> DataType<'scope> {
     }
 
     /// Returns the instance if this type is a singleton.
+    #[inline]
     pub fn instance(self) -> Option<Value<'scope, 'static>> {
         // Safety: the pointer points to valid data
         unsafe {
@@ -292,6 +305,7 @@ impl<'scope> DataType<'scope> {
     }
 
     /// Returns a pointer to the layout of this `DataType`.
+    #[inline]
     pub fn layout(self) -> Option<DatatypeLayout<'scope>> {
         // Safety: the pointer points to valid data
         unsafe {
@@ -302,6 +316,7 @@ impl<'scope> DataType<'scope> {
 
     #[julia_version(until = "1.8")]
     /// Returns the size of a value of this type in bytes.
+    #[inline]
     pub fn size(self) -> Option<u32> {
         if self.is_abstract() {
             return None;
@@ -312,11 +327,13 @@ impl<'scope> DataType<'scope> {
 
     #[julia_version(since = "1.9")]
     /// Returns the size of a value of this type in bytes.
+    #[inline]
     pub fn size(self) -> Option<u32> {
         Some(self.layout()?.size())
     }
 
     /// Returns the hash of this type.
+    #[inline]
     pub fn hash(self) -> u32 {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().hash }
@@ -324,6 +341,7 @@ impl<'scope> DataType<'scope> {
 
     #[julia_version(until = "1.6")]
     /// Returns true if this is an abstract type.
+    #[inline]
     pub fn is_abstract(self) -> bool {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().abstract_ != 0 }
@@ -331,12 +349,14 @@ impl<'scope> DataType<'scope> {
 
     #[julia_version(since = "1.7")]
     /// Returns true if this is an abstract type.
+    #[inline]
     pub fn is_abstract(self) -> bool {
         self.type_name().is_abstract()
     }
 
     #[julia_version(until = "1.6")]
     /// Returns true if this is a mutable type.
+    #[inline]
     pub fn mutable(self) -> bool {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().mutabl != 0 }
@@ -344,12 +364,14 @@ impl<'scope> DataType<'scope> {
 
     #[julia_version(since = "1.7")]
     /// Returns true if this is a mutable type.
+    #[inline]
     pub fn mutable(self) -> bool {
         self.type_name().is_mutable()
     }
 
     #[julia_version(until = "1.6")]
     /// Returns true if one or more of the type parameters has not been set.
+    #[inline]
     pub fn has_free_type_vars(self) -> bool {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().hasfreetypevars != 0 }
@@ -357,6 +379,7 @@ impl<'scope> DataType<'scope> {
 
     #[julia_version(since = "1.7")]
     /// Returns true if one or more of the type parameters has not been set.
+    #[inline]
     pub fn has_free_type_vars(self) -> bool {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().hasfreetypevars() != 0 }
@@ -364,6 +387,7 @@ impl<'scope> DataType<'scope> {
 
     #[julia_version(until = "1.6")]
     /// Returns true if this type can have instances
+    #[inline]
     pub fn is_concrete_type(self) -> bool {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().isconcretetype != 0 }
@@ -371,6 +395,7 @@ impl<'scope> DataType<'scope> {
 
     #[julia_version(since = "1.7")]
     /// Returns true if this type can have instances
+    #[inline]
     pub fn is_concrete_type(self) -> bool {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().isconcretetype() != 0 }
@@ -378,6 +403,7 @@ impl<'scope> DataType<'scope> {
 
     #[julia_version(until = "1.6")]
     /// Returns true if this type is a dispatch, or leaf, tuple type.
+    #[inline]
     pub fn is_dispatch_tuple(self) -> bool {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().isdispatchtuple != 0 }
@@ -385,6 +411,7 @@ impl<'scope> DataType<'scope> {
 
     #[julia_version(since = "1.7")]
     /// Returns true if this type is a dispatch, or leaf, tuple type.
+    #[inline]
     pub fn is_dispatch_tuple(self) -> bool {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().isdispatchtuple() != 0 }
@@ -392,6 +419,7 @@ impl<'scope> DataType<'scope> {
 
     #[julia_version(until = "1.6")]
     /// Returns true if this type is a bits-type.
+    #[inline]
     pub fn is_bits(self) -> bool {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().isbitstype != 0 }
@@ -399,6 +427,7 @@ impl<'scope> DataType<'scope> {
 
     #[julia_version(since = "1.7")]
     /// Returns true if this type is a bits-type.
+    #[inline]
     pub fn is_bits(self) -> bool {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().isbitstype() != 0 }
@@ -406,6 +435,7 @@ impl<'scope> DataType<'scope> {
 
     #[julia_version(until = "1.6")]
     /// Returns true if values of this type are zero-initialized.
+    #[inline]
     pub fn zero_init(self) -> bool {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().zeroinit != 0 }
@@ -413,6 +443,7 @@ impl<'scope> DataType<'scope> {
 
     #[julia_version(since = "1.7")]
     /// Returns true if values of this type are zero-initialized.
+    #[inline]
     pub fn zero_init(self) -> bool {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().zeroinit() != 0 }
@@ -420,6 +451,7 @@ impl<'scope> DataType<'scope> {
 
     #[julia_version(until = "1.6")]
     /// Returns true if a value of this type stores its data inline.
+    #[inline]
     pub fn is_inline_alloc(self) -> bool {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().isinlinealloc != 0 }
@@ -427,6 +459,7 @@ impl<'scope> DataType<'scope> {
 
     #[julia_version(since = "1.7")]
     /// Returns true if a value of this type stores its data inline.
+    #[inline]
     pub fn is_inline_alloc(self) -> bool {
         // Safety: the pointer points to valid data, so it must have a TypeName.
         unsafe {
@@ -437,6 +470,7 @@ impl<'scope> DataType<'scope> {
 
     #[julia_version(until = "1.6")]
     /// If false, no value will have this type.
+    #[inline]
     pub fn has_concrete_subtype(self) -> bool {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().has_concrete_subtype != 0 }
@@ -444,6 +478,7 @@ impl<'scope> DataType<'scope> {
 
     #[julia_version(since = "1.7")]
     /// If false, no value will have this type.
+    #[inline]
     pub fn has_concrete_subtype(self) -> bool {
         // Safety: the pointer points to valid data
         unsafe {
@@ -456,6 +491,7 @@ impl<'scope> DataType<'scope> {
 
     #[julia_version(until = "1.6")]
     /// If true, the type is stored in hash-based set cache (instead of linear cache).
+    #[inline]
     pub fn cached_by_hash(self) -> bool {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().cached_by_hash != 0 }
@@ -463,6 +499,7 @@ impl<'scope> DataType<'scope> {
 
     #[julia_version(since = "1.7", until = "1.9")]
     /// If true, the type is stored in hash-based set cache (instead of linear cache).
+    #[inline]
     pub fn cached_by_hash(self) -> bool {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().cached_by_hash() != 0 }
@@ -470,6 +507,7 @@ impl<'scope> DataType<'scope> {
 
     #[julia_version(since = "1.10")]
     /// Computational bit for has_concrete_supertype. See description in jltypes.c.
+    #[inline]
     pub fn maybe_subtype_of_cache(self) -> bool {
         // Safety: the pointer points to valid data
         unsafe {
@@ -482,6 +520,7 @@ impl<'scope> DataType<'scope> {
 
     #[julia_version(since = "1.9")]
     /// Whether this is declared with 'primitive type' keyword (sized, no fields, and immutable)
+    #[inline]
     pub fn is_primitive_type(self) -> bool {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().isprimitivetype() != 0 }
@@ -489,6 +528,7 @@ impl<'scope> DataType<'scope> {
 
     #[julia_version(since = "1.10")]
     /// Whether any mutable memory is reachable through this type (in the type or via fields)
+    #[inline]
     pub fn is_mutation_free(self) -> bool {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().ismutationfree() != 0 }
@@ -496,6 +536,7 @@ impl<'scope> DataType<'scope> {
 
     #[julia_version(since = "1.10")]
     /// Whether this type or any object reachable through its fields has non-content-based identity
+    #[inline]
     pub fn is_identity_free(self) -> bool {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().isidentityfree() != 0 }
@@ -504,11 +545,13 @@ impl<'scope> DataType<'scope> {
 
 impl<'scope> DataType<'scope> {
     /// Performs the given typecheck on this type.
+    #[inline]
     pub fn is<T: Typecheck>(self) -> bool {
         T::typecheck(self)
     }
 
     /// Returns the alignment of a value of this type in bytes.
+    #[inline]
     pub fn align(self) -> Option<u16> {
         // Safety: the pointer points to valid data, if the layout is null the code
         // panics.
@@ -516,16 +559,19 @@ impl<'scope> DataType<'scope> {
     }
 
     /// Returns the size of a value of this type in bits.
+    #[inline]
     pub fn n_bits(self) -> Option<u32> {
         Some(self.size()? * 8)
     }
 
     /// Returns the number of fields of a value of this type.
+    #[inline]
     pub fn n_fields(self) -> Option<u32> {
         Some(self.layout()?.n_fields())
     }
 
     /// Returns the name of this type.
+    #[inline]
     pub fn name(self) -> &'scope str {
         // Safety: the pointer points to valid data, so it must have a name. If it's not
         // a valid UTF-8 encoded string the code panics.
@@ -557,6 +603,7 @@ impl<'scope> DataType<'scope> {
     ///
     /// Safety: an exception must not be thrown if this method is called from a `ccall`ed
     /// function.
+    #[inline]
     pub unsafe fn field_size_unchecked(self, idx: usize) -> u32 {
         jl_field_size(self.unwrap(Private), idx as _)
     }
@@ -583,6 +630,7 @@ impl<'scope> DataType<'scope> {
     ///
     /// Safety: an exception must not be thrown if this method is called from a `ccall`ed
     /// function.
+    #[inline]
     pub unsafe fn field_offset_unchecked(self, idx: usize) -> u32 {
         jl_field_offset(self.unwrap(Private), idx as _)
     }
@@ -609,6 +657,7 @@ impl<'scope> DataType<'scope> {
     ///
     /// Safety: an exception must not be thrown if this method is called from a `ccall`ed
     /// function.
+    #[inline]
     pub unsafe fn is_pointer_field_unchecked(self, idx: usize) -> bool {
         jl_field_isptr(self.unwrap(Private), idx as _)
     }
@@ -637,6 +686,7 @@ impl<'scope> DataType<'scope> {
     ///
     /// Safety: an exception must not be thrown if this method is called from a `ccall`ed
     /// function.
+    #[inline]
     pub unsafe fn is_atomic_field_unchecked(self, idx: usize) -> bool {
         /*
             const uint32_t *atomicfields = st->name->atomicfields;
@@ -679,6 +729,7 @@ impl<'scope> DataType<'scope> {
     ///
     /// Safety: an exception must not be thrown if this method is called from a `ccall`ed
     /// function.
+    #[inline]
     pub unsafe fn is_const_field_unchecked(self, idx: usize) -> bool {
         /*
         jl_typename_t *tn = st->name;
@@ -719,12 +770,6 @@ impl<'scope> DataType<'scope> {
         T: Target<'target>,
         V: AsRef<[Value<'value, 'data>]>,
     {
-        use std::mem::MaybeUninit;
-
-        use jl_sys::jl_value_t;
-
-        use crate::{catch::catch_exceptions, error::InstantiationError};
-
         // Safety: the pointer points to valid data, if an exception is thrown it's caught
         unsafe {
             if self.is::<Array>() {
@@ -732,20 +777,19 @@ impl<'scope> DataType<'scope> {
             }
 
             let values = values.as_ref();
-            let mut callback = |result: &mut MaybeUninit<*mut jl_value_t>| {
-                let v = jl_new_structv(
+            let callback = || {
+                jl_new_structv(
                     self.unwrap(Private),
                     values.as_ptr() as *mut _,
                     values.len() as _,
-                );
-
-                result.write(v);
-                Ok(())
+                )
             };
 
-            let res = match catch_exceptions(&mut callback).unwrap() {
+            let exc = |err: Value| err.unwrap_non_null(Private);
+
+            let res = match catch_exceptions(callback, exc) {
                 Ok(ptr) => Ok(NonNull::new_unchecked(ptr)),
-                Err(e) => Err(e.ptr()),
+                Err(e) => Err(e),
             };
 
             Ok(target.result_from_ptr(res, Private))
@@ -762,6 +806,7 @@ impl<'scope> DataType<'scope> {
     ///
     /// Safety: an exception must not be thrown if this method is called from a `ccall`ed
     /// function.
+    #[inline]
     pub unsafe fn instantiate_unchecked<'target, 'value, 'data, V, T>(
         self,
         target: T,
@@ -794,6 +839,7 @@ impl<'scope> DataType<'scope> {
 
 impl<'base> DataType<'base> {
     /// The type of the bottom type, `Union{}`.
+    #[inline]
     pub fn typeofbottom_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -803,6 +849,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `DataType`.
+    #[inline]
     pub fn datatype_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -812,6 +859,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `Union`.
+    #[inline]
     pub fn uniontype_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -821,6 +869,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `UnionAll`.
+    #[inline]
     pub fn unionall_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -830,6 +879,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `TypeVar`.
+    #[inline]
     pub fn tvar_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -839,6 +889,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `Any`.
+    #[inline]
     pub fn any_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -848,6 +899,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `TypeName`.
+    #[inline]
     pub fn typename_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -857,6 +909,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `Symbol`.
+    #[inline]
     pub fn symbol_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -866,6 +919,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `SSAValue`.
+    #[inline]
     pub fn ssavalue_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -876,6 +930,7 @@ impl<'base> DataType<'base> {
 
     #[julia_version(until = "1.9")]
     /// The type `Slot`.
+    #[inline]
     pub fn abstractslot_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -885,6 +940,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `SlotNumber`.
+    #[inline]
     pub fn slotnumber_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -895,6 +951,7 @@ impl<'base> DataType<'base> {
 
     #[julia_version(until = "1.9")]
     /// The type `TypedSlot`.
+    #[inline]
     pub fn typedslot_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -904,6 +961,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `Core.Argument`
+    #[inline]
     pub fn argument_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -913,6 +971,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `Core.Const`
+    #[inline]
     pub fn const_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -922,6 +981,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `Core.PartialStruct`
+    #[inline]
     pub fn partial_struct_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -932,6 +992,7 @@ impl<'base> DataType<'base> {
 
     #[julia_version(since = "1.7")]
     /// The type `Core.PartialOpaque`
+    #[inline]
     pub fn partial_opaque_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -942,6 +1003,7 @@ impl<'base> DataType<'base> {
 
     #[julia_version(since = "1.7")]
     /// The type `Core.InterConditional`
+    #[inline]
     pub fn interconditional_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -951,6 +1013,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `MethodMatch`
+    #[inline]
     pub fn method_match_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -960,6 +1023,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `SimpleVector`.
+    #[inline]
     pub fn simplevector_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -969,6 +1033,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `Tuple`.
+    #[inline]
     pub fn anytuple_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -978,6 +1043,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type of an empty tuple.
+    #[inline]
     pub fn emptytuple_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -987,6 +1053,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `Tuple`.
+    #[inline]
     pub fn tuple_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -997,6 +1064,7 @@ impl<'base> DataType<'base> {
 
     #[julia_version(since = "1.7")]
     /// The type `Vararg`.
+    #[inline]
     pub fn vararg_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -1006,6 +1074,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `Function`.
+    #[inline]
     pub fn function_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -1015,6 +1084,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `Builtin`.
+    #[inline]
     pub fn builtin_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -1024,6 +1094,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `MethodInstance`.
+    #[inline]
     pub fn method_instance_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -1033,6 +1104,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `CodeInstance`.
+    #[inline]
     pub fn code_instance_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -1042,6 +1114,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `CodeInfo`.
+    #[inline]
     pub fn code_info_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -1051,6 +1124,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `Method`.
+    #[inline]
     pub fn method_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -1060,6 +1134,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `Module`.
+    #[inline]
     pub fn module_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -1069,6 +1144,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `WeakRef`.
+    #[inline]
     pub fn weakref_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -1078,6 +1154,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `AbstractString`.
+    #[inline]
     pub fn abstractstring_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -1087,6 +1164,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `String`.
+    #[inline]
     pub fn string_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -1096,6 +1174,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `ErrorException`.
+    #[inline]
     pub fn errorexception_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -1105,6 +1184,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `ArgumentError`.
+    #[inline]
     pub fn argumenterror_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -1114,6 +1194,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `LoadError`.
+    #[inline]
     pub fn loaderror_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -1123,6 +1204,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `InitError`.
+    #[inline]
     pub fn initerror_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -1132,6 +1214,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `TypeError`.
+    #[inline]
     pub fn typeerror_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -1141,6 +1224,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `MethodError`.
+    #[inline]
     pub fn methoderror_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -1150,6 +1234,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `UndefVarError`.
+    #[inline]
     pub fn undefvarerror_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -1160,6 +1245,7 @@ impl<'base> DataType<'base> {
 
     #[julia_version(since = "1.7")]
     /// The type `Core.AtomicError`.
+    #[inline]
     pub fn atomicerror_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -1169,6 +1255,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `LineInfoNode`.
+    #[inline]
     pub fn lineinfonode_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -1178,6 +1265,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `BoundsError`.
+    #[inline]
     pub fn boundserror_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -1187,6 +1275,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `Bool`.
+    #[inline]
     pub fn bool_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -1196,6 +1285,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `Char`.
+    #[inline]
     pub fn char_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -1205,6 +1295,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `Int8`.
+    #[inline]
     pub fn int8_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -1214,6 +1305,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `UInt8`.
+    #[inline]
     pub fn uint8_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -1223,6 +1315,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `Int16`.
+    #[inline]
     pub fn int16_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -1232,6 +1325,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `UInt16`.
+    #[inline]
     pub fn uint16_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -1241,6 +1335,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `Int32`.
+    #[inline]
     pub fn int32_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -1250,6 +1345,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `UInt32`.
+    #[inline]
     pub fn uint32_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -1259,6 +1355,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `Int64`.
+    #[inline]
     pub fn int64_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -1268,6 +1365,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `UInt64`.
+    #[inline]
     pub fn uint64_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -1277,6 +1375,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `Float16`.
+    #[inline]
     pub fn float16_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -1286,6 +1385,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `Float32`.
+    #[inline]
     pub fn float32_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -1295,6 +1395,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `Float64`.
+    #[inline]
     pub fn float64_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -1304,6 +1405,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `AbstractFloat`.
+    #[inline]
     pub fn floatingpoint_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -1313,6 +1415,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `Number`.
+    #[inline]
     pub fn number_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -1322,6 +1425,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `Nothing`.
+    #[inline]
     pub fn nothing_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -1331,6 +1435,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `Signed`.
+    #[inline]
     pub fn signed_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -1340,6 +1445,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `Ptr{Nothing}`.
+    #[inline]
     pub fn voidpointer_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -1349,6 +1455,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `Task`.
+    #[inline]
     pub fn task_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -1358,6 +1465,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `Expr`.
+    #[inline]
     pub fn expr_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -1368,6 +1476,7 @@ impl<'base> DataType<'base> {
 
     #[julia_version(since = "1.10")]
     /// The type `Expr`.
+    #[inline]
     pub fn binding_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -1377,6 +1486,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `GlobalRef`.
+    #[inline]
     pub fn globalref_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -1386,6 +1496,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `LineNumberNode`.
+    #[inline]
     pub fn linenumbernode_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -1395,6 +1506,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `GotoNode`.
+    #[inline]
     pub fn gotonode_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -1404,6 +1516,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `GotoIfNot`.
+    #[inline]
     pub fn gotoifnot_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -1413,6 +1526,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `ReturnNode`.
+    #[inline]
     pub fn returnnode_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -1422,6 +1536,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `PhiNode`.
+    #[inline]
     pub fn phinode_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -1431,6 +1546,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `PiNode`.
+    #[inline]
     pub fn pinode_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -1440,6 +1556,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `PhiCNode`.
+    #[inline]
     pub fn phicnode_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -1449,6 +1566,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `UpsilonNode`.
+    #[inline]
     pub fn upsilonnode_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -1458,6 +1576,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `QuoteNode`.
+    #[inline]
     pub fn quotenode_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -1467,6 +1586,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `NewVarNode`.
+    #[inline]
     pub fn newvarnode_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -1476,6 +1596,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `Intrinsic`.
+    #[inline]
     pub fn intrinsic_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -1485,6 +1606,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `MethodTable`.
+    #[inline]
     pub fn methtable_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -1494,6 +1616,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `TypeMapLevel`.
+    #[inline]
     pub fn typemap_level_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -1503,6 +1626,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `TypeMapEntry`.
+    #[inline]
     pub fn typemap_entry_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -1513,12 +1637,14 @@ impl<'base> DataType<'base> {
 }
 
 impl<'scope> PartialEq for DataType<'scope> {
+    #[inline]
     fn eq(&self, other: &Self) -> bool {
         self.as_value() == other.as_value()
     }
 }
 
 impl<'scope, 'data> PartialEq<Value<'scope, 'data>> for DataType<'scope> {
+    #[inline]
     fn eq(&self, other: &Value<'scope, 'data>) -> bool {
         self.as_value() == *other
     }
@@ -1535,16 +1661,18 @@ impl<'scope> ManagedPriv<'scope, '_> for DataType<'scope> {
 
     // Safety: `inner` must not have been freed yet, the result must never be
     // used after the GC might have freed it.
+    #[inline]
     unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self {
         Self(inner, ::std::marker::PhantomData)
     }
 
+    #[inline]
     fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps> {
         self.0
     }
 }
 
-impl_construct_type_managed!(DataType<'_>, jl_datatype_type);
+impl_construct_type_managed!(DataType, 1, jl_datatype_type);
 
 /// A reference to a [`DataType`] that has not been explicitly rooted.
 pub type DataTypeRef<'scope> = Ref<'scope, 'static, DataType<'scope>>;
@@ -1553,16 +1681,15 @@ pub type DataTypeRef<'scope> = Ref<'scope, 'static, DataType<'scope>>;
 /// `ccall`able functions that return a [`DataType`].
 pub type DataTypeRet = Ref<'static, 'static, DataType<'static>>;
 
-impl_valid_layout!(DataTypeRef, DataType);
+impl_valid_layout!(DataTypeRef, DataType, jl_datatype_type);
 
-use crate::memory::target::target_type::TargetType;
+use crate::memory::target::TargetType;
 
 /// `DataType` or `DataTypeRef`, depending on the target type `T`.
 pub type DataTypeData<'target, T> = <T as TargetType<'target>>::Data<'static, DataType<'target>>;
 
 /// `JuliaResult<DataType>` or `JuliaResultRef<DataTypeRef>`, depending on the target type `T`.
-pub type DataTypeResult<'target, T> =
-    <T as TargetType<'target>>::Result<'static, DataType<'target>>;
+pub type DataTypeResult<'target, T> = TargetResult<'target, 'static, DataType<'target>, T>;
 
 /// `DataType` layout information.
 #[derive(Copy, Clone)]
@@ -1571,36 +1698,43 @@ pub struct DatatypeLayout<'scope>(NonNull<jl_datatype_layout_t>, PhantomData<&'s
 impl DatatypeLayout<'_> {
     #[julia_version(since = "1.9")]
     /// Returns the size of the `DataType`.
+    #[inline]
     pub fn size(self) -> u32 {
         unsafe { self.0.as_ref().size }
     }
 
     /// Returns the number of fields of the `DataType`.
+    #[inline]
     pub fn n_fields(self) -> u32 {
         unsafe { self.0.as_ref().nfields }
     }
 
     /// Returns the number of pointers in the `DataType`.
+    #[inline]
     pub fn n_pointers(self) -> u32 {
         unsafe { self.0.as_ref().npointers }
     }
 
     /// Returns the offset to the first pointer, or -1 if the `DataType` contains no pointers.
+    #[inline]
     pub fn first_ptr(self) -> i32 {
         unsafe { self.0.as_ref().first_ptr }
     }
 
     /// Returns the alignment of the `DataType`.
+    #[inline]
     pub fn alignment(self) -> u16 {
         unsafe { self.0.as_ref().alignment }
     }
 
     /// Returns whether the `DataType` contains unitialized data.
+    #[inline]
     pub fn has_padding(self) -> u16 {
         unsafe { self.0.as_ref().haspadding() }
     }
 
     /// Returns the field descriptor type of this `DataType`.
+    #[inline]
     pub fn fielddesc_type(self) -> u16 {
         unsafe { self.0.as_ref().fielddesc_type() }
     }

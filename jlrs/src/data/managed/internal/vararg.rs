@@ -11,7 +11,7 @@ use crate::{
         Ref,
     },
     impl_julia_typecheck,
-    memory::target::Target,
+    memory::target::{Target, TargetResult},
     private::Private,
 };
 
@@ -56,10 +56,12 @@ impl<'scope, 'data> ManagedPriv<'scope, 'data> for Vararg<'scope> {
 
     // Safety: `inner` must not have been freed yet, the result must never be
     // used after the GC might have freed it.
+    #[inline]
     unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self {
         Self(inner, PhantomData)
     }
 
+    #[inline]
     fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps> {
         self.0
     }
@@ -67,12 +69,12 @@ impl<'scope, 'data> ManagedPriv<'scope, 'data> for Vararg<'scope> {
 
 /// A reference to a [`Vararg`] that has not been explicitly rooted.
 pub type VarargRef<'scope> = Ref<'scope, 'static, Vararg<'scope>>;
-impl_valid_layout!(VarargRef, Vararg);
+impl_valid_layout!(VarargRef, Vararg, jl_vararg_type);
 
-use crate::memory::target::target_type::TargetType;
+use crate::memory::target::TargetType;
 
 /// `Vararg` or `VarargRef`, depending on the target type `T`.
 pub type VarargData<'target, T> = <T as TargetType<'target>>::Data<'static, Vararg<'target>>;
 
 /// `JuliaResult<Vararg>` or `JuliaResultRef<VarargRef>`, depending on the target type`T`.
-pub type VarargResult<'target, T> = <T as TargetType<'target>>::Result<'static, Vararg<'target>>;
+pub type VarargResult<'target, T> = TargetResult<'target, 'static, Vararg<'target>, T>;

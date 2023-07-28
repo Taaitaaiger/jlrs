@@ -4,6 +4,7 @@ use std::fmt::{Debug, Formatter, Result as FmtResult};
 
 use jl_sys::jl_ssavalue_type;
 
+use super::is_bits::IsBits;
 use crate::{convert::unbox::Unbox, impl_julia_typecheck, impl_valid_layout};
 
 /// A Julia `SSAValue`.
@@ -13,6 +14,7 @@ pub struct SSAValue(isize);
 
 impl SSAValue {
     /// Returns the id of the `SSAValue`.
+    #[inline]
     pub fn id(self) -> isize {
         self.0
     }
@@ -25,7 +27,7 @@ impl<'scope> Debug for SSAValue {
 }
 
 impl_julia_typecheck!(SSAValue, jl_ssavalue_type);
-impl_valid_layout!(SSAValue);
+impl_valid_layout!(SSAValue, jl_ssavalue_type);
 
 unsafe impl Unbox for SSAValue {
     type Output = Self;
@@ -33,3 +35,5 @@ unsafe impl Unbox for SSAValue {
 
 impl_ccall_arg!(SSAValue);
 impl_construct_julia_type!(SSAValue, jl_ssavalue_type);
+
+unsafe impl IsBits for SSAValue {}

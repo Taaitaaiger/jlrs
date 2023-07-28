@@ -120,6 +120,7 @@ impl Julia<'_> {
                 Value::false_v(&frame)
             };
 
+            // FIXME: make atomic
             Module::main(&frame)
                 .submodule(&frame, "JlrsCore")?
                 .as_managed()

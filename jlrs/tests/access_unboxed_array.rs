@@ -19,8 +19,7 @@ mod tests {
                                 (1..=24).map(|x| x as $value_type).collect();
 
                             let array =
-                                Array::from_vec(frame.as_extended_target(), data, (2, 3, 4))?
-                                    .into_jlrs_result()?;
+                                Array::from_vec(&mut frame, data, (2, 3, 4))?.into_jlrs_result()?;
                             let d = unsafe { array.copy_inline_data::<$value_type>()? };
 
                             let mut out = 1 as $value_type;
@@ -53,8 +52,7 @@ mod tests {
                                 (1..=24).map(|x| x as $value_type).collect();
 
                             let array =
-                                Array::from_vec(frame.as_extended_target(), data, (2, 3, 4))?
-                                    .into_jlrs_result()?;
+                                Array::from_vec(&mut frame, data, (2, 3, 4))?.into_jlrs_result()?;
                             let mut d = unsafe { array.copy_inline_data::<$value_type>()? };
 
                             let mut out = 2 as $value_type;
@@ -92,12 +90,8 @@ mod tests {
                             let data: Vec<$value_type> =
                                 (1..=24).map(|x| x as $value_type).collect();
 
-                            let array = Array::from_vec(
-                                frame.as_extended_target(),
-                                data.clone(),
-                                (2, 3, 4),
-                            )?
-                            .into_jlrs_result()?;
+                            let array = Array::from_vec(&mut frame, data.clone(), (2, 3, 4))?
+                                .into_jlrs_result()?;
                             let d = unsafe { array.copy_inline_data::<$value_type>()? };
 
                             for (a, b) in data.iter().zip(d.as_slice()) {
@@ -120,12 +114,8 @@ mod tests {
                             let data: Vec<$value_type> =
                                 (1..=24).map(|x| x as $value_type).collect();
 
-                            let array = Array::from_vec(
-                                frame.as_extended_target(),
-                                data.clone(),
-                                (2, 3, 4),
-                            )?
-                            .into_jlrs_result()?;
+                            let array = Array::from_vec(&mut frame, data.clone(), (2, 3, 4))?
+                                .into_jlrs_result()?;
                             let mut d = unsafe { array.copy_inline_data::<$value_type>()? };
 
                             for (a, b) in data.iter().zip(d.as_mut_slice()) {

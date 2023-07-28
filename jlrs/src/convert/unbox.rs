@@ -56,7 +56,7 @@ pub unsafe trait Unbox {
     ///
     /// Safety: The default implementation assumes that `Self::Output` is the correct layout for
     /// the data that `value` points to.
-    #[inline(always)]
+    #[inline]
     unsafe fn unbox(value: Value) -> Self::Output {
         value.data_ptr().cast::<Self::Output>().as_ref().clone()
     }
@@ -66,7 +66,7 @@ macro_rules! impl_unboxer {
     ($type:ty, $unboxer:expr) => {
         unsafe impl Unbox for $type {
             type Output = Self;
-            #[inline(always)]
+            #[inline]
             unsafe fn unbox(value: Value) -> $type {
                 $unboxer(
                     <Value as crate::data::managed::private::ManagedPriv>::unwrap(

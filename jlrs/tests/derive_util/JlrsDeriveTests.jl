@@ -1,4 +1,4 @@
-# using JlrsReflect
+# using JlrsCore.Reflect
 
 struct BitsIntChar
     a::Int
@@ -127,6 +127,10 @@ struct DoubleVariant
     a::Union{Int16, Int32}
 end
 
+struct DoubleUVariant
+    a::Union{UInt16, UInt32}
+end
+
 struct SizeAlignMismatch
     a::Union{Tuple{Int16, Int16, Int16}, Int32}
 end
@@ -252,6 +256,10 @@ struct Empty end
 
 struct TypedEmpty{T} end
 
+struct HasElidedParam{T, U}
+    a::T
+end
+
 #reflect([
 #    BitsCharBitsIntChar,
 #    BitsCharFloat32Float64,
@@ -276,6 +284,7 @@ struct TypedEmpty{T} end
 #    DoubleHasGeneric,
 #    DoubleImmut,
 #    DoubleVariant,
+#    DoubleUVariant,
 #    Empty,
 #    HasGeneric,
 #    HasGenericImmut,

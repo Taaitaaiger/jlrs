@@ -284,6 +284,9 @@ fn compile_jlrs_cc(julia_dir: &str, target: Option<Target>) {
     #[cfg(feature = "julia-1-10")]
     c.define("JULIA_1_10", None);
 
+    #[cfg(feature = "fast-tls")]
+    c.define("JLRS_FAST_TLS", None);
+
     c.compile("jlrs_cc");
 }
 
@@ -328,6 +331,11 @@ fn generate_bindings(julia_dir: &str) {
     #[cfg(feature = "julia-1-10")]
     {
         builder = builder.clang_arg("-DJULIA_1_10");
+    }
+
+    #[cfg(feature = "julia-1-11")]
+    {
+        builder = builder.clang_arg("-DJULIA_1_11");
     }
 
     #[cfg(all(feature = "julia-1-6", any(windows, feature = "windows")))]
@@ -415,6 +423,7 @@ fn generate_bindings(julia_dir: &str) {
         .allowlist_function("jl_get_ptls_states")
         .allowlist_function("jl_get_ARCH")
         .allowlist_function("jl_get_UNAME")
+        .allowlist_function("jl_get_world_counter")
         .allowlist_function("jl_getallocationgranularity")
         .allowlist_function("jl_getpagesize")
         .allowlist_function("jl_git_branch")
@@ -491,6 +500,12 @@ fn generate_bindings(julia_dir: &str) {
         .allowlist_function("jl_current_exception")
         .allowlist_function("jl_restore_excstack")
         .allowlist_function("jl_get_pgcstack")
+        .allowlist_function("jlrs_gc_safe_enter")
+        .allowlist_function("jlrs_gc_unsafe_enter")
+        .allowlist_function("jlrs_gc_safe_leave")
+        .allowlist_function("jlrs_gc_unsafe_leave")
+        .allowlist_function("jlrs_dimtuple_type")
+        .allowlist_function("jlrs_tuple_of")
         .allowlist_type("jl_binding_t")
         .allowlist_type("jl_callptr_t")
         .allowlist_type("jl_code_instance_t")
@@ -506,6 +521,7 @@ fn generate_bindings(julia_dir: &str) {
         .allowlist_type("jl_options_t")
         .allowlist_type("jl_taggedvalue_t")
         .allowlist_type("jl_task_t")
+        .allowlist_type("jl_gcframe_t")
         .allowlist_type("jl_typemap_t")
         .allowlist_type("jl_typemap_entry_t")
         .allowlist_type("jl_typemap_level_t")
@@ -643,12 +659,29 @@ fn generate_bindings(julia_dir: &str) {
         .opaque_type("uv_mutex_t")
         .opaque_type("uv_cond_t");
 
-    #[cfg(feature = "julia-1-10")]
+    #[cfg(feature = "c-unwind")]
+    {
+        builder = builder
+            .override_abi(bindgen::Abi::CUnwind, "jl(rs)?_.*")
+            .rust_target(bindgen::RustTarget::Nightly);
+    }
+
+    #[cfg(not(any(
+        feature = "julia-1-6",
+        feature = "julia-1-7",
+        feature = "julia-1-8",
+        feature = "julia-1-9"
+    )))]
     {
         builder = builder.allowlist_var("jl_binding_type");
     }
 
-    #[cfg(not(feature = "julia-1-10"))]
+    #[cfg(any(
+        feature = "julia-1-6",
+        feature = "julia-1-7",
+        feature = "julia-1-8",
+        feature = "julia-1-9"
+    ))]
     {
         builder = builder.allowlist_function("jl_binding_type");
     }

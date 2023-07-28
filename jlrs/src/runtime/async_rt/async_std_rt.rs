@@ -32,6 +32,7 @@ impl AsyncRuntime for AsyncStd {
     type JoinHandle = JoinHandle<()>;
     type RuntimeHandle = JoinHandle<JlrsResult<()>>;
 
+    #[inline]
     fn spawn_blocking<F>(rt_fn: F) -> Self::RuntimeHandle
     where
         F: FnOnce() -> JlrsResult<()> + Send + 'static,
@@ -39,6 +40,7 @@ impl AsyncRuntime for AsyncStd {
         async_std::task::spawn_blocking(rt_fn)
     }
 
+    #[inline]
     fn block_on<F>(loop_fn: F, _: Option<usize>) -> JlrsResult<()>
     where
         F: Future<Output = JlrsResult<()>>,
@@ -46,10 +48,12 @@ impl AsyncRuntime for AsyncStd {
         async_std::task::block_on(loop_fn)
     }
 
+    #[inline]
     async fn yield_now() {
         async_std::task::yield_now().await
     }
 
+    #[inline]
     fn spawn_local<F>(future: F) -> Self::JoinHandle
     where
         F: Future<Output = ()> + 'static,
@@ -57,6 +61,7 @@ impl AsyncRuntime for AsyncStd {
         async_std::task::spawn_local(future)
     }
 
+    #[inline]
     async fn timeout<F>(duration: Duration, future: F) -> Option<JlrsResult<Message>>
     where
         F: Future<Output = JlrsResult<Message>>,
@@ -69,6 +74,7 @@ impl<M: Send + 'static> Channel<M> for (Sender<M>, Receiver<M>) {
     type Sender = Sender<M>;
     type Receiver = Receiver<M>;
 
+    #[inline]
     fn channel(capacity: Option<NonZeroUsize>) -> (Self::Sender, Self::Receiver) {
         match capacity {
             Some(n) => bounded(n.get()),
@@ -79,10 +85,12 @@ impl<M: Send + 'static> Channel<M> for (Sender<M>, Receiver<M>) {
 
 #[async_trait]
 impl<M: Send + 'static> ChannelSender<M> for Sender<M> {
+    #[inline]
     async fn send(&self, msg: M) -> Result<(), SendError<M>> {
         Ok((&*self).send(msg).await.map_err(|e| SendError(e.0))?)
     }
 
+    #[inline]
     fn try_send(&self, msg: M) -> Result<(), TrySendError<M>> {
         Ok((&*self).try_send(msg).map_err(|e| match e {
             async_std::channel::TrySendError::Closed(v) => TrySendError::Closed(v),
@@ -93,6 +101,7 @@ impl<M: Send + 'static> ChannelSender<M> for Sender<M> {
 
 #[async_trait]
 impl<M: Send + 'static> ChannelReceiver<M> for Receiver<M> {
+    #[inline]
     async fn recv(&mut self) -> JlrsResult<M> {
         match (&*self).recv().await {
             Ok(m) => Ok(m),
@@ -102,6 +111,7 @@ impl<M: Send + 'static> ChannelReceiver<M> for Receiver<M> {
 }
 
 impl<M: Send + 'static> OneshotSender<M> for Sender<M> {
+    #[inline]
     fn send(self, msg: M) {
         (&self).send_blocking(msg).ok();
     }

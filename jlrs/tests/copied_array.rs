@@ -15,8 +15,7 @@ mod tests {
 
             jlrs.instance(&mut frame)
                 .scope(|mut frame| {
-                    let arr_val = Array::new::<f32, _, _>(frame.as_extended_target(), (1, 2))
-                        .into_jlrs_result()?;
+                    let arr_val = Array::new::<f32, _, _>(&mut frame, (1, 2)).into_jlrs_result()?;
                     let arr = arr_val;
 
                     let data = unsafe { arr.copy_inline_data::<f32>()? };

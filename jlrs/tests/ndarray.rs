@@ -21,9 +21,8 @@ mod tests {
                 .scope(|mut frame| {
                     let mut data = vec![1usize, 2, 3, 4, 5, 6];
                     let slice = &mut data.as_mut_slice();
-                    let borrowed = unsafe {
-                        Array::from_slice_unchecked(frame.as_extended_target(), slice, (3, 2))?
-                    };
+                    let borrowed =
+                        unsafe { Array::from_slice_unchecked(&mut frame, slice, (3, 2))? };
 
                     let data = unsafe { borrowed.bits_data::<usize>()? };
                     let x = data[(2, 1)];
@@ -47,8 +46,7 @@ mod tests {
                 .scope(|mut frame| unsafe {
                     let mut data = vec![1usize, 2, 3, 4, 5, 6];
                     let slice = &mut data.as_mut_slice();
-                    let mut borrowed =
-                        Array::from_slice_unchecked(frame.as_extended_target(), slice, (3, 2))?;
+                    let mut borrowed = Array::from_slice_unchecked(&mut frame, slice, (3, 2))?;
 
                     let mut inline = borrowed.bits_data_mut::<usize>()?;
                     let x = inline[(2, 1)];
@@ -78,9 +76,8 @@ mod tests {
                 .scope(|mut frame| {
                     let mut data = vec![1usize, 2, 3, 4, 5, 6];
                     let slice = &mut data.as_mut_slice();
-                    let borrowed = unsafe {
-                        Array::from_slice_unchecked(frame.as_extended_target(), slice, (3, 2))?
-                    };
+                    let borrowed =
+                        unsafe { Array::from_slice_unchecked(&mut frame, slice, (3, 2))? };
 
                     let data = unsafe { borrowed.inline_data::<usize>()? };
                     let x = data[(2, 1)];
@@ -104,9 +101,8 @@ mod tests {
                 .scope(|mut frame| {
                     let mut data = vec![1usize, 2, 3, 4, 5, 6];
                     let slice = &mut data.as_mut_slice();
-                    let borrowed = unsafe {
-                        TypedArray::from_slice_unchecked(frame.as_extended_target(), slice, (3, 2))?
-                    };
+                    let borrowed =
+                        unsafe { TypedArray::from_slice_unchecked(&mut frame, slice, (3, 2))? };
                     let copied = unsafe { borrowed.copy_inline_data()? };
 
                     let x = copied[(2, 1)];
@@ -130,8 +126,7 @@ mod tests {
                 .scope(|mut frame| unsafe {
                     let mut data = vec![1usize, 2, 3, 4, 5, 6];
                     let slice = &mut data.as_mut_slice();
-                    let mut borrowed =
-                        Array::from_slice_unchecked(frame.as_extended_target(), slice, (3, 2))?;
+                    let mut borrowed = Array::from_slice_unchecked(&mut frame, slice, (3, 2))?;
                     let mut copied = borrowed.copy_inline_data()?;
                     let x = copied[(2, 1)];
 

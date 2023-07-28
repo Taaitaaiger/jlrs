@@ -16,7 +16,8 @@ pub struct Unrooted<'target> {
 }
 
 impl<'target> Unrooted<'target> {
-    pub(crate) unsafe fn new() -> Self {
+    #[inline]
+    pub(crate) const unsafe fn new() -> Self {
         Unrooted {
             _marker: PhantomData,
         }

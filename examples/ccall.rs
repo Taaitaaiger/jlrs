@@ -22,7 +22,7 @@ pub unsafe extern "C" fn incr_array(mut arr: TypedArray<f64>) {
     };
 
     let Ok(mut arr) = arr.bits_data_mut() else {
-        return // unreachable
+        return; // unreachable
     };
 
     for x in arr.as_mut_slice() {
@@ -84,7 +84,7 @@ mod tests {
                 ).into_jlrs_result()?;
 
                 let data  = vec![1.0f64, 2.0, 3.0];
-                let array = TypedArray::from_vec_unchecked(frame.as_extended_target(), data, 3)?;
+                let array = TypedArray::from_vec_unchecked(&mut frame, data, 3)?;
 
                 // Call the function and unbox the result.
                 let output = func.call2(&frame, incr_array_ptr, array.as_value());

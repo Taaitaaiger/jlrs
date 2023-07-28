@@ -15,8 +15,7 @@ mod tests {
             let unboxed = jlrs
                 .instance(&mut frame)
                 .scope(|mut frame| {
-                    let array = Array::from_slice(frame.as_extended_target(), &mut data, 4)?
-                        .into_jlrs_result()?;
+                    let array = Array::from_slice(&mut frame, &mut data, 4)?.into_jlrs_result()?;
                     assert!(array.contains::<u64>());
                     unsafe { array.copy_inline_data::<u64>() }
                 })
@@ -41,8 +40,7 @@ mod tests {
                     let output = frame.output();
                     let array = frame.scope(|mut frame| {
                         let borrowed = &mut data;
-                        let arr = Array::from_slice(frame.as_extended_target(), borrowed, 4)?
-                            .into_jlrs_result()?;
+                        let arr = Array::from_slice(&mut frame, borrowed, 4)?.into_jlrs_result()?;
                         Ok(arr.root(output))
                     })?;
 

@@ -12,10 +12,7 @@ mod tests {
 
             jlrs.instance(&mut frame)
                 .scope(|mut frame| {
-                    let array = Array::new::<f32, _, _>(
-                        frame.as_extended_target(),
-                        &[1, 1, 1, 1, 1, 1, 1, 1, 1][..],
-                    );
+                    let array = Array::new::<f32, _, _>(&mut frame, &[1, 1, 1, 1, 1, 1, 1, 1, 1]);
                     assert!(array.is_ok());
                     Ok(())
                 })
@@ -30,11 +27,8 @@ mod tests {
 
             jlrs.instance(&mut frame)
                 .scope(|mut frame| {
-                    let array = Array::from_vec(
-                        frame.as_extended_target(),
-                        vec![1u64],
-                        &[1, 1, 1, 1, 1, 1, 1, 1, 1][..],
-                    );
+                    let array =
+                        Array::from_vec(&mut frame, vec![1u64], &[1, 1, 1, 1, 1, 1, 1, 1, 1]);
                     assert!(array.is_ok());
                     Ok(())
                 })
@@ -51,12 +45,8 @@ mod tests {
                 .scope(|mut frame| {
                     let mut data = vec![1u32];
                     let array = {
-                        Array::from_slice(
-                            frame.as_extended_target(),
-                            &mut data,
-                            &[1, 1, 1, 1, 1, 1, 1, 1, 1][..],
-                        )?
-                        .into_jlrs_result()
+                        Array::from_slice(&mut frame, &mut data, &[1, 1, 1, 1, 1, 1, 1, 1, 1])?
+                            .into_jlrs_result()
                     };
                     assert!(array.is_ok());
                     Ok(())
@@ -72,10 +62,7 @@ mod tests {
 
             jlrs.instance(&mut frame)
                 .scope(|mut frame| {
-                    let array = TypedArray::<f32>::new(
-                        frame.as_extended_target(),
-                        &[1, 1, 1, 1, 1, 1, 1, 1, 1][..],
-                    );
+                    let array = TypedArray::<f32>::new(&mut frame, &[1, 1, 1, 1, 1, 1, 1, 1, 1]);
                     assert!(array.is_ok());
                     Ok(())
                 })
@@ -90,11 +77,8 @@ mod tests {
 
             jlrs.instance(&mut frame)
                 .scope(|mut frame| {
-                    let array = TypedArray::from_vec(
-                        frame.as_extended_target(),
-                        vec![1u64],
-                        &[1, 1, 1, 1, 1, 1, 1, 1, 1][..],
-                    );
+                    let array =
+                        TypedArray::from_vec(&mut frame, vec![1u64], &[1, 1, 1, 1, 1, 1, 1, 1, 1]);
                     assert!(array.is_ok());
                     Ok(())
                 })
@@ -111,12 +95,8 @@ mod tests {
                 .scope(|mut frame| {
                     let mut data = vec![1u32];
                     let array = {
-                        TypedArray::from_slice(
-                            frame.as_extended_target(),
-                            &mut data,
-                            &[1, 1, 1, 1, 1, 1, 1, 1, 1][..],
-                        )?
-                        .into_jlrs_result()
+                        TypedArray::from_slice(&mut frame, &mut data, &[1, 1, 1, 1, 1, 1, 1, 1, 1])?
+                            .into_jlrs_result()
                     };
                     assert!(array.is_ok());
                     Ok(())

@@ -73,6 +73,7 @@ pub struct FieldAccessor<'scope, 'data> {
 }
 
 impl<'scope, 'data> FieldAccessor<'scope, 'data> {
+    #[inline]
     pub(crate) fn new(value: Value<'scope, 'data>) -> Self {
         FieldAccessor {
             value: Some(value.as_ref()),
@@ -149,6 +150,7 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
     }
 
     /// Returns `true` if `self.access::<T>()` will succeed, `false` if it will fail.
+    #[inline]
     pub fn can_access_as<T: ValidLayout>(&self) -> bool {
         if self.current_field_type.is_none() {
             return false;
@@ -308,6 +310,7 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
     /// Try to clone this accessor and its state.
     ///
     /// If the current value this accessor is accessing is locked an error is returned.
+    #[inline]
     pub fn try_clone(&self) -> JlrsResult<Self> {
         #[cfg(not(feature = "julia-1-6"))]
         if self.state == ViewState::Locked {
@@ -325,23 +328,27 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
     }
 
     #[julia_version(since = "1.7")]
+    #[inline]
     /// Returns `true` if the current value the accessor is accessing is locked.
     pub fn is_locked(&self) -> bool {
         self.state == ViewState::Locked
     }
 
     #[julia_version(until = "1.6")]
+    #[inline]
     /// Returns `true` if the current value the accessor is accessing is locked.
     pub fn is_locked(&self) -> bool {
         false
     }
 
     /// Returns the type of the field the accessor is currently pointing at.
+    #[inline]
     pub fn current_field_type(&self) -> Option<DataTypeRef<'scope>> {
         self.current_field_type
     }
 
     /// Returns the value the accessor is currently inspecting.
+    #[inline]
     pub fn value(&self) -> Option<ValueRef<'scope, 'data>> {
         self.value
     }
@@ -814,6 +821,7 @@ mod private {
     }
 
     impl<D: Dims> FieldIndexPriv for D {
+        #[inline]
         fn field_index(&self, ty: DataType, _: Private) -> JlrsResult<usize> {
             debug_assert!(!ty.is::<Array>());
 

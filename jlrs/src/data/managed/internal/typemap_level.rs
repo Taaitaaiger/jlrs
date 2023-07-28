@@ -19,7 +19,7 @@ use crate::{
         Ref,
     },
     impl_julia_typecheck,
-    memory::target::Target,
+    memory::target::{Target, TargetResult},
     private::Private,
 };
 
@@ -244,16 +244,18 @@ impl<'scope> ManagedPriv<'scope, '_> for TypeMapLevel<'scope> {
 
     // Safety: `inner` must not have been freed yet, the result must never be
     // used after the GC might have freed it.
+    #[inline]
     unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self {
         Self(inner, PhantomData)
     }
 
+    #[inline]
     fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps> {
         self.0
     }
 }
 
-impl_construct_type_managed!(TypeMapLevel<'_>, jl_typemap_level_type);
+impl_construct_type_managed!(TypeMapLevel, 1, jl_typemap_level_type);
 
 /// A reference to a [`TypeMapLevel`] that has not been explicitly rooted.
 pub type TypeMapLevelRef<'scope> = Ref<'scope, 'static, TypeMapLevel<'scope>>;
@@ -262,9 +264,9 @@ pub type TypeMapLevelRef<'scope> = Ref<'scope, 'static, TypeMapLevel<'scope>>;
 /// `ccall`able functions that return a [`TypeMapLevel`].
 pub type TypeMapLevelRet = Ref<'static, 'static, TypeMapLevel<'static>>;
 
-impl_valid_layout!(TypeMapLevelRef, TypeMapLevel);
+impl_valid_layout!(TypeMapLevelRef, TypeMapLevel, jl_typemap_level_type);
 
-use crate::memory::target::target_type::TargetType;
+use crate::memory::target::TargetType;
 
 /// `TypeMaLevely` or `TypeMaLevelyRef`, depending on the target type `T`.
 pub type TypeMapLevelData<'target, T> =
@@ -272,8 +274,7 @@ pub type TypeMapLevelData<'target, T> =
 
 /// `JuliaResult<TypeMaLevely>` or `JuliaResultRef<TypeMapLevelRef>`, depending on the target type
 /// `T`.
-pub type TypeMapLevelResult<'target, T> =
-    <T as TargetType<'target>>::Result<'static, TypeMapLevel<'target>>;
+pub type TypeMapLevelResult<'target, T> = TargetResult<'target, 'static, TypeMapLevel<'target>, T>;
 
 impl_ccall_arg_managed!(TypeMapLevel, 1);
 impl_into_typed!(TypeMapLevel);

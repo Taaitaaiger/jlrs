@@ -6,8 +6,9 @@
 
 // todo: jl_new_module
 
-use std::{marker::PhantomData, ptr::NonNull};
+use std::{any::TypeId, marker::PhantomData, ptr::NonNull};
 
+use fxhash::FxHashMap;
 #[julia_version(since = "1.8", until = "1.9")]
 use jl_sys::jl_binding_type as jl_get_binding_type;
 #[julia_version(since = "1.10")]
@@ -17,27 +18,53 @@ use jl_sys::{
     jl_module_type, jl_set_const, jl_set_global,
 };
 use jlrs_macros::julia_version;
-use once_cell::sync::OnceCell;
 
 use super::{
+    erase_scope_lifetime,
     function::FunctionData,
-    value::{ValueData, ValueResult},
-    Ref,
+    union_all::UnionAll,
+    value::{ValueData, ValueResult, ValueUnbound},
+    Managed, Ref,
 };
 use crate::{
     call::Call,
+    catch::catch_exceptions,
     convert::to_symbol::ToSymbol,
     data::{
         layout::nothing::Nothing,
-        managed::{
-            function::Function, private::ManagedPriv, symbol::Symbol, value::Value, Managed as _,
-        },
+        managed::{function::Function, private::ManagedPriv, symbol::Symbol, value::Value},
+        types::{construct_type::ConstructType, typecheck::Typecheck},
     },
     error::{AccessError, JlrsResult, TypeError},
-    impl_julia_typecheck,
-    memory::target::Target,
+    gc_safe::{GcSafeOnceLock, GcSafeRwLock},
+    impl_julia_typecheck, inline_static_ref,
+    memory::target::{Target, TargetException, TargetResult},
+    prelude::DataType,
     private::Private,
 };
+
+struct GlobalCache {
+    // FxHashMap is significantly faster than HashMap with default hasher
+    // Boxed slice is faster to hash than a Vec
+    data: GcSafeRwLock<FxHashMap<Box<[u8]>, (TypeId, ValueUnbound)>>,
+}
+
+impl GlobalCache {
+    fn new() -> Self {
+        GlobalCache {
+            data: GcSafeRwLock::default(),
+        }
+    }
+}
+
+unsafe impl Send for GlobalCache {}
+unsafe impl Sync for GlobalCache {}
+
+static CACHE: GcSafeOnceLock<GlobalCache> = GcSafeOnceLock::new();
+
+pub(crate) unsafe fn init_global_cache() {
+    CACHE.set(GlobalCache::new()).ok();
+}
 
 /// Functionality in Julia can be accessed through its module system. You can get a handle to the
 /// three standard modules, `Main`, `Base`, and `Core` and access their submodules through them.
@@ -55,6 +82,7 @@ pub struct Module<'scope>(NonNull<jl_module_t>, PhantomData<&'scope ()>);
 
 impl<'scope> Module<'scope> {
     /// Returns the name of this module.
+    #[inline]
     pub fn name(self) -> Symbol<'scope> {
         // Safety: the pointer points to valid data, the name is never null
         unsafe {
@@ -64,6 +92,7 @@ impl<'scope> Module<'scope> {
     }
 
     /// Returns the parent of this module.
+    #[inline]
     pub fn parent(self) -> Module<'scope> {
         // Safety: the pointer points to valid data, the parent is never null
         unsafe {
@@ -73,11 +102,93 @@ impl<'scope> Module<'scope> {
     }
 
     /// Extend the lifetime of this module. This is safe as long as the module is never redefined.
+    #[inline]
     pub unsafe fn extend<'target, T>(self, _: &T) -> Module<'target>
     where
         T: Target<'target>,
     {
         Module::wrap_non_null(self.unwrap_non_null(Private), Private)
+    }
+
+    /// Access the global at `path`. The result is cached for faster lookup in the future.
+    ///
+    /// Safety:
+    ///
+    /// This method assumes the global remains globally rooted. Only use this method to access
+    /// module constants and globals which are never replaced with another value.
+    #[inline(never)]
+    pub unsafe fn typed_global_cached<'target, T, S, Tgt>(target: &Tgt, path: S) -> JlrsResult<T>
+    where
+        T: ConstructType + Managed<'target, 'static> + Typecheck,
+        S: AsRef<str>,
+        Tgt: Target<'target>,
+    {
+        let tid = T::type_id();
+        let data = &CACHE.get_unchecked().data;
+        let path = path.as_ref();
+
+        {
+            if let Some(cached) = data.read().get(path.as_bytes()) {
+                if cached.0 == tid {
+                    return Ok(cached.1.cast_unchecked());
+                } else {
+                    let ty = T::construct_type(target).as_value();
+                    Err(TypeError::NotA {
+                        value: cached.1.display_string_or("<Cannot display value>"),
+                        field_type: ty.display_string_or("<Cannot display type>"),
+                    })?
+                }
+            }
+        }
+
+        let mut parts = path.split('.');
+        let n_parts = parts.clone().count();
+        let module_name = parts.next().unwrap();
+
+        let mut module = match module_name {
+            "Main" => Module::main(&target),
+            "Base" => Module::base(&target),
+            "Core" => Module::core(&target),
+            "JlrsCore" => JlrsCore::module(&target),
+            module => {
+                if let Some(module) = Module::package_root_module(&target, module) {
+                    module
+                } else {
+                    Err(AccessError::ModuleNotFound {
+                        module: module_name.into(),
+                    })?
+                }
+            }
+        };
+
+        let item = match n_parts {
+            1 => module.as_value().cast::<T>()?,
+            2 => module
+                .global(&target, parts.next().unwrap())?
+                .as_value()
+                .cast::<T>()?,
+            n => {
+                for _ in 1..n - 1 {
+                    module = module
+                        .submodule(&target, parts.next().unwrap())?
+                        .as_managed();
+                }
+
+                module
+                    .global(&target, parts.next().unwrap())?
+                    .as_value()
+                    .cast::<T>()?
+            }
+        };
+
+        {
+            data.write().insert(
+                path.as_bytes().into(),
+                (tid, erase_scope_lifetime(item.as_value())),
+            );
+        }
+
+        Ok(item)
     }
 
     /// Returns a handle to Julia's `Main`-module. If you include your own Julia code with
@@ -86,24 +197,28 @@ impl<'scope> Module<'scope> {
     ///
     /// [`Julia::include`]: crate::runtime::sync_rt::Julia::include
     /// [`AsyncJulia::include`]: crate::runtime::async_rt::AsyncJulia::include
+    #[inline]
     pub fn main<T: Target<'scope>>(_: &T) -> Self {
         // Safety: the Main module is globally rooted
         unsafe { Module::wrap_non_null(NonNull::new_unchecked(jl_main_module), Private) }
     }
 
     /// Returns a handle to Julia's `Core`-module.
+    #[inline]
     pub fn core<T: Target<'scope>>(_: &T) -> Self {
         // Safety: the Core module is globally rooted
         unsafe { Module::wrap_non_null(NonNull::new_unchecked(jl_core_module), Private) }
     }
 
     /// Returns a handle to Julia's `Base`-module.
+    #[inline]
     pub fn base<T: Target<'scope>>(_: &T) -> Self {
         // Safety: the Base module is globally rooted
         unsafe { Module::wrap_non_null(NonNull::new_unchecked(jl_base_module), Private) }
     }
 
     /// Returns `true` if `self` has imported `sym`.
+    #[inline]
     pub fn is_imported<N: ToSymbol>(self, sym: N) -> bool {
         // Safety: the pointer points to valid data, the C API function is called with
         // valid arguments.
@@ -115,6 +230,7 @@ impl<'scope> Module<'scope> {
 
     #[julia_version(since = "1.8")]
     /// Returns the type of the binding in this module with the name `var`,
+    #[inline]
     pub fn binding_type<'target, N, T>(
         self,
         target: T,
@@ -176,30 +292,31 @@ impl<'scope> Module<'scope> {
         target: &T,
         name: N,
     ) -> Option<Module<'target>> {
-        static FUNC: OnceCell<unsafe extern "C" fn(Symbol) -> Value> = OnceCell::new();
+        static FUNC: GcSafeOnceLock<unsafe extern "C" fn(Symbol) -> Value> = GcSafeOnceLock::new();
+        unsafe {
+            let func = FUNC.get_or_init(|| {
+                let ptr = Module::main(&target)
+                    .submodule(&target, "JlrsCore")
+                    .unwrap()
+                    .as_managed()
+                    .global(&target, "root_module_c")
+                    .unwrap()
+                    .as_value()
+                    .data_ptr()
+                    .cast()
+                    .as_ptr();
 
-        let func = FUNC.get_or_init(|| unsafe {
-            let ptr = Module::main(&target)
-                .submodule(&target, "JlrsCore")
-                .unwrap()
-                .as_managed()
-                .global(&target, "root_module_c")
-                .unwrap()
-                .as_value()
-                .data_ptr()
-                .cast::<unsafe extern "C" fn(Symbol) -> Value>()
-                .as_ptr();
+                *ptr
+            });
 
-            *ptr
-        });
+            let name = name.to_symbol(&target);
+            let module = func(name);
+            if module.is::<Nothing>() {
+                return None;
+            }
 
-        let name = name.to_symbol(&target);
-        let module = unsafe { func(name) };
-        if module.is::<Nothing>() {
-            return None;
+            Some(module.cast_unchecked())
         }
-
-        unsafe { Some(module.cast_unchecked()) }
     }
 
     /// Set a global value in this module. Note that if this global already exists, this can
@@ -213,32 +330,23 @@ impl<'scope> Module<'scope> {
         target: T,
         name: N,
         value: Value<'_, 'static>,
-    ) -> T::Exception<'static, ()>
+    ) -> TargetException<'target, 'static, (), T>
     where
         N: ToSymbol,
         T: Target<'target>,
     {
-        use std::mem::MaybeUninit;
-
-        use crate::catch::catch_exceptions;
         let symbol = name.to_symbol_priv(Private);
 
-        let mut callback = |result: &mut MaybeUninit<()>| {
+        let callback = || {
             jl_set_global(
                 self.unwrap(Private),
                 symbol.unwrap(Private),
                 value.unwrap(Private),
-            );
-
-            result.write(());
-            Ok(())
+            )
         };
 
-        let res = match catch_exceptions(&mut callback).unwrap() {
-            Ok(_) => Ok(()),
-            Err(e) => Err(e.ptr()),
-        };
-
+        let exc = |err: Value| err.unwrap_non_null(Private);
+        let res = catch_exceptions(callback, exc);
         target.exception_from_ptr(res, Private)
     }
 
@@ -247,6 +355,7 @@ impl<'scope> Module<'scope> {
     ///
     /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
     /// this value is allowed.
+    #[inline]
     pub unsafe fn set_global_unchecked<N>(self, name: N, value: Value<'_, 'static>)
     where
         N: ToSymbol,
@@ -268,7 +377,7 @@ impl<'scope> Module<'scope> {
         target: T,
         name: N,
         value: Value<'_, 'static>,
-    ) -> T::Exception<'static, Value<'scope, 'static>>
+    ) -> TargetException<'target, 'static, Value<'scope, 'static>, T>
     where
         N: ToSymbol,
         T: Target<'target>,
@@ -277,28 +386,24 @@ impl<'scope> Module<'scope> {
         // valid arguments and its result is checked. if an exception is thrown it's caught
         // and returned
         unsafe {
-            use std::mem::MaybeUninit;
-
-            use crate::catch::catch_exceptions;
             let symbol = name.to_symbol_priv(Private);
 
-            let mut callback = |result: &mut MaybeUninit<()>| {
+            let callback = || {
                 jl_set_const(
                     self.unwrap(Private),
                     symbol.unwrap(Private),
                     value.unwrap(Private),
                 );
-
-                result.write(());
-                Ok(())
             };
 
-            let res = match catch_exceptions(&mut callback).unwrap() {
+            let exc = |err: Value| err.unwrap_non_null(Private);
+
+            let res = match catch_exceptions(callback, exc) {
                 Ok(_) => Ok(Value::wrap_non_null(
                     value.unwrap_non_null(Private),
                     Private,
                 )),
-                Err(e) => Err(e.ptr()),
+                Err(e) => Err(e),
             };
 
             target.exception_from_ptr(res, Private)
@@ -309,6 +414,7 @@ impl<'scope> Module<'scope> {
     /// otherwise an unrooted reference to the constant is returned.
     ///
     /// Safety: This method must not throw an error if called from a `ccall`ed function.
+    #[inline]
     pub unsafe fn set_const_unchecked<N>(
         self,
         name: N,
@@ -402,10 +508,8 @@ impl<'scope> Module<'scope> {
         T: Target<'target>,
         N: ToSymbol,
     {
-        Module::base(&target)
-            .function(&target, "require")
+        Module::typed_global_cached::<Value, _, _>(&target, "Base.require")
             .unwrap()
-            .as_managed()
             .call2(
                 target,
                 self.as_value(),
@@ -424,16 +528,18 @@ impl<'scope> ManagedPriv<'scope, '_> for Module<'scope> {
 
     // Safety: `inner` must not have been freed yet, the result must never be
     // used after the GC might have freed it.
+    #[inline]
     unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self {
         Self(inner, PhantomData)
     }
 
+    #[inline]
     fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps> {
         self.0
     }
 }
 
-impl_construct_type_managed!(Module<'_>, jl_module_type);
+impl_construct_type_managed!(Module, 1, jl_module_type);
 
 /// A reference to a [`Module`] that has not been explicitly rooted.
 pub type ModuleRef<'scope> = Ref<'scope, 'static, Module<'scope>>;
@@ -442,15 +548,167 @@ pub type ModuleRef<'scope> = Ref<'scope, 'static, Module<'scope>>;
 /// `ccall`able functions that return a [`Module`].
 pub type ModuleRet = Ref<'static, 'static, Module<'static>>;
 
-impl_valid_layout!(ModuleRef, Module);
+impl_valid_layout!(ModuleRef, Module, jl_module_type);
 
-use crate::memory::target::target_type::TargetType;
+use crate::memory::target::TargetType;
 
 /// `Module` or `ModuleRef`, depending on the target type `T`.
 pub type ModuleData<'target, T> = <T as TargetType<'target>>::Data<'static, Module<'target>>;
 
 /// `JuliaResult<Module>` or `JuliaResultRef<ModuleRef>`, depending on the target type `T`.
-pub type ModuleResult<'target, T> = <T as TargetType<'target>>::Result<'static, Module<'target>>;
+pub type ModuleResult<'target, T> = TargetResult<'target, 'static, Module<'target>, T>;
 
 impl_ccall_arg_managed!(Module, 1);
 impl_into_typed!(Module);
+
+pub struct JlrsCore;
+
+impl JlrsCore {
+    #[inline]
+    pub fn module<'target, Tgt>(target: &Tgt) -> Module<'target>
+    where
+        Tgt: Target<'target>,
+    {
+        inline_static_ref!(MODULE, Module, "JlrsCore", target)
+    }
+
+    #[inline]
+    pub fn borrow_error<'target, Tgt>(target: &Tgt) -> DataType<'target>
+    where
+        Tgt: Target<'target>,
+    {
+        inline_static_ref!(BORROW_ERROR, DataType, "JlrsCore.BorrowError", target)
+    }
+
+    #[inline]
+    pub fn jlrs_error<'target, Tgt>(target: &Tgt) -> DataType<'target>
+    where
+        Tgt: Target<'target>,
+    {
+        inline_static_ref!(JLRS_ERROR, DataType, "JlrsCore.JlrsError", target)
+    }
+
+    #[inline]
+    pub fn rust_result<'target, Tgt>(target: &Tgt) -> UnionAll<'target>
+    where
+        Tgt: Target<'target>,
+    {
+        inline_static_ref!(RUST_RESULT, UnionAll, "JlrsCore.RustResult", target)
+    }
+
+    #[inline]
+    pub fn set_pool_size<'target, Tgt>(target: &Tgt) -> Function<'target, 'static>
+    where
+        Tgt: Target<'target>,
+    {
+        inline_static_ref!(SET_POOL_SIZE, Function, "JlrsCore.set_pool_size", target)
+    }
+
+    #[inline]
+    pub fn value_string<'target, Tgt>(target: &Tgt) -> Function<'target, 'static>
+    where
+        Tgt: Target<'target>,
+    {
+        inline_static_ref!(VALUE_STRING, Function, "JlrsCore.valuestring", target)
+    }
+
+    #[inline]
+    pub fn error_string<'target, Tgt>(target: &Tgt) -> Function<'target, 'static>
+    where
+        Tgt: Target<'target>,
+    {
+        inline_static_ref!(ERROR_STRING, Function, "JlrsCore.errorstring", target)
+    }
+
+    #[inline]
+    pub fn call_catch_wrapper<'target, Tgt>(target: &Tgt) -> Function<'target, 'static>
+    where
+        Tgt: Target<'target>,
+    {
+        inline_static_ref!(
+            CALL_CATCH_WRAPPER,
+            Function,
+            "JlrsCore.call_catch_wrapper",
+            target
+        )
+    }
+
+    #[inline]
+    pub fn call_catch_wrapper_c<'target, Tgt>(target: &Tgt) -> Value<'target, 'static>
+    where
+        Tgt: Target<'target>,
+    {
+        inline_static_ref!(
+            CALL_CATCH_WRAPPER,
+            Value,
+            "JlrsCore.call_catch_wrapper_c",
+            target
+        )
+    }
+
+    #[cfg(feature = "async")]
+    #[inline]
+    pub(crate) fn async_call<'target, Tgt>(target: &Tgt) -> Function<'target, 'static>
+    where
+        Tgt: Target<'target>,
+    {
+        inline_static_ref!(ASYNC_CALL, Function, "JlrsCore.Threads.asynccall", target)
+    }
+
+    #[cfg(feature = "async")]
+    #[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8")))]
+    #[inline]
+    pub(crate) fn interactive_call<'target, Tgt>(target: &Tgt) -> Function<'target, 'static>
+    where
+        Tgt: Target<'target>,
+    {
+        inline_static_ref!(
+            INTERACTIVE_CALL,
+            Function,
+            "JlrsCore.Threads.interactivecall",
+            target
+        )
+    }
+
+    #[cfg(feature = "async")]
+    #[inline]
+    pub(crate) fn schedule_async<'target, Tgt>(target: &Tgt) -> Function<'target, 'static>
+    where
+        Tgt: Target<'target>,
+    {
+        inline_static_ref!(
+            SCHEDULE_ASYNC,
+            Function,
+            "JlrsCore.Threads.scheduleasync",
+            target
+        )
+    }
+
+    #[cfg(feature = "async")]
+    #[inline]
+    pub(crate) fn schedule_async_local<'target, Tgt>(target: &Tgt) -> Function<'target, 'static>
+    where
+        Tgt: Target<'target>,
+    {
+        inline_static_ref!(
+            SCHEDULE_ASYNC_LOCAL,
+            Function,
+            "JlrsCore.Threads.scheduleasynclocal",
+            target
+        )
+    }
+
+    #[cfg(feature = "async")]
+    #[inline]
+    pub(crate) fn post_blocking<'target, Tgt>(target: &Tgt) -> Function<'target, 'static>
+    where
+        Tgt: Target<'target>,
+    {
+        inline_static_ref!(
+            POST_BLOCKING,
+            Function,
+            "JlrsCore.Threads.postblocking",
+            target
+        )
+    }
+}

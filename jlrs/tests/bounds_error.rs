@@ -16,8 +16,7 @@ mod tests {
                     frame.scope(|mut frame| unsafe {
                         let idx = Value::new(&mut frame, 4usize);
                         let data = vec![1.0f64, 2., 3.];
-                        let array = Array::from_vec(frame.as_extended_target(), data, 3)?
-                            .into_jlrs_result()?;
+                        let array = Array::from_vec(&mut frame, data, 3)?.into_jlrs_result()?;
                         let func = Module::base(&frame)
                             .function(&frame, "getindex")?
                             .as_managed();

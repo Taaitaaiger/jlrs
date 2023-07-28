@@ -101,8 +101,8 @@ pub trait OneshotSender<M: Send + 'static>: 'static + Send + Sync {
     fn send(self, msg: M);
 }
 
-#[async_trait::async_trait]
 impl<M: Send + 'static> OneshotSender<M> for crossbeam_channel::Sender<M> {
+    #[inline]
     fn send(self, msg: M) {
         (&self).send(msg).ok();
     }

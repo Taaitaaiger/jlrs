@@ -270,7 +270,7 @@ mod tests {
             jlrs.instance(&mut frame)
                 .scope(|mut frame| {
                     let a = Value::new(&mut frame, 1usize);
-                    let named_tuple = named_tuple!(frame.as_extended_target(), "a" => a);
+                    let named_tuple = named_tuple!(&mut frame, "a" => a);
 
                     assert!(NamedTuple::typecheck(named_tuple.datatype()));
                     assert!(!NamedTuple::typecheck(DataType::bool_type(&frame)));

@@ -40,7 +40,7 @@ use crate::{
         types::{abstract_types::AnyType, construct_type::ConstructType, typecheck::Typecheck},
     },
     error::{JlrsResult, TypeError},
-    memory::target::{frame::GcFrame, ExtendedTarget, Target},
+    memory::target::{Target, TargetResult},
     private::Private,
 };
 
@@ -61,6 +61,7 @@ pub struct TypedValue<'scope, 'data, T>(
 impl<U: ConstructType + IntoJulia> TypedValue<'_, '_, U> {
     /// Create a new typed value, any type that implements [`IntoJulia`] can be converted using
     /// this function.
+    #[inline]
     pub fn new<'target, T>(target: T, data: U) -> TypedValueData<'target, 'static, U, T>
     where
         T: Target<'target>,
@@ -74,34 +75,57 @@ impl<U: ConstructType + IntoJulia> TypedValue<'_, '_, U> {
     }
 }
 
+impl<U: ConstructType> TypedValue<'_, '_, U> {
+    /// Create a new typed value, any type that implements [`ValidLayout`] can be converted using
+    /// this function as long as it's valid for `U`.
+    #[inline]
+    pub fn try_new_with<'target, L, Tgt>(
+        target: Tgt,
+        data: L,
+    ) -> JlrsResult<TypedValueData<'target, 'static, U, Tgt>>
+    where
+        L: ValidLayout,
+        Tgt: Target<'target>,
+    {
+        unsafe {
+            let v = Value::try_new_with::<U, _, _>(&target, data)?.as_value();
+            Ok(TypedValue::<U>::from_value_unchecked(v).root(target))
+        }
+    }
+}
+
 impl<'scope, 'data, U: ConstructType> TypedValue<'scope, 'data, U> {
     /// Create a new typed value from an existing value.
-    pub fn from_value(
-        frame: &mut GcFrame,
+    pub fn from_value<'target, Tgt>(
+        target: &Tgt,
         value: Value<'scope, 'data>,
-    ) -> JlrsResult<TypedValue<'scope, 'data, U>> {
-        frame.scope(|mut frame| {
-            let ty = U::construct_type(frame.as_extended_target());
-            if value.isa(ty) {
-                unsafe {
+    ) -> JlrsResult<TypedValue<'scope, 'data, U>>
+    where
+        Tgt: Target<'target>,
+    {
+        unsafe {
+            target.local_scope::<_, _, 1>(|mut frame| {
+                let ty = U::construct_type(&mut frame).as_value();
+                if value.isa(ty) {
                     Ok(TypedValue::<U>::wrap_non_null(
                         value.unwrap_non_null(Private),
                         Private,
                     ))
+                } else {
+                    Err(TypeError::NotA {
+                        value: value.display_string_or("<Cannot display value>"),
+                        field_type: ty.display_string_or("<Cannot display type>"),
+                    })?
                 }
-            } else {
-                Err(TypeError::NotA {
-                    value: value.display_string_or("<Cannot display value>"),
-                    field_type: ty.display_string_or("<Cannot display type>"),
-                })?
-            }
-        })
+            })
+        }
     }
 
     /// Create a new typed value from an existing value without checking the value is an instance
     /// of `U`.
     ///
     /// Safety: `value` must be an instance of the constructed type `U`.
+    #[inline]
     pub unsafe fn from_value_unchecked(
         value: Value<'scope, 'data>,
     ) -> TypedValue<'scope, 'data, U> {
@@ -113,6 +137,7 @@ impl<'scope, 'data, U: ValidLayout + ConstructType> TypedValue<'scope, 'data, U>
     /// Track `self` immutably.
     ///
     /// See [`Value::track_shared`] for more information.
+    #[inline]
     pub unsafe fn track_shared<'tracked>(
         &'tracked self,
     ) -> JlrsResult<Tracked<'tracked, 'scope, 'data, U>> {
@@ -122,6 +147,7 @@ impl<'scope, 'data, U: ValidLayout + ConstructType> TypedValue<'scope, 'data, U>
     /// Track `self` mutably.
     ///
     /// See [`Value::track_exclusive`] for more information.
+    #[inline]
     pub unsafe fn track_exclusive<'tracked>(
         &'tracked mut self,
     ) -> JlrsResult<TrackedMut<'tracked, 'scope, 'data, U>> {
@@ -133,6 +159,7 @@ impl<'scope, 'data, U: ConstructType> TypedValue<'scope, 'data, U> {
     /// Track `self` immutably.
     ///
     /// See [`Value::track_shared`] for more information.
+    #[inline]
     pub unsafe fn track_shared_as<'tracked, V: ValidLayout>(
         &'tracked self,
     ) -> JlrsResult<Tracked<'tracked, 'scope, 'data, V>> {
@@ -142,6 +169,7 @@ impl<'scope, 'data, U: ConstructType> TypedValue<'scope, 'data, U> {
     /// Track `self` mutably.
     ///
     /// See [`Value::track_exclusive`] for more information.
+    #[inline]
     pub unsafe fn track_exclusive_as<'tracked, V: ValidLayout>(
         &'tracked mut self,
     ) -> JlrsResult<TrackedMut<'tracked, 'scope, 'data, V>> {
@@ -153,6 +181,7 @@ impl<U: ConstructType + ValidLayout + Send> TypedValueUnbound<U> {
     /// Track `self` immutably.
     ///
     /// See [`Value::track_shared_unbound`] for more information.
+    #[inline]
     pub unsafe fn track_shared_unbound(self) -> JlrsResult<Tracked<'static, 'static, 'static, U>> {
         self.as_value().track_shared_unbound()
     }
@@ -160,6 +189,7 @@ impl<U: ConstructType + ValidLayout + Send> TypedValueUnbound<U> {
     /// Track `self` mutably.
     ///
     /// See [`Value::track_exclusive_unbound`] for more information.
+    #[inline]
     pub unsafe fn track_exclusive_unbound(
         self,
     ) -> JlrsResult<TrackedMut<'static, 'static, 'static, U>> {
@@ -171,6 +201,7 @@ impl<U: ConstructType> TypedValueUnbound<U> {
     /// Track `self` immutably.
     ///
     /// See [`Value::track_shared_unbound`] for more information.
+    #[inline]
     pub unsafe fn track_shared_unbound_as<V: ValidLayout + Send>(
         self,
     ) -> JlrsResult<Tracked<'static, 'static, 'static, V>> {
@@ -180,6 +211,7 @@ impl<U: ConstructType> TypedValueUnbound<U> {
     /// Track `self` mutably.
     ///
     /// See [`Value::track_exclusive_unbound`] for more information.
+    #[inline]
     pub unsafe fn track_exclusive_unbound_as<V: ValidLayout + Send>(
         self,
     ) -> JlrsResult<TrackedMut<'static, 'static, 'static, V>> {
@@ -190,11 +222,13 @@ impl<U: ConstructType> TypedValueUnbound<U> {
 impl<'scope, 'data, U: ConstructType> Deref for TypedValue<'scope, 'data, U> {
     type Target = Value<'scope, 'data>;
 
+    #[inline]
     fn deref(&self) -> &Self::Target {
         unsafe { std::mem::transmute(self) }
     }
 }
 impl<'scope, 'data, U: ConstructType> DerefMut for TypedValue<'scope, 'data, U> {
+    #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
         unsafe { std::mem::transmute(self) }
     }
@@ -213,6 +247,7 @@ impl<T> Clone for TypedValue<'_, '_, T>
 where
     T: ConstructType,
 {
+    #[inline]
     fn clone(&self) -> Self {
         unsafe { Self::wrap_non_null(self.unwrap_non_null(Private), Private) }
     }
@@ -224,8 +259,17 @@ unsafe impl<T> ValidLayout for TypedValue<'_, '_, T>
 where
     T: ConstructType,
 {
+    #[inline]
     fn valid_layout(v: Value) -> bool {
         ValueRef::valid_layout(v)
+    }
+
+    #[inline]
+    fn type_object<'target, Tgt>(target: &Tgt) -> Value<'target, 'static>
+    where
+        Tgt: Target<'target>,
+    {
+        T::base_type(target).expect("Type has no base type")
     }
 
     const IS_REF: bool = true;
@@ -234,6 +278,7 @@ unsafe impl<T> ValidField for Option<TypedValue<'_, '_, T>>
 where
     T: ConstructType,
 {
+    #[inline]
     fn valid_field(v: Value) -> bool {
         Option::<ValueRef>::valid_field(v)
     }
@@ -249,10 +294,12 @@ where
 
     // Safety: `inner` must not have been freed yet, the result must never be
     // used after the GC might have freed it.
+    #[inline]
     unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self {
         Self(inner, PhantomData, PhantomData, PhantomData)
     }
 
+    #[inline]
     fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps> {
         self.0
     }
@@ -262,37 +309,41 @@ unsafe impl<'scope, 'data, T> Typecheck for TypedValue<'scope, 'data, T>
 where
     T: ValidLayout + ConstructType,
 {
+    #[inline]
     fn typecheck(t: DataType) -> bool {
         T::valid_layout(t.as_value())
     }
 }
 
-unsafe impl<U> ConstructType for TypedValue<'_, 'static, U>
+unsafe impl<U> ConstructType for TypedValue<'_, '_, U>
 where
     U: ConstructType,
 {
-    fn construct_type<'target, T>(
-        target: ExtendedTarget<'target, '_, '_, T>,
-    ) -> ValueData<'target, 'static, T>
-    where
-        T: Target<'target>,
-    {
-        U::construct_type(target)
-    }
+    type Static = U::Static;
 
-    fn base_type<'target, Tgt>(_target: &Tgt) -> Option<Value<'target, 'static>>
+    #[inline]
+    fn construct_type_uncached<'target, Tgt>(target: Tgt) -> ValueData<'target, 'static, Tgt>
     where
         Tgt: Target<'target>,
     {
-        None
+        U::construct_type_uncached(target)
+    }
+
+    #[inline]
+    fn base_type<'target, Tgt>(target: &Tgt) -> Option<Value<'target, 'static>>
+    where
+        Tgt: Target<'target>,
+    {
+        U::base_type(target)
     }
 }
 
-use crate::memory::target::target_type::TargetType;
+use crate::memory::target::TargetType;
 
 pub type TypedValueRef<'scope, 'data, T> = Ref<'scope, 'data, TypedValue<'scope, 'data, T>>;
 
 impl<'scope, 'data> TypedValueRef<'scope, 'data, AnyType> {
+    #[inline]
     pub fn from_value_ref(value_ref: ValueRef<'scope, 'data>) -> Self {
         TypedValueRef::wrap(value_ref.ptr())
     }
@@ -309,7 +360,7 @@ pub type TypedValueData<'target, 'data, U, T> =
 /// `JuliaResult<TypedValue>` or `JuliaResultRef<TypedValueRef>`, depending on the target type
 /// `T`.
 pub type TypedValueResult<'target, 'data, U, T> =
-    <T as TargetType<'target>>::Result<'data, TypedValue<'target, 'data, U>>;
+    TargetResult<'target, 'data, TypedValue<'target, 'data, U>, T>;
 
 pub type TypedValueUnbound<T> = TypedValue<'static, 'static, T>;
 
@@ -321,4 +372,10 @@ unsafe impl<'scope, 'data, T: ConstructType> CCallArg for TypedValue<'scope, 'da
 unsafe impl<T: ConstructType> CCallReturn for TypedValueRef<'static, 'static, T> {
     type CCallReturnType = Value<'static, 'static>;
     type FunctionReturnType = T;
+    type ReturnAs = Self;
+
+    #[inline]
+    unsafe fn return_or_throw(self) -> Self::ReturnAs {
+        self
+    }
 }

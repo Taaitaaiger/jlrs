@@ -1,0 +1,51 @@
+[package]
+name = "benches"
+version = "0.0.0"
+publish = false
+edition = "2018"
+
+[dependencies]
+jlrs = { version = "0.19", path = "../jlrs", features = ["full"] }
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+pprof = { version = "0.12", features = ["flamegraph", "criterion"] }
+
+[profile.bench]
+debug = true
+
+[[bench]]
+name = "call_function"
+harness = false
+
+[[bench]]
+name = "arrays"
+harness = false
+
+[[bench]]
+name = "array_access"
+harness = false
+
+[[bench]]
+name = "frames"
+harness = false
+
+[[bench]]
+name = "module"
+harness = false
+
+[[bench]]
+name = "symbol"
+harness = false
+
+[[bench]]
+name = "track_array"
+harness = false
+
+[[bench]]
+name = "type_construction"
+harness = false
+
+[[bench]]
+name = "value"
+harness = false

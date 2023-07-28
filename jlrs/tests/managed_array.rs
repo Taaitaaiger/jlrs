@@ -14,8 +14,7 @@ mod tests {
             let unboxed = jlrs
                 .instance(&mut frame)
                 .scope(|mut frame| {
-                    let new_array = Array::new::<f32, _, _>(frame.as_extended_target(), 3)
-                        .into_jlrs_result()?;
+                    let new_array = Array::new::<f32, _, _>(&mut frame, 3).into_jlrs_result()?;
                     unsafe { new_array.copy_inline_data::<f32>() }
                 })
                 .unwrap();
@@ -37,10 +36,7 @@ mod tests {
                 .scope(|mut frame| {
                     let output = frame.output();
                     let array = frame
-                        .scope(|mut frame| {
-                            let output = output.into_extended_target(&mut frame);
-                            Ok(Array::new::<f32, _, _>(output, 3))
-                        })?
+                        .scope(|_frame| Ok(Array::new::<f32, _, _>(output, 3)))?
                         .into_jlrs_result()?;
                     unsafe { array.copy_inline_data::<f32>() }
                 })
@@ -62,8 +58,8 @@ mod tests {
                 .instance(&mut frame)
                 .scope(|mut frame| {
                     frame.scope(|mut frame| {
-                        let new_array = Array::new::<f64, _, _>(frame.as_extended_target(), 3)
-                            .into_jlrs_result()?;
+                        let new_array =
+                            Array::new::<f64, _, _>(&mut frame, 3).into_jlrs_result()?;
                         unsafe { new_array.copy_inline_data::<f64>() }
                     })
                 })
@@ -85,8 +81,7 @@ mod tests {
                 .instance(&mut frame)
                 .scope(|mut frame| {
                     frame.scope(|mut frame| {
-                        let new_array = Array::new::<i8, _, _>(frame.as_extended_target(), 3)
-                            .into_jlrs_result()?;
+                        let new_array = Array::new::<i8, _, _>(&mut frame, 3).into_jlrs_result()?;
                         unsafe { new_array.copy_inline_data::<i8>() }
                     })
                 })
@@ -107,8 +102,7 @@ mod tests {
             let unboxed = jlrs
                 .instance(&mut frame)
                 .scope(|mut frame| {
-                    let new_array = Array::new::<i16, _, _>(frame.as_extended_target(), 3)
-                        .into_jlrs_result()?;
+                    let new_array = Array::new::<i16, _, _>(&mut frame, 3).into_jlrs_result()?;
                     unsafe { new_array.copy_inline_data::<i16>() }
                 })
                 .unwrap();
@@ -129,8 +123,8 @@ mod tests {
                 .instance(&mut frame)
                 .scope(|mut frame| {
                     frame.scope(|mut frame| {
-                        let new_array = Array::new::<i32, _, _>(frame.as_extended_target(), 3)
-                            .into_jlrs_result()?;
+                        let new_array =
+                            Array::new::<i32, _, _>(&mut frame, 3).into_jlrs_result()?;
                         unsafe { new_array.copy_inline_data::<i32>() }
                     })
                 })
@@ -152,8 +146,8 @@ mod tests {
                 .instance(&mut frame)
                 .scope(|mut frame| {
                     frame.scope(|mut frame| {
-                        let new_array = Array::new::<i64, _, _>(frame.as_extended_target(), 3)
-                            .into_jlrs_result()?;
+                        let new_array =
+                            Array::new::<i64, _, _>(&mut frame, 3).into_jlrs_result()?;
                         unsafe { new_array.copy_inline_data::<i64>() }
                     })
                 })
@@ -174,8 +168,8 @@ mod tests {
             let unboxed = jlrs
                 .instance(&mut frame)
                 .scope(|mut frame| {
-                    let new_array = Array::new::<u8, _, _>(frame.as_extended_target(), (3, 4))
-                        .into_jlrs_result()?;
+                    let new_array =
+                        Array::new::<u8, _, _>(&mut frame, (3, 4)).into_jlrs_result()?;
                     unsafe { new_array.copy_inline_data::<u8>() }
                 })
                 .unwrap();
@@ -197,8 +191,8 @@ mod tests {
                 .instance(&mut frame)
                 .scope(|mut frame| {
                     frame.scope(|mut frame| {
-                        let new_array = Array::new::<u16, _, _>(frame.as_extended_target(), (3, 4))
-                            .into_jlrs_result()?;
+                        let new_array =
+                            Array::new::<u16, _, _>(&mut frame, (3, 4)).into_jlrs_result()?;
                         unsafe { new_array.copy_inline_data::<u16>() }
                     })
                 })
@@ -221,8 +215,8 @@ mod tests {
                 .instance(&mut frame)
                 .scope(|mut frame| {
                     frame.scope(|mut frame| {
-                        let new_array = Array::new::<u32, _, _>(frame.as_extended_target(), (3, 4))
-                            .into_jlrs_result()?;
+                        let new_array =
+                            Array::new::<u32, _, _>(&mut frame, (3, 4)).into_jlrs_result()?;
                         unsafe { new_array.copy_inline_data::<u32>() }
                     })
                 })
@@ -244,8 +238,8 @@ mod tests {
             let unboxed = jlrs
                 .instance(&mut frame)
                 .scope(|mut frame| {
-                    let new_array = Array::new::<u64, _, _>(frame.as_extended_target(), (3, 4))
-                        .into_jlrs_result()?;
+                    let new_array =
+                        Array::new::<u64, _, _>(&mut frame, (3, 4)).into_jlrs_result()?;
                     unsafe { new_array.copy_inline_data::<u64>() }
                 })
                 .unwrap();
@@ -268,8 +262,7 @@ mod tests {
                 .scope(|mut frame| {
                     frame.scope(|mut frame| {
                         let new_array =
-                            Array::new::<usize, _, _>(frame.as_extended_target(), (3, 4))
-                                .into_jlrs_result()?;
+                            Array::new::<usize, _, _>(&mut frame, (3, 4)).into_jlrs_result()?;
                         unsafe { new_array.copy_inline_data::<usize>() }
                     })
                 })
@@ -293,8 +286,7 @@ mod tests {
                 .scope(|mut frame| {
                     frame.scope(|mut frame| {
                         let new_array =
-                            Array::new::<isize, _, _>(frame.as_extended_target(), (3, 4))
-                                .into_jlrs_result()?;
+                            Array::new::<isize, _, _>(&mut frame, (3, 4)).into_jlrs_result()?;
                         unsafe { new_array.copy_inline_data::<isize>() }
                     })
                 })
@@ -316,8 +308,8 @@ mod tests {
             let unboxed = jlrs
                 .instance(&mut frame)
                 .scope(|mut frame| {
-                    let new_array = Array::new::<u8, _, _>(frame.as_extended_target(), (3, 4, 5))
-                        .into_jlrs_result()?;
+                    let new_array =
+                        Array::new::<u8, _, _>(&mut frame, (3, 4, 5)).into_jlrs_result()?;
                     unsafe { new_array.copy_inline_data::<u8>() }
                 })
                 .unwrap();
@@ -341,8 +333,7 @@ mod tests {
                 .scope(|mut frame| {
                     frame.scope(|mut frame| {
                         let new_array =
-                            Array::new::<u16, _, _>(frame.as_extended_target(), (3, 4, 5))
-                                .into_jlrs_result()?;
+                            Array::new::<u16, _, _>(&mut frame, (3, 4, 5)).into_jlrs_result()?;
                         unsafe { new_array.copy_inline_data::<u16>() }
                     })
                 })
@@ -367,8 +358,7 @@ mod tests {
                 .scope(|mut frame| {
                     frame.scope(|mut frame| {
                         let new_array =
-                            Array::new::<u32, _, _>(frame.as_extended_target(), (3, 4, 5))
-                                .into_jlrs_result()?;
+                            Array::new::<u32, _, _>(&mut frame, (3, 4, 5)).into_jlrs_result()?;
                         unsafe { new_array.copy_inline_data::<u32>() }
                     })
                 })
@@ -391,8 +381,8 @@ mod tests {
             let unboxed = jlrs
                 .instance(&mut frame)
                 .scope(|mut frame| {
-                    let new_array = Array::new::<u64, _, _>(frame.as_extended_target(), (3, 4, 5))
-                        .into_jlrs_result()?;
+                    let new_array =
+                        Array::new::<u64, _, _>(&mut frame, (3, 4, 5)).into_jlrs_result()?;
                     unsafe { new_array.copy_inline_data::<u64>() }
                 })
                 .unwrap();
@@ -416,8 +406,7 @@ mod tests {
                 .scope(|mut frame| {
                     frame.scope(|mut frame| {
                         let new_array =
-                            Array::new::<usize, _, _>(frame.as_extended_target(), (3, 4, 5))
-                                .into_jlrs_result()?;
+                            Array::new::<usize, _, _>(&mut frame, (3, 4, 5)).into_jlrs_result()?;
                         unsafe { new_array.copy_inline_data::<usize>() }
                     })
                 })
@@ -442,8 +431,7 @@ mod tests {
                 .scope(|mut frame| {
                     frame.scope(|mut frame| {
                         let new_array =
-                            Array::new::<isize, _, _>(frame.as_extended_target(), (3, 4, 5))
-                                .into_jlrs_result()?;
+                            Array::new::<isize, _, _>(&mut frame, (3, 4, 5)).into_jlrs_result()?;
                         unsafe { new_array.copy_inline_data::<isize>() }
                     })
                 })
@@ -467,8 +455,7 @@ mod tests {
                 .instance(&mut frame)
                 .scope(|mut frame| {
                     let new_array =
-                        Array::new::<u8, _, _>(frame.as_extended_target(), (3, 4, 5, 6))
-                            .into_jlrs_result()?;
+                        Array::new::<u8, _, _>(&mut frame, (3, 4, 5, 6)).into_jlrs_result()?;
                     unsafe { new_array.copy_inline_data::<u8>() }
                 })
                 .unwrap();
@@ -493,8 +480,7 @@ mod tests {
                 .scope(|mut frame| {
                     frame.scope(|mut frame| {
                         let new_array =
-                            Array::new::<u16, _, _>(frame.as_extended_target(), (3, 4, 5, 6))
-                                .into_jlrs_result()?;
+                            Array::new::<u16, _, _>(&mut frame, (3, 4, 5, 6)).into_jlrs_result()?;
                         unsafe { new_array.copy_inline_data::<u16>() }
                     })
                 })
@@ -520,8 +506,7 @@ mod tests {
                 .scope(|mut frame| {
                     frame.scope(|mut frame| {
                         let new_array =
-                            Array::new::<u32, _, _>(frame.as_extended_target(), (3, 4, 5, 6))
-                                .into_jlrs_result()?;
+                            Array::new::<u32, _, _>(&mut frame, (3, 4, 5, 6)).into_jlrs_result()?;
                         unsafe { new_array.copy_inline_data::<u32>() }
                     })
                 })
@@ -546,8 +531,7 @@ mod tests {
                 .instance(&mut frame)
                 .scope(|mut frame| {
                     let new_array =
-                        Array::new::<u64, _, _>(frame.as_extended_target(), (3, 4, 5, 6))
-                            .into_jlrs_result()?;
+                        Array::new::<u64, _, _>(&mut frame, (3, 4, 5, 6)).into_jlrs_result()?;
                     unsafe { new_array.copy_inline_data::<u64>() }
                 })
                 .unwrap();
@@ -571,9 +555,8 @@ mod tests {
                 .instance(&mut frame)
                 .scope(|mut frame| {
                     frame.scope(|mut frame| {
-                        let new_array =
-                            Array::new::<usize, _, _>(frame.as_extended_target(), (3, 4, 5, 6))
-                                .into_jlrs_result()?;
+                        let new_array = Array::new::<usize, _, _>(&mut frame, (3, 4, 5, 6))
+                            .into_jlrs_result()?;
                         unsafe { new_array.copy_inline_data::<usize>() }
                     })
                 })
@@ -598,9 +581,8 @@ mod tests {
                 .instance(&mut frame)
                 .scope(|mut frame| {
                     frame.scope(|mut frame| {
-                        let new_array =
-                            Array::new::<isize, _, _>(frame.as_extended_target(), (3, 4, 5, 6))
-                                .into_jlrs_result()?;
+                        let new_array = Array::new::<isize, _, _>(&mut frame, (3, 4, 5, 6))
+                            .into_jlrs_result()?;
                         unsafe { new_array.copy_inline_data::<isize>() }
                     })
                 })
@@ -625,9 +607,8 @@ mod tests {
                 .instance(&mut frame)
                 .scope(|mut frame| {
                     frame.scope(|mut frame| {
-                        let new_array =
-                            Array::new::<bool, _, _>(frame.as_extended_target(), (3, 4, 5, 6))
-                                .into_jlrs_result()?;
+                        let new_array = Array::new::<bool, _, _>(&mut frame, (3, 4, 5, 6))
+                            .into_jlrs_result()?;
                         unsafe { new_array.copy_inline_data::<bool>() }
                     })
                 })
@@ -652,9 +633,8 @@ mod tests {
                 .instance(&mut frame)
                 .scope(|mut frame| {
                     frame.scope(|mut frame| {
-                        let new_array =
-                            Array::new::<char, _, _>(frame.as_extended_target(), (3, 4, 5, 6))
-                                .into_jlrs_result()?;
+                        let new_array = Array::new::<char, _, _>(&mut frame, (3, 4, 5, 6))
+                            .into_jlrs_result()?;
                         unsafe { new_array.copy_inline_data::<char>() }
                     })
                 })
@@ -678,8 +658,7 @@ mod tests {
             let unboxed = jlrs
                 .instance(&mut frame)
                 .scope(|mut frame| unsafe {
-                    let new_array =
-                        { Array::new_unchecked::<f32, _, _>(frame.as_extended_target(), 3) };
+                    let new_array = { Array::new_unchecked::<f32, _, _>(&mut frame, 3) };
                     {
                         new_array.copy_inline_data::<f32>()
                     }
@@ -702,8 +681,7 @@ mod tests {
                 .instance(&mut frame)
                 .scope(|mut frame| {
                     let output = frame.output();
-                    let array = frame.scope(|mut frame| unsafe {
-                        let output = output.into_extended_target(&mut frame);
+                    let array = frame.scope(|_frame| unsafe {
                         Ok(Array::new_unchecked::<f32, _, _>(output, 3))
                     })?;
                     unsafe { array.copy_inline_data::<f32>() }
@@ -726,8 +704,7 @@ mod tests {
                 .instance(&mut frame)
                 .scope(|mut frame| {
                     frame.scope(|mut frame| unsafe {
-                        let new_array =
-                            { Array::new_unchecked::<f64, _, _>(frame.as_extended_target(), 3) };
+                        let new_array = { Array::new_unchecked::<f64, _, _>(&mut frame, 3) };
                         {
                             new_array.copy_inline_data::<f64>()
                         }
@@ -751,8 +728,7 @@ mod tests {
                 .instance(&mut frame)
                 .scope(|mut frame| {
                     frame.scope(|mut frame| unsafe {
-                        let new_array =
-                            { Array::new_unchecked::<i8, _, _>(frame.as_extended_target(), 3) };
+                        let new_array = { Array::new_unchecked::<i8, _, _>(&mut frame, 3) };
                         {
                             new_array.copy_inline_data::<i8>()
                         }
@@ -775,8 +751,7 @@ mod tests {
             let unboxed = jlrs
                 .instance(&mut frame)
                 .scope(|mut frame| unsafe {
-                    let new_array =
-                        { Array::new_unchecked::<i16, _, _>(frame.as_extended_target(), 3) };
+                    let new_array = { Array::new_unchecked::<i16, _, _>(&mut frame, 3) };
                     {
                         new_array.copy_inline_data::<i16>()
                     }
@@ -799,8 +774,7 @@ mod tests {
                 .instance(&mut frame)
                 .scope(|mut frame| {
                     frame.scope(|mut frame| unsafe {
-                        let new_array =
-                            { Array::new_unchecked::<i32, _, _>(frame.as_extended_target(), 3) };
+                        let new_array = { Array::new_unchecked::<i32, _, _>(&mut frame, 3) };
                         {
                             new_array.copy_inline_data::<i32>()
                         }
@@ -824,8 +798,7 @@ mod tests {
                 .instance(&mut frame)
                 .scope(|mut frame| {
                     frame.scope(|mut frame| unsafe {
-                        let new_array =
-                            { Array::new_unchecked::<i64, _, _>(frame.as_extended_target(), 3) };
+                        let new_array = { Array::new_unchecked::<i64, _, _>(&mut frame, 3) };
                         {
                             new_array.copy_inline_data::<i64>()
                         }
@@ -848,8 +821,7 @@ mod tests {
             let unboxed = jlrs
                 .instance(&mut frame)
                 .scope(|mut frame| unsafe {
-                    let new_array =
-                        { Array::new_unchecked::<u8, _, _>(frame.as_extended_target(), (3, 4)) };
+                    let new_array = { Array::new_unchecked::<u8, _, _>(&mut frame, (3, 4)) };
                     {
                         new_array.copy_inline_data::<u8>()
                     }
@@ -873,9 +845,7 @@ mod tests {
                 .instance(&mut frame)
                 .scope(|mut frame| {
                     frame.scope(|mut frame| unsafe {
-                        let new_array = {
-                            Array::new_unchecked::<u16, _, _>(frame.as_extended_target(), (3, 4))
-                        };
+                        let new_array = { Array::new_unchecked::<u16, _, _>(&mut frame, (3, 4)) };
                         {
                             new_array.copy_inline_data::<u16>()
                         }
@@ -900,9 +870,7 @@ mod tests {
                 .instance(&mut frame)
                 .scope(|mut frame| {
                     frame.scope(|mut frame| unsafe {
-                        let new_array = {
-                            Array::new_unchecked::<u32, _, _>(frame.as_extended_target(), (3, 4))
-                        };
+                        let new_array = { Array::new_unchecked::<u32, _, _>(&mut frame, (3, 4)) };
                         {
                             new_array.copy_inline_data::<u32>()
                         }
@@ -926,8 +894,7 @@ mod tests {
             let unboxed = jlrs
                 .instance(&mut frame)
                 .scope(|mut frame| unsafe {
-                    let new_array =
-                        { Array::new_unchecked::<u64, _, _>(frame.as_extended_target(), (3, 4)) };
+                    let new_array = { Array::new_unchecked::<u64, _, _>(&mut frame, (3, 4)) };
                     {
                         new_array.copy_inline_data::<u64>()
                     }
@@ -951,9 +918,7 @@ mod tests {
                 .instance(&mut frame)
                 .scope(|mut frame| {
                     frame.scope(|mut frame| unsafe {
-                        let new_array = {
-                            Array::new_unchecked::<usize, _, _>(frame.as_extended_target(), (3, 4))
-                        };
+                        let new_array = { Array::new_unchecked::<usize, _, _>(&mut frame, (3, 4)) };
                         new_array.copy_inline_data::<usize>()
                     })
                 })
@@ -976,9 +941,7 @@ mod tests {
                 .instance(&mut frame)
                 .scope(|mut frame| {
                     frame.scope(|mut frame| unsafe {
-                        let new_array = {
-                            Array::new_unchecked::<isize, _, _>(frame.as_extended_target(), (3, 4))
-                        };
+                        let new_array = { Array::new_unchecked::<isize, _, _>(&mut frame, (3, 4)) };
                         new_array.copy_inline_data::<isize>()
                     })
                 })
@@ -1000,8 +963,7 @@ mod tests {
             let unboxed = jlrs
                 .instance(&mut frame)
                 .scope(|mut frame| unsafe {
-                    let new_array =
-                        { Array::new_unchecked::<u8, _, _>(frame.as_extended_target(), (3, 4, 5)) };
+                    let new_array = { Array::new_unchecked::<u8, _, _>(&mut frame, (3, 4, 5)) };
                     new_array.copy_inline_data::<u8>()
                 })
                 .unwrap();
@@ -1024,9 +986,8 @@ mod tests {
                 .instance(&mut frame)
                 .scope(|mut frame| {
                     frame.scope(|mut frame| unsafe {
-                        let new_array = {
-                            Array::new_unchecked::<u16, _, _>(frame.as_extended_target(), (3, 4, 5))
-                        };
+                        let new_array =
+                            { Array::new_unchecked::<u16, _, _>(&mut frame, (3, 4, 5)) };
                         new_array.copy_inline_data::<u16>()
                     })
                 })
@@ -1050,9 +1011,8 @@ mod tests {
                 .instance(&mut frame)
                 .scope(|mut frame| {
                     frame.scope(|mut frame| unsafe {
-                        let new_array = {
-                            Array::new_unchecked::<u32, _, _>(frame.as_extended_target(), (3, 4, 5))
-                        };
+                        let new_array =
+                            { Array::new_unchecked::<u32, _, _>(&mut frame, (3, 4, 5)) };
                         new_array.copy_inline_data::<u32>()
                     })
                 })
@@ -1075,9 +1035,7 @@ mod tests {
             let unboxed = jlrs
                 .instance(&mut frame)
                 .scope(|mut frame| unsafe {
-                    let new_array = {
-                        Array::new_unchecked::<u64, _, _>(frame.as_extended_target(), (3, 4, 5))
-                    };
+                    let new_array = { Array::new_unchecked::<u64, _, _>(&mut frame, (3, 4, 5)) };
                     new_array.copy_inline_data::<u64>()
                 })
                 .unwrap();
@@ -1100,12 +1058,8 @@ mod tests {
                 .instance(&mut frame)
                 .scope(|mut frame| {
                     frame.scope(|mut frame| unsafe {
-                        let new_array = {
-                            Array::new_unchecked::<usize, _, _>(
-                                frame.as_extended_target(),
-                                (3, 4, 5),
-                            )
-                        };
+                        let new_array =
+                            { Array::new_unchecked::<usize, _, _>(&mut frame, (3, 4, 5)) };
 
                         new_array.copy_inline_data::<usize>()
                     })
@@ -1130,12 +1084,8 @@ mod tests {
                 .instance(&mut frame)
                 .scope(|mut frame| {
                     frame.scope(|mut frame| unsafe {
-                        let new_array = {
-                            Array::new_unchecked::<isize, _, _>(
-                                frame.as_extended_target(),
-                                (3, 4, 5),
-                            )
-                        };
+                        let new_array =
+                            { Array::new_unchecked::<isize, _, _>(&mut frame, (3, 4, 5)) };
                         new_array.copy_inline_data::<isize>()
                     })
                 })
@@ -1158,9 +1108,7 @@ mod tests {
             let unboxed = jlrs
                 .instance(&mut frame)
                 .scope(|mut frame| unsafe {
-                    let new_array = {
-                        Array::new_unchecked::<u8, _, _>(frame.as_extended_target(), (3, 4, 5, 6))
-                    };
+                    let new_array = { Array::new_unchecked::<u8, _, _>(&mut frame, (3, 4, 5, 6)) };
                     new_array.copy_inline_data::<u8>()
                 })
                 .unwrap();
@@ -1184,12 +1132,8 @@ mod tests {
                 .instance(&mut frame)
                 .scope(|mut frame| {
                     frame.scope(|mut frame| unsafe {
-                        let new_array = {
-                            Array::new_unchecked::<u16, _, _>(
-                                frame.as_extended_target(),
-                                (3, 4, 5, 6),
-                            )
-                        };
+                        let new_array =
+                            { Array::new_unchecked::<u16, _, _>(&mut frame, (3, 4, 5, 6)) };
                         new_array.copy_inline_data::<u16>()
                     })
                 })
@@ -1214,12 +1158,8 @@ mod tests {
                 .instance(&mut frame)
                 .scope(|mut frame| {
                     frame.scope(|mut frame| unsafe {
-                        let new_array = {
-                            Array::new_unchecked::<u32, _, _>(
-                                frame.as_extended_target(),
-                                (3, 4, 5, 6),
-                            )
-                        };
+                        let new_array =
+                            { Array::new_unchecked::<u32, _, _>(&mut frame, (3, 4, 5, 6)) };
                         new_array.copy_inline_data::<u32>()
                     })
                 })
@@ -1243,9 +1183,7 @@ mod tests {
             let unboxed = jlrs
                 .instance(&mut frame)
                 .scope(|mut frame| unsafe {
-                    let new_array = {
-                        Array::new_unchecked::<u64, _, _>(frame.as_extended_target(), (3, 4, 5, 6))
-                    };
+                    let new_array = { Array::new_unchecked::<u64, _, _>(&mut frame, (3, 4, 5, 6)) };
                     new_array.copy_inline_data::<u64>()
                 })
                 .unwrap();
@@ -1269,12 +1207,8 @@ mod tests {
                 .instance(&mut frame)
                 .scope(|mut frame| {
                     frame.scope(|mut frame| unsafe {
-                        let new_array = {
-                            Array::new_unchecked::<usize, _, _>(
-                                frame.as_extended_target(),
-                                (3, 4, 5, 6),
-                            )
-                        };
+                        let new_array =
+                            { Array::new_unchecked::<usize, _, _>(&mut frame, (3, 4, 5, 6)) };
                         new_array.copy_inline_data::<usize>()
                     })
                 })
@@ -1299,12 +1233,8 @@ mod tests {
                 .instance(&mut frame)
                 .scope(|mut frame| {
                     frame.scope(|mut frame| unsafe {
-                        let new_array = {
-                            Array::new_unchecked::<isize, _, _>(
-                                frame.as_extended_target(),
-                                (3, 4, 5, 6),
-                            )
-                        };
+                        let new_array =
+                            { Array::new_unchecked::<isize, _, _>(&mut frame, (3, 4, 5, 6)) };
                         new_array.copy_inline_data::<isize>()
                     })
                 })
@@ -1329,12 +1259,8 @@ mod tests {
                 .instance(&mut frame)
                 .scope(|mut frame| {
                     frame.scope(|mut frame| unsafe {
-                        let new_array = {
-                            Array::new_unchecked::<bool, _, _>(
-                                frame.as_extended_target(),
-                                (3, 4, 5, 6),
-                            )
-                        };
+                        let new_array =
+                            { Array::new_unchecked::<bool, _, _>(&mut frame, (3, 4, 5, 6)) };
                         new_array.copy_inline_data::<bool>()
                     })
                 })
@@ -1359,12 +1285,8 @@ mod tests {
                 .instance(&mut frame)
                 .scope(|mut frame| {
                     frame.scope(|mut frame| unsafe {
-                        let new_array = {
-                            Array::new_unchecked::<char, _, _>(
-                                frame.as_extended_target(),
-                                (3, 4, 5, 6),
-                            )
-                        };
+                        let new_array =
+                            { Array::new_unchecked::<char, _, _>(&mut frame, (3, 4, 5, 6)) };
 
                         new_array.copy_inline_data::<char>()
                     })
@@ -1390,12 +1312,9 @@ mod tests {
                 .instance(&mut frame)
                 .scope(|mut frame| {
                     let global = frame.unrooted();
-                    let new_array = Array::new_for(
-                        frame.as_extended_target(),
-                        3,
-                        DataType::float32_type(&global).as_value(),
-                    )
-                    .into_jlrs_result()?;
+                    let new_array =
+                        Array::new_for(&mut frame, 3, DataType::float32_type(&global).as_value())
+                            .into_jlrs_result()?;
                     unsafe { new_array.copy_inline_data::<f32>() }
                 })
                 .unwrap();
@@ -1418,8 +1337,7 @@ mod tests {
                     let global = frame.unrooted();
                     let output = frame.output();
                     let array = frame
-                        .scope(|mut frame| {
-                            let output = output.into_extended_target(&mut frame);
+                        .scope(|_frame| {
                             Ok(Array::new_for(
                                 output,
                                 3,
@@ -1449,7 +1367,7 @@ mod tests {
                     frame.scope(|mut frame| {
                         let global = frame.unrooted();
                         let new_array = Array::new_for(
-                            frame.as_extended_target(),
+                            &mut frame,
                             3,
                             DataType::float64_type(&global).as_value(),
                         )
@@ -1476,12 +1394,9 @@ mod tests {
                 .scope(|mut frame| {
                     let global = frame.unrooted();
                     frame.scope(|mut frame| {
-                        let new_array = Array::new_for(
-                            frame.as_extended_target(),
-                            3,
-                            DataType::int8_type(&global).as_value(),
-                        )
-                        .into_jlrs_result()?;
+                        let new_array =
+                            Array::new_for(&mut frame, 3, DataType::int8_type(&global).as_value())
+                                .into_jlrs_result()?;
                         unsafe { new_array.copy_inline_data::<i8>() }
                     })
                 })
@@ -1503,12 +1418,9 @@ mod tests {
                 .instance(&mut frame)
                 .scope(|mut frame| {
                     let global = frame.unrooted();
-                    let new_array = Array::new_for(
-                        frame.as_extended_target(),
-                        3,
-                        DataType::int16_type(&global).as_value(),
-                    )
-                    .into_jlrs_result()?;
+                    let new_array =
+                        Array::new_for(&mut frame, 3, DataType::int16_type(&global).as_value())
+                            .into_jlrs_result()?;
                     unsafe { new_array.copy_inline_data::<i16>() }
                 })
                 .unwrap();
@@ -1530,12 +1442,9 @@ mod tests {
                 .scope(|mut frame| {
                     let global = frame.unrooted();
                     frame.scope(|mut frame| {
-                        let new_array = Array::new_for(
-                            frame.as_extended_target(),
-                            3,
-                            DataType::int32_type(&global).as_value(),
-                        )
-                        .into_jlrs_result()?;
+                        let new_array =
+                            Array::new_for(&mut frame, 3, DataType::int32_type(&global).as_value())
+                                .into_jlrs_result()?;
                         unsafe { new_array.copy_inline_data::<i32>() }
                     })
                 })
@@ -1558,12 +1467,9 @@ mod tests {
                 .scope(|mut frame| {
                     let global = frame.unrooted();
                     frame.scope(|mut frame| {
-                        let new_array = Array::new_for(
-                            frame.as_extended_target(),
-                            3,
-                            DataType::int64_type(&global).as_value(),
-                        )
-                        .into_jlrs_result()?;
+                        let new_array =
+                            Array::new_for(&mut frame, 3, DataType::int64_type(&global).as_value())
+                                .into_jlrs_result()?;
                         unsafe { new_array.copy_inline_data::<i64>() }
                     })
                 })
@@ -1586,7 +1492,7 @@ mod tests {
                 .scope(|mut frame| {
                     let global = frame.unrooted();
                     let new_array = Array::new_for(
-                        frame.as_extended_target(),
+                        &mut frame,
                         (3, 4),
                         DataType::uint8_type(&global).as_value(),
                     )
@@ -1614,7 +1520,7 @@ mod tests {
                     frame.scope(|mut frame| {
                         let global = frame.unrooted();
                         let new_array = Array::new_for(
-                            frame.as_extended_target(),
+                            &mut frame,
                             (3, 4),
                             DataType::uint16_type(&global).as_value(),
                         )
@@ -1643,7 +1549,7 @@ mod tests {
                     let global = frame.unrooted();
                     frame.scope(|mut frame| {
                         let new_array = Array::new_for(
-                            frame.as_extended_target(),
+                            &mut frame,
                             (3, 4),
                             DataType::uint32_type(&global).as_value(),
                         )
@@ -1671,7 +1577,7 @@ mod tests {
                 .scope(|mut frame| {
                     let global = frame.unrooted();
                     let new_array = Array::new_for(
-                        frame.as_extended_target(),
+                        &mut frame,
                         (3, 4),
                         DataType::uint64_type(&global).as_value(),
                     )
@@ -1699,7 +1605,7 @@ mod tests {
                     frame.scope(|mut frame| {
                         let global = frame.unrooted();
                         let new_array = Array::new_for(
-                            frame.as_extended_target(),
+                            &mut frame,
                             (3, 4),
                             DataType::uint64_type(&global).as_value(),
                         )
@@ -1728,7 +1634,7 @@ mod tests {
                     frame.scope(|mut frame| {
                         let global = frame.unrooted();
                         let new_array = Array::new_for(
-                            frame.as_extended_target(),
+                            &mut frame,
                             (3, 4),
                             DataType::int64_type(&global).as_value(),
                         )
@@ -1756,7 +1662,7 @@ mod tests {
                 .scope(|mut frame| {
                     let global = frame.unrooted();
                     let new_array = Array::new_for(
-                        frame.as_extended_target(),
+                        &mut frame,
                         (3, 4, 5),
                         DataType::uint8_type(&global).as_value(),
                     )
@@ -1785,7 +1691,7 @@ mod tests {
                     frame.scope(|mut frame| {
                         let global = frame.unrooted();
                         let new_array = Array::new_for(
-                            frame.as_extended_target(),
+                            &mut frame,
                             (3, 4, 5),
                             DataType::uint16_type(&global).as_value(),
                         )
@@ -1815,7 +1721,7 @@ mod tests {
                     let global = frame.unrooted();
                     frame.scope(|mut frame| {
                         let new_array = Array::new_for(
-                            frame.as_extended_target(),
+                            &mut frame,
                             (3, 4, 5),
                             DataType::uint32_type(&global).as_value(),
                         )
@@ -1844,7 +1750,7 @@ mod tests {
                 .scope(|mut frame| {
                     let global = frame.unrooted();
                     let new_array = Array::new_for(
-                        frame.as_extended_target(),
+                        &mut frame,
                         (3, 4, 5),
                         DataType::uint64_type(&global).as_value(),
                     )
@@ -1873,7 +1779,7 @@ mod tests {
                     let global = frame.unrooted();
                     frame.scope(|mut frame| {
                         let new_array = Array::new_for(
-                            frame.as_extended_target(),
+                            &mut frame,
                             (3, 4, 5),
                             DataType::uint64_type(&global).as_value(),
                         )
@@ -1903,7 +1809,7 @@ mod tests {
                     frame.scope(|mut frame| {
                         let global = frame.unrooted();
                         let new_array = Array::new_for(
-                            frame.as_extended_target(),
+                            &mut frame,
                             (3, 4, 5),
                             DataType::int64_type(&global).as_value(),
                         )
@@ -1932,7 +1838,7 @@ mod tests {
                 .scope(|mut frame| {
                     let global = frame.unrooted();
                     let new_array = Array::new_for(
-                        frame.as_extended_target(),
+                        &mut frame,
                         (3, 4, 5, 6),
                         DataType::uint8_type(&global).as_value(),
                     )
@@ -1962,7 +1868,7 @@ mod tests {
                     let global = frame.unrooted();
                     frame.scope(|mut frame| {
                         let new_array = Array::new_for(
-                            frame.as_extended_target(),
+                            &mut frame,
                             (3, 4, 5, 6),
                             DataType::uint16_type(&global).as_value(),
                         )
@@ -1993,7 +1899,7 @@ mod tests {
                     frame.scope(|mut frame| {
                         let global = frame.unrooted();
                         let new_array = Array::new_for(
-                            frame.as_extended_target(),
+                            &mut frame,
                             (3, 4, 5, 6),
                             DataType::uint32_type(&global).as_value(),
                         )
@@ -2023,7 +1929,7 @@ mod tests {
                 .scope(|mut frame| {
                     let global = frame.unrooted();
                     let new_array = Array::new_for(
-                        frame.as_extended_target(),
+                        &mut frame,
                         (3, 4, 5, 6),
                         DataType::uint64_type(&global).as_value(),
                     )
@@ -2053,7 +1959,7 @@ mod tests {
                     frame.scope(|mut frame| {
                         let global = frame.unrooted();
                         let new_array = Array::new_for(
-                            frame.as_extended_target(),
+                            &mut frame,
                             (3, 4, 5, 6),
                             DataType::uint64_type(&global).as_value(),
                         )
@@ -2084,7 +1990,7 @@ mod tests {
                     frame.scope(|mut frame| {
                         let global = frame.unrooted();
                         let new_array = Array::new_for(
-                            frame.as_extended_target(),
+                            &mut frame,
                             (3, 4, 5, 6),
                             DataType::int64_type(&global).as_value(),
                         )
@@ -2115,7 +2021,7 @@ mod tests {
                     frame.scope(|mut frame| {
                         let global = frame.unrooted();
                         let new_array = Array::new_for(
-                            frame.as_extended_target(),
+                            &mut frame,
                             (3, 4, 5, 6),
                             DataType::bool_type(&global).as_value(),
                         )
@@ -2146,7 +2052,7 @@ mod tests {
                     frame.scope(|mut frame| {
                         let global = frame.unrooted();
                         let new_array = Array::new_for(
-                            frame.as_extended_target(),
+                            &mut frame,
                             (3, 4, 5, 6),
                             DataType::char_type(&global).as_value(),
                         )
@@ -2176,7 +2082,7 @@ mod tests {
                 .scope(|mut frame| unsafe {
                     let global = frame.unrooted();
                     let new_array = Array::new_for_unchecked(
-                        frame.as_extended_target(),
+                        &mut frame,
                         3,
                         DataType::float32_type(&global).as_value(),
                     );
@@ -2201,8 +2107,7 @@ mod tests {
                 .scope(|mut frame| {
                     let global = frame.unrooted();
                     let output = frame.output();
-                    let array = frame.scope(|mut frame| unsafe {
-                        let output = output.into_extended_target(&mut frame);
+                    let array = frame.scope(|_frame| unsafe {
                         Ok(Array::new_for_unchecked(
                             output,
                             3,
@@ -2231,7 +2136,7 @@ mod tests {
                     frame.scope(|mut frame| unsafe {
                         let global = frame.unrooted();
                         let new_array = Array::new_for_unchecked(
-                            frame.as_extended_target(),
+                            &mut frame,
                             3,
                             DataType::float64_type(&global).as_value(),
                         );
@@ -2258,7 +2163,7 @@ mod tests {
                     frame.scope(|mut frame| unsafe {
                         let global = frame.unrooted();
                         let new_array = Array::new_for_unchecked(
-                            frame.as_extended_target(),
+                            &mut frame,
                             3,
                             DataType::int8_type(&global).as_value(),
                         );
@@ -2284,7 +2189,7 @@ mod tests {
                 .scope(|mut frame| unsafe {
                     let global = frame.unrooted();
                     let new_array = Array::new_for_unchecked(
-                        frame.as_extended_target(),
+                        &mut frame,
                         3,
                         DataType::int16_type(&global).as_value(),
                     );
@@ -2310,7 +2215,7 @@ mod tests {
                     frame.scope(|mut frame| unsafe {
                         let global = frame.unrooted();
                         let new_array = Array::new_for_unchecked(
-                            frame.as_extended_target(),
+                            &mut frame,
                             3,
                             DataType::int32_type(&global).as_value(),
                         );
@@ -2337,7 +2242,7 @@ mod tests {
                     let global = frame.unrooted();
                     frame.scope(|mut frame| unsafe {
                         let new_array = Array::new_for_unchecked(
-                            frame.as_extended_target(),
+                            &mut frame,
                             3,
                             DataType::int64_type(&global).as_value(),
                         );
@@ -2363,7 +2268,7 @@ mod tests {
                 .scope(|mut frame| unsafe {
                     let global = frame.unrooted();
                     let new_array = Array::new_for_unchecked(
-                        frame.as_extended_target(),
+                        &mut frame,
                         (3, 4),
                         DataType::uint8_type(&global).as_value(),
                     );
@@ -2390,7 +2295,7 @@ mod tests {
                     frame.scope(|mut frame| unsafe {
                         let global = frame.unrooted();
                         let new_array = Array::new_for_unchecked(
-                            frame.as_extended_target(),
+                            &mut frame,
                             (3, 4),
                             DataType::uint16_type(&global).as_value(),
                         );
@@ -2418,7 +2323,7 @@ mod tests {
                     frame.scope(|mut frame| unsafe {
                         let global = frame.unrooted();
                         let new_array = Array::new_for_unchecked(
-                            frame.as_extended_target(),
+                            &mut frame,
                             (3, 4),
                             DataType::uint32_type(&global).as_value(),
                         );
@@ -2445,7 +2350,7 @@ mod tests {
                 .scope(|mut frame| unsafe {
                     let global = frame.unrooted();
                     let new_array = Array::new_for_unchecked(
-                        frame.as_extended_target(),
+                        &mut frame,
                         (3, 4),
                         DataType::uint64_type(&global).as_value(),
                     );
@@ -2472,7 +2377,7 @@ mod tests {
                     let global = frame.unrooted();
                     frame.scope(|mut frame| unsafe {
                         let new_array = Array::new_for_unchecked(
-                            frame.as_extended_target(),
+                            &mut frame,
                             (3, 4),
                             DataType::uint64_type(&global).as_value(),
                         );
@@ -2500,7 +2405,7 @@ mod tests {
                     let global = frame.unrooted();
                     frame.scope(|mut frame| unsafe {
                         let new_array = Array::new_for_unchecked(
-                            frame.as_extended_target(),
+                            &mut frame,
                             (3, 4),
                             DataType::int64_type(&global).as_value(),
                         );
@@ -2527,7 +2432,7 @@ mod tests {
                 .scope(|mut frame| unsafe {
                     let global = frame.unrooted();
                     let new_array = Array::new_for_unchecked(
-                        frame.as_extended_target(),
+                        &mut frame,
                         (3, 4, 5),
                         DataType::uint8_type(&global).as_value(),
                     );
@@ -2555,7 +2460,7 @@ mod tests {
                     let global = frame.unrooted();
                     frame.scope(|mut frame| unsafe {
                         let new_array = Array::new_for_unchecked(
-                            frame.as_extended_target(),
+                            &mut frame,
                             (3, 4, 5),
                             DataType::uint16_type(&global).as_value(),
                         );
@@ -2584,7 +2489,7 @@ mod tests {
                     frame.scope(|mut frame| unsafe {
                         let global = frame.unrooted();
                         let new_array = Array::new_for_unchecked(
-                            frame.as_extended_target(),
+                            &mut frame,
                             (3, 4, 5),
                             DataType::uint32_type(&global).as_value(),
                         );
@@ -2612,7 +2517,7 @@ mod tests {
                 .scope(|mut frame| unsafe {
                     let global = frame.unrooted();
                     let new_array = Array::new_for_unchecked(
-                        frame.as_extended_target(),
+                        &mut frame,
                         (3, 4, 5),
                         DataType::uint64_type(&global).as_value(),
                     );
@@ -2640,7 +2545,7 @@ mod tests {
                     frame.scope(|mut frame| unsafe {
                         let global = frame.unrooted();
                         let new_array = Array::new_for_unchecked(
-                            frame.as_extended_target(),
+                            &mut frame,
                             (3, 4, 5),
                             DataType::uint64_type(&global).as_value(),
                         );
@@ -2669,7 +2574,7 @@ mod tests {
                     frame.scope(|mut frame| unsafe {
                         let global = frame.unrooted();
                         let new_array = Array::new_for_unchecked(
-                            frame.as_extended_target(),
+                            &mut frame,
                             (3, 4, 5),
                             DataType::int64_type(&global).as_value(),
                         );
@@ -2697,7 +2602,7 @@ mod tests {
                 .scope(|mut frame| unsafe {
                     let global = frame.unrooted();
                     let new_array = Array::new_for_unchecked(
-                        frame.as_extended_target(),
+                        &mut frame,
                         (3, 4, 5, 6),
                         DataType::uint8_type(&global).as_value(),
                     );
@@ -2726,7 +2631,7 @@ mod tests {
                     let global = frame.unrooted();
                     frame.scope(|mut frame| unsafe {
                         let new_array = Array::new_for_unchecked(
-                            frame.as_extended_target(),
+                            &mut frame,
                             (3, 4, 5, 6),
                             DataType::uint16_type(&global).as_value(),
                         );
@@ -2756,7 +2661,7 @@ mod tests {
                     let global = frame.unrooted();
                     frame.scope(|mut frame| unsafe {
                         let new_array = Array::new_for_unchecked(
-                            frame.as_extended_target(),
+                            &mut frame,
                             (3, 4, 5, 6),
                             DataType::uint32_type(&global).as_value(),
                         );
@@ -2785,7 +2690,7 @@ mod tests {
                 .scope(|mut frame| unsafe {
                     let global = frame.unrooted();
                     let new_array = Array::new_for_unchecked(
-                        frame.as_extended_target(),
+                        &mut frame,
                         (3, 4, 5, 6),
                         DataType::uint64_type(&global).as_value(),
                     );
@@ -2814,7 +2719,7 @@ mod tests {
                     let global = frame.unrooted();
                     frame.scope(|mut frame| unsafe {
                         let new_array = Array::new_for_unchecked(
-                            frame.as_extended_target(),
+                            &mut frame,
                             (3, 4, 5, 6),
                             DataType::uint64_type(&global).as_value(),
                         );
@@ -2844,7 +2749,7 @@ mod tests {
                     let global = frame.unrooted();
                     frame.scope(|mut frame| unsafe {
                         let new_array = Array::new_for_unchecked(
-                            frame.as_extended_target(),
+                            &mut frame,
                             (3, 4, 5, 6),
                             DataType::int64_type(&global).as_value(),
                         );
@@ -2874,7 +2779,7 @@ mod tests {
                     let global = frame.unrooted();
                     frame.scope(|mut frame| unsafe {
                         let new_array = Array::new_for_unchecked(
-                            frame.as_extended_target(),
+                            &mut frame,
                             (3, 4, 5, 6),
                             DataType::bool_type(&global).as_value(),
                         );
@@ -2904,7 +2809,7 @@ mod tests {
                     frame.scope(|mut frame| unsafe {
                         let global = frame.unrooted();
                         let new_array = Array::new_for_unchecked(
-                            frame.as_extended_target(),
+                            &mut frame,
                             (3, 4, 5, 6),
                             DataType::char_type(&global).as_value(),
                         );

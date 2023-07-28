@@ -1,5 +1,5 @@
 module AsyncTests
-function kwfunc(dims::Int, iters::Int; kw::Float64=3.0)::Float64
+function kwfunc(dims, iters; kw::Float64=3.0)::Float64
     x::Array{Float64, 2} = ones(Float64, (dims, dims))
     for i in 1:iters
         x .+= 1.0

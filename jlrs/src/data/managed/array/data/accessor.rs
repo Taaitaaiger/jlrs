@@ -10,6 +10,7 @@ use std::{
 use jl_sys::{jl_array_ptr_set, jl_array_typetagdata, jl_arrayref, jl_arrayset};
 
 use crate::{
+    catch::catch_exceptions,
     data::{
         layout::valid_layout::ValidField,
         managed::{
@@ -25,7 +26,7 @@ use crate::{
         },
     },
     error::{AccessError, JlrsResult, TypeError, CANNOT_DISPLAY_TYPE},
-    memory::target::Target,
+    memory::target::{Target, TargetException},
     private::Private,
 };
 
@@ -174,6 +175,7 @@ pub type IndeterminateArrayAccessorMut<'borrow, 'array, 'data> =
 impl<'borrow, 'array, 'data, T, L: ArrayLayout> Clone
     for ArrayAccessor<'borrow, 'array, 'data, T, L, Immutable<'borrow, T>>
 {
+    #[inline]
     fn clone(&self) -> Self {
         ArrayAccessor {
             array: self.array,
@@ -188,6 +190,7 @@ impl<'borrow, 'array, 'data, T, L: ArrayLayout> Clone
 impl<'borrow, 'array, 'data, U, L: ArrayLayout, M: Mutability>
     ArrayAccessor<'borrow, 'array, 'data, U, L, M>
 {
+    #[inline]
     pub(crate) unsafe fn new(array: &'borrow Array<'array, 'data>) -> Self {
         ArrayAccessor {
             array: *array,
@@ -211,23 +214,14 @@ impl<'borrow, 'array, 'data, U, L: ArrayLayout, M: Mutability>
         D: Dims,
         T: Target<'frame>,
     {
-        use std::mem::MaybeUninit;
-
-        use jl_sys::jl_value_t;
-
-        use crate::catch::catch_exceptions;
-
         let idx = self.dimensions().index_of(&index)?;
 
         // Safety: exceptions are caught, the result is immediately rooted
         unsafe {
-            let mut callback = |result: &mut MaybeUninit<*mut jl_value_t>| {
-                let res = jl_arrayref(self.array.unwrap(Private), idx);
-                result.write(res);
-                Ok(())
-            };
+            let callback = || jl_arrayref(self.array.unwrap(Private), idx);
+            let exc = |err: Value| err.unwrap_non_null(Private);
 
-            let res = match catch_exceptions(&mut callback)? {
+            let res = match catch_exceptions(callback, exc) {
                 Ok(ptr) => {
                     if ptr.is_null() {
                         return Ok(None);
@@ -235,7 +229,7 @@ impl<'borrow, 'array, 'data, U, L: ArrayLayout, M: Mutability>
                         Ok(NonNull::new_unchecked(ptr))
                     }
                 }
-                Err(e) => Err(e.ptr()),
+                Err(e) => Err(e),
             };
 
             Ok(Some(target.result_from_ptr(res, Private)))
@@ -245,6 +239,7 @@ impl<'borrow, 'array, 'data, U, L: ArrayLayout, M: Mutability>
     /// Access the element at `index` and convert it to a `Value` rooted in `scope`.
     ///
     /// Safety: If an error is thrown by Julia it's not caught.
+    #[inline]
     pub unsafe fn get_value_unchecked<'frame, D, T>(
         &mut self,
         target: T,
@@ -282,29 +277,23 @@ impl<'borrow, 'array, 'data, U, L: ArrayLayout>
         target: T,
         index: D,
         value: Option<Value<'_, 'data>>,
-    ) -> JlrsResult<T::Exception<'data, ()>>
+    ) -> JlrsResult<TargetException<'target, 'data, (), T>>
     where
         D: Dims,
         T: Target<'target>,
     {
-        use std::mem::MaybeUninit;
-
-        use crate::catch::catch_exceptions;
-
         let idx = self.dimensions().index_of(&index)?;
         let ptr = value.map(|v| v.unwrap(Private)).unwrap_or(null_mut());
 
         // Safety: exceptions are caught, if one is thrown it's immediately rooted
         unsafe {
-            let mut callback = |result: &mut MaybeUninit<()>| {
-                jl_arrayset(self.array.unwrap(Private), ptr, idx);
-                result.write(());
-                Ok(())
-            };
+            let callback = || jl_arrayset(self.array.unwrap(Private), ptr, idx);
 
-            let res = match catch_exceptions(&mut callback).unwrap() {
+            let exc = |err: Value| err.unwrap_non_null(Private);
+
+            let res = match catch_exceptions(callback, exc) {
                 Ok(()) => Ok(()),
-                Err(e) => Err(e.ptr()),
+                Err(e) => Err(e),
             };
 
             Ok(target.exception_from_ptr(res, Private))
@@ -314,6 +303,7 @@ impl<'borrow, 'array, 'data, U, L: ArrayLayout>
     /// Set the element at `index` to `value`.
     ///
     /// Safety: If an error is thrown by Julia it's not caught.
+    #[inline]
     pub unsafe fn set_value_unchecked<D: Dims>(
         &mut self,
         index: D,
@@ -330,6 +320,7 @@ impl<'borrow, 'array, 'data, W: ManagedRef<'array, 'data>, M: Mutability>
     PtrArrayAccessor<'borrow, 'array, 'data, W, M>
 {
     /// Get a reference to the value at `index`, or `None` if the index is out of bounds.
+    #[inline]
     pub fn get<'target, D, T>(
         &self,
         target: T,
@@ -355,6 +346,7 @@ impl<'borrow, 'array, 'data, W: ManagedRef<'array, 'data>, M: Mutability>
     }
 
     /// Returns the array's data as a slice, the data is in column-major order.
+    #[inline]
     pub fn as_slice(&self) -> &[Option<W>] {
         let n_elems = self.dimensions().size();
         let arr_data = self.array.data_ptr().cast::<Option<W>>();
@@ -363,6 +355,7 @@ impl<'borrow, 'array, 'data, W: ManagedRef<'array, 'data>, M: Mutability>
     }
 
     /// Returns the array's data as a slice, the data is in column-major order.
+    #[inline]
     pub fn into_slice(self) -> &'borrow [Option<W>] {
         let n_elems = self.dimensions().size();
         let arr_data = self.array.data_ptr().cast::<Option<W>>();
@@ -375,6 +368,7 @@ impl<'borrow, 'array, 'data, T: ManagedRef<'array, 'data>>
     PtrArrayAccessor<'borrow, 'array, 'data, T, Mutable<'borrow, T>>
 {
     /// Set the value at `index` to `value` if `value` has a type that's compatible with this array.
+    #[inline]
     pub fn set<D>(&mut self, index: D, value: Option<Value<'_, 'data>>) -> JlrsResult<()>
     where
         D: Dims,
@@ -403,6 +397,19 @@ impl<'borrow, 'array, 'data, T: ManagedRef<'array, 'data>>
 
         Ok(())
     }
+
+    /// Add capacity for `inc` more elements at the end of the array. The array must be
+    /// one-dimensional. If the array isn't one-dimensional an exception is thrown.
+    ///
+    /// Safety: Mutating things that should absolutely not be mutated is not prevented. If an
+    /// exception is thrown, it isn't caught.
+    #[inline]
+    pub unsafe fn grow_end_unchecked(&mut self, inc: usize)
+    where
+        'data: 'static,
+    {
+        self.array.grow_end_unchecked(inc);
+    }
 }
 
 impl<'borrow, 'array, 'data, D, T, M> Index<D> for PtrArrayAccessor<'borrow, 'array, 'data, T, M>
@@ -412,6 +419,8 @@ where
     M: Mutability,
 {
     type Output = Option<T>;
+
+    #[inline]
     fn index(&self, index: D) -> &Self::Output {
         let idx = self.dimensions().index_of(&index).unwrap();
         // Safety: the index is in bounds
@@ -428,6 +437,7 @@ where
 
 impl<'borrow, 'array, 'data, T, M: Mutability> BitsArrayAccessor<'borrow, 'array, 'data, T, M> {
     /// Get a reference to the value at `index`, or `None` if the index is out of bounds.
+    #[inline]
     pub fn get<D>(&self, index: D) -> Option<&T>
     where
         D: Dims,
@@ -438,6 +448,7 @@ impl<'borrow, 'array, 'data, T, M: Mutability> BitsArrayAccessor<'borrow, 'array
     }
 
     /// Returns the array's data as a slice, the data is in column-major order.
+    #[inline]
     pub fn as_slice(&self) -> &[T] {
         let len = self.dimensions().size();
         let data = self.array.data_ptr().cast::<T>();
@@ -446,6 +457,7 @@ impl<'borrow, 'array, 'data, T, M: Mutability> BitsArrayAccessor<'borrow, 'array
     }
 
     /// Returns the array's data as a slice, the data is in column-major order.
+    #[inline]
     pub fn into_slice(self) -> &'borrow [T] {
         let len = self.dimensions().size();
         let data = self.array.data_ptr().cast::<T>();
@@ -456,6 +468,7 @@ impl<'borrow, 'array, 'data, T, M: Mutability> BitsArrayAccessor<'borrow, 'array
 
 impl<'borrow, 'array, 'data, T> BitsArrayAccessor<'borrow, 'array, 'data, T, Mutable<'borrow, T>> {
     /// Set the value at `index` to `value` if `value` has a type that's compatible with this array.
+    #[inline]
     pub fn set<D>(&mut self, index: D, value: T) -> JlrsResult<()>
     where
         D: Dims,
@@ -468,6 +481,7 @@ impl<'borrow, 'array, 'data, T> BitsArrayAccessor<'borrow, 'array, 'data, T, Mut
     }
 
     /// Get a mutable reference to the element stored at `index`.
+    #[inline]
     pub fn get_mut<D>(&mut self, index: D) -> Option<&mut T>
     where
         D: Dims,
@@ -478,6 +492,7 @@ impl<'borrow, 'array, 'data, T> BitsArrayAccessor<'borrow, 'array, 'data, T, Mut
     }
 
     /// Returns the array's data as a mutable slice, the data is in column-major order.
+    #[inline]
     pub fn as_mut_slice(&mut self) -> &mut [T] {
         let len = self.dimensions().size();
         let data = self.array.data_ptr().cast::<T>();
@@ -486,11 +501,25 @@ impl<'borrow, 'array, 'data, T> BitsArrayAccessor<'borrow, 'array, 'data, T, Mut
     }
 
     /// Returns the array's data as a mutable slice, the data is in column-major order.
+    #[inline]
     pub fn into_mut_slice(self) -> &'borrow mut [T] {
         let len = self.dimensions().size();
         let data = self.array.data_ptr().cast::<T>();
         // Safety: the layout is compatible and the lifetime is limited.
         unsafe { slice::from_raw_parts_mut(data, len) }
+    }
+
+    /// Add capacity for `inc` more elements at the end of the array. The array must be
+    /// one-dimensional. If the array isn't one-dimensional an exception is thrown.
+    ///
+    /// Safety: Mutating things that should absolutely not be mutated is not prevented. If an
+    /// exception is thrown, it isn't caught.
+    #[inline]
+    pub unsafe fn grow_end_unchecked(&mut self, inc: usize)
+    where
+        'data: 'static,
+    {
+        self.array.grow_end_unchecked(inc);
     }
 }
 
@@ -500,6 +529,8 @@ where
     M: Mutability,
 {
     type Output = T;
+
+    #[inline]
     fn index(&self, index: D) -> &Self::Output {
         let idx = self.dimensions().index_of(&index).unwrap();
         // Safety: the layout is compatible and the index is in bounds.
@@ -519,6 +550,7 @@ impl<'borrow, 'array, 'data, T, D> IndexMut<D>
 where
     D: Dims,
 {
+    #[inline]
     fn index_mut(&mut self, index: D) -> &mut Self::Output {
         let idx = self.dimensions().index_of(&index).unwrap();
         // Safety: the layout is compatible and the index is in bounds.
@@ -537,6 +569,7 @@ impl<'borrow, 'array, 'data, T, M: Mutability>
     InlinePtrArrayAccessor<'borrow, 'array, 'data, T, M>
 {
     /// Get a reference to the value at `index`, or `None` if the index is out of bounds.
+    #[inline]
     pub fn get<D>(&self, index: D) -> Option<&T>
     where
         D: Dims,
@@ -547,6 +580,7 @@ impl<'borrow, 'array, 'data, T, M: Mutability>
     }
 
     /// Returns the array's data as a slice, the data is in column-major order.
+    #[inline]
     pub fn as_slice(&self) -> &[T] {
         let len = self.dimensions().size();
         let data = self.array.data_ptr().cast::<T>();
@@ -555,6 +589,7 @@ impl<'borrow, 'array, 'data, T, M: Mutability>
     }
 
     /// Returns the array's data as a slice, the data is in column-major order.
+    #[inline]
     pub fn into_slice(self) -> &'borrow [T] {
         let len = self.dimensions().size();
         let data = self.array.data_ptr().cast::<T>();
@@ -570,6 +605,8 @@ where
     M: Mutability,
 {
     type Output = T;
+
+    #[inline]
     fn index(&self, index: D) -> &Self::Output {
         let idx = self.dimensions().index_of(&index).unwrap();
         // Safety: the layout is compatible and the index is in bounds.
@@ -586,12 +623,14 @@ where
 
 impl<'borrow, 'array, 'data, M: Mutability> UnionArrayAccessor<'borrow, 'array, 'data, M> {
     /// Returns `true` if `ty` if a value of that type can be stored in this array.
+    #[inline]
     pub fn contains(&self, ty: DataType) -> bool {
         let mut tag = 0;
         find_union_component(self.array.element_type(), ty.as_value(), &mut tag)
     }
 
     /// Returns the type of the element at index `idx`.
+    #[inline]
     pub fn element_type<D>(&self, index: D) -> JlrsResult<Option<Value<'array, 'static>>>
     where
         D: Dims,
@@ -610,6 +649,7 @@ impl<'borrow, 'array, 'data, M: Mutability> UnionArrayAccessor<'borrow, 'array, 
 
     /// Get the element at index `idx`. The type `T` must be a valid layout for the type of the
     /// element stored there.
+    #[inline]
     pub fn get<T, D>(&self, index: D) -> JlrsResult<T>
     where
         T: 'static + ValidField + Clone,
@@ -647,6 +687,7 @@ impl<'borrow, 'array, 'data> UnionArrayAccessor<'borrow, 'array, 'data, Mutable<
     ///
     /// The type `T` must be a valid layout for the value, and `ty` must be a member of the union
     /// of all possible element types.
+    #[inline]
     pub unsafe fn set<T, D>(&mut self, index: D, ty: DataType, value: T) -> JlrsResult<()>
     where
         T: 'static + ValidField + Clone,

@@ -6,9 +6,10 @@ use std::{
     ptr::{null_mut, NonNull},
 };
 
-use jl_sys::jl_opaque_closure_t;
+use jl_sys::{jl_opaque_closure_t, jl_opaque_closure_type};
 
 use crate::{
+    args::Values,
     call::Call,
     data::{
         managed::{
@@ -20,7 +21,8 @@ use crate::{
         },
         types::typecheck::Typecheck,
     },
-    memory::target::{unrooted::Unrooted, Target},
+    memory::target::{unrooted::Unrooted, Target, TargetResult},
+    prelude::ValueData,
     private::Private,
 };
 
@@ -104,10 +106,12 @@ impl<'scope, 'data> ManagedPriv<'scope, 'data> for OpaqueClosure<'scope> {
 
     // Safety: `inner` must not have been freed yet, the result must never be
     // used after the GC might have freed it.
+    #[inline]
     unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self {
         Self(inner, PhantomData)
     }
 
+    #[inline]
     fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps> {
         self.0
     }
@@ -119,6 +123,19 @@ impl<'data> Call<'data> for OpaqueClosure<'_> {
         T: Target<'target>,
     {
         self.as_value().call0(target)
+    }
+
+    #[inline]
+    unsafe fn call_unchecked<'target, 'value, V, T, const N: usize>(
+        self,
+        target: T,
+        args: V,
+    ) -> ValueData<'target, 'data, T>
+    where
+        V: Values<'value, 'data, N>,
+        T: Target<'target>,
+    {
+        self.as_value().call_unchecked(target, args)
     }
 
     unsafe fn call1<'target, T>(
@@ -157,13 +174,13 @@ impl<'data> Call<'data> for OpaqueClosure<'_> {
         self.as_value().call3(target, arg0, arg1, arg2)
     }
 
-    unsafe fn call<'target, 'value, V, T>(
+    unsafe fn call<'target, 'value, V, T, const N: usize>(
         self,
         target: T,
         args: V,
     ) -> ValueResult<'target, 'data, T>
     where
-        V: AsRef<[Value<'value, 'data>]>,
+        V: Values<'value, 'data, N>,
         T: Target<'target>,
     {
         self.as_value().call(target, args)
@@ -177,9 +194,9 @@ pub type OpaqueClosureRef<'scope> = Ref<'scope, 'static, OpaqueClosure<'scope>>;
 /// `ccall`able functions that return a [`OpaqueClosure`].
 pub type OpaqueClosureRet = Ref<'static, 'static, OpaqueClosure<'static>>;
 
-impl_valid_layout!(OpaqueClosureRef, OpaqueClosure);
+impl_valid_layout!(OpaqueClosureRef, OpaqueClosure, jl_opaque_closure_type);
 
-use crate::memory::target::target_type::TargetType;
+use crate::memory::target::TargetType;
 
 /// `OpaqueClosure` or `OpaqueClosureRef`, depending on the target type `T`.
 pub type OpaqueClosureData<'target, T> =
@@ -188,16 +205,22 @@ pub type OpaqueClosureData<'target, T> =
 /// `JuliaResult<OpaqueClosure>` or `JuliaResultRef<OpaqueClosureRef>`, depending on the target
 /// type `T`.
 pub type OpaqueClosureResult<'target, T> =
-    <T as TargetType<'target>>::Result<'static, OpaqueClosure<'target>>;
+    TargetResult<'target, 'static, OpaqueClosure<'target>, T>;
 
 unsafe impl<'scope> crate::convert::ccall_types::CCallArg for OpaqueClosure<'scope> {
-    type CCallArgType = Option<crate::data::managed::value::ValueRef<'scope, 'static>>;
-    type FunctionArgType = Option<crate::data::managed::value::ValueRef<'scope, 'static>>;
+    type CCallArgType = Value<'scope, 'static>;
+    type FunctionArgType = Value<'scope, 'static>;
 }
 
 unsafe impl crate::convert::ccall_types::CCallReturn
     for crate::data::managed::Ref<'static, 'static, OpaqueClosure<'static>>
 {
-    type CCallReturnType = Option<crate::data::managed::value::ValueRef<'static, 'static>>;
-    type FunctionReturnType = Option<crate::data::managed::value::ValueRef<'static, 'static>>;
+    type CCallReturnType = Value<'static, 'static>;
+    type FunctionReturnType = Value<'static, 'static>;
+    type ReturnAs = Self;
+
+    #[inline]
+    unsafe fn return_or_throw(self) -> Self::ReturnAs {
+        self
+    }
 }
