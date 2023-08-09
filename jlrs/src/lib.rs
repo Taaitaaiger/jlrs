@@ -76,7 +76,7 @@
 //!
 //! ## macOS
 //!
-//! Follow the instructions for Linux, but replace `LD_LIBARY_PATH` with `DYLD_LIBARY_PATH`.
+//! Follow the instructions for Linux, but replace `LD_LIBRARY_PATH` with `DYLD_LIBRARY_PATH`.
 //!
 //!
 //! # Features
