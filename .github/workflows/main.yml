@@ -465,7 +465,7 @@ jobs:
           julia JuliaModuleTest.jl
 
 
-  julia-module-test-windows-gnu:
+  julia-module-test-windows-gnu-beta:
     runs-on: windows-latest
     needs: test-windows-gnu
     steps:
@@ -488,7 +488,7 @@ jobs:
           cp ./target/debug/julia_module_test.* libjulia_module_test.dll
           julia JuliaModuleTest.jl
 
-  julia-module-test-macos:
+  julia-module-test-macos-beta:
     runs-on: macos-latest
     needs: test-macos
     steps:
