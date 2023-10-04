@@ -303,7 +303,7 @@ jobs:
         run: |
           cargo test --features full,julia-1-10 --verbose
 
-  test-windows-msvc-lts:
+  test-windows-msvc-beta:
     runs-on: windows-latest
     continue-on-error: ${{ matrix.allow-fail }}
     strategy:
