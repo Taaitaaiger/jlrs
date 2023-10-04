@@ -317,33 +317,6 @@ jobs:
         id: setup-julia
         uses: julia-actions/setup-julia@v1
         with:
-          version: '1.6'
-
-      - uses: ilammy/msvc-dev-cmd@v1
-
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: ${{ matrix.rust }}
-
-      - name: Run tests
-        run: |
-          cargo test --features full,julia-1-6 --verbose
-
-  test-windows-msvc-beta:
-    runs-on: windows-latest
-    continue-on-error: ${{ matrix.allow-fail }}
-    strategy:
-      matrix:
-        rust: [stable-x86_64-pc-windows-msvc]
-        allow-fail: [false]
-    steps:
-      - uses: actions/checkout@v3
-
-      - name: Setup Julia environment
-        id: setup-julia
-        uses: julia-actions/setup-julia@v1
-        with:
           version: '~1.10.0-0'
 
       - uses: ilammy/msvc-dev-cmd@v1
@@ -385,7 +358,6 @@ jobs:
           cargo build --features julia-1-9
           cp ./target/debug/libjulia_module_test.so .
           julia JuliaModuleTest.jl
-
 
   julia-module-test-windows-gnu:
     runs-on: windows-latest
