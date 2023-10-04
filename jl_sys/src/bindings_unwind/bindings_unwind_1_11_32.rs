@@ -1,4 +1,4 @@
-/* generated from julia version 1.11.0-DEV (Commit: 62605cc40f 2023-07-27 17:35 UTC) */
+/* generated from julia version 1.11.0-DEV (Commit: b790cf8f0c 2023-10-03 20:35 UTC) */
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct __BindgenBitfieldUnit<Storage> {
@@ -463,6 +463,17 @@ impl __jl_purity_overrides_t__bindgen_ty_1 {
         }
     }
     #[inline]
+    pub fn ipo_noub(&self) -> u8 {
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(7usize, 1u8) as u8) }
+    }
+    #[inline]
+    pub fn set_ipo_noub(&mut self, val: u8) {
+        unsafe {
+            let val: u8 = ::std::mem::transmute(val);
+            self._bitfield_1.set(7usize, 1u8, val as u64)
+        }
+    }
+    #[inline]
     pub fn new_bitfield_1(
         ipo_consistent: u8,
         ipo_effect_free: u8,
@@ -471,6 +482,7 @@ impl __jl_purity_overrides_t__bindgen_ty_1 {
         ipo_terminates_locally: u8,
         ipo_notaskstate: u8,
         ipo_inaccessiblememonly: u8,
+        ipo_noub: u8,
     ) -> __BindgenBitfieldUnit<[u8; 1usize]> {
         let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 1usize]> = Default::default();
         __bindgen_bitfield_unit.set(0usize, 1u8, {
@@ -503,6 +515,10 @@ impl __jl_purity_overrides_t__bindgen_ty_1 {
             let ipo_inaccessiblememonly: u8 =
                 unsafe { ::std::mem::transmute(ipo_inaccessiblememonly) };
             ipo_inaccessiblememonly as u64
+        });
+        __bindgen_bitfield_unit.set(7usize, 1u8, {
+            let ipo_noub: u8 = unsafe { ::std::mem::transmute(ipo_noub) };
+            ipo_noub as u64
         });
         __bindgen_bitfield_unit
     }
@@ -1157,53 +1173,65 @@ impl _jl_binding_t {
         }
     }
     #[inline]
-    pub fn imported(&self) -> u8 {
+    pub fn publicp(&self) -> u8 {
         unsafe { ::std::mem::transmute(self._bitfield_1.get(2usize, 1u8) as u8) }
     }
     #[inline]
-    pub fn set_imported(&mut self, val: u8) {
+    pub fn set_publicp(&mut self, val: u8) {
         unsafe {
             let val: u8 = ::std::mem::transmute(val);
             self._bitfield_1.set(2usize, 1u8, val as u64)
         }
     }
     #[inline]
-    pub fn usingfailed(&self) -> u8 {
+    pub fn imported(&self) -> u8 {
         unsafe { ::std::mem::transmute(self._bitfield_1.get(3usize, 1u8) as u8) }
     }
     #[inline]
-    pub fn set_usingfailed(&mut self, val: u8) {
+    pub fn set_imported(&mut self, val: u8) {
         unsafe {
             let val: u8 = ::std::mem::transmute(val);
             self._bitfield_1.set(3usize, 1u8, val as u64)
         }
     }
     #[inline]
+    pub fn usingfailed(&self) -> u8 {
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(4usize, 1u8) as u8) }
+    }
+    #[inline]
+    pub fn set_usingfailed(&mut self, val: u8) {
+        unsafe {
+            let val: u8 = ::std::mem::transmute(val);
+            self._bitfield_1.set(4usize, 1u8, val as u64)
+        }
+    }
+    #[inline]
     pub fn deprecated(&self) -> u8 {
-        unsafe { ::std::mem::transmute(self._bitfield_1.get(4usize, 2u8) as u8) }
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(5usize, 2u8) as u8) }
     }
     #[inline]
     pub fn set_deprecated(&mut self, val: u8) {
         unsafe {
             let val: u8 = ::std::mem::transmute(val);
-            self._bitfield_1.set(4usize, 2u8, val as u64)
+            self._bitfield_1.set(5usize, 2u8, val as u64)
         }
     }
     #[inline]
     pub fn padding(&self) -> u8 {
-        unsafe { ::std::mem::transmute(self._bitfield_1.get(6usize, 2u8) as u8) }
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(7usize, 1u8) as u8) }
     }
     #[inline]
     pub fn set_padding(&mut self, val: u8) {
         unsafe {
             let val: u8 = ::std::mem::transmute(val);
-            self._bitfield_1.set(6usize, 2u8, val as u64)
+            self._bitfield_1.set(7usize, 1u8, val as u64)
         }
     }
     #[inline]
     pub fn new_bitfield_1(
         constp: u8,
         exportp: u8,
+        publicp: u8,
         imported: u8,
         usingfailed: u8,
         deprecated: u8,
@@ -1219,18 +1247,22 @@ impl _jl_binding_t {
             exportp as u64
         });
         __bindgen_bitfield_unit.set(2usize, 1u8, {
+            let publicp: u8 = unsafe { ::std::mem::transmute(publicp) };
+            publicp as u64
+        });
+        __bindgen_bitfield_unit.set(3usize, 1u8, {
             let imported: u8 = unsafe { ::std::mem::transmute(imported) };
             imported as u64
         });
-        __bindgen_bitfield_unit.set(3usize, 1u8, {
+        __bindgen_bitfield_unit.set(4usize, 1u8, {
             let usingfailed: u8 = unsafe { ::std::mem::transmute(usingfailed) };
             usingfailed as u64
         });
-        __bindgen_bitfield_unit.set(4usize, 2u8, {
+        __bindgen_bitfield_unit.set(5usize, 2u8, {
             let deprecated: u8 = unsafe { ::std::mem::transmute(deprecated) };
             deprecated as u64
         });
-        __bindgen_bitfield_unit.set(6usize, 2u8, {
+        __bindgen_bitfield_unit.set(7usize, 1u8, {
             let padding: u8 = unsafe { ::std::mem::transmute(padding) };
             padding as u64
         });
