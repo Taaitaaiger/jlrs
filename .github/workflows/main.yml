@@ -226,6 +226,137 @@ jobs:
         run: |
           cargo test --features full,julia-1-6 --verbose
 
+  test-linux-beta:
+    runs-on: ubuntu-latest
+    continue-on-error: ${{ matrix.allow-fail }}
+    strategy:
+      matrix:
+        rust: [stable]
+        allow-fail: [false]
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Julia environment
+        uses: julia-actions/setup-julia@v1
+        with:
+          version: '~1.10.0-0'
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ matrix.rust }}
+
+      - name: Run tests
+        run: |
+          julia -e "import Pkg; Pkg.add(\"JlrsCore\")"
+          export JULIA_DIR="$(dirname $(dirname $(which julia)))"
+          export LD_LIBRARY_PATH="${JULIA_DIR}/lib:${JULIA_DIR}/lib/julia:${LD_LIBRARY_PATH}"
+          cargo test --features full,julia-1-10 --verbose
+
+  test-macos-beta:
+    runs-on: macos-latest
+    continue-on-error: ${{ matrix.allow-fail }}
+    strategy:
+      matrix:
+        rust: [stable]
+        allow-fail: [false]
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Julia environment
+        uses: julia-actions/setup-julia@v1
+        with:
+          version: '~1.10.0-0'
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ matrix.rust }}
+
+      - name: Run tests
+        run: |
+          export JULIA_DIR="$(dirname $(dirname $(which julia)))"
+          export DYLD_LIBRARY_PATH="${JULIA_DIR}/lib:${JULIA_DIR}/lib/julia:${DYLD_LIBRARY_PATH}"
+          cargo test --features full,julia-1-10 --verbose
+
+  test-windows-gnu-beta:
+    runs-on: windows-latest
+    continue-on-error: ${{ matrix.allow-fail }}
+    strategy:
+      matrix:
+        rust: [stable-x86_64-pc-windows-gnu]
+        allow-fail: [false]
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Julia environment
+        uses: julia-actions/setup-julia@v1
+        with:
+          version: '~1.10.0-0'
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ matrix.rust }}
+
+      - name: Run tests
+        run: |
+          cargo test --features full,julia-1-10 --verbose
+
+  test-windows-msvc-lts:
+    runs-on: windows-latest
+    continue-on-error: ${{ matrix.allow-fail }}
+    strategy:
+      matrix:
+        rust: [stable-x86_64-pc-windows-msvc]
+        allow-fail: [false]
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Julia environment
+        id: setup-julia
+        uses: julia-actions/setup-julia@v1
+        with:
+          version: '1.6'
+
+      - uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ matrix.rust }}
+
+      - name: Run tests
+        run: |
+          cargo test --features full,julia-1-6 --verbose
+
+  test-windows-msvc-beta:
+    runs-on: windows-latest
+    continue-on-error: ${{ matrix.allow-fail }}
+    strategy:
+      matrix:
+        rust: [stable-x86_64-pc-windows-msvc]
+        allow-fail: [false]
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Julia environment
+        id: setup-julia
+        uses: julia-actions/setup-julia@v1
+        with:
+          version: '~1.10.0-0'
+
+      - uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ matrix.rust }}
+
+      - name: Run tests
+        run: |
+          cargo test --features full,julia-1-10 --verbose
+
   julia-module-test-linux:
     runs-on: ubuntu-latest
     needs: test-linux
@@ -301,6 +432,84 @@ jobs:
           export DYLD_LIBRARY_PATH="${JULIA_DIR}/lib:${JULIA_DIR}/lib/julia:${DYLD_LIBRARY_PATH}"
           cd julia_module_test
           cargo build --features julia-1-9
+          cp ./target/debug/libjulia_module_test.* .
+          julia JuliaModuleTest.jl
+
+  julia-module-test-linux-beta:
+    runs-on: ubuntu-latest
+    needs: test-linux
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Julia environment
+        uses: julia-actions/setup-julia@v1
+        with:
+          version: '~1.10.0-0'
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+
+      - name: Set env
+        run: |
+          export JULIA_DIR=$(dirname $(dirname $(which julia)))
+          echo "LD_LIBRARY_PATH=${JULIA_DIR}/lib:${JULIA_DIR}/lib/julia:${LD_LIBRARY_PATH}" >> $GITHUB_ENV
+          echo "JULIA_DIR=${JULIA_DIR}" >> $GITHUB_ENV
+
+      - name: Run module tests
+        run: |
+          cd julia_module_test
+          cargo build --features julia-1-10
+          cp ./target/debug/libjulia_module_test.so .
+          julia JuliaModuleTest.jl
+
+
+  julia-module-test-windows-gnu:
+    runs-on: windows-latest
+    needs: test-windows-gnu
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Julia environment
+        uses: julia-actions/setup-julia@v1
+        with:
+          version: '~1.10.0-0'
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable-x86_64-pc-windows-gnu
+
+      - name: Run module tests
+        run: |
+          cd julia_module_test
+          cargo build --features julia-1-10
+          cp ./target/debug/julia_module_test.* libjulia_module_test.dll
+          julia JuliaModuleTest.jl
+
+  julia-module-test-macos:
+    runs-on: macos-latest
+    needs: test-macos
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Julia environment
+        uses: julia-actions/setup-julia@v1
+        with:
+          version: '~1.10.0-0'
+
+      - name: Setup Rust
+        uses:  dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+
+      - name: Run tests
+        run: |
+          export JULIA_DIR="$(dirname $(dirname $(which julia)))"
+          export DYLD_LIBRARY_PATH="${JULIA_DIR}/lib:${JULIA_DIR}/lib/julia:${DYLD_LIBRARY_PATH}"
+          cd julia_module_test
+          cargo build --features julia-1-10
           cp ./target/debug/libjulia_module_test.* .
           julia JuliaModuleTest.jl
 
