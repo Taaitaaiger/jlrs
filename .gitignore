@@ -24,3 +24,5 @@ ARCHITECTURE.md
 playground
 libjulia_module_test.so
 expanded.rs
+
+.idea

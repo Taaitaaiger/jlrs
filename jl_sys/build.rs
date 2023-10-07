@@ -624,6 +624,7 @@ fn generate_bindings(julia_dir: &str) {
         .allowlist_var("jl_signed_type")
         .allowlist_var("jl_simplevector_type")
         .allowlist_var("jl_slotnumber_type")
+        .allowlist_var("jl_small_typeof")
         .allowlist_var("jl_ssavalue_type")
         .allowlist_var("jl_stackovf_exception")
         .allowlist_var("jl_string_type")

@@ -1,4 +1,4 @@
-/* generated from julia version 1.10.0-beta1 */
+/* generated from julia version 1.10.0-beta3 */
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct __BindgenBitfieldUnit<Storage> {
@@ -1340,6 +1340,16 @@ pub struct jl_method_match_t {
     pub sparams: *mut jl_svec_t,
     pub method: *mut jl_method_t,
     pub fully_covers: u8,
+}
+#[cfg_attr(
+    all(
+        any(windows, target_os = "windows", feature = "windows"),
+        any(target_env = "msvc", feature = "yggdrasil")
+    ),
+    link(name = "libjulia", kind = "raw-dylib")
+)]
+extern "C" {
+    pub static mut jl_small_typeof: [*mut jl_datatype_t; 128usize];
 }
 #[cfg_attr(
     all(
