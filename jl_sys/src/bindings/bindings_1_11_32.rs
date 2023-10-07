@@ -1367,6 +1367,9 @@ pub struct jl_method_match_t {
     pub fully_covers: u8,
 }
 extern "C" {
+    pub static mut jl_small_typeof: [*mut jl_datatype_t; 256usize];
+}
+extern "C" {
     pub static mut jl_typeofbottom_type: *mut jl_datatype_t;
 }
 extern "C" {

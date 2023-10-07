@@ -301,7 +301,7 @@ jobs:
 
       - name: Run tests
         run: |
-          cargo test --features full,julia-1-10 --verbose
+          cargo test --features full,julia-1-10 --verbose --lib --bins --tests
 
   test-windows-msvc-beta:
     runs-on: windows-latest
@@ -328,7 +328,7 @@ jobs:
 
       - name: Run tests
         run: |
-          cargo test --features full,julia-1-10 --verbose
+          cargo test --features full,julia-1-10 --verbose --lib --bins --tests
 
   julia-module-test-linux:
     runs-on: ubuntu-latest

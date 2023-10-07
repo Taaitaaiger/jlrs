@@ -1381,6 +1381,16 @@ pub struct jl_method_match_t {
     link(name = "libjulia", kind = "raw-dylib")
 )]
 extern "C" {
+    pub static mut jl_small_typeof: [*mut jl_datatype_t; 128usize];
+}
+#[cfg_attr(
+    all(
+        any(windows, target_os = "windows", feature = "windows"),
+        any(target_env = "msvc", feature = "yggdrasil")
+    ),
+    link(name = "libjulia", kind = "raw-dylib")
+)]
+extern "C" {
     pub static mut jl_typeofbottom_type: *mut jl_datatype_t;
 }
 #[cfg_attr(
