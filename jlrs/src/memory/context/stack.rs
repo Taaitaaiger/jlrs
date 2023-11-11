@@ -19,7 +19,7 @@ use once_cell::sync::Lazy;
 use crate::{
     call::Call,
     data::{
-        managed::{module::Module, private::ManagedPriv, symbol::Symbol, value::Value, Managed},
+        managed::{module::JlrsCore, private::ManagedPriv, symbol::Symbol, value::Value, Managed},
         types::foreign_type::{create_foreign_type_nostack, ForeignType},
     },
     memory::{stack_frame::PinnedFrame, target::unrooted::Unrooted, PTls},
@@ -83,39 +83,43 @@ pub(crate) static STACK_TYPE_NAME: Lazy<StaticSymbol> = Lazy::new(|| unsafe {
 impl Stack {
     // Create the foreign type Stack in the JlrsCore module, or return immediately if it already
     // exists.
-    pub(crate) fn init<const N: usize>(frame: &PinnedFrame<N>, module: Module) {
-        let global = module.unrooted_target();
-        let sym = STACK_TYPE_NAME.as_symbol();
-        if module.global(&global, sym).is_ok() {
-            return;
-        }
-
+    pub(crate) fn init<const N: usize>(frame: &PinnedFrame<N>) {
         unsafe {
-            let lock_fn = module.global(&global, "lock_init_lock").unwrap().as_value();
+            let unrooted = Unrooted::new();
+            let module = JlrsCore::module(&unrooted);
+            let sym = STACK_TYPE_NAME.as_symbol();
+            if module.global(&unrooted, sym).is_ok() {
+                return;
+            }
 
-            let unlock_fn = module
-                .global(&global, "unlock_init_lock")
+            let lock_fn = module
+                .global(&unrooted, "lock_init_lock")
                 .unwrap()
                 .as_value();
 
-            lock_fn.call0(global).unwrap();
+            let unlock_fn = module
+                .global(&unrooted, "unlock_init_lock")
+                .unwrap()
+                .as_value();
 
-            if module.global(global, sym).is_ok() {
-                unlock_fn.call0(global).unwrap();
+            lock_fn.call0(unrooted).unwrap();
+
+            if module.global(unrooted, sym).is_ok() {
+                unlock_fn.call0(unrooted).unwrap();
                 return;
             }
 
             // Safety: create_foreign_type is called with the correct arguments, the new type is
             // rooted until the constant has been set, and we've just checked if JlrsCore.Stack
             // already exists.
-            let dt_ref = create_foreign_type_nostack::<Self, _>(global, sym, module);
+            let dt_ref = create_foreign_type_nostack::<Self, _>(unrooted, sym, module);
             let ptr = dt_ref.ptr();
             frame.set_sync_root(ptr.cast().as_ptr());
 
             let dt = dt_ref.as_managed();
             module.set_const_unchecked(sym, dt.as_value());
 
-            unlock_fn.call0(global).unwrap();
+            unlock_fn.call0(unrooted).unwrap();
         };
     }
 

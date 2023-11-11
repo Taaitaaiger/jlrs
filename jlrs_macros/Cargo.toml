@@ -1,6 +1,6 @@
 [package]
 name = "jlrs-macros"
-version = "0.2.0"
+version = "0.2.1"
 authors = ["Thomas van Doornmalen <thomas.vandoornmalen@gmail.com>"]
 description = """
 jlrs-macros contains the custom derives offered by jlrs.
@@ -23,7 +23,7 @@ julia-1-10 = []
 julia-1-11 = []
 windows = []
 
-derive = ["proc-macro2", "syn", "quote"]
+derive = ["syn", "quote"]
 ccall = ["proc-macro2", "syn", "quote"]
 
 [lib]

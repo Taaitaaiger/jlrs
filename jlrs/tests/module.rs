@@ -4,7 +4,7 @@ mod util;
 mod tests {
     use std::borrow::Cow;
 
-    use jlrs::prelude::*;
+    use jlrs::{prelude::*, data::managed::module::JlrsCore};
 
     use crate::util::JULIA;
 
@@ -83,10 +83,8 @@ mod tests {
 
             jlrs.instance(&mut frame)
                 .scope(|mut frame| {
-                    let main_module = Module::main(&frame);
-                    let jlrs_module = main_module.submodule(&mut frame, "JlrsCore");
-                    assert!(jlrs_module.is_ok());
-                    let func = jlrs_module.unwrap().function(&mut frame, "valuestring");
+                    let jlrs_module = JlrsCore::module(&frame);
+                    let func = jlrs_module.function(&mut frame, "valuestring");
                     assert!(func.is_ok());
                     Ok(())
                 })
@@ -101,26 +99,9 @@ mod tests {
 
             jlrs.instance(&mut frame)
                 .scope(|mut frame| {
-                    let main_module = Module::main(&frame);
-                    let jlrs_module = main_module.submodule(&mut frame, "JlrsCore");
-                    assert!(jlrs_module.is_ok());
-                    let func = jlrs_module.unwrap().function(&mut frame, "valuestring");
+                    let jlrs_module = JlrsCore::module(&frame);
+                    let func = jlrs_module.function(&mut frame, "valuestring");
                     assert!(func.is_ok());
-                    Ok(())
-                })
-                .unwrap();
-        });
-    }
-
-    fn jlrs_module() {
-        JULIA.with(|j| {
-            let mut frame = StackFrame::new();
-            let mut jlrs = j.borrow_mut();
-
-            jlrs.instance(&mut frame)
-                .scope(|frame| {
-                    let jlrs_module = Module::package_root_module(&frame, "JlrsCore");
-                    assert!(jlrs_module.is_some());
                     Ok(())
                 })
                 .unwrap();
@@ -518,7 +499,6 @@ mod tests {
         base_module_dynamic();
         main_module();
         main_module_dynamic();
-        jlrs_module();
         error_nonexistent_function();
         error_nonexistent_function_dynamic();
         error_nonexistent_submodule();

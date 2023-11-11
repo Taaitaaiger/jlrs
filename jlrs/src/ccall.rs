@@ -309,8 +309,7 @@ impl<'context> CCall<'context> {
 
                 set_pool_name(module);
 
-                let add_pool = Module::package_root_module(&unrooted, "JlrsCore")
-                    .unwrap()
+                let add_pool = JlrsCore::module(&unrooted)
                     .global(unrooted, "add_pool")
                     .unwrap()
                     .as_value();

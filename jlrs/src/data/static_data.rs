@@ -16,7 +16,7 @@ use crate::{
     data::managed::{module::Module, value::ValueUnbound, Managed},
     gc_safe::GcSafeOnceLock,
     memory::target::Target,
-    private::Private,
+    private::Private, prelude::Value,
 };
 
 struct StaticDataInner<T>(ValueUnbound, PhantomData<T>);
@@ -205,6 +205,39 @@ where
             self.global.store(ptr, atomic::Ordering::Relaxed);
             T::wrap_non_null(NonNull::new_unchecked(ptr), Private)
         }
+    }
+
+    // Safety: The result of the evaluated command must be globally rooted.
+    #[inline]
+    pub(crate) unsafe fn get_or_eval<'target, Tgt>(&self, target: &Tgt) -> T
+    where
+        Tgt: Target<'target>,
+    {
+        let ptr = self.global.load(atomic::Ordering::Relaxed);
+        if ptr.is_null() {
+            self.eval(target)
+        } else {
+            T::wrap_non_null(NonNull::new_unchecked(ptr), Private)
+        }
+    }
+
+    // Safety: The result of the evaluated command must be globally rooted.
+    #[cold]
+    #[inline(never)]
+    unsafe fn eval<'target, Tgt>(&self, target: &Tgt) -> T
+    where
+        Tgt: Target<'target>,
+    {
+        let v = Value::eval_string(target, self.path)
+            .unwrap()
+            .leak()
+            .as_value()
+            .cast::<T>()
+            .unwrap();
+
+        let ptr = v.unwrap(Private);
+        self.global.store(ptr, atomic::Ordering::Relaxed);
+        T::wrap_non_null(NonNull::new_unchecked(ptr), Private)
     }
 }
 

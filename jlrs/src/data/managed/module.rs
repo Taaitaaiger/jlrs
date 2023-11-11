@@ -33,7 +33,7 @@ use crate::{
     data::{
         layout::nothing::Nothing,
         managed::{function::Function, private::ManagedPriv, symbol::Symbol, value::Value},
-        types::{construct_type::ConstructType, typecheck::Typecheck},
+        types::{construct_type::ConstructType, typecheck::Typecheck}, static_data::StaticRef,
     },
     error::{AccessError, JlrsResult, TypeError},
     gc_safe::{GcSafeOnceLock, GcSafeRwLock},
@@ -217,6 +217,14 @@ impl<'scope> Module<'scope> {
         unsafe { Module::wrap_non_null(NonNull::new_unchecked(jl_base_module), Private) }
     }
 
+    // /// Returns a handle to the `JlrsCore`-module.
+    // #[inline]
+    // pub fn jlrs_core<T: Target<'scope>>(target: &T) -> Self {
+    //     // This won't be called until jlrs has been initialized, which loads the JlrsCore module.
+    //     static JLRS_CORE: StaticRef<Module> = StaticRef::new("Base.loaded_modules[Base.PkgId(Base.UUID(\"29be08bc-e5fd-4da2-bbc1-72011c6ea2c9\"), \"JlrsCore\")]");
+    //     unsafe { JLRS_CORE.get_or_eval(target) }
+    // }
+
     /// Returns `true` if `self` has imported `sym`.
     #[inline]
     pub fn is_imported<N: ToSymbol>(self, sym: N) -> bool {
@@ -295,10 +303,7 @@ impl<'scope> Module<'scope> {
         static FUNC: GcSafeOnceLock<unsafe extern "C" fn(Symbol) -> Value> = GcSafeOnceLock::new();
         unsafe {
             let func = FUNC.get_or_init(|| {
-                let ptr = Module::main(&target)
-                    .submodule(&target, "JlrsCore")
-                    .unwrap()
-                    .as_managed()
+                let ptr = JlrsCore::module(&target)
                     .global(&target, "root_module_c")
                     .unwrap()
                     .as_value()
@@ -569,7 +574,8 @@ impl JlrsCore {
     where
         Tgt: Target<'target>,
     {
-        inline_static_ref!(MODULE, Module, "JlrsCore", target)
+        static JLRS_CORE: StaticRef<Module> = StaticRef::new("Base.loaded_modules[Base.PkgId(Base.UUID(\"29be08bc-e5fd-4da2-bbc1-72011c6ea2c9\"), \"JlrsCore\")]");
+        unsafe { JLRS_CORE.get_or_eval(target) }
     }
 
     #[inline]

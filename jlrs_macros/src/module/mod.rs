@@ -1568,10 +1568,7 @@ impl JuliaModule {
                 ccall.init_jlrs(&::jlrs::InstallJlrsCore::Default, Some(module));
 
                 ccall.scope(|mut frame| {
-                    let wrap_mod = ::jlrs::data::managed::module::Module::main(&frame)
-                        .submodule(&frame, "JlrsCore")
-                        .unwrap()
-                        .as_managed()
+                    let wrap_mod = ::jlrs::data::managed::module::JlrsCore::module(&frame)
                         .submodule(&frame, "Wrap")
                         .unwrap()
                         .as_managed();
