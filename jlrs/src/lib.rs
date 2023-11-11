@@ -1,7 +1,7 @@
 //! jlrs is a crate that provides access to most of the Julia C API, it can be used to embed Julia
 //! in Rust applications and to use functionality it provides when writing `ccall`able
 //! functions in Rust. Currently this crate is only tested in combination with Julia 1.6 and 1.9,
-//! but also supports Julia 1.7, 1.8 and 1.10. Using the current stable version is highly 
+//! but also supports Julia 1.7, 1.8 and 1.10. Using the current stable version is highly
 //! recommended. The minimum supported Rust version is currently 1.65.
 //!
 //! The documentation assumes you're already familiar with the Julia and Rust programming
@@ -785,11 +785,7 @@ use prelude::Managed;
 
 use crate::{
     data::{
-        managed::{
-            module::{init_global_cache, Module},
-            symbol::init_symbol_cache,
-            value::Value,
-        },
+        managed::{module::init_global_cache, symbol::init_symbol_cache, value::Value},
         types::{
             construct_type::init_constructed_type_cache, foreign_type::init_foreign_type_registry,
         },
@@ -888,8 +884,6 @@ impl InstallJlrsCore {
                              import Pkg; Pkg.add(\"JlrsCore\")
                              using JlrsCore
                          end
-                     else
-                         const JlrsCore = Base.loaded_modules[Base.PkgId(Base.UUID(\"29be08bc-e5fd-4da2-bbc1-72011c6ea2c9\"), \"JlrsCore\")]
                      end",
                 )
             },
@@ -904,8 +898,6 @@ impl InstallJlrsCore {
                                  import Pkg; Pkg.add(url=\"{repo}#{revision}\")
                                  using JlrsCore
                              end
-                         else
-                             const JlrsCore = Base.loaded_modules[Base.PkgId(Base.UUID(\"29be08bc-e5fd-4da2-bbc1-72011c6ea2c9\"), \"JlrsCore\")]
                          end"
                     ),
                 )
@@ -921,8 +913,6 @@ impl InstallJlrsCore {
                                  import Pkg; Pkg.add(name=\"JlrsCore\", version=\"{major}.{minor}.{patch}\")
                                  using JlrsCore
                              end
-                         else
-                             const JlrsCore = Base.loaded_modules[Base.PkgId(Base.UUID(\"29be08bc-e5fd-4da2-bbc1-72011c6ea2c9\"), \"JlrsCore\")]
                          end"
                     ),
                 )
@@ -932,8 +922,6 @@ impl InstallJlrsCore {
                     unrooted,
                     "if !haskey(Base.loaded_modules, Base.PkgId(Base.UUID(\"29be08bc-e5fd-4da2-bbc1-72011c6ea2c9\"), \"JlrsCore\"))
                          using JlrsCore
-                     else
-                         const JlrsCore = Base.loaded_modules[Base.PkgId(Base.UUID(\"29be08bc-e5fd-4da2-bbc1-72011c6ea2c9\"), \"JlrsCore\")]
                      end",
                 )
             },
@@ -972,13 +960,8 @@ pub(crate) unsafe fn init_jlrs<const N: usize>(
     let unrooted = Unrooted::new();
     install_jlrs_core.use_or_install(unrooted);
 
-    let jlrs_module = Module::main(&unrooted)
-        .submodule(unrooted, "JlrsCore")
-        .unwrap()
-        .as_managed();
-
     init_ledger();
 
     // Init foreign Stack type
-    Stack::init(frame, jlrs_module);
+    Stack::init(frame);
 }

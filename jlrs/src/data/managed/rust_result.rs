@@ -27,7 +27,6 @@ use crate::{
         layout::bool::Bool,
         managed::{
             datatype::DataType,
-            module::Module,
             private::ManagedPriv,
             string::JuliaString,
             value::{Value, ValueRef},
@@ -132,10 +131,7 @@ impl<'target, 'data, U: ConstructType> RustResult<'target, 'data, U> {
         target
             .with_local_scope::<_, _, 3>(|target, mut frame| unsafe {
                 let msg = JuliaString::new(&mut frame, format!("{}", error));
-                let error = Module::main(&unrooted)
-                    .submodule(unrooted, "JlrsCore")
-                    .unwrap()
-                    .as_managed()
+                let error = JlrsCore::module(&frame)
                     .global(unrooted, "JlrsError")
                     .unwrap()
                     .as_value()
@@ -160,13 +156,9 @@ impl<'target, 'data, U: ConstructType> RustResult<'target, 'data, U> {
 
         ccall
             .scope(|mut frame| {
-                let unrooted = frame.unrooted();
                 unsafe {
-                    let error = Module::main(&unrooted)
-                        .submodule(unrooted, "JlrsCore")
-                        .unwrap()
-                        .as_managed()
-                        .global(unrooted, "BorrowError")
+                    let error = JlrsCore::module(&frame)
+                        .global(&frame, "BorrowError")
                         .unwrap()
                         .as_value()
                         .cast_unchecked::<DataType>()
@@ -175,7 +167,7 @@ impl<'target, 'data, U: ConstructType> RustResult<'target, 'data, U> {
 
                     let instance = Self::construct_type(&mut frame)
                         .cast_unchecked::<DataType>()
-                        .instantiate_unchecked(&frame, [error, Value::true_v(&unrooted)])
+                        .instantiate_unchecked(&frame, [error, Value::true_v(&frame)])
                         .as_value()
                         .cast_unchecked::<RustResult<U>>()
                         .as_ref()

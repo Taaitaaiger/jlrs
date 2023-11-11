@@ -1,5 +1,4 @@
 use proc_macro::TokenStream;
-use proc_macro2::TokenStream as TS2;
 use quote::{format_ident, quote};
 use syn::{self, punctuated::Punctuated, token::Comma, Token};
 
@@ -253,9 +252,9 @@ pub fn impl_into_julia(ast: &syn::DeriveInput) -> TokenStream {
     into_julia_impl.into()
 }
 
-pub fn impl_into_julia_fn(attrs: &JlrsTypeAttrs) -> Option<TS2> {
+pub fn impl_into_julia_fn(attrs: &JlrsTypeAttrs) -> Option<syn::Item> {
     if attrs.zst {
-        Some(quote! {
+        Some(syn::parse_quote! {
             #[inline]
             fn into_julia<'target, T>(self, target: T) -> ::jlrs::data::managed::value::ValueData<'target, 'static, T>
             where

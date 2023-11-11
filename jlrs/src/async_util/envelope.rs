@@ -10,7 +10,7 @@ use crate::{
         task::AsyncTask,
     },
     call::Call,
-    data::managed::{module::Module, string::JuliaString, value::Value, Managed},
+    data::managed::{module::{Module, JlrsCore}, string::JuliaString, value::Value, Managed},
     error::{JlrsError, JlrsResult},
     memory::{
         context::stack::Stack,
@@ -553,9 +553,7 @@ where
             Value::false_v(&unrooted)
         };
 
-        Module::main(&unrooted)
-            .submodule(&unrooted, "JlrsCore")?
-            .as_managed()
+        JlrsCore::module(&unrooted)
             .global(&unrooted, "color")?
             .as_value()
             .set_nth_field_unchecked(0, enable);

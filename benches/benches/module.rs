@@ -8,7 +8,7 @@ use pprof::{
 #[inline(never)]
 fn module_submodule(frame: &GcFrame, c: &mut Criterion) {
     c.bench_function("Module::submodule", |b| {
-        b.iter(|| Module::main(frame).submodule(frame, black_box("JlrsCore")))
+        b.iter(|| Module::main(frame).submodule(frame, black_box("Base")))
     });
 }
 

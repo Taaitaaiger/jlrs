@@ -292,6 +292,8 @@ use std::{
     ptr::NonNull,
 };
 
+use jl_sys::jl_stderr_obj;
+
 use self::module::JlrsCore;
 use crate::{
     call::Call,
@@ -404,19 +406,12 @@ pub trait Managed<'scope, 'data>: private::ManagedPriv<'scope, 'data> {
     #[doc(hidden)]
     unsafe fn print_error(self) {
         let unrooted = Unrooted::new();
-        Module::main(&unrooted)
-            .set_global(&unrooted, "__jlrs_global", self.as_value().assume_owned())
-            .unwrap();
-
-        Value::eval_string(
-            unrooted,
-            "println(stderr, sprint(showerror, __jlrs_global))",
-        )
-        .unwrap();
-
-        Module::main(&unrooted)
-            .set_global(&unrooted, "__jlrs_global", Value::nothing(&unrooted))
-            .unwrap();
+        let stderr = Value::wrap_non_null(NonNull::new_unchecked(jl_stderr_obj()), Private);
+        let showerror = Module::base(&unrooted)
+            .global(unrooted, "showerror")
+            .unwrap()
+            .as_value();
+        showerror.call2(unrooted, stderr, self.as_value()).ok();
     }
 
     /// Convert the data to its display string, i.e. the string that is shown by calling

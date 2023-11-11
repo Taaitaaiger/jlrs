@@ -10,7 +10,7 @@ use jl_sys::{jl_atexit_hook, jl_init, jl_init_with_image, jl_is_initialized};
 use crate::{
     call::Call,
     convert::into_jlrs_result::IntoJlrsResult,
-    data::managed::{module::Module, string::JuliaString, value::Value, Managed},
+    data::managed::{module::{Module, JlrsCore}, string::JuliaString, value::Value, Managed},
     error::{IOError, JlrsResult, RuntimeError},
     init_jlrs,
     memory::{
@@ -121,9 +121,7 @@ impl Julia<'_> {
             };
 
             // FIXME: make atomic
-            Module::main(&frame)
-                .submodule(&frame, "JlrsCore")?
-                .as_managed()
+            JlrsCore::module(&frame)
                 .global(&frame, "color")?
                 .as_value()
                 .set_field_unchecked("x", enable)
