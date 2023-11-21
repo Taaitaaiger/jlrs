@@ -599,9 +599,18 @@ function that can be called from Julia to generate the module.
 In Rust, the macro can be used like this:
 
 ```rust
+use jlrs::prelude::*;
+fn call_me(arg: Bool) -> isize {
+    if arg.as_bool() {
+        1
+    } else {
+        0
+    }
+}
+
 julia_module! {
     become callme_init_fn;
-    fn call_me(arg: bool) -> isize;
+    fn call_me(arg: Bool) -> isize;
 }
 ```
 
