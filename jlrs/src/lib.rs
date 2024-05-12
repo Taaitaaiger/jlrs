@@ -3,7 +3,7 @@
 //!
 //! Julia versions 1.6 up to and including 1.11 are supported, but only the LTS and stable versions
 //! are actively tested. Using the current stable version of Julia is highly recommended. The
-//! minimum supported Rust version is currently 1.78.
+//! minimum supported Rust version is currently 1.77.
 //!
 //!
 //! # Overview
@@ -192,6 +192,11 @@
 //!   `CC` environment variable. Setting `RUSTFLAGS` overrides the default flags that jlrs sets, so
 //!   you must set at least the following flags:
 //!   `RUSTFLAGS="-Clinker-plugin-lto -Clinker=clang-XX -Clink-arg=-fuse-ld=lld -Clink-args=-rdynamic"`.
+//!
+//! - `diagnostics`
+//!
+//!   Enable custom diagnostics for several traits because the default lint is unhelpful. This feature
+//!   requires Rust 1.78.
 //!
 //! - `i686`
 //!

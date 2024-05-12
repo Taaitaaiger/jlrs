@@ -32,12 +32,12 @@ use crate::{
 /// [`Value::is`]: crate::data::managed::value::Value::is
 /// [`Unbox`]: crate::convert::unbox::Unbox
 /// [`Managed`]: crate::data::managed::Managed
-#[diagnostic::on_unimplemented(
+#[cfg_attr(feature = "diagnostics", diagnostic::on_unimplemented(
     message = "the trait bound `{Self}: Typecheck` is not satisfied",
     label = "the trait `Typecheck` is not implemented for `{Self}`",
     note = "Custom types that implement `Typecheck` should be generated with JlrsCore.reflect",
     note = "Do not implement `ForeignType`, `OpaqueType`, or `ParametricVariant` unless this type is exported to Julia with `julia_module!`"
-)]
+))]
 pub unsafe trait Typecheck {
     /// Returns whether the property implied by `Self` holds true.
     fn typecheck(t: DataType) -> bool;

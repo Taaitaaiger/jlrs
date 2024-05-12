@@ -30,12 +30,12 @@ use crate::{
 /// Safety: implementations of [`ValidLayout::valid_layout`] must not trigger the GC. This means
 /// no function can be called that allocates Julia data, calls Julia functions, or can trigger the
 /// GC some other way.
-#[diagnostic::on_unimplemented(
+#[cfg_attr(feature = "diagnostics", diagnostic::on_unimplemented(
     message = "the trait bound `{Self}: ValidLayout` is not satisfied",
     label = "the trait `ValidLayout` is not implemented for `{Self}`",
     note = "Custom types that implement `ValidLayout` should be generated with JlrsCore.reflect",
     note = "Do not implement `ForeignType`, `OpaqueType`, or `ParametricVariant` unless this type is exported to Julia with `julia_module!`"
-)]
+))]
 pub unsafe trait ValidLayout {
     /// Must be `true` if the Rust type is a managed type.
     const IS_REF: bool = false;

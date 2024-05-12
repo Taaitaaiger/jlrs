@@ -211,12 +211,12 @@ macro_rules! bytes {
 ///
 /// `ConstructType::construct_type` must either return a valid type object, or an instance of an
 /// isbits type which is immediately used as a type parameter of another constructed type.
-#[diagnostic::on_unimplemented(
+#[cfg_attr(feature = "diagnostics", diagnostic::on_unimplemented(
     message = "the trait bound `{Self}: ConstructType` is not satisfied",
     label = "the trait `ConstructType` is not implemented for `{Self}`",
     note = "Custom types that implement `ConstructType` should be generated with JlrsCore.reflect",
     note = "Do not implement `ForeignType`, `OpaqueType`, or `ParametricVariant` unless this type is exported to Julia with `julia_module!`"
-)]
+))]
 
 pub unsafe trait ConstructType: Sized {
     /// `Self`, but with all lifetimes set to `'static`. This ensures `Self::Static` has a type

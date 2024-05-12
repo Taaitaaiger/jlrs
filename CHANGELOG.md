@@ -1,6 +1,6 @@
 #### v0.20
 
-- Add support for Julia 1.11. Bump MSRV to 1.78.
+- Add support for Julia 1.11. Bump MSRV to 1.77.
 
 - The layout of builtin types defined by the C API like `jl_datatype_t` and `jl_module_t` are opaque to jlrs. Any access to their internals is delegated to functions defined in jl-sys's support library.
 
@@ -50,7 +50,7 @@
 
 - Scopes can return arbitrary types, the return type is no longer required to be a `JlrsResult`.
 
-- Custom diagnostics are emitted when `ValidLayout`, `Unbox`, `IntoJulia`, `ConstructType`, `Typecheck` or `ForeignType` has not been implemented to explicitly warn you probably don't want `ForeignType`'s blanket impementations for these traits.
+- Custom diagnostics are emitted when `ValidLayout`, `Unbox`, `IntoJulia`, `ConstructType`, `Typecheck` or `ForeignType` has not been implemented to explicitly warn you probably don't want `ForeignType`'s blanket impementations for these traits. This requires enabling the `diagnostics` feature and Rust 1.78.
 
 - Initializing Julia is considered safe as long as no custom system image is used.
 

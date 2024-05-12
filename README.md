@@ -8,7 +8,7 @@ applications and to write interop libraries to Rust crates that can be used by J
 
 Julia versions 1.6 up to and including 1.11 are supported, but only the LTS and stable versions
 are actively tested. Using the current stable version of Julia is highly recommended. The minimum
-supported Rust version is currently 1.78.
+supported Rust version is currently 1.77.
 
 This readme only contains information about what features are supported by jlrs, what
 prerequisites must be met, and how to meet them. For information and examples about how to use
@@ -198,6 +198,11 @@ All other features are called utility features. The following are available:
   `RUSTFLAGS="-Clinker-plugin-lto -Clinker=clang-XX -Clink-arg=-fuse-ld=lld -Clink-args=-rdynamic"`.
   The last one is particularly important for embedders, forgetting it is guaranteed to kill
   performance.
+
+- `diagnostics`
+
+  Enable custom diagnostics for several traits because the default lint is unhelpful. This feature
+  requires Rust 1.78.
 
 - `i686`
 
