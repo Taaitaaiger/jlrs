@@ -37,10 +37,13 @@ use crate::{
     data::{
         layout::valid_layout::{ValidField, ValidLayout},
         managed::{datatype::DataType, private::ManagedPriv, Managed, Ref},
-        types::{abstract_types::AnyType, construct_type::ConstructType, typecheck::Typecheck},
+        types::{abstract_type::AnyType, construct_type::ConstructType, typecheck::Typecheck},
     },
     error::{JlrsResult, TypeError},
-    memory::target::{Target, TargetResult},
+    memory::{
+        scope::LocalScope,
+        target::{Target, TargetResult},
+    },
     private::Private,
 };
 
@@ -62,9 +65,9 @@ impl<U: ConstructType + IntoJulia> TypedValue<'_, '_, U> {
     /// Create a new typed value, any type that implements [`IntoJulia`] can be converted using
     /// this function.
     #[inline]
-    pub fn new<'target, T>(target: T, data: U) -> TypedValueData<'target, 'static, U, T>
+    pub fn new<'target, Tgt>(target: Tgt, data: U) -> TypedValueData<'target, 'static, U, Tgt>
     where
-        T: Target<'target>,
+        Tgt: Target<'target>,
     {
         unsafe {
             Value::new(&target, data)
@@ -104,7 +107,7 @@ impl<'scope, 'data, U: ConstructType> TypedValue<'scope, 'data, U> {
         Tgt: Target<'target>,
     {
         unsafe {
-            target.local_scope::<_, _, 1>(|mut frame| {
+            target.local_scope::<_, 1>(|mut frame| {
                 let ty = U::construct_type(&mut frame).as_value();
                 if value.isa(ty) {
                     Ok(TypedValue::<U>::wrap_non_null(
@@ -289,7 +292,7 @@ where
     T: ConstructType,
 {
     type Wraps = jl_value_t;
-    type TypeConstructorPriv<'target, 'da> = TypedValue<'target, 'da, T>;
+    type WithLifetimes<'target, 'da> = TypedValue<'target, 'da, T>;
     const NAME: &'static str = "TypedValue";
 
     // Safety: `inner` must not have been freed yet, the result must never be
@@ -336,6 +339,16 @@ where
     {
         U::base_type(target)
     }
+
+    fn construct_type_with_env_uncached<'target, Tgt>(
+        target: Tgt,
+        env: &crate::data::types::construct_type::TypeVarEnv,
+    ) -> ValueData<'target, 'static, Tgt>
+    where
+        Tgt: Target<'target>,
+    {
+        U::construct_type_with_env_uncached(target, env)
+    }
 }
 
 use crate::memory::target::TargetType;
@@ -353,12 +366,12 @@ impl<'scope, 'data> TypedValueRef<'scope, 'data, AnyType> {
 /// `ccall`able functions that return a [`TypedValue`].
 pub type TypedValueRet<T> = Ref<'static, 'static, TypedValue<'static, 'static, T>>;
 
-/// `TypedValue` or `TypedValueRef`, depending on the target type `T`.
-pub type TypedValueData<'target, 'data, U, T> =
-    <T as TargetType<'target>>::Data<'data, TypedValue<'target, 'data, U>>;
+/// `TypedValue` or `TypedValueRef`, depending on the target type `Tgt`.
+pub type TypedValueData<'target, 'data, U, Tgt> =
+    <Tgt as TargetType<'target>>::Data<'data, TypedValue<'target, 'data, U>>;
 
 /// `JuliaResult<TypedValue>` or `JuliaResultRef<TypedValueRef>`, depending on the target type
-/// `T`.
+/// `Tgt`.
 pub type TypedValueResult<'target, 'data, U, T> =
     TargetResult<'target, 'data, TypedValue<'target, 'data, U>, T>;
 

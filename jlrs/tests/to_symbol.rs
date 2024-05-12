@@ -1,6 +1,6 @@
 mod util;
 
-#[cfg(feature = "sync-rt")]
+#[cfg(feature = "local-rt")]
 mod tests {
     use jlrs::{data::managed::symbol::Symbol, prelude::*};
 
@@ -12,6 +12,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
                     assert!(Module::base(&frame).function(&mut frame, "+").is_ok());
                     Ok(())
@@ -26,6 +27,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
                     let plus = JuliaString::new(&mut frame, "+");
                     assert!(Module::base(&frame).function(&mut frame, plus).is_ok());
@@ -41,6 +43,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
                     let plus = Symbol::new(&frame, "+");
                     assert!(Module::base(&frame).function(&mut frame, plus).is_ok());

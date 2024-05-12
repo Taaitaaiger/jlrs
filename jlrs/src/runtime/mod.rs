@@ -1,22 +1,16 @@
 //! Embed Julia in a Rust application.
 //!
-//! There are two ways Julia can be embedded in a Rust application using jlrs, either as a sync or
-//! async runtime. The sync runtime initializes Julia on the current thread and you can interact
-//! with it directly, while an async runtime is run on one or more separate threads and uses a
-//! task-based system. More information is available in the [`sync_rt`] and [`async_rt`] modules
-//! respectively.
+//! There are several ways Julia can be embedded in a Rust application using jlrs, see the
+//! [crate-level docs] for more information. To start the Julia runtime runtime, you must
+//! use a [`Builder`]. See the [`builder`] module for more information.
 //!
-//! To create a runtime, you must use a [`RuntimeBuilder`]. See the [`builder`] module for more
-//! information.
-//!
-//! [`RuntimeBuilder`]: crate::runtime::builder::RuntimeBuilder
+//! [`Builder`]: crate::runtime::builder::Builder
 
-use std::sync::atomic::AtomicBool;
-
-#[cfg(feature = "async-rt")]
-pub mod async_rt;
+#[cfg(any(feature = "local-rt", feature = "async-rt", feature = "multi-rt"))]
 pub mod builder;
-#[cfg(feature = "sync-rt")]
+#[cfg(feature = "async")]
+pub mod executor;
+pub mod handle;
+pub mod state;
+#[cfg(feature = "local-rt")]
 pub mod sync_rt;
-
-pub(crate) static INIT: AtomicBool = AtomicBool::new(false);

@@ -18,7 +18,7 @@ use crate::{
     data::{
         layout::valid_layout::{ValidField, ValidLayout},
         managed::{datatype::DataType, private::ManagedPriv, value::Value, Managed},
-        types::{construct_type::ConstructType, typecheck::Typecheck},
+        types::{abstract_type::AbstractType, construct_type::ConstructType, typecheck::Typecheck},
     },
     error::JlrsResult,
     memory::target::{unrooted::Unrooted, Target, TargetResult},
@@ -56,7 +56,7 @@ impl_debug!(Function<'_, '_>);
 
 impl<'scope, 'data> ManagedPriv<'scope, 'data> for Function<'scope, 'data> {
     type Wraps = jl_value_t;
-    type TypeConstructorPriv<'target, 'da> = Function<'target, 'da>;
+    type WithLifetimes<'target, 'da> = Function<'target, 'da>;
     const NAME: &'static str = "Function";
 
     // Safety: `inner` must not have been freed yet, the result must never be
@@ -78,74 +78,74 @@ impl<'scope, 'data> ManagedPriv<'scope, 'data> for Function<'scope, 'data> {
 
 impl<'data> Call<'data> for Function<'_, 'data> {
     #[inline]
-    unsafe fn call0<'target, T>(self, target: T) -> ValueResult<'target, 'data, T>
+    unsafe fn call0<'target, Tgt>(self, target: Tgt) -> ValueResult<'target, 'data, Tgt>
     where
-        T: Target<'target>,
+        Tgt: Target<'target>,
     {
         self.as_value().call0(target)
     }
 
     #[inline]
-    unsafe fn call_unchecked<'target, 'value, V, T, const N: usize>(
+    unsafe fn call_unchecked<'target, 'value, V, Tgt, const N: usize>(
         self,
-        target: T,
+        target: Tgt,
         args: V,
-    ) -> ValueData<'target, 'data, T>
+    ) -> ValueData<'target, 'data, Tgt>
     where
         V: Values<'value, 'data, N>,
-        T: Target<'target>,
+        Tgt: Target<'target>,
     {
         self.as_value().call_unchecked(target, args)
     }
 
     #[inline]
-    unsafe fn call1<'target, T>(
+    unsafe fn call1<'target, Tgt>(
         self,
-        target: T,
+        target: Tgt,
         arg0: Value<'_, 'data>,
-    ) -> ValueResult<'target, 'data, T>
+    ) -> ValueResult<'target, 'data, Tgt>
     where
-        T: Target<'target>,
+        Tgt: Target<'target>,
     {
         self.as_value().call1(target, arg0)
     }
 
     #[inline]
-    unsafe fn call2<'target, T>(
+    unsafe fn call2<'target, Tgt>(
         self,
-        target: T,
+        target: Tgt,
         arg0: Value<'_, 'data>,
         arg1: Value<'_, 'data>,
-    ) -> ValueResult<'target, 'data, T>
+    ) -> ValueResult<'target, 'data, Tgt>
     where
-        T: Target<'target>,
+        Tgt: Target<'target>,
     {
         self.as_value().call2(target, arg0, arg1)
     }
 
     #[inline]
-    unsafe fn call3<'target, T>(
+    unsafe fn call3<'target, Tgt>(
         self,
-        target: T,
+        target: Tgt,
         arg0: Value<'_, 'data>,
         arg1: Value<'_, 'data>,
         arg2: Value<'_, 'data>,
-    ) -> ValueResult<'target, 'data, T>
+    ) -> ValueResult<'target, 'data, Tgt>
     where
-        T: Target<'target>,
+        Tgt: Target<'target>,
     {
         self.as_value().call3(target, arg0, arg1, arg2)
     }
 
     #[inline]
-    unsafe fn call<'target, 'value, V, T, const N: usize>(
+    unsafe fn call<'target, 'value, V, Tgt, const N: usize>(
         self,
-        target: T,
+        target: Tgt,
         args: V,
-    ) -> ValueResult<'target, 'data, T>
+    ) -> ValueResult<'target, 'data, Tgt>
     where
         V: Values<'value, 'data, N>,
-        T: Target<'target>,
+        Tgt: Target<'target>,
     {
         self.as_value().call(target, args)
     }
@@ -196,13 +196,13 @@ unsafe impl ValidField for Option<FunctionRef<'_, '_>> {
 
 use crate::memory::target::TargetType;
 
-/// `Function` or `FunctionRef`, depending on the target type `T`.
-pub type FunctionData<'target, 'data, T> =
-    <T as TargetType<'target>>::Data<'data, Function<'target, 'data>>;
+/// `Function` or `FunctionRef`, depending on the target type `Tgt`.
+pub type FunctionData<'target, 'data, Tgt> =
+    <Tgt as TargetType<'target>>::Data<'data, Function<'target, 'data>>;
 
-/// `JuliaResult<Function>` or `JuliaResultRef<FunctionRef>`, depending on the target type `T`.
-pub type FunctionResult<'target, 'data, T> =
-    TargetResult<'target, 'data, Function<'target, 'data>, T>;
+/// `JuliaResult<Function>` or `JuliaResultRef<FunctionRef>`, depending on the target type `Tgt`.
+pub type FunctionResult<'target, 'data, Tgt> =
+    TargetResult<'target, 'data, Function<'target, 'data>, Tgt>;
 
 unsafe impl<'scope, 'data> CCallArg for Function<'scope, 'data> {
     type CCallArgType = Value<'scope, 'data>;
@@ -236,10 +236,23 @@ unsafe impl ConstructType for Function<'_, '_> {
     }
 
     #[inline]
-    fn base_type<'target, T>(target: &T) -> Option<Value<'target, 'static>>
+    fn base_type<'target, Tgt>(target: &Tgt) -> Option<Value<'target, 'static>>
     where
-        T: Target<'target>,
+        Tgt: Target<'target>,
     {
         Some(DataType::function_type(target).as_value())
     }
+
+    #[inline]
+    fn construct_type_with_env_uncached<'target, Tgt>(
+        target: Tgt,
+        _env: &crate::data::types::construct_type::TypeVarEnv,
+    ) -> ValueData<'target, 'static, Tgt>
+    where
+        Tgt: Target<'target>,
+    {
+        DataType::function_type(&target).as_value().root(target)
+    }
 }
+
+unsafe impl<'scope, 'data> AbstractType for Function<'scope, 'data> {}

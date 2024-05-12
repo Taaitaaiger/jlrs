@@ -9,7 +9,7 @@ use jl_sys::{jl_char_type, jl_unbox_uint32};
 
 use super::is_bits::IsBits;
 use crate::{
-    convert::unbox::Unbox,
+    convert::{ccall_types::CCallReturn, unbox::Unbox},
     data::managed::{private::ManagedPriv, value::Value},
     impl_julia_typecheck, impl_valid_layout,
     private::Private,
@@ -22,19 +22,19 @@ pub struct Char(u32);
 
 impl Char {
     #[inline]
-    pub fn new(val: char) -> Self {
+    pub const fn new(val: char) -> Self {
         Char(val as u32)
     }
 
     /// Returns the value of the `Char` as a `u32`.
     #[inline]
-    pub fn as_u32(self) -> u32 {
+    pub const fn as_u32(self) -> u32 {
         self.0
     }
 
     /// Returns the value of the `Char` as a `char` if it's valid, `None` if it isn't.
     #[inline]
-    pub fn try_as_char(self) -> Option<char> {
+    pub const fn try_as_char(self) -> Option<char> {
         char::from_u32(self.0)
     }
 
@@ -77,6 +77,29 @@ unsafe impl Unbox for char {
 }
 
 impl_ccall_arg!(Char);
+
+unsafe impl CCallReturn for Char {
+    type FunctionReturnType = Self;
+    type CCallReturnType = Self;
+    type ReturnAs = Self;
+
+    #[inline]
+    unsafe fn return_or_throw(self) -> Self::ReturnAs {
+        self
+    }
+}
+
+unsafe impl CCallReturn for char {
+    type FunctionReturnType = Char;
+    type CCallReturnType = Char;
+    type ReturnAs = Char;
+
+    #[inline]
+    unsafe fn return_or_throw(self) -> Self::ReturnAs {
+        Char(self as u32)
+    }
+}
+
 impl_construct_julia_type!(Char, jl_char_type);
 
 unsafe impl IsBits for Char {}

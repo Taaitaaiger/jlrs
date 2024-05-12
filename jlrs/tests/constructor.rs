@@ -1,6 +1,6 @@
 mod util;
 
-#[cfg(feature = "sync-rt")]
+#[cfg(feature = "local-rt")]
 mod tests {
     /*
     struct HasConstructors
@@ -24,6 +24,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
                     unsafe {
                         let ty = Module::main(&frame)
@@ -56,6 +57,7 @@ mod tests {
                 .unwrap();
 
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
                     unsafe {
                         let ty = Module::main(&frame)
@@ -95,6 +97,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
                     unsafe {
                         let ty = Module::main(&frame)
@@ -134,6 +137,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
                     unsafe {
                         let ty = Module::main(&frame)

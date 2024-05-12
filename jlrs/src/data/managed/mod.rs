@@ -20,15 +20,6 @@
 //! [`DataType`]: crate::data::managed::datatype::DataType
 //! [`Array`]: crate::data::managed::array::Array
 
-// NB: inspect layout of builtin types with:
-/*
-function inspect(ty)
-    for (a, b) in zip(fieldnames(ty), fieldtypes(ty))
-        println(a, ": ", b, " (", isconst(ty, a) ? "const" : "mut", ")")
-    end
-end
-*/
-
 macro_rules! impl_construct_type_managed {
     ($ty:ident, 1, $jl_ty:expr) => {
         unsafe impl crate::data::types::construct_type::ConstructType for $ty<'_> {
@@ -49,6 +40,20 @@ macro_rules! impl_construct_type_managed {
                         $crate::private::Private,
                     )
                 }
+            }
+
+            fn construct_type_with_env_uncached<'target, Tgt>(
+                target: Tgt,
+                _env: &$crate::data::types::construct_type::TypeVarEnv,
+            ) -> $crate::data::managed::value::ValueData<'target, 'static, Tgt>
+            where
+                Tgt: $crate::memory::target::Target<'target> {
+                    unsafe {
+                        target.data_from_ptr(
+                            NonNull::new_unchecked($jl_ty.cast::<::jl_sys::jl_value_t>()),
+                            $crate::private::Private,
+                        )
+                    }
             }
 
             #[inline]
@@ -85,6 +90,20 @@ macro_rules! impl_construct_type_managed {
                         $crate::private::Private,
                     )
                 }
+            }
+
+            fn construct_type_with_env_uncached<'target, Tgt>(
+                target: Tgt,
+                _env: &$crate::data::types::construct_type::TypeVarEnv,
+            ) -> $crate::data::managed::value::ValueData<'target, 'static, Tgt>
+            where
+                Tgt: $crate::memory::target::Target<'target> {
+                    unsafe {
+                        target.data_from_ptr(
+                            NonNull::new_unchecked($jl_ty.cast::<::jl_sys::jl_value_t>()),
+                            $crate::private::Private,
+                        )
+                    }
             }
 
             #[inline]
@@ -267,18 +286,18 @@ macro_rules! impl_debug {
 }
 
 pub mod array;
+pub mod background_task;
 pub mod ccall_ref;
 pub mod datatype;
+#[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8")))]
+pub mod delegated_task;
+pub mod expr;
 pub mod function;
-#[cfg(feature = "internal-types")]
-pub mod internal;
 pub mod module;
 pub mod parachute;
-pub mod rust_result;
 pub mod simple_vector;
 pub mod string;
 pub mod symbol;
-pub mod task;
 pub mod type_name;
 pub mod type_var;
 pub mod union;
@@ -289,20 +308,22 @@ use std::{
     ffi::c_void,
     fmt::{Debug, Formatter, Result as FmtResult},
     marker::PhantomData,
-    ptr::NonNull,
+    ptr::{null_mut, NonNull},
+    sync::atomic::{AtomicPtr, Ordering},
 };
 
-use jl_sys::jl_stderr_obj;
+use jl_sys::{jl_stderr_obj, jlrs_gc_wb};
 
-use self::module::JlrsCore;
+use self::{module::JlrsCore, private::ManagedPriv};
 use crate::{
     call::Call,
     data::{
         layout::valid_layout::{ValidField, ValidLayout},
-        managed::{module::Module, private::ManagedPriv as _, string::JuliaString, value::Value},
+        managed::{module::Module, string::JuliaString, value::Value},
     },
     error::{JlrsError, JlrsResult, CANNOT_DISPLAY_VALUE},
     memory::target::{unrooted::Unrooted, Target},
+    prelude::TargetType,
     private::Private,
 };
 
@@ -316,7 +337,7 @@ pub trait ManagedRef<'scope, 'data>:
 
 impl<'scope, 'data, T> ManagedRef<'scope, 'data> for Ref<'scope, 'data, T>
 where
-    T: Managed<'scope, 'data>,
+    T: ManagedPriv<'scope, 'data>,
     Self: Copy + ValidLayout,
     Option<Self>: ValidField,
 {
@@ -325,28 +346,30 @@ where
 
 /// Trait implemented by all managed types.
 pub trait Managed<'scope, 'data>: private::ManagedPriv<'scope, 'data> {
-    /// `Self`, but with arbitrary lifetimes. Used to construct the appropriate type in generic
-    /// contexts.
-    type TypeConstructor<'target, 'da>: Managed<'target, 'da>;
+    /// `Self`, but with an arbitrary `'target` lifetime instead of `'scope`.
+    type InScope<'target>: Managed<'target, 'data>;
 
-    /// Convert the data to a `Ref`.
+    /// `Self`, but with an arbitrary `'da` lifetime instead of `'data`.
+    type WithData<'da>: Managed<'scope, 'da>;
+
+    /// Convert `self` to a `Ref`.
     #[inline]
     fn as_ref(self) -> Ref<'scope, 'data, Self> {
         Ref::wrap(self.unwrap_non_null(Private))
     }
 
-    /// Convert the data to a `Value`.
+    /// Convert `self` to a `Value`.
     #[inline]
     fn as_value(self) -> Value<'scope, 'data> {
         // Safety: Managed types can always be converted to a Value
         unsafe { Value::wrap_non_null(self.unwrap_non_null(Private).cast(), Private) }
     }
 
-    /// Use the target to reroot this data.
+    /// Use the target to reroot `self`.
     #[inline]
-    fn root<'target, T>(self, target: T) -> T::Data<'data, Self::TypeConstructor<'target, 'data>>
+    fn root<'target, Tgt>(self, target: Tgt) -> Tgt::Data<'data, Self::InScope<'target>>
     where
-        T: Target<'target>,
+        Tgt: Target<'target>,
     {
         unsafe { target.data_from_ptr(self.unwrap_non_null(Private).cast(), Private) }
     }
@@ -357,7 +380,7 @@ pub trait Managed<'scope, 'data>: private::ManagedPriv<'scope, 'data> {
         unsafe { Unrooted::new() }
     }
 
-    /// Convert the data to its display string, i.e. the string that is shown when calling
+    /// Convert `self` to its display string, i.e. the string that is shown when calling
     /// `Base.show`.
     fn display_string(self) -> JlrsResult<String> {
         // Safety: all Julia data that is accessed is globally rooted, the result is converted
@@ -378,12 +401,12 @@ pub trait Managed<'scope, 'data>: private::ManagedPriv<'scope, 'data> {
         Ok(s)
     }
 
-    /// Convert the data to its error string, i.e. the string that is shown when calling
+    /// Convert `self` to its error string, i.e. the string that is shown when calling
     /// `Base.showerror`. This string can contain ANSI color codes if this is enabled by calling
-    /// [`Julia::error_color`] or [`AsyncJulia::error_color`].
+    /// [`Julia::error_color`] or [`AsyncHandle::error_color`].
     ///
     /// [`Julia::error_color`]: crate::runtime::sync_rt::Julia::error_color
-    /// [`AsyncJulia::error_color`]: crate::runtime::async_rt::AsyncJulia::error_color
+    /// [`AsyncHandle::error_color`]: crate::runtime::handle::async_handle::AsyncHandle::error_color
     fn error_string(self) -> JlrsResult<String> {
         // Safety: all Julia data that is accessed is globally rooted, the result is converted
         // to a String before the GC can free it.
@@ -414,44 +437,39 @@ pub trait Managed<'scope, 'data>: private::ManagedPriv<'scope, 'data> {
         showerror.call2(unrooted, stderr, self.as_value()).ok();
     }
 
-    /// Convert the data to its display string, i.e. the string that is shown by calling
+    /// Convert `self` to its display string, i.e. the string that is shown by calling
     /// `Base.display`, or some default value.
     fn display_string_or<S: Into<String>>(self, default: S) -> String {
         self.display_string().unwrap_or(default.into())
     }
 
-    /// Convert the data to its error string, i.e. the string that is shown when this value is
+    /// Convert `self` to its error string, i.e. the string that is shown when this value is
     /// thrown as an exception, or some default value.
     fn error_string_or<S: Into<String>>(self, default: S) -> String {
         self.error_string().unwrap_or(default.into())
     }
 
-    /// Extends the `'scope` lifetime to `'static`, which allows this managed data to be leaked
-    /// from a scope.
+    /// Extends the `'scope` lifetime to `'static` and converts it to a `Ref`, which allows this
+    /// managed data to be leaked from a scope.
     ///
-    /// This method only extends the `'scope` lifetime, the `'data` lifetime must already be
-    /// `'static`. This method should only be used to return Julia data from a `ccall`ed function,
-    /// and in combination with the `ForeignType` trait to store references to Julia data in types
-    /// that that implement that trait.
+    /// This method only extends the `'scope` lifetime. This method should only be used to return
+    /// managed data from a `ccall`ed function, and in combination with the `ForeignType` trait to
+    /// store references to managed data in types that that implement that trait.
     #[inline]
-    fn leak(self) -> Ref<'static, 'data, Self::TypeConstructor<'static, 'data>> {
+    fn leak(self) -> Ref<'static, 'data, Self::InScope<'static>> {
         self.as_ref().leak()
     }
 }
-
-/// The managed type `W<'target, 'data>` assocatiated with the reference type `T<'scope, 'data>`.
-pub type ManagedType<'target, 'scope, 'data, T> =
-    <<T as ManagedRef<'scope, 'data>>::Managed as Managed<'scope, 'data>>::TypeConstructor<
-        'target,
-        'data,
-    >;
 
 impl<'scope, 'data, W> Managed<'scope, 'data> for W
 where
     W: private::ManagedPriv<'scope, 'data>,
 {
-    type TypeConstructor<'target, 'da> = Self::TypeConstructorPriv<'target, 'da>;
+    type InScope<'target> = Self::WithLifetimes<'target, 'data>;
+    type WithData<'da> = Self::WithLifetimes<'scope, 'da>;
 }
+
+pub type ManagedData<'target, 'data, Tgt, T> = <Tgt as TargetType<'target>>::Data<'data, T>;
 
 /// A reference to Julia data that is not guaranteed to be rooted.
 ///
@@ -461,7 +479,7 @@ where
 /// safe to use. Whenever data is not rooted jlrs returns a `Ref`. Because it's not rooted it's
 /// unsafe to use.
 #[repr(transparent)]
-pub struct Ref<'scope, 'data, T: Managed<'scope, 'data>>(
+pub struct Ref<'scope, 'data, T: ManagedPriv<'scope, 'data>>(
     NonNull<T::Wraps>,
     PhantomData<&'scope ()>,
     PhantomData<&'data ()>,
@@ -469,7 +487,7 @@ pub struct Ref<'scope, 'data, T: Managed<'scope, 'data>>(
 
 impl<'scope, 'data, T> Clone for Ref<'scope, 'data, T>
 where
-    T: Managed<'scope, 'data>,
+    T: ManagedPriv<'scope, 'data>,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -477,7 +495,7 @@ where
     }
 }
 
-impl<'scope, 'data, T> Copy for Ref<'scope, 'data, T> where T: Managed<'scope, 'data> {}
+impl<'scope, 'data, T> Copy for Ref<'scope, 'data, T> where T: ManagedPriv<'scope, 'data> {}
 
 impl<'scope, 'data, T: Managed<'scope, 'data>> Debug for Ref<'scope, 'data, T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
@@ -486,16 +504,13 @@ impl<'scope, 'data, T: Managed<'scope, 'data>> Debug for Ref<'scope, 'data, T> {
 }
 
 impl<'scope, 'data, W: Managed<'scope, 'data>> Ref<'scope, 'data, W> {
-    /// Use `target` to root this data.
+    /// Use `target` to root `self`.
     ///
     /// Safety: The data pointed to by `self` must not have been freed by the GC yet.
     #[inline]
-    pub unsafe fn root<'target, T>(
-        self,
-        target: T,
-    ) -> T::Data<'data, W::TypeConstructor<'target, 'data>>
+    pub unsafe fn root<'target, Tgt>(self, target: Tgt) -> Tgt::Data<'data, W::InScope<'target>>
     where
-        T: Target<'target>,
+        Tgt: Target<'target>,
     {
         target.data_from_ptr(self.ptr().cast(), Private)
     }
@@ -505,7 +520,7 @@ impl<'scope, 'data, W: Managed<'scope, 'data>> Ref<'scope, 'data, W> {
         Ref(ptr, PhantomData, PhantomData)
     }
 
-    /// Assume the reference still points to valid Julia data and convert it to its managed type.
+    /// Assume the reference still points to valid managed data and convert it to its managed type.
     ///
     /// Safety: a reference is only guaranteed to be valid as long as it's reachable from some
     /// GC root. If the reference is unreachable, the GC can free it. The GC can run whenever a
@@ -515,7 +530,7 @@ impl<'scope, 'data, W: Managed<'scope, 'data>> Ref<'scope, 'data, W> {
         W::wrap_non_null(self.ptr(), Private)
     }
 
-    /// Assume the reference still points to valid Julia data and convert it to a `Value`.
+    /// Assume the reference still points to valid managed data and convert it to a `Value`.
     ///
     /// Safety: a reference is only guaranteed to be valid as long as it's reachable from some
     /// GC root. If the reference is unreachable, the GC can free it. The GC can run whenever a
@@ -530,7 +545,7 @@ impl<'scope, 'data, W: Managed<'scope, 'data>> Ref<'scope, 'data, W> {
     /// Safety: this method should only be used when no data borrowed from Rust is referenced by
     /// this Julia data.
     #[inline]
-    pub unsafe fn assume_owned(self) -> Ref<'scope, 'static, W::TypeConstructor<'scope, 'static>> {
+    pub unsafe fn assume_owned(self) -> Ref<'scope, 'static, W::WithData<'static>> {
         Ref::wrap(self.ptr().cast())
     }
 
@@ -540,11 +555,11 @@ impl<'scope, 'data, W: Managed<'scope, 'data>> Ref<'scope, 'data, W> {
     /// Safety: this method should only be called to return Julia data from a `ccall`ed function
     /// or when storing Julia data in a foreign type.
     #[inline]
-    pub fn leak(self) -> Ref<'static, 'data, W::TypeConstructor<'static, 'data>> {
+    pub fn leak(self) -> Ref<'static, 'data, W::InScope<'static>> {
         Ref::wrap(self.ptr().cast())
     }
 
-    /// Returns a pointer to the data,
+    /// Returns a pointer to the data.
     #[inline]
     pub fn data_ptr(self) -> NonNull<c_void> {
         self.ptr().cast()
@@ -556,24 +571,116 @@ impl<'scope, 'data, W: Managed<'scope, 'data>> Ref<'scope, 'data, W> {
     }
 }
 
-#[inline]
-pub fn leak<'scope, 'data, M: Managed<'scope, 'data>>(
-    data: M,
-) -> Ref<'static, 'data, M::TypeConstructor<'static, 'data>> {
-    data.as_ref().leak()
+/// Atomic pointer field.
+#[repr(transparent)]
+pub struct Atomic<'scope, 'data, T: Managed<'scope, 'data>> {
+    ptr: AtomicPtr<T::Wraps>,
+    _marker: PhantomData<T>,
 }
 
-#[inline]
-pub unsafe fn assume_rooted<'scope, M: Managed<'scope, 'static>>(
-    data: Ref<'scope, 'static, M>,
-) -> M {
-    data.as_managed()
+impl<'scope, 'data, T: Managed<'scope, 'data>> Atomic<'scope, 'data, T> {
+    #[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8")))]
+    pub(crate) fn new() -> Self {
+        Atomic {
+            ptr: AtomicPtr::new(null_mut()),
+            _marker: PhantomData,
+        }
+    }
+
+    /// Load the value with ordering `order`.
+    pub fn load<'target, Tgt: Target<'target>>(
+        &self,
+        target: Tgt,
+        order: Ordering,
+    ) -> Option<ManagedData<'target, 'data, Tgt, T::InScope<'target>>> {
+        let ptr = self.ptr.load(order);
+        let nn = NonNull::new(ptr)?;
+        unsafe { Some(T::wrap_non_null(nn, Private).root(target)) }
+    }
+
+    /// Load the underlying pointer with ordering `order`.
+    pub fn load_ptr(&self, order: Ordering) -> *mut c_void {
+        self.ptr.load(order).cast()
+    }
+
+    /// Load the value with relaxed ordering.
+    pub fn load_relaxed<'target, Tgt: Target<'target>>(
+        &self,
+        target: Tgt,
+    ) -> Option<ManagedData<'target, 'data, Tgt, T::InScope<'target>>> {
+        self.load(target, Ordering::Relaxed)
+    }
+
+    pub(crate) unsafe fn store(&self, data: Option<T::InScope<'_>>, order: Ordering) {
+        if let Some(data) = data {
+            self.ptr.store(data.unwrap(Private).cast(), order);
+        } else {
+            self.ptr.store(null_mut(), order)
+        }
+    }
 }
 
+/// A slice of atomic pointer fields.
+pub struct AtomicSlice<'borrow, 'data, T: Managed<'borrow, 'data>, P: Managed<'borrow, 'data>> {
+    parent: P,
+    slice: &'borrow [Atomic<'borrow, 'data, T>],
+}
+
+impl<'borrow, 'data, T: Managed<'borrow, 'data>, P: Managed<'borrow, 'data>>
+    AtomicSlice<'borrow, 'data, T, P>
+{
+    fn new(parent: P, slice: &'borrow [Atomic<'borrow, 'data, T>]) -> Self {
+        AtomicSlice { parent, slice }
+    }
+
+    /// Returns the underlying slice.
+    pub fn into_slice(self) -> &'borrow [Atomic<'borrow, 'data, T>] {
+        self.slice
+    }
+
+    /// Returns the underlying slice, assuming the data is immutable and non-null.
+    ///
+    /// Safety: you must guarantee the content of this slice is never changed and contains no
+    /// undefined references.
+    pub unsafe fn assume_immutable_non_null(self) -> &'borrow [T] {
+        std::mem::transmute(self.slice)
+    }
+
+    /// Returns the underlying slice, assuming the data is immutable but possibly null.
+    ///
+    /// Safety: you must guarantee the content of this slice is never changed
+    pub unsafe fn assume_immutable(self) -> &'borrow [Option<T>] {
+        std::mem::transmute(self.slice)
+    }
+
+    /// Atomically sets the element at position `index` to `data` with ordering `order`.
+    ///
+    /// Safety: Mutating Julia data is generally unsafe. You must guarantee that you're allowed to
+    /// mutate this data.
+    pub unsafe fn store(&self, index: usize, data: Option<T::InScope<'_>>, order: Ordering) {
+        self.slice[index].store(data, order);
+        jlrs_gc_wb(
+            self.parent.unwrap(Private).cast(),
+            data.map(|x| x.unwrap(Private)).unwrap_or(null_mut()).cast(),
+        )
+    }
+
+    /// Atomically sets the element at position `index` to `data` with relaxed ordering.
+    ///
+    /// Safety: Mutating Julia data is generally unsafe. You must guarantee that you're allowed to
+    /// mutate this data.
+    pub unsafe fn store_relaxed(&self, index: usize, data: Option<T::InScope<'_>>) {
+        self.store(index, data, Ordering::Relaxed)
+    }
+}
+
+/// Erase the scope lifetime of managed data by replacing it with `'static`.
+///
+/// Safety: the returned data must never be used after it has become unrooted.
 #[inline]
 pub unsafe fn erase_scope_lifetime<'scope, 'data, M: Managed<'scope, 'data>>(
     data: M,
-) -> M::TypeConstructor<'static, 'data> {
+) -> M::InScope<'static> {
     data.leak().as_managed()
 }
 
@@ -587,7 +694,7 @@ pub(crate) mod private {
 
     pub trait ManagedPriv<'scope, 'data>: Copy + Debug {
         type Wraps;
-        type TypeConstructorPriv<'target, 'da>: ManagedPriv<'target, 'da>;
+        type WithLifetimes<'target, 'da>: ManagedPriv<'target, 'da>;
         const NAME: &'static str;
 
         // Safety: `inner` must point to valid data. If it is not

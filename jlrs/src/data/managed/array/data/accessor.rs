@@ -1,701 +1,1564 @@
-//! Access and modify the contents of Julia arrays.
-
+/// Access the data in an `Array`.
+///
+/// This module provides several traits and types that allow accessing the data in an array.
+/// Unlike other parts of jlrs, methods that mutate the array are safe: guaranteeing that it's
+/// safe to access and/or mutate an array is considered part of the safety-contract of the methods
+/// that create a mutable accessor.
+///
+/// While the [`ArrayBase`] type only cares about the element type, accessors care about the
+/// layout of that type.
+///
+/// All accessors implement the [`Accessor`] trait, all mutable accessors implement
+/// [`AccessorMut`], and all mutable accessors of rank 1 implement [`AccessorMut1D`]. These traits
+/// let you access and mutate the content of the array as `Value`s. Only [`AccessorMut1D`] allows
+/// growing or shrinking the `Array`.
+///
+/// See the documentation of the [`array`] module for more information about the layout of an
+/// array and choosing the right accessor.
 use std::{
     marker::PhantomData,
-    ops::{Index, IndexMut},
-    ptr::{null_mut, NonNull},
-    slice,
+    mem::MaybeUninit,
+    ops::{Deref, Index, IndexMut},
+    ptr::NonNull,
+    sync::atomic::{AtomicPtr, Ordering},
 };
 
-use jl_sys::{jl_array_ptr_set, jl_array_typetagdata, jl_arrayref, jl_arrayset};
+#[julia_version(until = "1.10")]
+use jl_sys::{jl_apply_array_type, jl_reshape_array};
+use jl_sys::{
+    jl_array_del_end, jl_array_grow_end, jl_value_t, jlrs_array_data, jlrs_array_typetagdata,
+    jlrs_arrayref, jlrs_arrayset,
+};
+use jlrs_macros::julia_version;
 
+use super::copied::CopiedArray;
+#[julia_version(until = "1.10")]
+use crate::data::managed::array::{
+    dimensions::{ArrayDimensions, CompatibleIndices, RankedDims},
+    sized_dim_tuple, ArrayBaseData, ArrayBaseResult,
+};
 use crate::{
-    catch::catch_exceptions,
+    catch::{catch_exceptions, unwrap_exc},
     data::{
-        layout::valid_layout::ValidField,
+        layout::{
+            is_bits::IsBits,
+            typed_layout::{HasLayout, TypedLayout},
+            valid_layout::ValidField,
+        },
         managed::{
             array::{
-                dimensions::{ArrayDimensions, Dims},
-                Array,
+                dimensions::{Dims, DimsRankAssert, DimsRankCheck},
+                ArrayBase,
             },
-            datatype::DataType,
             private::ManagedPriv,
             union::{find_union_component, nth_union_component},
-            value::{Value, ValueData, ValueResult},
-            Managed, ManagedRef, ManagedType,
+            Ref,
         },
+        types::construct_type::ConstructType,
     },
-    error::{AccessError, JlrsResult, TypeError, CANNOT_DISPLAY_TYPE},
-    memory::target::{Target, TargetException},
+    error::{AccessError, JlrsError, TypeError, CANNOT_DISPLAY_TYPE},
+    memory::target::{unrooted::Unrooted, TargetException},
+    prelude::{DataType, JlrsResult, Managed, Target, Value, ValueData, ValueRef, ValueResult},
     private::Private,
 };
 
-/// Trait used to indicate how the elements are laid out.
-pub trait ArrayLayout: Sized {}
+/// Functionality supported by all accessors.
+pub trait Accessor<'scope, 'data, T, const N: isize> {
+    /// Returns the backing array.
+    fn array(&self) -> &ArrayBase<'scope, 'data, T, N>;
 
-/// Indeterminate layout.
-pub enum UnknownLayout {}
-impl ArrayLayout for UnknownLayout {}
-
-/// Layout for inline elements with no pointer fields.
-pub enum BitsLayout {}
-impl ArrayLayout for BitsLayout {}
-
-/// Layout for elements that are bits unions.
-pub enum UnionLayout {}
-impl ArrayLayout for UnionLayout {}
-
-/// Layout for elements that are pointers.
-pub enum PtrLayout {}
-impl ArrayLayout for PtrLayout {}
-
-/// Layout for inline elements that have pointer fields.
-pub enum InlinePtrLayout {}
-impl ArrayLayout for InlinePtrLayout {}
-
-/// Trait used to indicate if the array is accessed mutably or immutably.
-pub trait Mutability: Sized {}
-
-/// Immutable array access.
-pub struct Immutable<'borrow, T> {
-    _marker: PhantomData<&'borrow [T]>,
-}
-impl<'borrow, T> Mutability for Immutable<'borrow, T> {}
-
-/// Mutable array access.
-pub struct Mutable<'borrow, T> {
-    _marker: PhantomData<&'borrow mut [T]>,
-}
-impl<'borrow, T> Mutability for Mutable<'borrow, T> {}
-
-/// An accessor for Julia arrays.
-///
-/// What methods are available depends on the layout of the data and whether the data is accessed
-/// mutably or immutably. The elements can always be accessed as Julia data with
-/// [`ArrayAccessor::get_value`], and if the accessor is mutable its contents can be changed with
-/// [`ArrayAccessor::get_value`].
-///
-/// There are four possible layouts:
-///
-///  - [`BitsLayout`]
-///   The element type `T` is an `isbits` type, the array is stored as an array of `T`s. Because
-///   these types store no pointers the `IndexMut` trait is implemented for mutable accessor for
-///   this layout.
-///
-///  - [`InlinePtrLayout`]
-///   The element type `T` is an inline type, the array is stored as an array of `T`s. Because
-///   these types might store pointers the `IndexMut` trait is not implemented, but `Index` is.
-///   You can update its contents with [`ArrayAccessor::set_value`].
-///
-///  - [`UnionLayout`]
-///   The element type is a union of `isbits` types, the data and flags of these elements are
-///   stored separately in different parts of the array. Due to how the data is stored the `Index`
-///   trait is not implemented. You can use [`UnionArrayAccessor::get`] and
-///   [`UnionArrayAccessor::set`] instead.
-///
-///  - [`PtrLayout`]
-///   The element type is a mutable type or is not concrete, the elements are stored as pointers
-///   to Julia data (i.e. as [`ValueRef`]s). The `IndexMut` trait is not implemented, but `Index`
-///   is. You can mutate its contents with [`ArrayAccessor::set_value`].
-///
-/// In addition to these four layouts, there's also [`UnknownLayout`] which doesn't impose any
-/// requirements on the layout, but as a result it can only access its contents with
-/// [`ArrayAccessor::get_value`] and mutate them with [`ArrayAccessor::set_value`].
-///
-/// [`ValueRef`]: crate::data::managed::value::ValueRef
-#[repr(transparent)]
-pub struct ArrayAccessor<'borrow, 'array, 'data, T, L: ArrayLayout, M: Mutability> {
-    pub(crate) array: Array<'array, 'data>,
-    _lt_marker: PhantomData<&'borrow ()>,
-    _ty_marker: PhantomData<*mut T>,
-    _layout_marker: PhantomData<L>,
-    _mut_marker: PhantomData<M>,
-}
-
-/// A type alias for an ArrayAcccessor for the `BitsLayout`.
-pub type BitsArrayAccessor<'borrow, 'array, 'data, T, M> =
-    ArrayAccessor<'borrow, 'array, 'data, T, BitsLayout, M>;
-
-/// A type alias for an ArrayAcccessor for the `BitsLayout`.
-pub type BitsArrayAccessorI<'borrow, 'array, 'data, T> =
-    ArrayAccessor<'borrow, 'array, 'data, T, BitsLayout, Immutable<'borrow, T>>;
-
-/// A type alias for an ArrayAcccessor for the `BitsLayout`.
-pub type BitsArrayAccessorMut<'borrow, 'array, 'data, T> =
-    ArrayAccessor<'borrow, 'array, 'data, T, BitsLayout, Mutable<'borrow, T>>;
-
-/// A type alias for an ArrayAcccessor for the `InlinePtrLayout`.
-pub type InlinePtrArrayAccessor<'borrow, 'array, 'data, T, M> =
-    ArrayAccessor<'borrow, 'array, 'data, T, InlinePtrLayout, M>;
-
-/// A type alias for an ArrayAcccessor for the `InlinePtrLayout`.
-pub type InlinePtrArrayAccessorI<'borrow, 'array, 'data, T> =
-    ArrayAccessor<'borrow, 'array, 'data, T, InlinePtrLayout, Immutable<'borrow, T>>;
-
-/// A type alias for an ArrayAcccessor for the `InlinePtrLayout`.
-pub type InlinePtrArrayAccessorMut<'borrow, 'array, 'data, T> =
-    ArrayAccessor<'borrow, 'array, 'data, T, InlinePtrLayout, Mutable<'borrow, T>>;
-
-/// A type alias for an ArrayAcccessor for the `UnionLayout`.
-pub type UnionArrayAccessor<'borrow, 'array, 'data, M> =
-    ArrayAccessor<'borrow, 'array, 'data, u8, UnionLayout, M>;
-
-/// A type alias for an ArrayAcccessor for the `UnionLayout`.
-pub type UnionArrayAccessorI<'borrow, 'array, 'data> =
-    ArrayAccessor<'borrow, 'array, 'data, u8, UnionLayout, Immutable<'borrow, u8>>;
-
-/// A type alias for an ArrayAcccessor for the `UnionLayout`.
-pub type UnionArrayAccessorMut<'borrow, 'array, 'data> =
-    ArrayAccessor<'borrow, 'array, 'data, u8, UnionLayout, Mutable<'borrow, u8>>;
-
-/// A type alias for an ArrayAcccessor for the `PtrLayout`.
-pub type PtrArrayAccessor<'borrow, 'array, 'data, T, M> =
-    ArrayAccessor<'borrow, 'array, 'data, T, PtrLayout, M>;
-
-/// A type alias for an ArrayAcccessor for the `PtrLayout`.
-pub type PtrArrayAccessorI<'borrow, 'array, 'data, T> =
-    ArrayAccessor<'borrow, 'array, 'data, T, PtrLayout, Immutable<'borrow, T>>;
-
-/// A type alias for an ArrayAcccessor for the `PtrLayout`.
-pub type PtrArrayAccessorMut<'borrow, 'array, 'data, T> =
-    ArrayAccessor<'borrow, 'array, 'data, T, PtrLayout, Mutable<'borrow, T>>;
-
-/// A type alias for an ArrayAcccessor for the `UnknownLayout`.
-pub type IndeterminateArrayAccessor<'borrow, 'array, 'data, M> =
-    ArrayAccessor<'borrow, 'array, 'data, u8, UnknownLayout, M>;
-
-/// A type alias for an ArrayAcccessor for the `UnknownLayout`.
-pub type IndeterminateArrayAccessorI<'borrow, 'array, 'data> =
-    ArrayAccessor<'borrow, 'array, 'data, u8, UnknownLayout, Immutable<'borrow, u8>>;
-
-/// A type alias for an ArrayAcccessor for the `UnknownLayout`.
-pub type IndeterminateArrayAccessorMut<'borrow, 'array, 'data> =
-    ArrayAccessor<'borrow, 'array, 'data, u8, UnknownLayout, Mutable<'borrow, u8>>;
-
-impl<'borrow, 'array, 'data, T, L: ArrayLayout> Clone
-    for ArrayAccessor<'borrow, 'array, 'data, T, L, Immutable<'borrow, T>>
-{
-    #[inline]
-    fn clone(&self) -> Self {
-        ArrayAccessor {
-            array: self.array,
-            _lt_marker: PhantomData,
-            _ty_marker: PhantomData,
-            _layout_marker: PhantomData,
-            _mut_marker: PhantomData,
-        }
-    }
-}
-
-impl<'borrow, 'array, 'data, U, L: ArrayLayout, M: Mutability>
-    ArrayAccessor<'borrow, 'array, 'data, U, L, M>
-{
-    #[inline]
-    pub(crate) unsafe fn new(array: &'borrow Array<'array, 'data>) -> Self {
-        ArrayAccessor {
-            array: *array,
-            _lt_marker: PhantomData,
-            _ty_marker: PhantomData,
-            _layout_marker: PhantomData,
-            _mut_marker: PhantomData,
-        }
-    }
-
-    /// Access the element at `index` and convert it to a `Value` rooted in `scope`.
+    /// Converts the element at `index` to a `Value` and returns it.
     ///
-    /// If an error is thrown by Julia it's caught and returned.
-
-    pub fn get_value<'frame, D, T>(
-        &mut self,
-        target: T,
-        index: D,
-    ) -> JlrsResult<Option<ValueResult<'frame, 'data, T>>>
-    where
-        D: Dims,
-        T: Target<'frame>,
-    {
-        let idx = self.dimensions().index_of(&index)?;
-
-        // Safety: exceptions are caught, the result is immediately rooted
-        unsafe {
-            let callback = || jl_arrayref(self.array.unwrap(Private), idx);
-            let exc = |err: Value| err.unwrap_non_null(Private);
-
-            let res = match catch_exceptions(callback, exc) {
-                Ok(ptr) => {
-                    if ptr.is_null() {
-                        return Ok(None);
-                    } else {
-                        Ok(NonNull::new_unchecked(ptr))
-                    }
-                }
-                Err(e) => Err(e),
-            };
-
-            Ok(Some(target.result_from_ptr(res, Private)))
-        }
-    }
-
-    /// Access the element at `index` and convert it to a `Value` rooted in `scope`.
-    ///
-    /// Safety: If an error is thrown by Julia it's not caught.
-    #[inline]
-    pub unsafe fn get_value_unchecked<'frame, D, T>(
-        &mut self,
-        target: T,
-        index: D,
-    ) -> JlrsResult<Option<ValueData<'frame, 'data, T>>>
-    where
-        D: Dims,
-        T: Target<'frame>,
-    {
-        let idx = self.dimensions().index_of(&index)?;
-        let res = jl_arrayref(self.array.unwrap(Private), idx);
-        if res.is_null() {
-            return Ok(None);
-        }
-
-        Ok(Some(
-            target.data_from_ptr(NonNull::new_unchecked(res), Private),
-        ))
-    }
-
-    /// Returns the array's dimensions.
-    pub fn dimensions(&self) -> ArrayDimensions<'array> {
-        ArrayDimensions::new(self.array)
-    }
-}
-
-impl<'borrow, 'array, 'data, U, L: ArrayLayout>
-    ArrayAccessor<'borrow, 'array, 'data, U, L, Mutable<'borrow, U>>
-{
-    /// Set the element at `index` to `value`.
-    ///
-    /// If an error is thrown by Julia it's caught and returned.
-    pub fn set_value<'target, D, T>(
-        &mut self,
-        target: T,
-        index: D,
-        value: Option<Value<'_, 'data>>,
-    ) -> JlrsResult<TargetException<'target, 'data, (), T>>
-    where
-        D: Dims,
-        T: Target<'target>,
-    {
-        let idx = self.dimensions().index_of(&index)?;
-        let ptr = value.map(|v| v.unwrap(Private)).unwrap_or(null_mut());
-
-        // Safety: exceptions are caught, if one is thrown it's immediately rooted
-        unsafe {
-            let callback = || jl_arrayset(self.array.unwrap(Private), ptr, idx);
-
-            let exc = |err: Value| err.unwrap_non_null(Private);
-
-            let res = match catch_exceptions(callback, exc) {
-                Ok(()) => Ok(()),
-                Err(e) => Err(e),
-            };
-
-            Ok(target.exception_from_ptr(res, Private))
-        }
-    }
-
-    /// Set the element at `index` to `value`.
-    ///
-    /// Safety: If an error is thrown by Julia it's not caught.
-    #[inline]
-    pub unsafe fn set_value_unchecked<D: Dims>(
-        &mut self,
-        index: D,
-        value: Option<Value<'_, 'data>>,
-    ) -> JlrsResult<()> {
-        let idx = self.dimensions().index_of(&index)?;
-        let ptr = value.map(|v| v.unwrap(Private)).unwrap_or(null_mut());
-        jl_arrayset(self.array.unwrap(Private), ptr, idx);
-        Ok(())
-    }
-}
-
-impl<'borrow, 'array, 'data, W: ManagedRef<'array, 'data>, M: Mutability>
-    PtrArrayAccessor<'borrow, 'array, 'data, W, M>
-{
-    /// Get a reference to the value at `index`, or `None` if the index is out of bounds.
-    #[inline]
-    pub fn get<'target, D, T>(
+    /// If `index` is not in-bounds, `None` is returned.
+    fn get_value<'target, D: Dims, Tgt: Target<'target>>(
         &self,
-        target: T,
+        target: Tgt,
         index: D,
-    ) -> Option<T::Data<'data, ManagedType<'target, 'array, 'data, W>>>
-    where
-        D: Dims,
-        T: Target<'target>,
-    {
-        let idx = self.dimensions().index_of(&index).ok()?;
-        // The index is in-bounds, the type has been checked in advance
-        unsafe {
-            let x = self
-                .array
-                .data_ptr()
-                .cast::<W::Managed>()
-                .add(idx)
-                .as_ref()
-                .cloned()?;
+    ) -> Option<ValueResult<'target, 'data, Tgt>> {
+        let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
+        let idx = self.array().dimensions().index_of(&index)?;
 
-            Some(target.data_from_ptr(x.unwrap_non_null(Private).cast(), Private))
+        unsafe {
+            let callback = || jlrs_arrayref(self.array().unwrap(Private), idx);
+
+            let res = match catch_exceptions(callback, unwrap_exc) {
+                Ok(v) => Ok(NonNull::new_unchecked(v)),
+                Err(e) => Err(e),
+            };
+
+            Some(target.result_from_ptr(res, Private))
         }
     }
 
-    /// Returns the array's data as a slice, the data is in column-major order.
+    /// Converts the element at `index` to a `Value` and returns it.
+    ///
+    /// Safety: `index` must be in-bounds.
     #[inline]
-    pub fn as_slice(&self) -> &[Option<W>] {
-        let n_elems = self.dimensions().size();
-        let arr_data = self.array.data_ptr().cast::<Option<W>>();
-        // Safety: the layout is compatible and the lifetime is limited.
-        unsafe { slice::from_raw_parts(arr_data, n_elems) }
+    unsafe fn get_value_unchecked<'target, D: Dims, Tgt: Target<'target>>(
+        &self,
+        target: Tgt,
+        index: D,
+    ) -> ValueData<'target, 'data, Tgt> {
+        let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
+        unsafe {
+            let idx = self.array().dimensions().index_of_unchecked(&index);
+            let v = jlrs_arrayref(self.array().unwrap(Private), idx);
+            ValueRef::wrap(NonNull::new_unchecked(v)).root(target)
+        }
     }
 
-    /// Returns the array's data as a slice, the data is in column-major order.
-    #[inline]
-    pub fn into_slice(self) -> &'borrow [Option<W>] {
-        let n_elems = self.dimensions().size();
-        let arr_data = self.array.data_ptr().cast::<Option<W>>();
-        // Safety: the layout is compatible and the lifetime is limited.
-        unsafe { slice::from_raw_parts(arr_data, n_elems) }
+    /// Create a new array with dimensions `D` that shares its data with `self`.
+    ///
+    /// If the number of elements of `dims` is not equal to the number of elements
+    /// an exception is thrown, which is caught and returned.
+    #[julia_version(until = "1.10")]
+    fn reshape<'target, D, Tgt>(
+        &self,
+        target: Tgt,
+        dims: D,
+    ) -> ArrayBaseResult<'target, 'data, Tgt, T, -1>
+    where
+        D: RankedDims,
+        Tgt: Target<'target>,
+    {
+        // todo: check size
+
+        target.with_local_scope::<_, _, 1>(|target, mut frame| unsafe {
+            let arr = self.array();
+            let elty_ptr = arr.element_type().unwrap(Private);
+
+            // Safety: The array type is rooted until the array has been constructed, all C API
+            // functions are called with valid data. If an exception is thrown it's caught.
+            let callback = || {
+                let array_type = jl_apply_array_type(elty_ptr, dims.rank());
+
+                let tuple = sized_dim_tuple(&mut frame, &dims);
+
+                jl_reshape_array(array_type, arr.unwrap(Private), tuple.unwrap(Private))
+            };
+
+            let res = match catch_exceptions(callback, unwrap_exc) {
+                Ok(array_ptr) => Ok(NonNull::new_unchecked(array_ptr)),
+                Err(e) => Err(e),
+            };
+
+            target.result_from_ptr(res, Private)
+        })
+    }
+
+    /// Create a new array with dimensions `D` that shares its data with `self` without checking
+    /// any invariants.
+    ///
+    /// If the number of elements of `dims` is not equal to the number of elements
+    /// an exception is thrown which is not caught.
+    #[julia_version(until = "1.10")]
+    unsafe fn reshape_unchecked<'target, D, Tgt>(
+        &self,
+        target: Tgt,
+        dims: D,
+    ) -> ArrayBaseData<'target, 'data, Tgt, T, -1>
+    where
+        D: RankedDims,
+        Tgt: Target<'target>,
+    {
+        target.with_local_scope::<_, _, 1>(|target, mut frame| {
+            let arr = self.array();
+            let elty_ptr = arr.element_type().unwrap(Private);
+            let array_type = jl_apply_array_type(elty_ptr, dims.rank());
+            let tuple = sized_dim_tuple(&mut frame, &dims);
+            let arr = jl_reshape_array(array_type, arr.unwrap(Private), tuple.unwrap(Private));
+
+            target.data_from_ptr(NonNull::new_unchecked(arr), Private)
+        })
+    }
+
+    /// See [`ArrayBase::reshape`]. The only difference is that the rank of the returned array is
+    /// set.
+    #[julia_version(until = "1.10")]
+    fn reshape_ranked<'target, D, Tgt, const M: isize>(
+        &self,
+        target: Tgt,
+        dims: D,
+    ) -> JlrsResult<ArrayBaseResult<'target, 'data, Tgt, T, M>>
+    where
+        D: RankedDims,
+        Tgt: Target<'target>,
+    {
+        let _ = D::ASSERT_RANKED;
+        let _ = <(ArrayDimensions<'_, M>, D) as CompatibleIndices<_, _>>::ASSERT_COMPATIBLE;
+
+        // todo: check size
+
+        target.with_local_scope::<_, _, 1>(|target, mut frame| unsafe {
+            let arr = self.array();
+            let elty_ptr = arr.element_type().unwrap(Private);
+
+            // Safety: The array type is rooted until the array has been constructed, all C API
+            // functions are called with valid data. If an exception is thrown it's caught.
+            let callback = || {
+                let array_type = jl_apply_array_type(elty_ptr, dims.rank());
+
+                let tuple = sized_dim_tuple(&mut frame, &dims);
+
+                jl_reshape_array(array_type, arr.unwrap(Private), tuple.unwrap(Private))
+            };
+
+            let res = match catch_exceptions(callback, unwrap_exc) {
+                Ok(array_ptr) => Ok(NonNull::new_unchecked(array_ptr)),
+                Err(e) => Err(e),
+            };
+
+            Ok(target.result_from_ptr(res, Private))
+        })
+    }
+
+    /// See [`ArrayBase::reshape_unchecked`]. The only difference is that the rank of the returned
+    /// array is set.
+    #[julia_version(until = "1.10")]
+    unsafe fn reshape_ranked_unchecked<'target, D, Tgt, const M: isize>(
+        &self,
+        target: Tgt,
+        dims: D,
+    ) -> ArrayBaseData<'target, 'data, Tgt, T, M>
+    where
+        D: RankedDims,
+        Tgt: Target<'target>,
+    {
+        let _ = D::ASSERT_RANKED;
+        let _ = <(ArrayDimensions<'_, M>, D) as CompatibleIndices<_, _>>::ASSERT_COMPATIBLE;
+
+        target.with_local_scope::<_, _, 1>(|target, mut frame| {
+            let arr = self.array();
+            let elty_ptr = arr.element_type().unwrap(Private);
+            let array_type = jl_apply_array_type(elty_ptr, dims.rank());
+            let tuple = sized_dim_tuple(&mut frame, &dims);
+            let arr = jl_reshape_array(array_type, arr.unwrap(Private), tuple.unwrap(Private));
+
+            target.data_from_ptr(NonNull::new_unchecked(arr), Private)
+        })
     }
 }
 
-impl<'borrow, 'array, 'data, T: ManagedRef<'array, 'data>>
-    PtrArrayAccessor<'borrow, 'array, 'data, T, Mutable<'borrow, T>>
-{
-    /// Set the value at `index` to `value` if `value` has a type that's compatible with this array.
-    #[inline]
-    pub fn set<D>(&mut self, index: D, value: Option<Value<'_, 'data>>) -> JlrsResult<()>
-    where
-        D: Dims,
-    {
-        let ptr = self.array.unwrap(Private);
-        let idx = self.dimensions().index_of(&index)?;
-
-        let data_ptr = if let Some(value) = value {
-            let ty = self.array.element_type();
-            if !value.isa(ty) {
-                let element_type = ty.display_string_or(CANNOT_DISPLAY_TYPE);
-                let value_type = value.datatype().display_string_or(CANNOT_DISPLAY_TYPE);
-                Err(TypeError::IncompatibleType {
-                    element_type,
-                    value_type,
-                })?;
-            }
-
-            value.unwrap(Private)
-        } else {
-            null_mut()
+/// Functionality supported by all mutable accessors.
+pub trait AccessorMut<'scope, 'data, T, const N: isize>: Accessor<'scope, 'data, T, N> {
+    /// Sets the element at `index` to `value`.
+    ///
+    /// If the `DataType` of `value` is not a valid type for an element of this array,
+    /// an exception is thrown which is caught and returned. If the index is not in-bounds,
+    /// `None` is returned.
+    fn set_value<'target, 'value, D: Dims, Tgt: Target<'target>>(
+        &mut self,
+        target: Tgt,
+        index: D,
+        value: Value<'value, 'data>,
+    ) -> Result<TargetException<'target, 'data, (), Tgt>, Value<'value, 'data>> {
+        let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
+        let Some(idx) = self.array().dimensions().index_of(&index) else {
+            return Err(value);
         };
 
-        // Safety: the index is in bounds, the value can be stored in this array
-        unsafe { jl_array_ptr_set(ptr.cast(), idx, data_ptr.cast()) };
+        unsafe {
+            let callback = || {
+                jlrs_arrayset(self.array().unwrap(Private), value.unwrap(Private), idx);
+            };
 
-        Ok(())
+            match catch_exceptions(callback, unwrap_exc) {
+                Ok(_) => Ok(Ok(())),
+                Err(e) => Ok(Err(ValueRef::wrap(e).root(target))),
+            }
+        }
     }
 
-    /// Add capacity for `inc` more elements at the end of the array. The array must be
-    /// one-dimensional. If the array isn't one-dimensional an exception is thrown.
+    /// Sets the element at `index` to `value`.
     ///
-    /// Safety: Mutating things that should absolutely not be mutated is not prevented. If an
-    /// exception is thrown, it isn't caught.
+    /// Safety: `index` must be in-bounds. If the `DataType` of `value` is not a valid type for an
+    /// element of this array, an exception is thrown which is not caught.
     #[inline]
-    pub unsafe fn grow_end_unchecked(&mut self, inc: usize)
-    where
-        'data: 'static,
-    {
-        self.array.grow_end_unchecked(inc);
+    unsafe fn set_value_unchecked<D: Dims>(&mut self, index: D, value: Value<'_, 'data>) {
+        let idx = self.array().dimensions().index_of_unchecked(&index);
+        jlrs_arrayset(self.array().unwrap(Private), value.unwrap(Private), idx);
     }
 }
 
-impl<'borrow, 'array, 'data, D, T, M> Index<D> for PtrArrayAccessor<'borrow, 'array, 'data, T, M>
-where
-    D: Dims,
-    T: ManagedRef<'array, 'data>,
-    M: Mutability,
-{
-    type Output = Option<T>;
-
-    #[inline]
-    fn index(&self, index: D) -> &Self::Output {
-        let idx = self.dimensions().index_of(&index).unwrap();
-        // Safety: the index is in bounds
+/// Functionality supported by all mutable accessors for 1D arrays.
+pub trait AccessorMut1D<'scope, 'data, T>: AccessorMut<'scope, 'data, T, 1> {
+    /// Inserts `inc` elements at the end of the array. If an exception is thrown, it's caught and
+    /// returned.
+    fn grow_end<'target, Tgt>(
+        &mut self,
+        target: Tgt,
+        inc: usize,
+    ) -> TargetException<'target, 'static, (), Tgt>
+    where
+        Tgt: Target<'target>,
+    {
+        // Safety: the C API function is called with valid data. If an exception is thrown it's
+        // caught.
         unsafe {
-            self.array
-                .data_ptr()
-                .cast::<Option<T>>()
-                .add(idx)
-                .as_ref()
-                .unwrap()
+            let callback = || self.grow_end_unchecked(inc);
+
+            let res = match catch_exceptions(callback, unwrap_exc) {
+                Ok(_) => Ok(()),
+                Err(e) => Err(e),
+            };
+
+            target.exception_from_ptr(res, Private)
+        }
+    }
+
+    /// Inserts `inc` elements at the end of the array. If an exception is thrown, it's not
+    /// caught.
+    #[inline]
+    unsafe fn grow_end_unchecked(&mut self, inc: usize) {
+        jl_array_grow_end(self.array().unwrap(Private), inc);
+    }
+    /// Removes `dec` elements from the end of the array. If an exception is thrown, it's caught
+    /// and returned.
+    fn del_end<'target, Tgt>(
+        &mut self,
+        target: Tgt,
+        dec: usize,
+    ) -> TargetException<'target, 'static, (), Tgt>
+    where
+        Tgt: Target<'target>,
+    {
+        // Safety: the C API function is called with valid data. If an exception is thrown it's
+        // caught.
+        unsafe {
+            let callback = || self.del_end_unchecked(dec);
+
+            let res = match catch_exceptions(callback, unwrap_exc) {
+                Ok(_) => Ok(()),
+                Err(e) => Err(e),
+            };
+
+            target.exception_from_ptr(res, Private)
+        }
+    }
+
+    /// Removes `dec` elements from the end of the array. If an exception is thrown, it's not
+    /// caught.
+    #[inline]
+    unsafe fn del_end_unchecked(&mut self, dec: usize) {
+        jl_array_del_end(self.array().unwrap(Private), dec);
+    }
+}
+
+impl<'scope, 'data, A, T> AccessorMut1D<'scope, 'data, T> for A where
+    A: AccessorMut<'scope, 'data, T, 1>
+{
+}
+
+/// An accessor for `isbits` data.
+#[repr(transparent)]
+pub struct BitsAccessor<'borrow, 'scope, 'data, T, L, const N: isize> {
+    array: ArrayBase<'scope, 'data, T, N>,
+    _data: PhantomData<&'borrow [L]>,
+}
+
+impl<'borrow, 'scope, 'data, T, L, const N: isize> BitsAccessor<'borrow, 'scope, 'data, T, L, N>
+where
+    L: ValidField + IsBits,
+{
+    #[inline]
+    pub(crate) unsafe fn new(array: &'borrow ArrayBase<'scope, 'data, T, N>) -> Self {
+        BitsAccessor {
+            array: *array,
+            _data: PhantomData,
+        }
+    }
+
+    /// Returns a reference the element at `index` if `index` is in-bounds`, `None` otherwise.
+    pub fn get<D: Dims>(&self, index: D) -> Option<&L> {
+        let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
+        let array_dims = self.array.dimensions();
+        let idx = array_dims.index_of(&index)?;
+
+        unsafe {
+            let elem = jlrs_array_data(self.array.unwrap(Private))
+                .cast::<L>()
+                .add(idx);
+
+            Some(&*elem)
+        }
+    }
+
+    /// Returns a reference to the element at `index`.
+    ///
+    /// Safety: `index` must be in-bounds.
+    pub unsafe fn get_unchecked<D: Dims>(&self, index: D) -> &L {
+        let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
+        let idx = self.array.dimensions().index_of_unchecked(&index);
+
+        let elem = jlrs_array_data(self.array.unwrap(Private))
+            .cast::<L>()
+            .add(idx);
+
+        &*elem
+    }
+
+    /// Temporarily converts this accessor to a slice.
+    pub fn as_slice<'a>(&'a self) -> &'a [L] {
+        unsafe {
+            let sz = self.array.dimensions().size();
+            let ptr = jlrs_array_data(self.array.unwrap(Private)).cast::<L>();
+            std::slice::from_raw_parts(ptr, sz)
+        }
+    }
+
+    /// Converts this accessor into a slice.
+    pub fn into_slice(self) -> &'borrow [L] {
+        unsafe {
+            let sz = self.array.dimensions().size();
+            let ptr = jlrs_array_data(self.array.unwrap(Private)).cast::<L>();
+            std::slice::from_raw_parts(ptr, sz)
+        }
+    }
+
+    /// Copies the content of this array to a `CopiedArray`.
+    pub fn to_copied_array(&self) -> CopiedArray<L>
+    where
+        L: Copy,
+    {
+        unsafe {
+            let data = self.as_slice().into();
+            let dims = self.array.dimensions().to_dimensions();
+            CopiedArray::new(data, dims)
+        }
+    }
+
+    /// Returns a reference the element at `index` if `index` is in-bounds`, `None` otherwise.
+    pub fn get_uninit<D: Dims>(&self, index: D) -> Option<&MaybeUninit<L>> {
+        let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
+        let array_dims = self.array.dimensions();
+        let idx = array_dims.index_of(&index)?;
+
+        unsafe {
+            let elem = jlrs_array_data(self.array.unwrap(Private))
+                .cast::<MaybeUninit<L>>()
+                .add(idx);
+
+            Some(&*elem)
+        }
+    }
+
+    /// Returns a reference to the element at `index`.
+    ///
+    /// Safety: `index` must be in-bounds.
+    pub unsafe fn get_uninit_unchecked<D: Dims>(&self, index: D) -> &MaybeUninit<L> {
+        let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
+        let idx = self.array.dimensions().index_of_unchecked(&index);
+
+        let elem = jlrs_array_data(self.array.unwrap(Private))
+            .cast::<MaybeUninit<L>>()
+            .add(idx);
+
+        &*elem
+    }
+
+    /// Temporarily converts this accessor to a slice.
+    pub fn as_uninit_slice<'a>(&'a self) -> &'a [MaybeUninit<L>] {
+        unsafe {
+            let sz = self.array.dimensions().size();
+            let ptr = jlrs_array_data(self.array.unwrap(Private)).cast::<MaybeUninit<L>>();
+            std::slice::from_raw_parts(ptr, sz)
+        }
+    }
+
+    /// Converts this accessor into a slice.
+    pub fn into_uninit_slice(self) -> &'borrow [MaybeUninit<L>] {
+        unsafe {
+            let sz = self.array.dimensions().size();
+            let ptr = jlrs_array_data(self.array.unwrap(Private)).cast::<MaybeUninit<L>>();
+            std::slice::from_raw_parts(ptr, sz)
+        }
+    }
+
+    /// Copies the content of this array to a `CopiedArray` without assuming the content has
+    /// been fully initialized.
+    pub fn to_maybe_uninit_copied_array(&self) -> CopiedArray<MaybeUninit<L>>
+    where
+        L: Copy,
+    {
+        unsafe {
+            let s = self.as_uninit_slice();
+            let mut v = Vec::with_capacity(s.len());
+
+            v.as_mut_slice().copy_from_slice(s);
+
+            let data = v.into_boxed_slice();
+            let dims = self.array.dimensions().to_dimensions();
+            CopiedArray::new(data, dims)
         }
     }
 }
 
-impl<'borrow, 'array, 'data, T, M: Mutability> BitsArrayAccessor<'borrow, 'array, 'data, T, M> {
-    /// Get a reference to the value at `index`, or `None` if the index is out of bounds.
-    #[inline]
-    pub fn get<D>(&self, index: D) -> Option<&T>
-    where
-        D: Dims,
-    {
-        let idx = self.dimensions().index_of(&index).ok()?;
-        // Safety: the index is in bounds
-        unsafe { self.array.data_ptr().cast::<T>().add(idx).as_ref() }
-    }
-
-    /// Returns the array's data as a slice, the data is in column-major order.
-    #[inline]
-    pub fn as_slice(&self) -> &[T] {
-        let len = self.dimensions().size();
-        let data = self.array.data_ptr().cast::<T>();
-        // Safety: the layout is compatible and the lifetime is limited.
-        unsafe { slice::from_raw_parts(data, len) }
-    }
-
-    /// Returns the array's data as a slice, the data is in column-major order.
-    #[inline]
-    pub fn into_slice(self) -> &'borrow [T] {
-        let len = self.dimensions().size();
-        let data = self.array.data_ptr().cast::<T>();
-        // Safety: the layout is compatible and the lifetime is limited.
-        unsafe { slice::from_raw_parts(data, len) }
-    }
-}
-
-impl<'borrow, 'array, 'data, T> BitsArrayAccessor<'borrow, 'array, 'data, T, Mutable<'borrow, T>> {
-    /// Set the value at `index` to `value` if `value` has a type that's compatible with this array.
-    #[inline]
-    pub fn set<D>(&mut self, index: D, value: T) -> JlrsResult<()>
-    where
-        D: Dims,
-    {
-        let idx = self.dimensions().index_of(&index)?;
-        // Safety: the index is in bounds and layout is compatible.
-        unsafe { self.array.data_ptr().cast::<T>().add(idx).write(value) };
-
-        Ok(())
-    }
-
-    /// Get a mutable reference to the element stored at `index`.
-    #[inline]
-    pub fn get_mut<D>(&mut self, index: D) -> Option<&mut T>
-    where
-        D: Dims,
-    {
-        let idx = self.dimensions().index_of(&index).ok()?;
-        // Safety: the index is in bounds and layout is compatible.
-        unsafe { self.array.data_ptr().cast::<T>().add(idx).as_mut() }
-    }
-
-    /// Returns the array's data as a mutable slice, the data is in column-major order.
-    #[inline]
-    pub fn as_mut_slice(&mut self) -> &mut [T] {
-        let len = self.dimensions().size();
-        let data = self.array.data_ptr().cast::<T>();
-        // Safety: the layout is compatible and the lifetime is limited.
-        unsafe { slice::from_raw_parts_mut(data, len) }
-    }
-
-    /// Returns the array's data as a mutable slice, the data is in column-major order.
-    #[inline]
-    pub fn into_mut_slice(self) -> &'borrow mut [T] {
-        let len = self.dimensions().size();
-        let data = self.array.data_ptr().cast::<T>();
-        // Safety: the layout is compatible and the lifetime is limited.
-        unsafe { slice::from_raw_parts_mut(data, len) }
-    }
-
-    /// Add capacity for `inc` more elements at the end of the array. The array must be
-    /// one-dimensional. If the array isn't one-dimensional an exception is thrown.
-    ///
-    /// Safety: Mutating things that should absolutely not be mutated is not prevented. If an
-    /// exception is thrown, it isn't caught.
-    #[inline]
-    pub unsafe fn grow_end_unchecked(&mut self, inc: usize)
-    where
-        'data: 'static,
-    {
-        self.array.grow_end_unchecked(inc);
-    }
-}
-
-impl<'borrow, 'array, 'data, T, M, D> Index<D> for BitsArrayAccessor<'borrow, 'array, 'data, T, M>
-where
-    D: Dims,
-    M: Mutability,
+impl<'borrow, 'scope, 'data, T, L, D: Dims, const N: isize> Index<D>
+    for BitsAccessor<'borrow, 'scope, 'data, T, L, N>
 {
-    type Output = T;
+    type Output = L;
 
-    #[inline]
     fn index(&self, index: D) -> &Self::Output {
-        let idx = self.dimensions().index_of(&index).unwrap();
-        // Safety: the layout is compatible and the index is in bounds.
+        let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
+        let array_dims = self.array.dimensions();
+        let idx = array_dims.index_of(&index).unwrap();
+
         unsafe {
-            self.array
-                .data_ptr()
-                .cast::<T>()
-                .add(idx)
-                .as_ref()
-                .unwrap_unchecked()
+            let elem = jlrs_array_data(self.array.unwrap(Private))
+                .cast::<L>()
+                .add(idx);
+
+            &*elem
         }
     }
 }
 
-impl<'borrow, 'array, 'data, T, D> IndexMut<D>
-    for BitsArrayAccessor<'borrow, 'array, 'data, T, Mutable<'borrow, T>>
-where
-    D: Dims,
+impl<'scope, 'data, T, L, const N: isize> Accessor<'scope, 'data, T, N>
+    for BitsAccessor<'_, 'scope, 'data, T, L, N>
 {
     #[inline]
+    fn array(&self) -> &ArrayBase<'scope, 'data, T, N> {
+        &self.array
+    }
+}
+
+/// A mutable accessor for `isbits` data.
+#[repr(transparent)]
+pub struct BitsAccessorMut<'borrow, 'scope, 'data, T, L, const N: isize> {
+    array: ArrayBase<'scope, 'data, T, N>,
+    _data: PhantomData<&'borrow mut [L]>,
+}
+
+impl<'borrow, 'scope, 'data, T, L, const N: isize> BitsAccessorMut<'borrow, 'scope, 'data, T, L, N>
+where
+    L: ValidField + IsBits,
+{
+    pub(crate) unsafe fn new(array: &'borrow mut ArrayBase<'scope, 'data, T, N>) -> Self {
+        BitsAccessorMut {
+            array: *array,
+            _data: PhantomData,
+        }
+    }
+
+    /// Returns a mutable reference to the element at `index` if it is in-bounds, `None`
+    /// otherwise.
+    pub fn get_mut<D: Dims>(&mut self, index: D) -> Option<&mut L> {
+        let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
+        let array_dims = self.array.dimensions();
+        let idx = array_dims.index_of(&index)?;
+
+        unsafe {
+            let elem = jlrs_array_data(self.array.unwrap(Private))
+                .cast::<L>()
+                .add(idx);
+
+            Some(&mut *elem)
+        }
+    }
+
+    /// Returns a mutable reference to the element at `index`.
+    ///
+    /// Safety: `index` must be in-bounds.
+    pub unsafe fn get_mut_unchecked<D: Dims>(&mut self, index: D) -> &mut L {
+        let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
+        let idx = self.array.dimensions().index_of_unchecked(&index);
+
+        let elem = jlrs_array_data(self.array.unwrap(Private))
+            .cast::<L>()
+            .add(idx);
+
+        &mut *elem
+    }
+
+    /// Returns a mutable reference to the element at `index` if it is in-bounds, `None`
+    /// otherwise.
+    pub fn get_mut_uninit<D: Dims>(&mut self, index: D) -> Option<&mut MaybeUninit<L>> {
+        let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
+        let array_dims = self.array.dimensions();
+        let idx = array_dims.index_of(&index)?;
+
+        unsafe {
+            let elem = jlrs_array_data(self.array.unwrap(Private))
+                .cast::<MaybeUninit<L>>()
+                .add(idx);
+
+            Some(&mut *elem)
+        }
+    }
+
+    /// Returns a mutable reference to the element at `index`.
+    ///
+    /// Safety: `index` must be in-bounds.
+    pub unsafe fn get_mut_uninit_unchecked<D: Dims>(&mut self, index: D) -> &mut MaybeUninit<L> {
+        let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
+        let idx = self.array.dimensions().index_of_unchecked(&index);
+
+        let elem = jlrs_array_data(self.array.unwrap(Private))
+            .cast::<MaybeUninit<L>>()
+            .add(idx);
+
+        &mut *elem
+    }
+
+    /// Sets the elements at `index` to `value` if `index` is in-bounds.
+    ///
+    /// If `index` is not in-bounds `Err(value)` is retuned, if it is in-bounds `Ok(())` is
+    /// returned.
+    pub fn set<D: Dims>(&mut self, index: D, value: L) -> Result<(), L> {
+        let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
+        let array_dims = self.array.dimensions();
+        let idx = array_dims.index_of(&index);
+        match idx {
+            None => Err(value),
+            Some(idx) => unsafe {
+                let elem = jlrs_array_data(self.array.unwrap(Private))
+                    .cast::<L>()
+                    .add(idx);
+
+                elem.write(value);
+                Ok(())
+            },
+        }
+    }
+
+    /// Sets the elements at `index` to `value`.
+    ///
+    /// Safety: `index` must be in-bounds.
+    pub unsafe fn set_unchecked<D: Dims>(&mut self, index: D, value: L) {
+        let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
+        let idx = self.array.dimensions().index_of_unchecked(&index);
+
+        let elem = jlrs_array_data(self.array.unwrap(Private))
+            .cast::<L>()
+            .add(idx);
+
+        elem.write(value);
+    }
+
+    /// Temporarily converts this accessor to a mutable slice.
+    pub fn as_mut_slice<'a>(&'a mut self) -> &'a mut [L] {
+        unsafe {
+            let sz = self.array.dimensions().size();
+            let ptr = jlrs_array_data(self.array.unwrap(Private)).cast::<L>();
+            std::slice::from_raw_parts_mut(ptr, sz)
+        }
+    }
+
+    /// Converts this accessor into a mutable slice.
+    pub fn into_mut_slice(self) -> &'borrow mut [L] {
+        unsafe {
+            let sz = self.array.dimensions().size();
+            let ptr = jlrs_array_data(self.array.unwrap(Private)).cast::<L>();
+            std::slice::from_raw_parts_mut(ptr, sz)
+        }
+    }
+
+    /// Temporarily converts this accessor to a mutable slice.
+    pub fn as_mut_uninit_slice<'a>(&'a mut self) -> &'a mut [MaybeUninit<L>] {
+        unsafe {
+            let sz = self.array.dimensions().size();
+            let ptr = jlrs_array_data(self.array.unwrap(Private)).cast::<MaybeUninit<L>>();
+            std::slice::from_raw_parts_mut(ptr, sz)
+        }
+    }
+
+    /// Converts this accessor into a mutable slice.
+    pub fn into_mut_uninit_slice(self) -> &'borrow mut [MaybeUninit<L>] {
+        unsafe {
+            let sz = self.array.dimensions().size();
+            let ptr = jlrs_array_data(self.array.unwrap(Private)).cast::<MaybeUninit<L>>();
+            std::slice::from_raw_parts_mut(ptr, sz)
+        }
+    }
+}
+
+impl<'borrow, 'scope, 'data, T, L> BitsAccessorMut<'borrow, 'scope, 'data, T, L, 1>
+where
+    L: ValidField + IsBits,
+{
+    /// Pushes the new element `data` to the end of this `Vector`. If an exception is thrown, it's
+    /// caught and returned.
+    pub fn push<'target, Tgt>(
+        &mut self,
+        target: Tgt,
+        data: L,
+    ) -> TargetException<'target, 'static, (), Tgt>
+    where
+        Tgt: Target<'target>,
+    {
+        let length = self.array.length();
+        self.grow_end(target, 1)?;
+        unsafe {
+            self.get_mut_uninit_unchecked(length).write(data);
+        }
+
+        Ok(())
+    }
+
+    /// Pushes the new element `data` to the end of this `Vector`. If an exception is thrown, it's
+    /// not caught.
+    pub unsafe fn push_unchecked(&mut self, data: L) {
+        let length = self.array.length();
+        self.grow_end_unchecked(1);
+        self.get_mut_uninit_unchecked(length).write(data);
+    }
+
+    /// Pushes all elements from `data` to the end of this `Vector`. If an exception is thrown,
+    /// it's caught and returned.
+    pub fn extend_from_slice<'target, Tgt>(
+        &mut self,
+        target: Tgt,
+        data: &[L],
+    ) -> TargetException<'target, 'static, (), Tgt>
+    where
+        L: Copy,
+        Tgt: Target<'target>,
+    {
+        let length = self.array.length();
+        let n = data.len();
+        self.grow_end(target, n)?;
+
+        unsafe {
+            let slice = &mut self.as_mut_uninit_slice()[length..];
+            let data_ptr = data.as_ptr().cast::<MaybeUninit<L>>();
+            let data = std::slice::from_raw_parts(data_ptr, n);
+
+            slice.copy_from_slice(data);
+        }
+
+        Ok(())
+    }
+
+    /// Pushes all elements from `data` to the end of this `Vector`. If an exception is thrown,
+    /// it's not caught.
+    pub unsafe fn extend_from_slice_unchecked(&mut self, data: &[L])
+    where
+        L: Copy,
+    {
+        let length = self.array.length();
+        let n = data.len();
+        self.grow_end_unchecked(n);
+        let slice = &mut self.as_mut_uninit_slice()[length..];
+        let data_ptr = data.as_ptr().cast::<MaybeUninit<L>>();
+        let data = std::slice::from_raw_parts(data_ptr, n);
+
+        slice.copy_from_slice(data);
+    }
+}
+
+impl<'borrow, 'scope, 'data, T, L, const N: isize> Deref
+    for BitsAccessorMut<'borrow, 'scope, 'data, T, L, N>
+{
+    type Target = BitsAccessor<'borrow, 'scope, 'data, T, L, N>;
+
+    fn deref(&self) -> &Self::Target {
+        unsafe { std::mem::transmute(self) }
+    }
+}
+
+impl<'borrow, 'scope, 'data, T, L, D: Dims, const N: isize> Index<D>
+    for BitsAccessorMut<'borrow, 'scope, 'data, T, L, N>
+{
+    type Output = L;
+
+    fn index(&self, index: D) -> &Self::Output {
+        let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
+        let array_dims = self.array.dimensions();
+        let idx = array_dims.index_of(&index).unwrap();
+
+        unsafe {
+            let elem = jlrs_array_data(self.array.unwrap(Private))
+                .cast::<L>()
+                .add(idx);
+
+            &*elem
+        }
+    }
+}
+
+impl<'borrow, 'scope, 'data, T, L, D: Dims, const N: isize> IndexMut<D>
+    for BitsAccessorMut<'borrow, 'scope, 'data, T, L, N>
+{
     fn index_mut(&mut self, index: D) -> &mut Self::Output {
-        let idx = self.dimensions().index_of(&index).unwrap();
-        // Safety: the layout is compatible and the index is in bounds.
+        let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
+        let array_dims = self.array.dimensions();
+        let idx = array_dims.index_of(&index).unwrap();
+
         unsafe {
-            self.array
-                .data_ptr()
-                .cast::<T>()
-                .add(idx)
-                .as_mut()
-                .unwrap_unchecked()
+            let elem = jlrs_array_data(self.array.unwrap(Private))
+                .cast::<L>()
+                .add(idx);
+
+            &mut *elem
         }
     }
 }
 
-impl<'borrow, 'array, 'data, T, M: Mutability>
-    InlinePtrArrayAccessor<'borrow, 'array, 'data, T, M>
+impl<'scope, 'data, T, L, const N: isize> Accessor<'scope, 'data, T, N>
+    for BitsAccessorMut<'_, 'scope, 'data, T, L, N>
 {
-    /// Get a reference to the value at `index`, or `None` if the index is out of bounds.
     #[inline]
-    pub fn get<D>(&self, index: D) -> Option<&T>
-    where
-        D: Dims,
-    {
-        let idx = self.dimensions().index_of(&index).ok()?;
-        // Safety: the layout is compatible and the index is in bounds.
-        unsafe { self.array.data_ptr().cast::<T>().add(idx).as_ref() }
-    }
-
-    /// Returns the array's data as a slice, the data is in column-major order.
-    #[inline]
-    pub fn as_slice(&self) -> &[T] {
-        let len = self.dimensions().size();
-        let data = self.array.data_ptr().cast::<T>();
-        // Safety: the layout is compatible and the lifetime is limited.
-        unsafe { slice::from_raw_parts(data, len) }
-    }
-
-    /// Returns the array's data as a slice, the data is in column-major order.
-    #[inline]
-    pub fn into_slice(self) -> &'borrow [T] {
-        let len = self.dimensions().size();
-        let data = self.array.data_ptr().cast::<T>();
-        // Safety: the layout is compatible and the lifetime is limited.
-        unsafe { slice::from_raw_parts(data, len) }
+    fn array(&self) -> &ArrayBase<'scope, 'data, T, N> {
+        &self.array
     }
 }
 
-impl<'borrow, 'array, 'data, T, M, D> Index<D>
-    for InlinePtrArrayAccessor<'borrow, 'array, 'data, T, M>
+impl<'scope, 'data, T, L, const N: isize> AccessorMut<'scope, 'data, T, N>
+    for BitsAccessorMut<'_, 'scope, 'data, T, L, N>
+{
+}
+
+/// An accessor for inline data.
+#[repr(transparent)]
+pub struct InlineAccessor<'borrow, 'scope, 'data, T, L, const N: isize> {
+    array: ArrayBase<'scope, 'data, T, N>,
+    _data: PhantomData<&'borrow [L]>,
+}
+
+impl<'borrow, 'scope, 'data, T, L, const N: isize> InlineAccessor<'borrow, 'scope, 'data, T, L, N>
 where
-    D: Dims,
-    M: Mutability,
+    L: ValidField,
 {
-    type Output = T;
+    pub(crate) unsafe fn new(array: &'borrow ArrayBase<'scope, 'data, T, N>) -> Self {
+        InlineAccessor {
+            array: *array,
+            _data: PhantomData,
+        }
+    }
 
-    #[inline]
-    fn index(&self, index: D) -> &Self::Output {
-        let idx = self.dimensions().index_of(&index).unwrap();
-        // Safety: the layout is compatible and the index is in bounds.
+    /// Returns a reference the element at `index` if `index` is in-bounds`, `None` otherwise.
+    pub fn get<D: Dims>(&self, index: D) -> Option<&L> {
+        let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
+        let array_dims = self.array.dimensions();
+        let idx = array_dims.index_of(&index)?;
+
         unsafe {
-            self.array
-                .data_ptr()
-                .cast::<T>()
-                .add(idx)
-                .as_ref()
-                .unwrap_unchecked()
+            let elem = jlrs_array_data(self.array.unwrap(Private))
+                .cast::<L>()
+                .add(idx);
+
+            Some(&*elem)
+        }
+    }
+
+    /// Returns a reference the element at `index` if `index` is in-bounds`.
+    ///
+    /// Safety: `index` must be in-bounds.
+    pub unsafe fn get_unchecked<D: Dims>(&self, index: D) -> &L {
+        let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
+        let idx = self.array.dimensions().index_of_unchecked(&index);
+
+        let elem = jlrs_array_data(self.array.unwrap(Private))
+            .cast::<L>()
+            .add(idx);
+
+        &*elem
+    }
+
+    /// Returns a reference the element at `index` if `index` is in-bounds`, `None` otherwise.
+    pub fn get_uninit<D: Dims>(&self, index: D) -> Option<&MaybeUninit<L>> {
+        let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
+        let array_dims = self.array.dimensions();
+        let idx = array_dims.index_of(&index)?;
+
+        unsafe {
+            let elem = jlrs_array_data(self.array.unwrap(Private))
+                .cast::<MaybeUninit<L>>()
+                .add(idx);
+
+            Some(&*elem)
+        }
+    }
+
+    /// Returns a reference the element at `index` if `index` is in-bounds`.
+    ///
+    /// Safety: `index` must be in-bounds.
+    pub unsafe fn get_uninit_unchecked<D: Dims>(&self, index: D) -> &MaybeUninit<L> {
+        let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
+        let idx = self.array.dimensions().index_of_unchecked(&index);
+
+        let elem = jlrs_array_data(self.array.unwrap(Private))
+            .cast::<MaybeUninit<L>>()
+            .add(idx);
+
+        &*elem
+    }
+
+    /// Temporarily converts this accessor to a slice.
+    pub fn as_slice<'a>(&'a self) -> &'a [L] {
+        unsafe {
+            let sz = self.array.dimensions().size();
+            let ptr = jlrs_array_data(self.array.unwrap(Private)).cast::<L>();
+            std::slice::from_raw_parts(ptr, sz)
+        }
+    }
+
+    /// Converts this accessor into a slice.
+    pub fn into_slice(self) -> &'borrow [L] {
+        unsafe {
+            let sz = self.array.dimensions().size();
+            let ptr = jlrs_array_data(self.array.unwrap(Private)).cast::<L>();
+            std::slice::from_raw_parts(ptr, sz)
+        }
+    }
+
+    /// Temporarily converts this accessor to a slice.
+    pub fn as_uninit_slice<'a>(&'a self) -> &'a [MaybeUninit<L>] {
+        unsafe {
+            let sz = self.array.dimensions().size();
+            let ptr = jlrs_array_data(self.array.unwrap(Private)).cast::<MaybeUninit<L>>();
+            std::slice::from_raw_parts(ptr, sz)
+        }
+    }
+
+    /// Converts this accessor into a slice.
+    pub fn into_uninit_slice(self) -> &'borrow [MaybeUninit<L>] {
+        unsafe {
+            let sz = self.array.dimensions().size();
+            let ptr = jlrs_array_data(self.array.unwrap(Private)).cast::<MaybeUninit<L>>();
+            std::slice::from_raw_parts(ptr, sz)
         }
     }
 }
 
-impl<'borrow, 'array, 'data, M: Mutability> UnionArrayAccessor<'borrow, 'array, 'data, M> {
-    /// Returns `true` if `ty` if a value of that type can be stored in this array.
-    #[inline]
-    pub fn contains(&self, ty: DataType) -> bool {
-        let mut tag = 0;
-        find_union_component(self.array.element_type(), ty.as_value(), &mut tag)
-    }
+impl<'borrow, 'scope, 'data, T, L, D: Dims, const N: isize> Index<D>
+    for InlineAccessor<'borrow, 'scope, 'data, T, L, N>
+{
+    type Output = L;
 
-    /// Returns the type of the element at index `idx`.
-    #[inline]
-    pub fn element_type<D>(&self, index: D) -> JlrsResult<Option<Value<'array, 'static>>>
-    where
-        D: Dims,
-    {
-        let elty = self.array.element_type();
-        let idx = self.dimensions().index_of(&index)?;
+    fn index(&self, index: D) -> &Self::Output {
+        let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
+        let array_dims = self.array.dimensions();
+        let idx = array_dims.index_of(&index).unwrap();
 
-        // Safety: the index is in bounds.
         unsafe {
-            let tags = jl_array_typetagdata(self.array.unwrap(Private));
-            let mut tag = *tags.add(idx) as _;
+            let elem = jlrs_array_data(self.array.unwrap(Private))
+                .cast::<L>()
+                .add(idx);
 
-            Ok(nth_union_component(elty, &mut tag))
+            &*elem
+        }
+    }
+}
+
+impl<'scope, 'data, T, L, const N: isize> Accessor<'scope, 'data, T, N>
+    for InlineAccessor<'_, 'scope, 'data, T, L, N>
+{
+    #[inline]
+    fn array(&self) -> &ArrayBase<'scope, 'data, T, N> {
+        &self.array
+    }
+}
+
+/// A mutable accessor for inline data.
+#[repr(transparent)]
+pub struct InlineAccessorMut<'borrow, 'scope, 'data, T, L, const N: isize> {
+    array: ArrayBase<'scope, 'data, T, N>,
+    _data: PhantomData<&'borrow mut [L]>,
+}
+
+impl<'borrow, 'scope, 'data, T, L, const N: isize> Deref
+    for InlineAccessorMut<'borrow, 'scope, 'data, T, L, N>
+{
+    type Target = InlineAccessor<'borrow, 'scope, 'data, T, L, N>;
+
+    fn deref(&self) -> &Self::Target {
+        unsafe { std::mem::transmute(self) }
+    }
+}
+
+impl<'borrow, 'scope, 'data, T, L, const N: isize>
+    InlineAccessorMut<'borrow, 'scope, 'data, T, L, N>
+where
+    L: ValidField,
+{
+    pub(crate) unsafe fn new(array: &'borrow mut ArrayBase<'scope, 'data, T, N>) -> Self {
+        InlineAccessorMut {
+            array: *array,
+            _data: PhantomData,
+        }
+    }
+}
+
+impl<'scope, 'data, T, L, const N: isize> Accessor<'scope, 'data, T, N>
+    for InlineAccessorMut<'_, 'scope, 'data, T, L, N>
+{
+    #[inline]
+    fn array(&self) -> &ArrayBase<'scope, 'data, T, N> {
+        &self.array
+    }
+}
+
+impl<'scope, 'data, T, L, const N: isize> AccessorMut<'scope, 'data, T, N>
+    for InlineAccessorMut<'_, 'scope, 'data, T, L, N>
+{
+}
+
+/// An accessor for value data.
+#[repr(transparent)]
+pub struct ValueAccessor<'borrow, 'scope, 'data, T, const N: isize> {
+    array: ArrayBase<'scope, 'data, T, N>,
+    _data: PhantomData<&'borrow [Option<ValueRef<'scope, 'data>>]>,
+}
+
+/// An atomic reference to a `Value`.
+#[repr(transparent)]
+pub struct AtomicValueRef<M> {
+    ptr: AtomicPtr<jl_value_t>,
+    _marker: PhantomData<M>,
+}
+
+impl<'scope, 'data, M: Managed<'scope, 'data>> AtomicValueRef<M> {
+    pub fn load(&self, order: Ordering) -> Option<Ref<'scope, 'data, M>> {
+        let ptr = self.ptr.load(order);
+        if ptr.is_null() {
+            return None;
+        }
+
+        unsafe { Some(Ref::wrap(NonNull::new_unchecked(ptr.cast()))) }
+    }
+}
+
+impl<'borrow, 'scope, 'data, T, const N: isize> ValueAccessor<'borrow, 'scope, 'data, T, N> {
+    pub(crate) unsafe fn new(array: &'borrow ArrayBase<'scope, 'data, T, N>) -> Self {
+        ValueAccessor {
+            array: *array,
+            _data: PhantomData,
         }
     }
 
-    /// Get the element at index `idx`. The type `T` must be a valid layout for the type of the
-    /// element stored there.
+    /// Returns the element at `index` if `index` is in-bounds`, `None` otherwise.
+    pub fn get<'target, D: Dims, Tgt: Target<'target>>(
+        &self,
+        target: Tgt,
+        index: D,
+    ) -> Option<ValueData<'target, 'data, Tgt>> {
+        let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
+        let array_dims = self.array.dimensions();
+        let idx = array_dims.index_of(&index)?;
+
+        unsafe {
+            let elem = jlrs_array_data(self.array.unwrap(Private))
+                .cast::<AtomicValueRef<Value>>()
+                .add(idx);
+
+            if let Some(elem) = (&*elem).load(Ordering::Relaxed) {
+                Some(elem.root(target))
+            } else {
+                None
+            }
+        }
+    }
+
+    /// Returns the element at `index`.
+    ///
+    /// Safety: `index` must be in-bounds.
+    pub unsafe fn get_unchecked<'target, D: Dims, Tgt: Target<'target>>(
+        &self,
+        target: Tgt,
+        index: D,
+    ) -> Option<ValueData<'target, 'data, Tgt>> {
+        let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
+        let idx = self.array.dimensions().index_of_unchecked(&index);
+
+        let elem = jlrs_array_data(self.array.unwrap(Private))
+            .cast::<AtomicValueRef<Value>>()
+            .add(idx);
+
+        match (&*elem).load(Ordering::Relaxed) {
+            Some(elem) => Some(elem.root(target)),
+            None => None,
+        }
+    }
+
+    /// Temporarily converts this accessor to a slice.
+    pub fn as_slice<'a>(&'a self) -> &'a [AtomicValueRef<Value<'scope, 'data>>] {
+        unsafe {
+            let sz = self.array.dimensions().size();
+            let ptr = jlrs_array_data(self.array.unwrap(Private)).cast();
+            std::slice::from_raw_parts(ptr, sz)
+        }
+    }
+
+    /// Converts this accessor into a slice.
+    pub fn into_slice(self) -> &'borrow [AtomicValueRef<Value<'scope, 'data>>] {
+        unsafe {
+            let sz = self.array.dimensions().size();
+            let ptr = jlrs_array_data(self.array.unwrap(Private)).cast();
+            std::slice::from_raw_parts(ptr, sz)
+        }
+    }
+}
+
+impl<'borrow, 'scope, 'data, T, D: Dims, const N: isize> Index<D>
+    for ValueAccessor<'borrow, 'scope, 'data, T, N>
+{
+    type Output = AtomicValueRef<Value<'scope, 'data>>;
+
+    fn index(&self, index: D) -> &Self::Output {
+        let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
+        let array_dims = self.array.dimensions();
+        let idx = array_dims.index_of(&index).unwrap();
+
+        unsafe {
+            let elem = jlrs_array_data(self.array.unwrap(Private))
+                .cast::<Self::Output>()
+                .add(idx);
+
+            &*elem
+        }
+    }
+}
+
+impl<'scope, 'data, T, const N: isize> Accessor<'scope, 'data, T, N>
+    for ValueAccessor<'_, 'scope, 'data, T, N>
+{
     #[inline]
-    pub fn get<T, D>(&self, index: D) -> JlrsResult<T>
+    fn array(&self) -> &ArrayBase<'scope, 'data, T, N> {
+        &self.array
+    }
+}
+
+/// A mutable accessor for value data.
+#[repr(transparent)]
+pub struct ValueAccessorMut<'borrow, 'scope, 'data, T, const N: isize> {
+    array: ArrayBase<'scope, 'data, T, N>,
+    _data: PhantomData<&'borrow mut [Option<ValueRef<'scope, 'data>>]>,
+}
+
+impl<'borrow, 'scope, 'data, T, const N: isize> Deref
+    for ValueAccessorMut<'borrow, 'scope, 'data, T, N>
+{
+    type Target = ValueAccessor<'borrow, 'scope, 'data, T, N>;
+
+    fn deref(&self) -> &Self::Target {
+        unsafe { std::mem::transmute(self) }
+    }
+}
+
+impl<'borrow, 'scope, 'data, T, const N: isize> ValueAccessorMut<'borrow, 'scope, 'data, T, N> {
+    pub(crate) unsafe fn new(array: &'borrow mut ArrayBase<'scope, 'data, T, N>) -> Self {
+        ValueAccessorMut {
+            array: *array,
+            _data: PhantomData,
+        }
+    }
+}
+
+impl<'scope, 'data, T, const N: isize> Accessor<'scope, 'data, T, N>
+    for ValueAccessorMut<'_, 'scope, 'data, T, N>
+{
+    #[inline]
+    fn array(&self) -> &ArrayBase<'scope, 'data, T, N> {
+        &self.array
+    }
+}
+
+impl<'scope, 'data, T, const N: isize> AccessorMut<'scope, 'data, T, N>
+    for ValueAccessorMut<'_, 'scope, 'data, T, N>
+{
+}
+
+/// An accessor for managed data.
+#[repr(transparent)]
+pub struct ManagedAccessor<'borrow, 'scope, 'data, T, M: Managed<'scope, 'data>, const N: isize> {
+    array: ArrayBase<'scope, 'data, T, N>,
+    _data: PhantomData<&'borrow [Option<Ref<'scope, 'data, M>>]>,
+}
+
+impl<'borrow, 'scope, 'data, T, M, const N: isize> ManagedAccessor<'borrow, 'scope, 'data, T, M, N>
+where
+    M: Managed<'scope, 'data>,
+{
+    pub(crate) unsafe fn new(array: &'borrow ArrayBase<'scope, 'data, T, N>) -> Self {
+        ManagedAccessor {
+            array: *array,
+            _data: PhantomData,
+        }
+    }
+
+    /// Returns the element at `index` if `index` is in-bounds`, `None` otherwise.
+    pub fn get<'target, D: Dims, Tgt: Target<'target>>(
+        &self,
+        target: Tgt,
+        index: D,
+    ) -> Option<Tgt::Data<'data, M::InScope<'target>>> {
+        let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
+        let array_dims = self.array.dimensions();
+        let idx = array_dims.index_of(&index)?;
+
+        unsafe {
+            let elem = jlrs_array_data(self.array.unwrap(Private))
+                .cast::<AtomicValueRef<M>>()
+                .add(idx);
+
+            if let Some(elem) = (&*elem).load(Ordering::Relaxed) {
+                Some(elem.root(target))
+            } else {
+                None
+            }
+        }
+    }
+
+    /// Returns the element at `index`.
+    ///
+    /// Safety: `index` must be in-bounds.
+    pub unsafe fn get_unchecked<'target, D: Dims, Tgt: Target<'target>>(
+        &self,
+        target: Tgt,
+        index: D,
+    ) -> Option<Tgt::Data<'data, M::InScope<'target>>> {
+        let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
+        let idx = self.array.dimensions().index_of_unchecked(&index);
+
+        let elem = jlrs_array_data(self.array.unwrap(Private))
+            .cast::<AtomicValueRef<M>>()
+            .add(idx);
+
+        match (&*elem).load(Ordering::Relaxed) {
+            Some(elem) => Some(elem.root(target)),
+            None => None,
+        }
+    }
+
+    /// Temporarily converts this accessor to a slice.
+    pub fn as_slice<'a>(&'a self) -> &'a [AtomicValueRef<M>] {
+        unsafe {
+            let sz = self.array.dimensions().size();
+            let ptr = jlrs_array_data(self.array.unwrap(Private)).cast();
+            std::slice::from_raw_parts(ptr, sz)
+        }
+    }
+
+    /// Converts this accessor into a slice.
+    pub fn into_slice(self) -> &'borrow [AtomicValueRef<M>] {
+        unsafe {
+            let sz = self.array.dimensions().size();
+            let ptr = jlrs_array_data(self.array.unwrap(Private)).cast();
+            std::slice::from_raw_parts(ptr, sz)
+        }
+    }
+}
+
+impl<'borrow, 'scope, 'data, T, M: Managed<'scope, 'data>, D: Dims, const N: isize> Index<D>
+    for ManagedAccessor<'borrow, 'scope, 'data, T, M, N>
+{
+    type Output = AtomicValueRef<M>;
+
+    fn index(&self, index: D) -> &Self::Output {
+        let array_dims = self.array.dimensions();
+        let idx = array_dims.index_of(&index).unwrap();
+
+        unsafe {
+            let elem = jlrs_array_data(self.array.unwrap(Private))
+                .cast::<Self::Output>()
+                .add(idx);
+
+            &*elem
+        }
+    }
+}
+
+impl<'scope, 'data, T, M: Managed<'scope, 'data>, const N: isize> Accessor<'scope, 'data, T, N>
+    for ManagedAccessor<'_, 'scope, 'data, T, M, N>
+{
+    #[inline]
+    fn array(&self) -> &ArrayBase<'scope, 'data, T, N> {
+        &self.array
+    }
+}
+
+/// A mutable accessor for managed data.
+#[repr(transparent)]
+pub struct ManagedAccessorMut<'borrow, 'scope, 'data, T, M: Managed<'scope, 'data>, const N: isize>
+{
+    array: ArrayBase<'scope, 'data, T, N>,
+    _data: PhantomData<&'borrow mut [Option<Ref<'scope, 'data, M>>]>,
+}
+
+impl<'borrow, 'scope, 'data, T, M: Managed<'scope, 'data>, const N: isize> Deref
+    for ManagedAccessorMut<'borrow, 'scope, 'data, T, M, N>
+{
+    type Target = ManagedAccessor<'borrow, 'scope, 'data, T, M, N>;
+
+    fn deref(&self) -> &Self::Target {
+        unsafe { std::mem::transmute(self) }
+    }
+}
+
+impl<'borrow, 'scope, 'data, T, M, const N: isize>
+    ManagedAccessorMut<'borrow, 'scope, 'data, T, M, N>
+where
+    M: Managed<'scope, 'data>,
+{
+    pub(crate) unsafe fn new(array: &'borrow mut ArrayBase<'scope, 'data, T, N>) -> Self {
+        ManagedAccessorMut {
+            array: *array,
+            _data: PhantomData,
+        }
+    }
+}
+
+impl<'scope, 'data, T, M: Managed<'scope, 'data>, const N: isize> Accessor<'scope, 'data, T, N>
+    for ManagedAccessorMut<'_, 'scope, 'data, T, M, N>
+{
+    #[inline]
+    fn array(&self) -> &ArrayBase<'scope, 'data, T, N> {
+        &self.array
+    }
+}
+
+impl<'scope, 'data, T, M: Managed<'scope, 'data>, const N: isize> AccessorMut<'scope, 'data, T, N>
+    for ManagedAccessorMut<'_, 'scope, 'data, T, M, N>
+{
+}
+
+/// An accessor for bits-union data.
+#[repr(transparent)]
+pub struct BitsUnionAccessor<'borrow, 'scope, 'data, T, const N: isize> {
+    array: ArrayBase<'scope, 'data, T, N>,
+    _data: PhantomData<&'borrow [MaybeUninit<u8>]>,
+}
+
+impl<'borrow, 'scope, 'data, T, const N: isize> BitsUnionAccessor<'borrow, 'scope, 'data, T, N> {
+    pub(crate) unsafe fn new(array: &'borrow ArrayBase<'scope, 'data, T, N>) -> Self {
+        BitsUnionAccessor {
+            array: *array,
+            _data: PhantomData,
+        }
+    }
+
+    pub fn get<L, D>(&self, index: D) -> JlrsResult<Option<L>>
     where
-        T: 'static + ValidField + Clone,
+        L: ValidField + IsBits,
         D: Dims,
     {
-        let elty = self.array.element_type();
-        let idx = self.dimensions().index_of(&index)?;
+        let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
+        let array = self.array;
+        let elty = array.element_type();
+        let idx = array.dimensions().index_of(&index);
+        if let Some(idx) = idx {
+            unsafe {
+                let tags = jlrs_array_typetagdata(array.unwrap(Private));
+                let mut tag = *tags.add(idx) as _;
 
-        // Safety: The index is in bounds and layout compatibility is checked.
-        unsafe {
-            let tags = jl_array_typetagdata(self.array.unwrap(Private));
-            let mut tag = *tags.add(idx) as _;
-
-            if let Some(ty) = nth_union_component(elty, &mut tag) {
-                if T::valid_field(ty) {
-                    let offset = idx * self.array.unwrap_non_null(Private).as_ref().elsize as usize;
-                    let ptr = self.array.data_ptr().cast::<i8>().add(offset).cast::<T>();
-                    return Ok((&*ptr).clone());
+                if let Some(ty) = nth_union_component(elty, &mut tag) {
+                    if L::valid_field(ty) {
+                        let offset = idx * array.element_size();
+                        let ptr = array.data_ptr().cast::<u8>().add(offset).cast::<L>();
+                        return Ok(Some(ptr.read()));
+                    }
+                    Err(AccessError::InvalidLayout {
+                        value_type: ty.display_string_or(CANNOT_DISPLAY_TYPE),
+                    })?
                 }
-                Err(AccessError::InvalidLayout {
-                    value_type: ty.display_string_or(CANNOT_DISPLAY_TYPE),
+
+                Err(AccessError::IllegalUnionTag {
+                    union_type: elty.display_string_or(CANNOT_DISPLAY_TYPE),
+                    tag: tag as usize,
                 })?
             }
-
-            Err(AccessError::IllegalUnionTag {
-                union_type: elty.display_string_or(CANNOT_DISPLAY_TYPE),
-                tag: tag as usize,
-            })?
+        } else {
+            Ok(None)
         }
+    }
+
+    pub unsafe fn get_unchecked<L, D>(&self, index: D) -> L
+    where
+        L: ValidField + IsBits,
+        D: Dims,
+    {
+        let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
+        let array = self.array;
+        let idx = array.dimensions().index_of_unchecked(&index);
+        let offset = idx * array.element_size();
+        let ptr = array.data_ptr().cast::<u8>().add(offset).cast::<L>();
+        ptr.read()
     }
 }
 
-impl<'borrow, 'array, 'data> UnionArrayAccessor<'borrow, 'array, 'data, Mutable<'borrow, u8>> {
-    /// Set the element at index `idx` to `value` with the type `ty`.
-    ///
-    /// The type `T` must be a valid layout for the value, and `ty` must be a member of the union
-    /// of all possible element types.
+impl<'scope, 'data, T, const N: isize> Accessor<'scope, 'data, T, N>
+    for BitsUnionAccessor<'_, 'scope, 'data, T, N>
+{
     #[inline]
-    pub unsafe fn set<T, D>(&mut self, index: D, ty: DataType, value: T) -> JlrsResult<()>
+    fn array(&self) -> &ArrayBase<'scope, 'data, T, N> {
+        &self.array
+    }
+}
+
+/// A mutable accessor for bits-union data.
+#[repr(transparent)]
+pub struct BitsUnionAccessorMut<'borrow, 'scope, 'data, T, const N: isize> {
+    array: ArrayBase<'scope, 'data, T, N>,
+    _data: PhantomData<&'borrow mut [MaybeUninit<u8>]>,
+}
+
+impl<'borrow, 'scope, 'data, T, const N: isize> Deref
+    for BitsUnionAccessorMut<'borrow, 'scope, 'data, T, N>
+{
+    type Target = BitsUnionAccessor<'borrow, 'scope, 'data, T, N>;
+
+    fn deref(&self) -> &Self::Target {
+        unsafe { std::mem::transmute(self) }
+    }
+}
+
+impl<'scope, 'data, T, const N: isize> Accessor<'scope, 'data, T, N>
+    for BitsUnionAccessorMut<'_, 'scope, 'data, T, N>
+{
+    #[inline]
+    fn array(&self) -> &ArrayBase<'scope, 'data, T, N> {
+        &self.array
+    }
+}
+
+impl<'scope, 'data, T, const N: isize> AccessorMut<'scope, 'data, T, N>
+    for BitsUnionAccessorMut<'_, 'scope, 'data, T, N>
+{
+}
+
+impl<'borrow, 'scope, 'data, T, const N: isize> BitsUnionAccessorMut<'borrow, 'scope, 'data, T, N> {
+    pub(crate) unsafe fn new(array: &'borrow mut ArrayBase<'scope, 'data, T, N>) -> Self {
+        BitsUnionAccessorMut {
+            array: *array,
+            _data: PhantomData,
+        }
+    }
+
+    /// Sets the element at `index` to `value`.
+    ///
+    /// Returns a nested error. The outer error is returned if the index is out-of-bounds, the
+    /// inner error is returned if `L` is not a variant of the element type.
+    pub fn set_typed<L, D>(&mut self, index: D, value: L) -> Result<JlrsResult<()>, L>
     where
-        T: 'static + ValidField + Clone,
+        L: ConstructType + ValidField + IsBits + HasLayout<'static, 'static, Layout = L>,
         D: Dims,
     {
-        if !T::valid_field(ty.as_value()) {
+        self.set_typed_layout(index, TypedLayout::<L, L>::new(value))
+            .map_err(TypedLayout::into_layout)
+    }
+
+    /// Sets the element at `index` to `value`.
+    ///
+    /// Returns a nested error. The outer error is returned if the index is out-of-bounds, the
+    /// inner error is returned if `L` is not a variant of the element type.
+    pub fn set_typed_layout<U, L, D>(
+        &mut self,
+        index: D,
+        value: TypedLayout<L, U>,
+    ) -> Result<JlrsResult<()>, TypedLayout<L, U>>
+    where
+        U: ConstructType + HasLayout<'static, 'static, Layout = L>,
+        L: ValidField + IsBits,
+        D: Dims,
+    {
+        let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
+        let ty = unsafe {
+            let unrooted = Unrooted::new();
+            U::construct_type(unrooted).as_value()
+        };
+
+        let mut tag = 0;
+        let array = self.array;
+        let elty = array.element_type();
+        if !find_union_component(elty, ty, &mut tag) {
+            let element_type = elty.display_string_or(CANNOT_DISPLAY_TYPE);
+            let value_type = ty.display_string_or(CANNOT_DISPLAY_TYPE);
+            return Ok(Err(Box::new(JlrsError::TypeError(
+                TypeError::IncompatibleType {
+                    element_type,
+                    value_type,
+                },
+            ))));
+        }
+
+        let idx = array.dimensions().index_of(&index);
+        if let Some(idx) = idx {
+            // Safety: The data can be stored in this array, the tag is updated accordingly.
+            unsafe {
+                let offset = idx * self.array.element_size() as usize;
+                array
+                    .data_ptr()
+                    .cast::<u8>()
+                    .add(offset)
+                    .cast::<L>()
+                    .write(value.into_layout());
+
+                jlrs_array_typetagdata(self.array.unwrap(Private))
+                    .add(idx)
+                    .write(tag as _);
+            }
+
+            Ok(Ok(()))
+        } else {
+            Err(value)
+        }
+    }
+
+    /// Sets the element at `index` to `value`.
+    ///
+    /// Safety: `index` must be in-bounds and `U` must be a valid variant of the element type.
+    pub unsafe fn set_typed_unchecked<L, D>(&mut self, index: D, value: L)
+    where
+        L: ConstructType + ValidField + IsBits + HasLayout<'static, 'static, Layout = L>,
+        D: Dims,
+    {
+        self.set_typed_layout_unchecked(index, TypedLayout::<L, L>::new(value))
+    }
+
+    /// Sets the element at `index` to `value`.
+    ///
+    /// Safety: `index` must be in-bounds and `U` must be a valid variant of the element type.
+    pub unsafe fn set_typed_layout_unchecked<U, L, D>(&mut self, index: D, value: TypedLayout<L, U>)
+    where
+        U: ConstructType + HasLayout<'static, 'static, Layout = L>,
+        L: ValidField + IsBits,
+        D: Dims,
+    {
+        let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
+        let ty = {
+            let unrooted = Unrooted::new();
+            U::construct_type(unrooted).as_value()
+        };
+
+        debug_assert!(ty.is::<DataType>());
+        debug_assert!(ty.cast_unchecked::<DataType>().is_bits());
+
+        let mut tag = 0;
+        let elty = self.array.element_type();
+        let success = find_union_component(elty, ty, &mut tag);
+
+        debug_assert!(success);
+
+        let idx = self.array.dimensions().index_of_unchecked(&index);
+        let offset = idx * self.array.element_size() as usize;
+        self.array
+            .data_ptr()
+            .cast::<u8>()
+            .add(offset)
+            .cast::<L>()
+            .write(value.into_layout());
+
+        jlrs_array_typetagdata(self.array.unwrap(Private))
+            .add(idx)
+            .write(tag as _);
+    }
+
+    /// Sets the element at `index` to `value` using `ty` as the type.
+    ///
+    /// Returns an error if `ty` is not a valid variant of the element type, returns `None` if
+    /// `index` is out-of-bounds.
+    pub fn set<L, D>(&mut self, index: D, ty: DataType, value: L) -> Result<JlrsResult<()>, L>
+    where
+        L: ValidField + IsBits,
+        D: Dims,
+    {
+        let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
+        if !L::valid_field(ty.as_value()) {
             let value_type = ty.display_string_or(CANNOT_DISPLAY_TYPE).into();
-            Err(AccessError::InvalidLayout { value_type })?;
+            return Ok(Err(Box::new(JlrsError::AccessError(
+                AccessError::InvalidLayout { value_type },
+            ))));
         }
 
         let mut tag = 0;
@@ -703,28 +1566,122 @@ impl<'borrow, 'array, 'data> UnionArrayAccessor<'borrow, 'array, 'data, Mutable<
         if !find_union_component(elty, ty.as_value(), &mut tag) {
             let element_type = elty.display_string_or(CANNOT_DISPLAY_TYPE);
             let value_type = ty.display_string_or(CANNOT_DISPLAY_TYPE);
-            Err(TypeError::IncompatibleType {
-                element_type,
-                value_type,
-            })?;
+            return Ok(Err(Box::new(JlrsError::TypeError(
+                TypeError::IncompatibleType {
+                    element_type,
+                    value_type,
+                },
+            ))));
         }
 
-        let idx = self.dimensions().index_of(&index)?;
-        // Safety: The data can be stored in this array, the tag is updated accordingly.
-        {
-            let offset = idx * self.array.unwrap_non_null(Private).as_ref().elsize as usize;
-            self.array
-                .data_ptr()
-                .cast::<i8>()
-                .add(offset)
-                .cast::<T>()
-                .write(value);
+        let idx = self.array.dimensions().index_of(&index);
+        if let Some(idx) = idx {
+            // Safety: The data can be stored in this array, the tag is updated accordingly.
+            unsafe {
+                let offset = idx * self.array.element_size() as usize;
+                self.array
+                    .data_ptr()
+                    .cast::<u8>()
+                    .add(offset)
+                    .cast::<L>()
+                    .write(value);
 
-            jl_array_typetagdata(self.array.unwrap(Private))
-                .add(idx)
-                .write(tag as _);
+                jlrs_array_typetagdata(self.array.unwrap(Private))
+                    .add(idx)
+                    .write(tag as _);
+            }
+
+            Ok(Ok(()))
+        } else {
+            Err(value)
         }
-
-        Ok(())
     }
+
+    /// Sets the element at `index` to `value` using `ty` as the type.
+    ///
+    /// Safety: `ty` must be a valid variant of the element type, `index` must be in-bounds.
+    pub unsafe fn set_unchecked<L, D>(&mut self, index: D, ty: DataType, value: L)
+    where
+        L: ValidField + IsBits,
+        D: Dims,
+    {
+        let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
+        let mut tag = 0;
+        let array = self.array;
+        let elty = array.element_type();
+        let success = find_union_component(elty, ty.as_value(), &mut tag);
+        debug_assert!(success);
+
+        let idx = array.dimensions().index_of_unchecked(&index);
+        let offset = idx * self.array.element_size() as usize;
+        array
+            .data_ptr()
+            .cast::<u8>()
+            .add(offset)
+            .cast::<L>()
+            .write(value);
+
+        jlrs_array_typetagdata(self.array.unwrap(Private))
+            .add(idx)
+            .write(tag as _);
+    }
+}
+
+/// An accessor for indeterminate data.
+#[repr(transparent)]
+pub struct IndeterminateAccessor<'borrow, 'scope, 'data, T, const N: isize> {
+    array: ArrayBase<'scope, 'data, T, N>,
+    _data: PhantomData<&'borrow [MaybeUninit<u8>]>,
+}
+
+impl<'borrow, 'scope, 'data, T, const N: isize>
+    IndeterminateAccessor<'borrow, 'scope, 'data, T, N>
+{
+    pub(crate) unsafe fn new(array: &'borrow ArrayBase<'scope, 'data, T, N>) -> Self {
+        IndeterminateAccessor {
+            array: *array,
+            _data: PhantomData,
+        }
+    }
+}
+
+impl<'scope, 'data, T, const N: isize> Accessor<'scope, 'data, T, N>
+    for IndeterminateAccessor<'_, 'scope, 'data, T, N>
+{
+    #[inline]
+    fn array(&self) -> &ArrayBase<'scope, 'data, T, N> {
+        &self.array
+    }
+}
+
+/// A mutable accessor for indeterminate data.
+#[repr(transparent)]
+pub struct IndeterminateAccessorMut<'borrow, 'scope, 'data, T, const N: isize> {
+    array: ArrayBase<'scope, 'data, T, N>,
+    _data: PhantomData<&'borrow mut [MaybeUninit<u8>]>,
+}
+
+impl<'borrow, 'scope, 'data, T, const N: isize>
+    IndeterminateAccessorMut<'borrow, 'scope, 'data, T, N>
+{
+    pub(crate) unsafe fn new(array: &'borrow mut ArrayBase<'scope, 'data, T, N>) -> Self {
+        IndeterminateAccessorMut {
+            array: *array,
+            _data: PhantomData,
+        }
+    }
+}
+
+impl<'scope, 'data, T, const N: isize> Accessor<'scope, 'data, T, N>
+    for IndeterminateAccessorMut<'_, 'scope, 'data, T, N>
+{
+    #[inline]
+    fn array(&self) -> &ArrayBase<'scope, 'data, T, N> {
+        &self.array
+    }
+}
+
+impl<'scope, 'data, T, const N: isize> AccessorMut<'scope, 'data, T, N>
+    for IndeterminateAccessorMut<'_, 'scope, 'data, T, N>
+{
 }

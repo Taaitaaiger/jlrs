@@ -3,18 +3,15 @@
 use std::{
     fmt::{Debug, Formatter, Result as FmtResult},
     marker::PhantomData,
-    ptr::NonNull,
+    ptr::{null_mut, NonNull},
 };
 
 use jl_sys::{
-    jl_alloc_svec, jl_alloc_svec_uninit, jl_emptysvec, jl_gc_wb, jl_simplevector_type,
-    jl_svec_data, jl_svec_t,
+    jl_alloc_svec, jl_alloc_svec_uninit, jl_emptysvec, jl_simplevector_type, jl_svec_copy,
+    jl_svec_t, jlrs_svec_data, jlrs_svec_len, jlrs_svecref, jlrs_svecset,
 };
 
-use super::{
-    datatype::DataType, private::ManagedPriv, value::ValueRef, Managed, ManagedRef, ManagedType,
-    Ref,
-};
+use super::{datatype::DataType, private::ManagedPriv, AtomicSlice, Managed, ManagedData, Ref};
 use crate::{
     data::{
         layout::valid_layout::{ValidField, ValidLayout},
@@ -28,72 +25,57 @@ use crate::{
 
 /// Access the content of a `SimpleVector`.
 #[repr(transparent)]
-pub struct SimpleVectorContent<'scope, 'borrow, T = ValueRef<'scope, 'static>>(
-    NonNull<jl_svec_t>,
-    PhantomData<&'scope ()>,
-    PhantomData<&'borrow [Option<T>]>,
-);
-
-impl<'scope, 'borrow, T: ManagedRef<'scope, 'static>> SimpleVectorContent<'scope, 'borrow, T> {
-    /// Returns the length of this `SimpleVector`.
-    #[inline]
-    pub fn len(&self) -> usize {
-        // Safety: the pointer points to valid data
-        unsafe { self.0.as_ref().length }
-    }
-
-    /// Returns the content of this `SimpleVector` as a slice.
-    #[inline]
-    pub fn as_slice(&self) -> &'borrow [Option<T>] {
-        // Safety: the C API function is called with valid data
-        unsafe { std::slice::from_raw_parts(jl_svec_data(self.0.as_ptr()).cast(), self.len()) }
-    }
-
-    /// Returns the content of this `SimpleVector` as a slice.
-    ///
-    /// Safety: the `SimpleVector` must not contain any undefined references.
-    #[inline]
-    pub unsafe fn as_slice_non_null_managed(&self) -> &'borrow [T::Managed] {
-        // Safety: the C API function is called with valid data
-        std::slice::from_raw_parts(jl_svec_data(self.0.as_ptr()).cast(), self.len())
-    }
-}
-
-/// Access and mutate the content of a `SimpleVector`.
-#[repr(transparent)]
-pub struct SimpleVectorContentMut<'scope, 'borrow, T = ValueRef<'scope, 'static>>(
-    NonNull<jl_svec_t>,
-    PhantomData<&'scope ()>,
-    PhantomData<&'borrow mut [Option<T>]>,
+pub struct SimpleVectorAccessor<'borrow, T = Value<'borrow, 'static>>(
+    SimpleVector<'borrow>,
+    PhantomData<&'borrow AtomicSlice<'borrow, 'static, T, SimpleVector<'borrow>>>,
 )
 where
-    T: ManagedRef<'scope, 'static>;
+    T: Managed<'borrow, 'static>;
 
-impl<'scope, 'borrow, T: ManagedRef<'scope, 'static>> SimpleVectorContentMut<'scope, 'borrow, T> {
+impl<'borrow, T> SimpleVectorAccessor<'borrow, T>
+where
+    T: Managed<'borrow, 'static>,
+{
     /// Returns the length of this `SimpleVector`.
     #[inline]
     pub fn len(&self) -> usize {
         // Safety: the pointer points to valid data
-        unsafe { self.0.as_ref().length }
+        unsafe { jlrs_svec_len(self.0.unwrap(Private)) }
     }
 
-    /// Returns the contents of this `SimpleVector` as a slice.
-    #[inline]
-    pub fn as_slice(&self) -> &'borrow [Option<T>] {
-        // Safety: the C API function is called with valid data
-        unsafe { std::slice::from_raw_parts(jl_svec_data(self.0.as_ptr()).cast(), self.len()) }
+    /// Get the element at `index`. Returns `None` if the field is undefined or out-of-bounds.
+    pub fn get<'target, Tgt>(
+        &self,
+        target: Tgt,
+        index: usize,
+    ) -> Option<ManagedData<'target, 'static, Tgt, T::InScope<'target>>>
+    where
+        Tgt: Target<'target>,
+    {
+        if index >= self.len() {
+            return None;
+        }
+
+        unsafe {
+            let v = jlrs_svecref(self.0.unwrap(Private).cast(), index);
+            if v.is_null() {
+                None
+            } else {
+                let v = Value::wrap_non_null(NonNull::new_unchecked(v), Private)
+                    .cast_unchecked::<T>()
+                    .root(target);
+
+                Some(v)
+            }
+        }
     }
 
     /// Set the element at `index` to `value`. This is only safe if the `SimpleVector` has just
     /// been allocated.
     ///
-    /// Safety: you may only mutate a `SimpleVector` after creating it, they should generally be
+    /// Safety: you should only mutate a `SimpleVector` after creating it, they should generally be
     /// considered immutable.
-    pub unsafe fn set(
-        &mut self,
-        index: usize,
-        value: Option<ManagedType<'_, 'scope, 'static, T>>,
-    ) -> JlrsResult<()> {
+    pub unsafe fn set(&self, index: usize, value: Option<T::InScope<'_>>) -> JlrsResult<()> {
         if index >= self.len() {
             Err(AccessError::OutOfBoundsSVec {
                 idx: index,
@@ -101,16 +83,27 @@ impl<'scope, 'borrow, T: ManagedRef<'scope, 'static>> SimpleVectorContentMut<'sc
             })?
         }
 
-        jl_svec_data(self.0.as_ptr())
-            .cast::<Option<ManagedType<'_, 'scope, 'static, T>>>()
-            .add(index)
-            .write(value);
-
-        if let Some(value) = value {
-            jl_gc_wb(self.0.as_ptr().cast(), value.unwrap(Private).cast());
+        let v = match value {
+            Some(v) => v.unwrap(Private).cast(),
+            None => null_mut(),
         };
 
+        jlrs_svecset(self.0.unwrap(Private).cast(), index as _, v);
         Ok(())
+    }
+
+    /// Returns the content of this `SimpleVector` as an `AtomicSlice`.
+    #[inline]
+    pub fn as_atomic_slice<'b>(
+        &'b self,
+    ) -> AtomicSlice<'b, 'static, T::InScope<'b>, SimpleVector<'b>> {
+        // Safety: the C API function is called with valid data
+        let slice = unsafe {
+            let data = jlrs_svec_data(self.0.unwrap(Private)).cast();
+            std::slice::from_raw_parts(data, self.len())
+        };
+
+        AtomicSlice::new(self.0, slice)
     }
 }
 
@@ -122,9 +115,9 @@ pub struct SimpleVector<'scope>(NonNull<jl_svec_t>, PhantomData<&'scope ()>);
 impl<'scope> SimpleVector<'scope> {
     /// Create a new `SimpleVector` that can hold `n` values.
     #[inline]
-    pub fn with_capacity<T>(target: T, n: usize) -> SimpleVectorData<'scope, T>
+    pub fn with_capacity<Tgt>(target: Tgt, n: usize) -> SimpleVectorData<'scope, Tgt>
     where
-        T: Target<'scope>,
+        Tgt: Target<'scope>,
     {
         // Safety: the allocated data is immediately rooted
         unsafe {
@@ -138,72 +131,31 @@ impl<'scope> SimpleVector<'scope> {
     /// Safety: The contents must be set before calling Julia again, the contents must never be
     /// accessed before all elements are set.
     #[inline]
-    pub unsafe fn with_capacity_uninit<T>(target: T, n: usize) -> SimpleVectorData<'scope, T>
+    pub unsafe fn with_capacity_uninit<Tgt>(target: Tgt, n: usize) -> SimpleVectorData<'scope, Tgt>
     where
-        T: Target<'scope>,
+        Tgt: Target<'scope>,
     {
         let svec = NonNull::new_unchecked(jl_alloc_svec_uninit(n));
         target.data_from_ptr(svec, Private)
     }
 
-    /// Access the contents of this `SimpleVector` as `ValueRef`.
-    // TODO: ledger
+    /// Copy an existing `SimpleVector`.
     #[inline]
-    pub fn data<'borrow>(&'borrow self) -> SimpleVectorContent<'scope, 'borrow> {
-        SimpleVectorContent(self.unwrap_non_null(Private), PhantomData, PhantomData)
+    pub fn copy<'target, Tgt>(self, target: Tgt) -> SimpleVectorData<'target, Tgt>
+    where
+        Tgt: Target<'target>,
+    {
+        unsafe {
+            let svec = jl_svec_copy(self.unwrap(Private));
+            let svec = SimpleVector::wrap_non_null(NonNull::new_unchecked(svec), Private);
+            svec.root(target)
+        }
     }
 
-    /// Mutably ccess the contents of this `SimpleVector` as `ValueRef`.
+    /// Immutably access the contents of this `SimpleVector`.
     #[inline]
-    pub unsafe fn data_mut<'borrow>(&'borrow mut self) -> SimpleVectorContentMut<'scope, 'borrow> {
-        SimpleVectorContentMut(self.unwrap_non_null(Private), PhantomData, PhantomData)
-    }
-
-    /// Access the contents of this `SimpleVector` as `U`.
-    ///
-    /// This method returns a `JlrsError::AccessError` if `U` isn't correct for all elements.
-    // TODO: ledger
-    pub fn typed_data<'borrow, U>(
-        &'borrow self,
-    ) -> JlrsResult<SimpleVectorContent<'scope, 'borrow, U>>
-    where
-        U: ManagedRef<'scope, 'static>,
-        Option<U>: ValidField,
-    {
-        if !self.is_typed::<U>() {
-            Err(AccessError::InvalidLayout {
-                value_type: String::from("this SimpleVector"),
-            })?;
-        }
-
-        Ok(SimpleVectorContent(
-            self.unwrap_non_null(Private),
-            PhantomData,
-            PhantomData,
-        ))
-    }
-
-    /// Mutably access the contents of this `SimpleVector` as `U`.
-    ///
-    /// This method returns a `JlrsError::AccessError` if `U` isn't correct for all elements.
-    pub unsafe fn typed_data_mut<'borrow, U>(
-        &'borrow mut self,
-    ) -> JlrsResult<SimpleVectorContentMut<'scope, 'borrow, U>>
-    where
-        U: ManagedRef<'scope, 'static>,
-        Option<U>: ValidField,
-    {
-        if !self.is_typed::<U>() {
-            Err(AccessError::InvalidLayout {
-                value_type: String::from("this SimpleVector"),
-            })?;
-        }
-
-        Ok(SimpleVectorContentMut(
-            self.unwrap_non_null(Private),
-            PhantomData,
-            PhantomData,
-        ))
+    pub fn data<'borrow>(&'borrow self) -> SimpleVectorAccessor<'borrow> {
+        SimpleVectorAccessor(*self, PhantomData)
     }
 
     /// Access the contents of this `SimpleVector` as `U`.
@@ -212,71 +164,25 @@ impl<'scope> SimpleVector<'scope> {
     #[inline]
     pub unsafe fn typed_data_unchecked<'borrow, U>(
         &'borrow self,
-    ) -> SimpleVectorContent<'scope, 'borrow, U>
+    ) -> SimpleVectorAccessor<'borrow, U>
     where
-        U: ManagedRef<'scope, 'static>,
+        U: Managed<'borrow, 'static>,
     {
-        SimpleVectorContent(self.unwrap_non_null(Private), PhantomData, PhantomData)
-    }
-
-    /// Mutably access the contents of this `SimpleVector` as `U`.
-    ///
-    /// Safety: this method doesn't check if `U` is correct for all elements.
-    #[inline]
-    pub unsafe fn typed_data_mut_unchecked<'borrow, U>(
-        &'borrow mut self,
-    ) -> SimpleVectorContentMut<'scope, 'borrow, U>
-    where
-        U: ManagedRef<'scope, 'static>,
-    {
-        SimpleVectorContentMut(self.unwrap_non_null(Private), PhantomData, PhantomData)
-    }
-
-    fn is_typed<U>(self) -> bool
-    where
-        U: ManagedRef<'scope, 'static>,
-        Option<U>: ValidField,
-    {
-        // Safety: the pointer points to valid data
-        unsafe {
-            let len = self.unwrap_non_null(Private).as_ref().length;
-            let ptr = self.unwrap_non_null(Private).as_ptr();
-            let slice =
-                std::slice::from_raw_parts(jl_svec_data(ptr).cast::<Option<ValueRef>>(), len);
-
-            for element in slice.iter().copied() {
-                match element {
-                    Some(value) => {
-                        let value = value.as_value();
-                        if !Option::<U>::valid_field(value.datatype().as_value()) {
-                            return false;
-                        }
-                    }
-                    None => (),
-                }
-            }
-        }
-
-        true
+        SimpleVectorAccessor(*self, PhantomData)
     }
 
     /// Returns the length of this `SimpleVector`.
     #[inline]
     pub fn len(&self) -> usize {
         // Safety: the pointer points to valid data
-        unsafe { self.0.as_ref().length }
-    }
-
-    #[inline]
-    pub unsafe fn value_slice_unchecked<'a>(&'a self) -> &'a [Value<'scope, 'static>] {
-        unsafe { std::slice::from_raw_parts(jl_svec_data(self.0.as_ptr()).cast(), self.len()) }
+        unsafe { jlrs_svec_len(self.0.as_ptr()) }
     }
 }
 
 impl<'base> SimpleVector<'base> {
     /// The empty `SimpleVector`.
     #[inline]
-    pub fn emptysvec<T: Target<'base>>(_: &T) -> Self {
+    pub fn emptysvec<Tgt: Target<'base>>(_: &Tgt) -> Self {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_emptysvec), Private) }
     }
@@ -302,7 +208,7 @@ impl<'scope> Debug for SimpleVector<'scope> {
 
 impl<'scope> ManagedPriv<'scope, '_> for SimpleVector<'scope> {
     type Wraps = jl_svec_t;
-    type TypeConstructorPriv<'target, 'da> = SimpleVector<'target>;
+    type WithLifetimes<'target, 'da> = SimpleVector<'target>;
     const NAME: &'static str = "SimpleVector";
 
     // Safety: `inner` must not have been freed yet, the result must never be
@@ -360,13 +266,14 @@ unsafe impl<'scope> ValidField for Option<SimpleVectorRef<'scope>> {
 
 use crate::memory::target::TargetType;
 
-/// `SimpleVector` or `SimpleVectorRef`, depending on the target type `T`.
-pub type SimpleVectorData<'target, T> =
-    <T as TargetType<'target>>::Data<'static, SimpleVector<'target>>;
+/// `SimpleVector` or `SimpleVectorRef`, depending on the target type `Tgt`.
+pub type SimpleVectorData<'target, Tgt> =
+    <Tgt as TargetType<'target>>::Data<'static, SimpleVector<'target>>;
 
 /// `JuliaResult<SimpleVector>` or `JuliaResultRef<SimpleVectorRef>`, depending on the target type
-/// `T`.
-pub type SimpleVectorResult<'target, T> = TargetResult<'target, 'static, SimpleVector<'target>, T>;
+/// `Tgt`.
+pub type SimpleVectorResult<'target, Tgt> =
+    TargetResult<'target, 'static, SimpleVector<'target>, Tgt>;
 
 impl_ccall_arg_managed!(SimpleVector, 1);
 impl_into_typed!(SimpleVector);

@@ -481,7 +481,7 @@ pub struct Immut<'scope, 'data> {
 }
 
 #[repr(C)]
-#[derive(Clone, Debug, Unbox, ValidLayout, Typecheck, IsBits, ConstructType)]
+#[derive(Clone, Debug, Unbox, ValidLayout, Typecheck, ConstructType)]
 #[jlrs(julia_type = "Main.MutF32")]
 pub struct MutF32 {
     pub a: f32,
@@ -768,8 +768,8 @@ pub struct WithSymbol<'scope> {
     Clone, Debug, Unbox, ValidLayout, Typecheck, ValidField, ConstructType, CCallArg, CCallReturn,
 )]
 #[jlrs(julia_type = "Main.WithTask")]
-pub struct WithTask<'scope> {
-    pub a: ::std::option::Option<::jlrs::data::managed::task::TaskRef<'scope>>,
+pub struct WithTask<'scope, 'data> {
+    pub a: ::std::option::Option<::jlrs::data::managed::value::ValueRef<'scope, 'data>>,
 }
 
 #[repr(C)]

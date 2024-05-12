@@ -1,6 +1,6 @@
 mod util;
 
-#[cfg(feature = "sync-rt")]
+#[cfg(feature = "local-rt")]
 mod tests {
     use std::borrow::Cow;
 
@@ -18,6 +18,7 @@ mod tests {
 
             let unwrapped_string = jlrs
                 .instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
                     frame.scope(|mut frame| {
                         let string = JuliaString::new(&mut frame, "Hellõ world!");
@@ -37,6 +38,7 @@ mod tests {
 
             let unwrapped_string = jlrs
                 .instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
                     frame.scope(|mut frame| {
                         let string = JuliaString::new(&mut frame, String::from("Hellõ world!"));
@@ -56,6 +58,7 @@ mod tests {
 
             let unwrapped_string = jlrs
                 .instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
                     frame.scope(|mut frame| {
                         let string = JuliaString::new(&mut frame, Cow::from("Hellõ world!"));
@@ -74,6 +77,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
                     let v = JuliaString::new(&mut frame, "Foo bar");
                     assert!(v.as_value().is::<JuliaString>());
@@ -97,6 +101,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
                     let string = JuliaString::new_bytes(&mut frame, &[129, 2, 0, 0]);
                     assert!(string.as_value().is::<JuliaString>());
@@ -124,6 +129,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
                     let string = JuliaString::new_bytes(&mut frame, &[1]);
 
@@ -144,6 +150,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
                     let string1 = JuliaString::new_bytes(&mut frame, &[129, 2, 0, 0]);
                     let string2 = JuliaString::new(&mut frame, "Foo").clone();
@@ -164,20 +171,14 @@ mod tests {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
-            jlrs.instance(&mut frame)
-                .scope(|mut frame| {
-                    let output = frame.output();
+            jlrs.instance(&mut frame).scope(|mut frame| {
+                let output = frame.output();
 
-                    frame
-                        .scope(|mut frame| {
-                            let string = JuliaString::new(&mut frame, "Foo");
-                            Ok(string.root(output))
-                        })
-                        .unwrap();
-
-                    Ok(())
-                })
-                .unwrap();
+                frame.scope(|mut frame| {
+                    let string = JuliaString::new(&mut frame, "Foo");
+                    string.root(output)
+                });
+            });
         });
     }
 

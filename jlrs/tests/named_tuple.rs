@@ -1,5 +1,5 @@
 mod util;
-#[cfg(feature = "sync-rt")]
+#[cfg(feature = "local-rt")]
 mod tests {
     use jlrs::{convert::to_symbol::ToSymbol, data::types::typecheck::NamedTuple, prelude::*};
 
@@ -11,6 +11,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
                     let name = "foo";
                     let value = Value::new(&mut frame, 1u32);
@@ -30,6 +31,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
                     let a_name = "a";
                     let a_value = Value::new(&mut frame, 1u32);

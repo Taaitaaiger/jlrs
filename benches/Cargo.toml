@@ -2,17 +2,25 @@
 name = "benches"
 version = "0.0.0"
 publish = false
-edition = "2018"
+edition = "2021"
+
+[features]
+lto = ["jlrs/lto"]
 
 [dependencies]
-jlrs = { version = "0.19", path = "../jlrs", features = ["full"] }
+jlrs = { version = "0.20", path = "../jlrs", features = ["full"] }
 
 [dev-dependencies]
-criterion = { version = "0.5", features = ["html_reports"] }
-pprof = { version = "0.12", features = ["flamegraph", "criterion"] }
+criterion = { version = "0.5", features = ["html_reports", "async"] }
+tokio ={ version = "1", features = ["rt"]}
+
+[target.'cfg(unix)'.dev-dependencies]
+pprof = { version = "0.13", features = ["flamegraph", "criterion"] }
 
 [profile.bench]
 debug = true
+lto = "thin"
+codegen-units = 1
 
 [[bench]]
 name = "call_function"
@@ -27,11 +35,27 @@ name = "array_access"
 harness = false
 
 [[bench]]
+name = "async_rt"
+harness = false
+
+[[bench]]
+name = "background_task"
+harness = false
+
+[[bench]]
 name = "frames"
 harness = false
 
 [[bench]]
 name = "module"
+harness = false
+
+[[bench]]
+name = "mt_rt_pool"
+harness = false
+
+[[bench]]
+name = "static_symbol"
 harness = false
 
 [[bench]]

@@ -21,16 +21,17 @@
 //!
 //! [blog post]: https://blog.rust-lang.org/inside-rust/2021/01/26/ffi-unwind-longjmp.html#pofs-and-stack-deallocating-functions
 
-use cfg_if::cfg_if;
+use std::ptr::NonNull;
 
-cfg_if! {
-    if #[cfg(feature = "c-unwind")] {
-        #[path ="impl_nightly.rs"]
-        mod imp;
-    } else {
-        #[path ="impl_stable.rs"]
-        mod imp;
-    }
-}
+#[path = "impl_stable.rs"]
+mod imp;
 
 pub use imp::catch_exceptions;
+use jl_sys::jl_value_t;
+
+use crate::{data::managed::private::ManagedPriv, prelude::Value, private::Private};
+
+#[inline]
+pub(crate) fn unwrap_exc(exc: Value) -> NonNull<jl_value_t> {
+    exc.unwrap_non_null(Private)
+}

@@ -144,18 +144,6 @@ function runbenches()
     b = @benchmark JuliaModuleTest.ForeignThing(Int32(-1)) gctrial = false gcsample = false
     show(stdout, MIME"text/plain"(), b)
     print("\n\n")
-
-    println("Benchmark async_callback")
-    scrubgc()
-    b = @benchmark JuliaModuleTest.async_callback(arr) gctrial = false gcsample = false
-    show(stdout, MIME"text/plain"(), b)
-    print("\n\n")
-
-    println("Benchmark generic_async_callback")
-    scrubgc()
-    b = @benchmark JuliaModuleTest.generic_async_callback(Float32(1.0)) gctrial = false gcsample = false
-    show(stdout, MIME"text/plain"(), b)
-    print("\n\n")
 end
 
 runbenches()

@@ -9,7 +9,7 @@ use jl_sys::{jl_bool_type, jl_unbox_int8};
 
 use super::is_bits::IsBits;
 use crate::{
-    convert::unbox::Unbox,
+    convert::{ccall_types::CCallReturn, unbox::Unbox},
     data::managed::{private::ManagedPriv, value::Value},
     impl_julia_typecheck, impl_valid_layout,
     private::Private,
@@ -81,6 +81,28 @@ unsafe impl Unbox for bool {
 }
 
 impl_ccall_arg!(Bool);
+
+unsafe impl CCallReturn for Bool {
+    type FunctionReturnType = Self;
+    type CCallReturnType = Self;
+    type ReturnAs = Self;
+
+    #[inline]
+    unsafe fn return_or_throw(self) -> Self::ReturnAs {
+        self
+    }
+}
+unsafe impl CCallReturn for bool {
+    type FunctionReturnType = Bool;
+    type CCallReturnType = Bool;
+    type ReturnAs = Bool;
+
+    #[inline]
+    unsafe fn return_or_throw(self) -> Self::ReturnAs {
+        Bool(self as i8)
+    }
+}
+
 impl_construct_julia_type!(Bool, jl_bool_type);
 
 unsafe impl IsBits for Bool {}

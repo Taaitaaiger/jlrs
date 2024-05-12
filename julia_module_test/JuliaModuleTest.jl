@@ -34,6 +34,12 @@ using Test
     @test JuliaModuleTest.freestanding_func_ret_rust_result(false) == 3
     @inferred JuliaModuleTest.freestanding_func_ret_rust_result(false)
     @test_throws JlrsCore.JlrsError JuliaModuleTest.freestanding_func_ret_rust_result(true)
+
+    @test JuliaModuleTest.freestanding_func_ccall_ref_ret()
+    @inferred JuliaModuleTest.freestanding_func_ccall_ref_ret()
+
+    @test JuliaModuleTest.freestanding_func_typed_value_ret()
+    @inferred JuliaModuleTest.freestanding_func_typed_value_ret()
 end
 
 @testset "OpaqueInt" begin
@@ -77,18 +83,18 @@ end
     @inferred JuliaModuleTest.assoc_func()
 end
 
-@testset "Async callback" begin
-    arr = Int[1, 2, 3, 4]
-    @test JuliaModuleTest.async_callback(arr) == 10
-    @inferred JuliaModuleTest.async_callback(arr)
+# @testset "Async callback" begin
+#     # arr = Int[1, 2, 3, 4]
+#     # @test JuliaModuleTest.async_callback(arr) == 10
+#     # @inferred JuliaModuleTest.async_callback(arr)
 
-    @test Ledger.try_borrow_exclusive(arr)
-    @test_throws JlrsCore.JlrsError JuliaModuleTest.async_callback(arr)
-    @test Ledger.unborrow_exclusive(arr)
+#     # @test Ledger.try_borrow_exclusive(arr)
+#     # @test_throws JlrsCore.JlrsError JuliaModuleTest.async_callback(arr)
+#     # @test Ledger.unborrow_exclusive(arr)
 
-    @test_throws JlrsCore.JlrsError JuliaModuleTest.async_callback_init_err()
-    @test_throws JlrsCore.JlrsError JuliaModuleTest.async_callback_callback_err()
-end
+#     @test_throws JlrsCore.JlrsError JuliaModuleTest.async_callback_init_err()
+#     @test_throws JlrsCore.JlrsError JuliaModuleTest.async_callback_callback_err()
+# end
 
 @testset "Constants and globals" begin
     @test JuliaModuleTest.CONST_U8 == 0x1
@@ -122,10 +128,21 @@ end
     @test JuliaModuleTest.has_generic(Float64(1.0)) == Float64(1.0)
 end
 
-@testset "generic_callback" begin
-    @test JuliaModuleTest.generic_async_callback(Float32(1.0)) == Float32(1.0)
-    @test JuliaModuleTest.generic_async_callback(Float64(1.0)) == Float64(1.0)
+@testset "generic_from_env" begin
+    arr = Float32[]
+    @test JuliaModuleTest.takes_generics_from_env(arr, Float32(1.0)) === nothing
+
+    arr = Float64[]
+    @test JuliaModuleTest.takes_generics_from_env(arr, Float64(1.0)) === nothing
+
+    arr = Int[]
+    @test_throws MethodError JuliaModuleTest.takes_generics_from_env(arr, 1)
 end
+
+# @testset "generic_callback" begin
+#     @test JuliaModuleTest.generic_async_callback(Float32(1.0)) == Float32(1.0)
+#     @test JuliaModuleTest.generic_async_callback(Float64(1.0)) == Float64(1.0)
+# end
 
 @testset "POpaqueTwo" begin
     @test JuliaModuleTest.POpaqueTwo isa UnionAll

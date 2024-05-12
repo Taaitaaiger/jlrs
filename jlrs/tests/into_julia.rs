@@ -1,6 +1,6 @@
 mod util;
 
-#[cfg(feature = "sync-rt")]
+#[cfg(feature = "local-rt")]
 mod tests {
     use std::{ffi::c_void, ptr::null_mut};
 
@@ -16,6 +16,7 @@ mod tests {
                     let mut jlrs = j.borrow_mut();
 
                     jlrs.instance(&mut frame)
+                        .returning::<JlrsResult<_>>()
                         .scope(|frame| unsafe {
                             let ty = <$type as IntoJulia>::julia_type(&frame).as_value();
                             assert_eq!(ty, DataType::$assoc_ty(&frame).as_value());
@@ -32,14 +33,12 @@ mod tests {
                     let mut frame = StackFrame::new();
                     let mut jlrs = j.borrow_mut();
 
-                    jlrs.instance(&mut frame)
-                        .scope(|frame| unsafe {
+                    jlrs.instance(&mut frame).scope(|frame| unsafe {
+                        frame.local_scope::<_, 0>(|frame| {
                             let val = $val.into_julia(&frame).as_value();
                             assert!(val.is::<$type>());
-
-                            Ok(())
                         })
-                        .unwrap();
+                    });
                 });
             }
         };
@@ -53,6 +52,7 @@ mod tests {
                     let mut jlrs = j.borrow_mut();
 
                     jlrs.instance(&mut frame)
+                        .returning::<JlrsResult<_>>()
                         .scope(|mut frame| unsafe {
                             let ty = <*mut $type as IntoJulia>::julia_type(&frame).as_value();
                             let args = [DataType::$assoc_ty(&frame).as_value()];
@@ -76,6 +76,7 @@ mod tests {
                     let mut jlrs = j.borrow_mut();
 
                     jlrs.instance(&mut frame)
+                        .returning::<JlrsResult<_>>()
                         .scope(|frame| unsafe {
                             let val = null_mut::<$type>().into_julia(&frame).as_value();
                             assert!(val.is::<*mut $type>());
@@ -189,6 +190,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|frame| unsafe {
                     let ty = <*mut c_void as IntoJulia>::julia_type(&frame).as_value();
                     assert_eq!(ty, DataType::voidpointer_type(&frame).as_value());
@@ -205,6 +207,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|frame| unsafe {
                     let val = null_mut::<c_void>().into_julia(&frame).as_value();
                     assert!(val.is::<*mut c_void>());

@@ -1,5 +1,4 @@
-
 [workspace]
-# members = ["benches", "examples", "jl_sys", "jlrs", "jlrs_macros", "julia_module_test"]
-members = ["examples", "jl_sys", "jlrs", "jlrs_macros"]
+resolver = "2"
+members = ["jlrs", "jlrs_macros", "jl_sys", "examples"]
 exclude = ["julia_module_test", "benches"]

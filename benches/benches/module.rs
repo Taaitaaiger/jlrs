@@ -1,5 +1,6 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use jlrs::{data::managed::module::JlrsCore, memory::target::frame::GcFrame, prelude::*};
+#[cfg(not(target_os = "windows"))]
 use pprof::{
     criterion::{Output, PProfProfiler},
     flamegraph::Options,
@@ -8,7 +9,7 @@ use pprof::{
 #[inline(never)]
 fn module_submodule(frame: &GcFrame, c: &mut Criterion) {
     c.bench_function("Module::submodule", |b| {
-        b.iter(|| Module::main(frame).submodule(frame, black_box("Base")))
+        b.iter(|| Module::jlrs_core(frame).submodule(frame, black_box("Wrap")))
     });
 }
 
@@ -41,24 +42,19 @@ fn module_global_cached(frame: &GcFrame, c: &mut Criterion) {
 }
 
 fn criterion_benchmark(c: &mut Criterion) {
-    unsafe {
-        let mut frame = StackFrame::new();
-        let mut julia = RuntimeBuilder::new().start().unwrap();
-        let mut julia = julia.instance(&mut frame);
+    let mut julia = Builder::new().start_local().unwrap();
 
-        julia
-            .scope(|frame| {
-                module_submodule(&frame, c);
-                module_submodule_cached(&frame, c);
-                module_global(&frame, c);
-                module_global_cached(&frame, c);
-
-                Ok(())
-            })
-            .unwrap();
-    }
+    julia.with_stack(|mut stack| {
+        stack.scope(|frame| {
+            module_submodule(&frame, c);
+            module_submodule_cached(&frame, c);
+            module_global(&frame, c);
+            module_global_cached(&frame, c);
+        });
+    })
 }
 
+#[cfg(not(target_os = "windows"))]
 fn opts() -> Option<Options<'static>> {
     let mut opts = Options::default();
     opts.image_width = Some(1920);
@@ -66,9 +62,17 @@ fn opts() -> Option<Options<'static>> {
     Some(opts)
 }
 
+#[cfg(not(target_os = "windows"))]
 criterion_group! {
     name = module;
     config = Criterion::default().with_profiler(PProfProfiler::new(1000, Output::Flamegraph(opts())));
+    targets = criterion_benchmark
+}
+
+#[cfg(target_os = "windows")]
+criterion_group! {
+    name = module;
+    config = Criterion::default();
     targets = criterion_benchmark
 }
 

@@ -1,7 +1,6 @@
 mod util;
 
-#[cfg(feature = "sync-rt")]
-#[cfg(not(feature = "julia-1-6"))]
+#[cfg(feature = "local-rt")]
 mod tests {
     use jlrs::prelude::*;
 
@@ -14,11 +13,11 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
-                    let arr_val = Array::new::<f32, _, _>(&mut frame, (1, 2)).into_jlrs_result()?;
-                    let arr = arr_val;
+                    let arr = TypedArray::<f32>::new(&mut frame, (1, 2)).into_jlrs_result()?;
 
-                    let data = unsafe { arr.copy_inline_data::<f32>()? };
+                    let data = unsafe { arr.bits_data().to_copied_array() };
                     assert_eq!(data.dimensions().as_slice(), &[1, 2]);
 
                     Ok(())

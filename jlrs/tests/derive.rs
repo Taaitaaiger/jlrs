@@ -1,7 +1,7 @@
-#[cfg(all(test, feature = "jlrs-derive", feature = "sync-rt"))]
+#[cfg(all(test, feature = "jlrs-derive", feature = "local-rt"))]
 mod derive_util;
 
-#[cfg(all(test, feature = "jlrs-derive", feature = "sync-rt"))]
+#[cfg(all(test, feature = "jlrs-derive", feature = "local-rt"))]
 mod tests {
     use jlrs::{
         data::types::construct_type::{ConstantBool, ConstructType},
@@ -16,6 +16,7 @@ mod tests {
 
             julia
                 .instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
                     let s = BitsTypeBool { a: Bool::new(true) };
                     let v = Value::new(&mut frame, s);
@@ -38,6 +39,7 @@ mod tests {
 
             julia
                 .instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
                     let a = HasElidedParam { a: 3.0 };
                     type ElidedParam<T, const U: bool> =
@@ -62,6 +64,7 @@ mod tests {
 
             julia
                 .instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
                     let main_mod = Module::main(&frame).as_ref();
                     let a = HasElidedParam { a: Some(main_mod) };
@@ -87,6 +90,7 @@ mod tests {
 
             julia
                 .instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| unsafe {
                     let constr = Module::main(&frame)
                         .global(&frame, "DoubleVariant")?
@@ -119,6 +123,7 @@ mod tests {
 
             julia
                 .instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| unsafe {
                     let constr = Module::main(&frame)
                         .global(&frame, "DoubleVariant")?
@@ -148,6 +153,7 @@ mod tests {
 
             julia
                 .instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| unsafe {
                     let constr = Module::main(&frame)
                         .global(&frame, "DoubleVariant")?
@@ -177,6 +183,7 @@ mod tests {
 
             julia
                 .instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
                     let ty = WithGenericTU::<isize, usize>::construct_type(&mut frame);
                     assert_eq!(
@@ -196,6 +203,7 @@ mod tests {
 
             julia
                 .instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
                     let s = BitsTypeChar { a: Char::new('b') };
                     let v = Value::new(&mut frame, s);
@@ -218,6 +226,7 @@ mod tests {
 
             julia
                 .instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
                     let s = BitsTypeUInt8 { a: 1 };
                     let v = Value::new(&mut frame, s);
@@ -240,6 +249,7 @@ mod tests {
 
             julia
                 .instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
                     let s = BitsTypeUInt16 { a: 2 };
                     let v = Value::new(&mut frame, s);
@@ -262,6 +272,7 @@ mod tests {
 
             julia
                 .instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
                     let s = BitsTypeUInt32 { a: 3 };
                     let v = Value::new(&mut frame, s);
@@ -284,6 +295,7 @@ mod tests {
 
             julia
                 .instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
                     let s = BitsTypeUInt64 { a: 4 };
                     let v = Value::new(&mut frame, s);
@@ -306,6 +318,7 @@ mod tests {
 
             julia
                 .instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
                     let s = BitsTypeUInt { a: 5 };
                     let v = Value::new(&mut frame, s);
@@ -328,6 +341,7 @@ mod tests {
 
             julia
                 .instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
                     let s = BitsTypeInt8 { a: -1 };
                     let v = Value::new(&mut frame, s);
@@ -350,6 +364,7 @@ mod tests {
 
             julia
                 .instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
                     let s = BitsTypeInt16 { a: -2 };
                     let v = Value::new(&mut frame, s);
@@ -372,6 +387,7 @@ mod tests {
 
             julia
                 .instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
                     let s = BitsTypeInt32 { a: -3 };
                     let v = Value::new(&mut frame, s);
@@ -394,6 +410,7 @@ mod tests {
 
             julia
                 .instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
                     let s = BitsTypeInt64 { a: -4 };
                     let v = Value::new(&mut frame, s);
@@ -416,6 +433,7 @@ mod tests {
 
             julia
                 .instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
                     let s = BitsTypeInt { a: -5 };
                     let v = Value::new(&mut frame, s);
@@ -438,6 +456,7 @@ mod tests {
 
             julia
                 .instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
                     let s = BitsTypeFloat32 { a: 1.2 };
                     let v = Value::new(&mut frame, s);
@@ -460,6 +479,7 @@ mod tests {
 
             julia
                 .instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
                     let s = BitsTypeFloat64 { a: -2.3 };
                     let v = Value::new(&mut frame, s);
@@ -482,6 +502,7 @@ mod tests {
 
             julia
                 .instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
                     let s = BitsCharFloat32Float64 {
                         a: Char::new('a'),
@@ -508,6 +529,7 @@ mod tests {
 
             julia
                 .instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
                     let s = BitsIntBool {
                         a: 1,
@@ -533,6 +555,7 @@ mod tests {
 
             julia
                 .instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
                     let s = BitsCharBitsIntChar {
                         a: Char::new('a'),
@@ -560,6 +583,7 @@ mod tests {
 
             julia
                 .instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
                     let s = BitsUInt8TupleInt32Int64 {
                         a: 0,
@@ -588,6 +612,7 @@ mod tests {
 
             julia
                 .instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
                     let rs_val = BitsUInt8TupleInt32TupleInt16UInt16 {
                         a: 0,
@@ -632,6 +657,7 @@ mod tests {
 
             julia
                 .instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| unsafe {
                     let constr = Module::main(&frame)
                         .global(&frame, "SingleVariant")?
@@ -663,6 +689,7 @@ mod tests {
 
             julia
                 .instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| unsafe {
                     let constr = Module::main(&frame)
                         .global(&frame, "SizeAlignMismatch")?
@@ -698,6 +725,7 @@ mod tests {
 
             julia
                 .instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| unsafe {
                     let constr = Module::main(&frame)
                         .global(&frame, "UnionInTuple")?
@@ -724,6 +752,7 @@ mod tests {
 
             julia
                 .instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| unsafe {
                     let constr = Module::main(&frame)
                         .global(&frame, "NonBitsUnion")?
@@ -759,6 +788,7 @@ mod tests {
 
             julia
                 .instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| unsafe {
                     let constr = Module::main(&frame)
                         .global(&frame, "WithString")?
@@ -794,6 +824,7 @@ mod tests {
 
             julia
                 .instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| unsafe {
                     let constr = Module::main(&frame)
                         .global(&frame, "WithGenericT")?
@@ -829,6 +860,7 @@ mod tests {
 
             julia
                 .instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| unsafe {
                     let constr = Module::main(&frame)
                         .global(&frame, "WithGenericT")?
@@ -870,6 +902,7 @@ mod tests {
 
             julia
                 .instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| unsafe {
                     let constr = Module::main(&frame)
                         .global(&frame, "WithGenericT")?
@@ -911,6 +944,7 @@ mod tests {
 
             julia
                 .instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| unsafe {
                     let global = frame.unrooted();
                     let constr = Module::main(&frame)
@@ -954,8 +988,9 @@ mod tests {
 
             julia
                 .instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| unsafe {
-                    let arr = Array::new::<i32, _, _>(&mut frame, (2, 2)).into_jlrs_result()?;
+                    let arr = TypedArray::<i32>::new(&mut frame, (2, 2)).into_jlrs_result()?;
 
                     let wgt_constr = Module::main(&frame)
                         .global(&frame, "WithGenericT")?
@@ -1003,6 +1038,7 @@ mod tests {
 
             julia
                 .instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| unsafe {
                     let wgt_constr = Module::main(&frame)
                         .global(&frame, "WithGenericT")?
@@ -1044,6 +1080,7 @@ mod tests {
 
             julia
                 .instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| unsafe {
                     let wgt_constr = Module::main(&frame)
                         .global(&frame, "WithGenericT")?
@@ -1088,6 +1125,7 @@ mod tests {
 
             julia
                 .instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| unsafe {
                     let b = Value::new(&mut frame, true);
                     let wvt_constr = Module::main(&frame)
@@ -1126,6 +1164,7 @@ mod tests {
 
             julia
                 .instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
                     let v = Value::new(&mut frame, Empty {});
                     assert!(v.unbox::<Empty>().is_ok());
@@ -1143,6 +1182,7 @@ mod tests {
 
             julia
                 .instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
                     let wvt = WithValueType { a: 1 };
                     type WVT = WithValueTypeTypeConstructor<ConstantBool<true>>;
@@ -1163,6 +1203,7 @@ mod tests {
 
             julia
                 .instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
                     let layout = WithGenericTU { a: 1i32, b: 2u32 };
                     let v = Value::new_bits(&mut frame, layout.clone());

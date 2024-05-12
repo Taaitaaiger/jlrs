@@ -1,6 +1,6 @@
 mod util;
 
-#[cfg(feature = "sync-rt")]
+#[cfg(feature = "local-rt")]
 mod tests {
     use std::collections::HashSet;
 
@@ -16,6 +16,7 @@ mod tests {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|frame| {
                     let smb = Symbol::new(&frame, "a");
                     smb.extend(&frame);
@@ -31,6 +32,7 @@ mod tests {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| unsafe {
                     let smb = Module::main(&frame)
                         .submodule(&frame, "JlrsTests")?
@@ -56,6 +58,7 @@ mod tests {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|frame| {
                     let s1 = Symbol::new(&frame, "foo");
                     let s2 = Symbol::new(&frame, "foo");
@@ -73,6 +76,7 @@ mod tests {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|frame| {
                     let s1 = Symbol::new(&frame, "foo");
 
@@ -93,6 +97,7 @@ mod tests {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
                     let string = JuliaString::new(&mut frame, "+");
                     assert!(Module::base(&frame).function(&frame, string).is_ok());
@@ -108,6 +113,7 @@ mod tests {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
                     let sym = Symbol::new_bytes(&mut frame, &[1]).into_jlrs_result();
                     assert!(sym.is_ok());
@@ -122,6 +128,7 @@ mod tests {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
                     let sym = Symbol::new_bytes(&mut frame, &[1, 0, 1]).into_jlrs_result();
                     assert!(sym.is_err());
@@ -136,6 +143,7 @@ mod tests {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|frame| {
                     let sym = unsafe { Symbol::new_bytes_unchecked(&frame, &[129]) };
                     assert_eq!(sym.clone().as_cstr().to_bytes().len(), 1);
@@ -151,20 +159,14 @@ mod tests {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
-            jlrs.instance(&mut frame)
-                .scope(|mut frame| {
-                    let output = frame.output();
+            jlrs.instance(&mut frame).scope(|mut frame| {
+                let output = frame.output();
 
-                    frame
-                        .scope(|frame| {
-                            let sym = Symbol::new(&frame, "a");
-                            Ok(sym.root(output))
-                        })
-                        .unwrap();
-
-                    Ok(())
-                })
-                .unwrap();
+                frame.scope(|frame| {
+                    let sym = Symbol::new(&frame, "a");
+                    sym.root(output)
+                });
+            });
         })
     }
 
@@ -173,6 +175,7 @@ mod tests {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|frame| {
                     let mut map = HashSet::new();
                     map.insert(Symbol::new(&frame, "foo"));

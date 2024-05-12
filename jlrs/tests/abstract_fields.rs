@@ -1,5 +1,5 @@
 mod util;
-#[cfg(feature = "sync-rt")]
+#[cfg(feature = "local-rt")]
 mod tests {
     use jlrs::{memory::gc::Gc, prelude::*};
 
@@ -11,6 +11,7 @@ mod tests {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
                     frame.gc_collect(jlrs::memory::gc::GcCollection::Full);
                     let ty = unsafe {

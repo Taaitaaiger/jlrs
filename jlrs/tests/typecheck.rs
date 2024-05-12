@@ -1,6 +1,6 @@
 mod util;
 
-#[cfg(feature = "sync-rt")]
+#[cfg(feature = "local-rt")]
 mod tests {
     use std::{ffi::c_void, ptr::null_mut};
 
@@ -18,6 +18,7 @@ mod tests {
                     let mut frame = StackFrame::new();
                     let mut jlrs = j.borrow_mut();
                     jlrs.instance(&mut frame)
+                        .returning::<JlrsResult<_>>()
                         .scope(|mut frame| {
                             let val: $t = $val;
                             let v = Value::new(&mut frame, val);
@@ -33,6 +34,7 @@ mod tests {
                     let mut frame = StackFrame::new();
                     let mut jlrs = j.borrow_mut();
                     jlrs.instance(&mut frame)
+                        .returning::<JlrsResult<_>>()
                         .scope(|mut frame| {
                             let val: $t = $val;
                             let v = Value::new(&mut frame, val);
@@ -157,6 +159,7 @@ mod tests {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|frame| {
                     assert!(Type::typecheck(DataType::datatype_type(&frame)));
                     assert!(Type::typecheck(DataType::unionall_type(&frame)));
@@ -174,6 +177,7 @@ mod tests {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|frame| {
                     assert!(Bits::typecheck(DataType::bool_type(&frame)));
                     assert!(!Bits::typecheck(DataType::datatype_type(&frame)));
@@ -188,6 +192,7 @@ mod tests {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|frame| {
                     assert!(Abstract::typecheck(DataType::floatingpoint_type(&frame)));
                     assert!(!Abstract::typecheck(DataType::datatype_type(&frame)));
@@ -202,6 +207,7 @@ mod tests {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| unsafe {
                     let args = [DataType::uint8_type(&frame).as_value()];
                     let v = UnionAll::ref_type(&frame)
@@ -223,6 +229,7 @@ mod tests {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| unsafe {
                     let value = Value::new(&mut frame, 0u8);
                     let args = [DataType::uint8_type(&frame).as_value()];
@@ -248,6 +255,7 @@ mod tests {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| unsafe {
                     let args = [DataType::uint8_type(&frame).as_value()];
                     let ty = UnionAll::type_type(&frame)
@@ -268,6 +276,7 @@ mod tests {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
                     let a = Value::new(&mut frame, 1usize);
                     let named_tuple = named_tuple!(&mut frame, "a" => a);
@@ -285,6 +294,7 @@ mod tests {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|frame| {
                     assert!(Mutable::typecheck(DataType::datatype_type(&frame)));
                     assert!(!Mutable::typecheck(DataType::bool_type(&frame)));
@@ -299,6 +309,7 @@ mod tests {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|frame| {
                     let nothing = Value::nothing(&frame);
                     assert!(Nothing::typecheck(nothing.datatype()));
@@ -314,6 +325,7 @@ mod tests {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|frame| {
                     assert!(Immutable::typecheck(DataType::bool_type(&frame)));
                     assert!(!Immutable::typecheck(DataType::datatype_type(&frame)));
@@ -328,6 +340,7 @@ mod tests {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|frame| {
                     assert!(PrimitiveType::typecheck(DataType::bool_type(&frame)));
                     assert!(!PrimitiveType::typecheck(DataType::datatype_type(&frame)));
@@ -345,6 +358,7 @@ mod tests {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|frame| {
                     assert!(StructType::typecheck(DataType::datatype_type(&frame)));
                     assert!(!StructType::typecheck(DataType::bool_type(&frame)));
@@ -360,170 +374,10 @@ mod tests {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|frame| {
                     assert!(Singleton::typecheck(DataType::nothing_type(&frame)));
                     assert!(!Singleton::typecheck(DataType::bool_type(&frame)));
-                    Ok(())
-                })
-                .unwrap();
-        })
-    }
-
-    #[cfg(any(
-        feature = "julia-1-6",
-        feature = "julia-1-7",
-        feature = "julia-1-8",
-        feature = "julia-1-9"
-    ))]
-    fn slot_typecheck() {
-        JULIA.with(|j| {
-            let mut frame = StackFrame::new();
-            let mut jlrs = j.borrow_mut();
-            jlrs.instance(&mut frame)
-                .scope(|frame| {
-                    assert!(Slot::typecheck(DataType::slotnumber_type(&frame)));
-                    assert!(Slot::typecheck(DataType::typedslot_type(&frame)));
-                    assert!(!Slot::typecheck(DataType::bool_type(&frame)));
-                    Ok(())
-                })
-                .unwrap();
-        })
-    }
-
-    fn global_ref_typecheck() {
-        JULIA.with(|j| {
-            let mut frame = StackFrame::new();
-            let mut jlrs = j.borrow_mut();
-            jlrs.instance(&mut frame)
-                .scope(|frame| {
-                    assert!(GlobalRef::typecheck(DataType::globalref_type(&frame)));
-                    assert!(!GlobalRef::typecheck(DataType::bool_type(&frame)));
-                    Ok(())
-                })
-                .unwrap();
-        })
-    }
-
-    fn goto_node_typecheck() {
-        JULIA.with(|j| {
-            let mut frame = StackFrame::new();
-            let mut jlrs = j.borrow_mut();
-            jlrs.instance(&mut frame)
-                .scope(|frame| {
-                    assert!(GotoNode::typecheck(DataType::gotonode_type(&frame)));
-                    assert!(!GotoNode::typecheck(DataType::bool_type(&frame)));
-                    Ok(())
-                })
-                .unwrap();
-        })
-    }
-
-    fn pi_node_typecheck() {
-        JULIA.with(|j| {
-            let mut frame = StackFrame::new();
-            let mut jlrs = j.borrow_mut();
-            jlrs.instance(&mut frame)
-                .scope(|frame| {
-                    assert!(PiNode::typecheck(DataType::pinode_type(&frame)));
-                    assert!(!PiNode::typecheck(DataType::bool_type(&frame)));
-                    Ok(())
-                })
-                .unwrap();
-        })
-    }
-
-    fn phi_node_typecheck() {
-        JULIA.with(|j| {
-            let mut frame = StackFrame::new();
-            let mut jlrs = j.borrow_mut();
-            jlrs.instance(&mut frame)
-                .scope(|frame| {
-                    assert!(PhiNode::typecheck(DataType::phinode_type(&frame)));
-                    assert!(!PhiNode::typecheck(DataType::bool_type(&frame)));
-                    Ok(())
-                })
-                .unwrap();
-        })
-    }
-
-    fn phic_node_typecheck() {
-        JULIA.with(|j| {
-            let mut frame = StackFrame::new();
-            let mut jlrs = j.borrow_mut();
-            jlrs.instance(&mut frame)
-                .scope(|frame| {
-                    assert!(PhiCNode::typecheck(DataType::phicnode_type(&frame)));
-                    assert!(!PhiCNode::typecheck(DataType::bool_type(&frame)));
-                    Ok(())
-                })
-                .unwrap();
-        })
-    }
-
-    fn upsilon_node_typecheck() {
-        JULIA.with(|j| {
-            let mut frame = StackFrame::new();
-            let mut jlrs = j.borrow_mut();
-            jlrs.instance(&mut frame)
-                .scope(|frame| {
-                    assert!(UpsilonNode::typecheck(DataType::upsilonnode_type(&frame)));
-                    assert!(!UpsilonNode::typecheck(DataType::bool_type(&frame)));
-                    Ok(())
-                })
-                .unwrap();
-        })
-    }
-
-    fn quote_node_typecheck() {
-        JULIA.with(|j| {
-            let mut frame = StackFrame::new();
-            let mut jlrs = j.borrow_mut();
-            jlrs.instance(&mut frame)
-                .scope(|frame| {
-                    assert!(QuoteNode::typecheck(DataType::quotenode_type(&frame)));
-                    assert!(!QuoteNode::typecheck(DataType::bool_type(&frame)));
-                    Ok(())
-                })
-                .unwrap();
-        })
-    }
-
-    fn new_var_node_typecheck() {
-        JULIA.with(|j| {
-            let mut frame = StackFrame::new();
-            let mut jlrs = j.borrow_mut();
-            jlrs.instance(&mut frame)
-                .scope(|frame| {
-                    assert!(NewVarNode::typecheck(DataType::newvarnode_type(&frame)));
-                    assert!(!NewVarNode::typecheck(DataType::bool_type(&frame)));
-                    Ok(())
-                })
-                .unwrap();
-        })
-    }
-
-    fn line_node_typecheck() {
-        JULIA.with(|j| {
-            let mut frame = StackFrame::new();
-            let mut jlrs = j.borrow_mut();
-            jlrs.instance(&mut frame)
-                .scope(|frame| {
-                    assert!(LineNode::typecheck(DataType::linenumbernode_type(&frame)));
-                    assert!(!LineNode::typecheck(DataType::bool_type(&frame)));
-                    Ok(())
-                })
-                .unwrap();
-        })
-    }
-
-    fn code_info_typecheck() {
-        JULIA.with(|j| {
-            let mut frame = StackFrame::new();
-            let mut jlrs = j.borrow_mut();
-            jlrs.instance(&mut frame)
-                .scope(|frame| {
-                    assert!(CodeInfo::typecheck(DataType::code_info_type(&frame)));
-                    assert!(!CodeInfo::typecheck(DataType::bool_type(&frame)));
                     Ok(())
                 })
                 .unwrap();
@@ -535,6 +389,7 @@ mod tests {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|frame| {
                     assert!(String::typecheck(DataType::string_type(&frame)));
                     assert!(!String::typecheck(DataType::bool_type(&frame)));
@@ -549,6 +404,7 @@ mod tests {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
                     let v: *mut u8 = null_mut();
                     let value = Value::new(&mut frame, v);
@@ -565,6 +421,7 @@ mod tests {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| unsafe {
                     let cmd = "reinterpret(Core.LLVMPtr{UInt8,1}, 0)";
                     let value = Value::eval_string(&mut frame, cmd).into_jlrs_result()?;
@@ -576,51 +433,15 @@ mod tests {
         })
     }
 
-    fn intrinsic_typecheck() {
-        JULIA.with(|j| {
-            let mut frame = StackFrame::new();
-            let mut jlrs = j.borrow_mut();
-            jlrs.instance(&mut frame)
-                .scope(|frame| {
-                    assert!(Intrinsic::typecheck(DataType::intrinsic_type(&frame)));
-                    assert!(!Intrinsic::typecheck(DataType::bool_type(&frame)));
-                    Ok(())
-                })
-                .unwrap();
-        })
-    }
-
     fn concrete_typecheck() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|frame| {
                     assert!(Concrete::typecheck(DataType::bool_type(&frame)));
                     assert!(!Concrete::typecheck(DataType::floatingpoint_type(&frame)));
-                    Ok(())
-                })
-                .unwrap();
-        })
-    }
-
-    fn dispatch_tuple_typecheck() {
-        JULIA.with(|j| {
-            let mut frame = StackFrame::new();
-            let mut jlrs = j.borrow_mut();
-            jlrs.instance(&mut frame)
-                .scope(|mut frame| unsafe {
-                    let args = [
-                        DataType::bool_type(&frame).as_value(),
-                        DataType::int32_type(&frame).as_value(),
-                    ];
-                    let tt = DataType::anytuple_type(&frame)
-                        .as_value()
-                        .apply_type_unchecked(&mut frame, args)
-                        .cast::<DataType>()?;
-
-                    assert!(DispatchTuple::typecheck(tt));
-                    assert!(!DispatchTuple::typecheck(DataType::bool_type(&frame)));
                     Ok(())
                 })
                 .unwrap();
@@ -700,29 +521,10 @@ mod tests {
         primitive_type_typecheck();
         struct_type_typecheck();
         singleton_typecheck();
-        #[cfg(any(
-            feature = "julia-1-6",
-            feature = "julia-1-7",
-            feature = "julia-1-8",
-            feature = "julia-1-9"
-        ))]
-        slot_typecheck();
-        global_ref_typecheck();
-        goto_node_typecheck();
-        pi_node_typecheck();
-        phi_node_typecheck();
-        phic_node_typecheck();
-        upsilon_node_typecheck();
-        quote_node_typecheck();
-        new_var_node_typecheck();
-        line_node_typecheck();
-        code_info_typecheck();
         string_typecheck();
         pointer_typecheck();
         llvm_pointer_typecheck();
-        intrinsic_typecheck();
         concrete_typecheck();
-        dispatch_tuple_typecheck();
         #[cfg(not(feature = "julia-1-6"))]
         vec_element_typecheck();
     }

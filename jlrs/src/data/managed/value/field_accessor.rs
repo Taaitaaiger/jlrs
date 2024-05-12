@@ -6,9 +6,9 @@ use std::{
     sync::atomic::{AtomicPtr, AtomicU16, AtomicU32, AtomicU64, AtomicU8},
 };
 
-use jl_sys::jl_array_typetagdata;
+use jl_sys::jlrs_array_typetagdata;
 #[julia_version(since = "1.7")]
-use jl_sys::{jl_value_t, jlrs_lock, jlrs_unlock};
+use jl_sys::{jl_value_t, jlrs_lock_nogc, jlrs_unlock_nogc};
 use jlrs_macros::julia_version;
 
 use super::{Value, ValueRef};
@@ -24,15 +24,14 @@ use crate::{
         },
     },
     error::{AccessError, JlrsResult, CANNOT_DISPLAY_TYPE},
-    memory::target::unrooted::Unrooted,
     private::Private,
 };
 
 #[julia_version(since = "1.7")]
-#[repr(C)]
+#[repr(C, align(16))]
 #[derive(Clone, Copy)]
 union AtomicBuffer {
-    bytes: [MaybeUninit<u8>; 8],
+    bytes: [MaybeUninit<u8>; 16],
     ptr: *mut jl_value_t,
 }
 
@@ -202,14 +201,12 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
             }
 
             let index = field.field_index(current_field_type, Private)?;
-            let global = Unrooted::new();
 
-            let next_field_type = match current_field_type.field_type_unchecked(global, index) {
+            let next_field_type = match current_field_type.field_type(index) {
                 Some(ty) => ty,
                 _ => Err(AccessError::UndefRef)?,
             };
 
-            let next_field_type = next_field_type.as_managed();
             let is_pointer_field = current_field_type.is_pointer_field_unchecked(index);
             let field_offset = current_field_type.field_offset_unchecked(index);
             self.offset += field_offset;
@@ -271,14 +268,12 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
             }
 
             let index = field.field_index(current_field_type, Private)?;
-            let global = Unrooted::new();
 
-            let next_field_type = match current_field_type.field_type_unchecked(global, index) {
+            let next_field_type = match current_field_type.field_type(index) {
                 Some(ty) => ty,
                 _ => Err(AccessError::UndefRef)?,
             };
 
-            let next_field_type = next_field_type.as_managed();
             let is_pointer_field = current_field_type.is_pointer_field_unchecked(index);
             let field_offset = current_field_type.field_offset_unchecked(index);
             self.offset += field_offset;
@@ -559,8 +554,28 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
                 self.state = ViewState::AtomicBuffer;
                 self.offset = 0;
             }
+            #[cfg(not(any(
+                feature = "julia-1-6",
+                feature = "julia-1-7",
+                feature = "julia-1-8",
+                feature = "julia-1-9",
+                feature = "julia-1-10",
+                feature = "julia-1-11"
+            )))]
+            sz if sz <= 16 => {
+                let atomic = &*ptr.cast::<atomic::Atomic<u128>>();
+                let v = atomic.load(ordering);
+                let dst_ptr = self.buffer.bytes.as_mut_ptr();
+                std::ptr::copy_nonoverlapping(
+                    &v as *const _ as *const u8,
+                    dst_ptr as _,
+                    sz as usize,
+                );
+                self.state = ViewState::AtomicBuffer;
+                self.offset = 0;
+            }
             _ => {
-                jlrs_lock(self.value.unwrap().ptr().as_ptr());
+                jlrs_lock_nogc(self.value.unwrap().ptr().as_ptr());
                 self.state = ViewState::Locked;
             }
         }
@@ -569,10 +584,10 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
     // Safety: must only be used to read an array element
     unsafe fn get_array_field(&mut self, arr: Array<'scope, 'data>, index: usize) {
         debug_assert!(self.state == ViewState::Array);
-        let el_size = arr.element_size();
+        let el_size = arr.element_size() as usize;
         self.offset = (index * el_size) as u32;
 
-        if arr.is_value_array() {
+        if arr.has_value_layout() {
             self.value = arr.data_ptr().cast::<Option<ValueRef>>().add(index).read();
             self.offset = 0;
             if self.value.is_none() {
@@ -597,8 +612,8 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
                     self.state = ViewState::Unlocked;
                 }
             }
-        } else if arr.is_union_array() {
-            let mut tag = *jl_array_typetagdata(arr.unwrap(Private)).add(index) as i32;
+        } else if arr.has_union_layout() {
+            let mut tag = *jlrs_array_typetagdata(arr.unwrap(Private)).add(index) as i32;
             let component = nth_union_component(arr.element_type(), &mut tag);
             debug_assert!(component.is_some());
             let ty = component.unwrap_unchecked();
@@ -627,7 +642,7 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
             .read();
 
         if locked {
-            jlrs_unlock(self.value.unwrap().ptr().as_ptr());
+            jlrs_unlock_nogc(self.value.unwrap().ptr().as_ptr());
             self.state = ViewState::Unlocked;
         }
 
@@ -763,7 +778,7 @@ impl Drop for FieldAccessor<'_, '_> {
         if self.state == ViewState::Locked {
             debug_assert!(!self.value.is_none());
             // Safety: the value is currently locked.
-            unsafe { jlrs_unlock(self.value.unwrap().ptr().as_ptr()) }
+            unsafe { jlrs_unlock_nogc(self.value.unwrap().ptr().as_ptr()) }
         }
     }
 }
@@ -784,11 +799,11 @@ mod private {
             symbol::Symbol,
             Managed,
         },
-        error::{AccessError, JlrsResult, CANNOT_DISPLAY_TYPE},
+        error::{AccessError, JlrsResult, CANNOT_DISPLAY_TYPE, CANNOT_DISPLAY_VALUE},
         private::Private,
     };
 
-    pub trait FieldIndexPriv {
+    pub trait FieldIndexPriv: std::fmt::Debug {
         fn field_index(&self, ty: DataType, _: Private) -> JlrsResult<usize>;
 
         #[inline]
@@ -801,22 +816,46 @@ mod private {
         #[inline]
         fn field_index(&self, ty: DataType, _: Private) -> JlrsResult<usize> {
             // Safety: This method can only be called from a thread known to Julia
-            ty.field_index(unsafe { self.to_symbol_priv(Private) })
+            let sym = unsafe { self.to_symbol_priv(Private) };
+
+            let Some(idx) = ty.field_index(sym) else {
+                Err(AccessError::NoSuchField {
+                    type_name: ty.display_string_or(CANNOT_DISPLAY_TYPE),
+                    field_name: self.to_string(),
+                })?
+            };
+
+            Ok(idx as usize)
         }
     }
 
     impl FieldIndexPriv for Symbol<'_> {
         #[inline]
         fn field_index(&self, ty: DataType, _: Private) -> JlrsResult<usize> {
-            ty.field_index(*self)
+            let Some(idx) = ty.field_index(*self) else {
+                Err(AccessError::NoSuchField {
+                    type_name: ty.display_string_or(CANNOT_DISPLAY_TYPE),
+                    field_name: self.display_string_or(CANNOT_DISPLAY_VALUE),
+                })?
+            };
+
+            Ok(idx as usize)
         }
     }
 
     impl FieldIndexPriv for JuliaString<'_> {
         #[inline]
         fn field_index(&self, ty: DataType, _: Private) -> JlrsResult<usize> {
-            // Safety: This method can only be called from a thread known to Julia
-            ty.field_index(unsafe { self.to_symbol_priv(Private) })
+            let sym = unsafe { self.to_symbol_priv(Private) };
+
+            let Some(idx) = ty.field_index(sym) else {
+                Err(AccessError::NoSuchField {
+                    type_name: ty.display_string_or(CANNOT_DISPLAY_TYPE),
+                    field_name: self.as_str().unwrap_or(CANNOT_DISPLAY_VALUE).to_string(),
+                })?
+            };
+
+            Ok(idx as usize)
         }
     }
 
@@ -846,7 +885,15 @@ mod private {
 
         #[inline]
         fn array_index(&self, data: Array, _: Private) -> JlrsResult<usize> {
-            unsafe { data.dimensions().index_of(self) }
+            let res = data
+                .dimensions()
+                .index_of(self)
+                .ok_or(AccessError::InvalidIndex {
+                    idx: self.to_dimensions(),
+                    sz: data.dimensions().to_dimensions(),
+                })?;
+
+            Ok(res)
         }
     }
 }

@@ -45,6 +45,19 @@ macro_rules! impl_construct_julia_type {
                 }
             }
 
+            fn construct_type_with_env_uncached<'target, Tgt>(
+                target: Tgt,
+                _env: &$crate::data::types::construct_type::TypeVarEnv,
+            ) -> $crate::data::managed::value::ValueData<'target, 'static, Tgt>
+            where
+                Tgt: $crate::memory::target::Target<'target> {
+                    unsafe {
+                        let ptr =
+                            ::std::ptr::NonNull::new_unchecked($jl_ty.cast::<::jl_sys::jl_value_t>());
+                        target.data_from_ptr(ptr, $crate::private::Private)
+                    }
+            }
+
             #[inline]
             fn base_type<'target, Tgt>(_target: &Tgt) -> Option<$crate::data::managed::value::Value<'target, 'static>>
             where
@@ -62,12 +75,12 @@ macro_rules! impl_construct_julia_type {
 
 pub mod bool;
 pub mod char;
+#[cfg(feature = "complex")]
+pub mod complex;
 #[cfg(feature = "f16")]
 pub mod f16;
 pub mod is_bits;
 pub mod nothing;
-#[cfg(feature = "internal-types")]
-pub mod ssa_value;
 pub mod tuple;
 pub mod typed_layout;
 pub mod union;

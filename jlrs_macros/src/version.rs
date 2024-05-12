@@ -4,7 +4,7 @@ use proc_macro::{Delimiter, TokenStream, TokenTree};
 
 const MAJOR_VERSION: usize = 1;
 const LTS_MINOR_VERSION: usize = 6;
-const NIGHTLY_MINOR_VERSION: usize = 11;
+const NIGHTLY_MINOR_VERSION: usize = 12;
 
 #[cfg(feature = "julia-1-6")]
 const SELECTED_MINOR_VERSION: usize = 6;
@@ -18,6 +18,8 @@ const SELECTED_MINOR_VERSION: usize = 9;
 const SELECTED_MINOR_VERSION: usize = 10;
 #[cfg(feature = "julia-1-11")]
 const SELECTED_MINOR_VERSION: usize = 11;
+#[cfg(feature = "julia-1-12")]
+const SELECTED_MINOR_VERSION: usize = 12;
 
 pub fn emit_if_compatible(attr: TokenStream, item: TokenStream) -> TokenStream {
     let mut tts = attr.into_iter();

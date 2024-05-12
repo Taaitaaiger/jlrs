@@ -1,10 +1,11 @@
 use std::cell::RefCell;
 
-use crate::runtime::{builder::RuntimeBuilder, sync_rt::PendingJulia};
+use crate::runtime::{builder::Builder, sync_rt::PendingJulia};
 
 thread_local! {
     #[doc(hidden)]
+    #[allow(deprecated)]
     pub static JULIA: RefCell<PendingJulia<>> = {
-        RefCell::new(unsafe {RuntimeBuilder::new().start().unwrap() })
+        RefCell::new(unsafe {Builder::new().start().unwrap() })
     }
 }

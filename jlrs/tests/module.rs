@@ -1,10 +1,10 @@
 mod util;
 
-#[cfg(feature = "sync-rt")]
+#[cfg(feature = "local-rt")]
 mod tests {
     use std::borrow::Cow;
 
-    use jlrs::{prelude::*, data::managed::module::JlrsCore};
+    use jlrs::prelude::*;
 
     use crate::util::JULIA;
 
@@ -14,6 +14,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
                     let module = Module::core(&frame);
                     let func = module.function(&mut frame, "isa");
@@ -32,6 +33,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
                     let module = Module::core(&frame);
                     let func = module.function(&mut frame, "isa");
@@ -48,6 +50,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
                     let module = Module::base(&frame);
                     let func = module.function(&mut frame, "+");
@@ -66,6 +69,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
                     let module = Module::base(&frame);
                     let func = module.function(&mut frame, "+");
@@ -82,8 +86,9 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
-                    let jlrs_module = JlrsCore::module(&frame);
+                    let jlrs_module = Module::jlrs_core(&frame);
                     let func = jlrs_module.function(&mut frame, "valuestring");
                     assert!(func.is_ok());
                     Ok(())
@@ -98,10 +103,27 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
-                    let jlrs_module = JlrsCore::module(&frame);
+                    let jlrs_module = Module::jlrs_core(&frame);
                     let func = jlrs_module.function(&mut frame, "valuestring");
                     assert!(func.is_ok());
+                    Ok(())
+                })
+                .unwrap();
+        });
+    }
+
+    fn jlrs_module() {
+        JULIA.with(|j| {
+            let mut frame = StackFrame::new();
+            let mut jlrs = j.borrow_mut();
+
+            jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
+                .scope(|frame| {
+                    let jlrs_module = Module::package_root_module(&frame, "JlrsCore");
+                    assert!(jlrs_module.is_some());
                     Ok(())
                 })
                 .unwrap();
@@ -114,6 +136,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
                     assert!(Module::base(&frame).function(&mut frame, "foo").is_err());
                     Ok(())
@@ -128,6 +151,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
                     assert!(Module::base(&frame).function(&mut frame, "foo").is_err());
                     Ok(())
@@ -142,6 +166,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
                     assert!(Module::base(&frame).submodule(&mut frame, "foo").is_err());
                     Ok(())
@@ -156,6 +181,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
                     assert!(Module::base(&frame).submodule(&mut frame, "foo").is_err());
                     Ok(())
@@ -169,6 +195,7 @@ mod tests {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| unsafe {
                     let base = Module::main(&frame)
                         .submodule(&frame, "JlrsTests")?
@@ -192,6 +219,7 @@ mod tests {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
                     assert!(Module::main(&frame)
                         .submodule(&mut frame, "JlrsTests".to_string())
@@ -208,6 +236,7 @@ mod tests {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
                     assert!(Module::main(&frame)
                         .submodule(&mut frame, Cow::from("JlrsTests"))
@@ -231,6 +260,7 @@ mod tests {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
                     let name = MyString("JlrsTests".to_string());
                     assert!(Module::main(&frame)
@@ -248,6 +278,7 @@ mod tests {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| unsafe {
                     let main = Module::main(&frame);
                     let value = Value::new(&mut frame, 1usize);
@@ -268,6 +299,7 @@ mod tests {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| unsafe {
                     let main = Module::main(&frame);
                     let value = Value::new(&mut frame, 2usize);
@@ -289,7 +321,7 @@ mod tests {
             let mut jlrs = jlrs.instance(&mut frame);
             jlrs.error_color(true).unwrap();
             jlrs.error_color(false).unwrap();
-            let err = jlrs.scope(|mut frame| {
+            let err = jlrs.returning::<JlrsResult<_>>().scope(|mut frame| {
                 let main = Module::main(&frame);
                 let value1 = Value::new(&mut frame, 3usize);
                 let value2 = Value::new(&mut frame, 4usize);
@@ -309,15 +341,18 @@ mod tests {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
-            let res = jlrs.instance(&mut frame).scope(|mut frame| unsafe {
-                assert!(Module::main(&frame)
-                    .global(&mut frame, "Hermitian")
-                    .is_err());
-                Value::eval_string(&mut frame, "using LinearAlgebra: Hermitian").unwrap();
-                assert!(Module::main(&frame).global(&mut frame, "Hermitian").is_ok());
+            let res = jlrs
+                .instance(&mut frame)
+                .returning::<JlrsResult<_>>()
+                .scope(|mut frame| unsafe {
+                    assert!(Module::main(&frame)
+                        .global(&mut frame, "Hermitian")
+                        .is_err());
+                    Value::eval_string(&mut frame, "using LinearAlgebra: Hermitian").unwrap();
+                    assert!(Module::main(&frame).global(&mut frame, "Hermitian").is_ok());
 
-                Ok(())
-            });
+                    Ok(())
+                });
 
             assert!(res.is_ok());
         })
@@ -327,33 +362,15 @@ mod tests {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
-            let res = jlrs.instance(&mut frame).scope(|frame| {
-                let main = Module::main(&frame);
-                assert_eq!(main, main.parent());
+            let res = jlrs
+                .instance(&mut frame)
+                .returning::<JlrsResult<_>>()
+                .scope(|frame| {
+                    let main = Module::main(&frame);
+                    assert_eq!(main, main.parent());
 
-                Ok(())
-            });
-
-            assert!(res.is_ok());
-        })
-    }
-
-    fn extend_lifetime() {
-        JULIA.with(|j| {
-            let mut frame = StackFrame::new();
-            let mut jlrs = j.borrow_mut();
-            let res = jlrs.instance(&mut frame).scope(|mut frame| {
-                let global = frame.unrooted();
-                frame
-                    .scope(|frame| {
-                        let inner_global = frame.unrooted();
-                        let main = Module::main(&inner_global);
-                        unsafe { Ok(main.extend(&global)) }
-                    })
-                    .unwrap();
-
-                Ok(())
-            });
+                    Ok(())
+                });
 
             assert!(res.is_ok());
         })
@@ -363,18 +380,19 @@ mod tests {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
-            let res = jlrs.instance(&mut frame).scope(|mut frame| {
-                let output = frame.output();
+            let res = jlrs
+                .instance(&mut frame)
+                .returning::<JlrsResult<_>>()
+                .scope(|mut frame| {
+                    let output = frame.output();
 
-                frame
-                    .scope(|frame| {
+                    frame.scope(|frame| {
                         let inner_global = frame.unrooted();
-                        Ok(Module::main(&inner_global).root(output))
-                    })
-                    .unwrap();
+                        Module::main(&inner_global).root(output)
+                    });
 
-                Ok(())
-            });
+                    Ok(())
+                });
 
             assert!(res.is_ok());
         })
@@ -384,16 +402,19 @@ mod tests {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
-            let res = jlrs.instance(&mut frame).scope(|mut frame| {
-                let main = Module::main(&frame);
-                assert!(!main.is_imported("+"));
-                unsafe {
-                    Value::eval_string(&mut frame, "import Base: +").into_jlrs_result()?;
-                }
-                assert!(main.is_imported("+"));
+            let res = jlrs
+                .instance(&mut frame)
+                .returning::<JlrsResult<_>>()
+                .scope(|mut frame| {
+                    let main = Module::main(&frame);
+                    assert!(!main.is_imported("+"));
+                    unsafe {
+                        Value::eval_string(&mut frame, "import Base: +").into_jlrs_result()?;
+                    }
+                    assert!(main.is_imported("+"));
 
-                Ok(())
-            });
+                    Ok(())
+                });
 
             assert!(res.is_ok());
         })
@@ -403,12 +424,15 @@ mod tests {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
-            let res = jlrs.instance(&mut frame).scope(|mut frame| {
-                let submod = Module::main(&frame).submodule(&mut frame, "+");
-                assert!(submod.is_err());
+            let res = jlrs
+                .instance(&mut frame)
+                .returning::<JlrsResult<_>>()
+                .scope(|mut frame| {
+                    let submod = Module::main(&frame).submodule(&mut frame, "+");
+                    assert!(submod.is_err());
 
-                Ok(())
-            });
+                    Ok(())
+                });
 
             assert!(res.is_ok());
         })
@@ -418,16 +442,19 @@ mod tests {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
-            let res = jlrs.instance(&mut frame).scope(|mut frame| {
-                let value = Value::new(&mut frame, 1usize);
-                let main = Module::base(&frame);
+            let res = jlrs
+                .instance(&mut frame)
+                .returning::<JlrsResult<_>>()
+                .scope(|mut frame| {
+                    let value = Value::new(&mut frame, 1usize);
+                    let main = Module::base(&frame);
 
-                assert!(main.set_const(&mut frame, "pi", value).is_err());
+                    assert!(main.set_const(&mut frame, "pi", value).is_err());
 
-                unsafe { assert!(main.set_global(&mut frame, "pi", value).is_err()) }
+                    unsafe { assert!(main.set_global(&mut frame, "pi", value).is_err()) }
 
-                Ok(())
-            });
+                    Ok(())
+                });
 
             assert!(res.is_ok());
         })
@@ -437,17 +464,20 @@ mod tests {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
-            let res = jlrs.instance(&mut frame).scope(|mut frame| {
-                let main = Module::base(&frame);
-                assert!(main.global(&mut frame, "FOO").is_err());
+            let res = jlrs
+                .instance(&mut frame)
+                .returning::<JlrsResult<_>>()
+                .scope(|mut frame| {
+                    let main = Module::base(&frame);
+                    assert!(main.global(&mut frame, "FOO").is_err());
 
-                let value = Value::new(&mut frame, 1usize);
-                unsafe { main.set_global_unchecked("FOO", value) }
+                    let value = Value::new(&mut frame, 1usize);
+                    unsafe { main.set_global_unchecked("FOO", value) }
 
-                assert_eq!(value, main.global(&mut frame, "FOO")?);
+                    assert_eq!(value, main.global(&mut frame, "FOO")?);
 
-                Ok(())
-            });
+                    Ok(())
+                });
 
             assert!(res.is_ok());
         })
@@ -457,17 +487,20 @@ mod tests {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
-            let res = jlrs.instance(&mut frame).scope(|mut frame| {
-                let main = Module::base(&frame);
-                assert!(main.global(&mut frame, "BAR").is_err());
+            let res = jlrs
+                .instance(&mut frame)
+                .returning::<JlrsResult<_>>()
+                .scope(|mut frame| {
+                    let main = Module::base(&frame);
+                    assert!(main.global(&mut frame, "BAR").is_err());
 
-                let value = Value::new(&mut frame, 1usize);
-                unsafe { main.set_const_unchecked("BAR", value) };
+                    let value = Value::new(&mut frame, 1usize);
+                    unsafe { main.set_const_unchecked("BAR", value) };
 
-                assert_eq!(value, main.global(&mut frame, "BAR")?);
+                    assert_eq!(value, main.global(&mut frame, "BAR")?);
 
-                Ok(())
-            });
+                    Ok(())
+                });
 
             assert!(res.is_ok());
         })
@@ -477,15 +510,18 @@ mod tests {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
-            let res = jlrs.instance(&mut frame).scope(|mut frame| {
-                let main = Module::base(&frame);
+            let res = jlrs
+                .instance(&mut frame)
+                .returning::<JlrsResult<_>>()
+                .scope(|mut frame| {
+                    let main = Module::base(&frame);
 
-                let value = Value::new(&mut frame, 1usize);
-                unsafe { main.set_const_unchecked("BAZ", value) };
+                    let value = Value::new(&mut frame, 1usize);
+                    unsafe { main.set_const_unchecked("BAZ", value) };
 
-                assert!(main.function(&mut frame, "BAZ").is_err());
-                Ok(())
-            });
+                    assert!(main.function(&mut frame, "BAZ").is_err());
+                    Ok(())
+                });
 
             assert!(res.is_ok());
         })
@@ -499,6 +535,7 @@ mod tests {
         base_module_dynamic();
         main_module();
         main_module_dynamic();
+        jlrs_module();
         error_nonexistent_function();
         error_nonexistent_function_dynamic();
         error_nonexistent_submodule();
@@ -512,7 +549,6 @@ mod tests {
         set_const_twice();
         eval_using();
         module_parent();
-        extend_lifetime();
         extend_lifetime_with_root();
         is_imported();
         submodule_must_be_module();

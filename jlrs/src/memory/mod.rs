@@ -10,9 +10,9 @@
 //! won't free its data. Any Julia data referenced by rooted data is also safe from being freed.
 //!
 //! Before data can be rooted a scope has to be created. Functions that call into Julia can
-//! only be called from a scope. When the sync runtime is used, a new scope can be created by
-//! calling [`Julia::scope`]. This function takes a closure which contains the code called inside
-//! that scope.
+//! only be called from a scope. When the local runtime is used, a new scope can be created by
+//! calling [`LocalScope::local_scope`] or [`Scope::scope`]. These functions takes a closure which
+//! contains the code called inside that scope.
 //!
 //! This closure takes a single argument, a [`GcFrame`], which lets you root data. Methods
 //! in jlrs that return Julia data can be called with a mutable reference to a `GcFrame`. The
@@ -21,16 +21,11 @@
 //! ```
 //! # use jlrs::prelude::*;
 //! # fn main() {
-//! # let mut julia = unsafe { RuntimeBuilder::new().start().unwrap() };
-//! # let mut frame = StackFrame::new();
-//! # let mut julia = julia.instance(&mut frame);
-//! julia
-//!     .scope(|mut frame| {
-//!         // This data is guaranteed to live at least until we leave this scope
-//!         let i = Value::new(&mut frame, 1u64);
-//!         Ok(())
-//!     })
-//!     .unwrap();
+//! let mut julia = Builder::new().start_local().unwrap();
+//! julia.local_scope::<_, 1>(|mut frame| {
+//!     // This data is guaranteed to live at least until we leave this scope
+//!     let i = Value::new(&mut frame, 1u64);
+//! });
 //! # }
 //! ```
 //!
@@ -44,52 +39,32 @@
 //! ```
 //! # use jlrs::prelude::*;
 //! # fn main() {
-//! # let mut julia = unsafe { RuntimeBuilder::new().start().unwrap() };
-//! # let mut frame = StackFrame::new();
-//! # let mut julia = julia.instance(&mut frame);
-//! julia
-//!     .scope(|mut frame| {
-//!         let i = Value::new(&mut frame, 1u64);
+//! let mut julia = Builder::new().start_local().unwrap();
+//! julia.local_scope::<_, 1>(|mut frame| {
+//!     let i = Value::new(&mut frame, 1u64);
 //!
-//!         frame
-//!             .scope(|mut frame| {
-//!                 let j = Value::new(&mut frame, 2u64);
-//!                 // j can't be returned from this scope, but i can.
-//!                 Ok(i)
-//!             })
-//!             .unwrap();
-//!
-//!         Ok(())
-//!     })
-//!     .unwrap();
+//!     frame.local_scope::<_, 1>(|mut frame| {
+//!         let j = Value::new(&mut frame, 2u64);
+//!         // j can't be returned from this scope, but i can.
+//!         i
+//!     });
+//! });
 //! # }
 //! ```
 //!
 //! As you can see in that example, `i` can be returned from the subscope because `i` is
 //! guaranteed to outlive it, while `j` can't because it doesn't. In many cases, though, we want
 //! to create a subscope and return data created in that scope. In that case, we'll need to
-//! allocate an [`Output`] in the targeted scope:
+//! allocate an [`LocalOutput`] or [`Output`] in the targeted scope:
 //!
 //! ```
 //! # use jlrs::prelude::*;
 //! # fn main() {
-//! # let mut julia = unsafe { RuntimeBuilder::new().start().unwrap() };
-//! # let mut frame = StackFrame::new();
-//! # let mut julia = julia.instance(&mut frame);
-//! julia
-//!     .scope(|mut frame| {
-//!         let output = frame.output();
-//!
-//!         frame
-//!             .scope(|_| {
-//!                 let j = Value::new(output, 2u64);
-//!                 Ok(j)
-//!             })
-//!             .unwrap();
-//!
-//!         Ok(())
-//!     })
-//!     .unwrap();
+//! let mut julia = Builder::new().start_local().unwrap();
+//! julia.local_scope::<_, 1>(|mut frame| {
+//!     let output = frame.local_output();
+//!     frame.local_scope::<_, 0>(|_| Value::new(output, 2u64));
+//! });
 //! # }
 //! ```
 //!
@@ -182,10 +157,12 @@
 //! `&mut frame` in a closure will take one slot, and all you need to do is count how often
 //! `&mut frame` is used to find the required size of the `LocalGcFrame`.
 //!
-//! [`Julia::scope`]: crate::runtime::sync_rt::Julia::scope
+//! [`Scope::scope`]: crate::memory::scope::Scope::scope
+//! [`LocalScope::local_scope`]: crate::memory::scope::LocalScope::local_scope
 //! [`GcFrame`]: crate::memory::target::frame::GcFrame
 //! [`LocalGcFrame`]: crate::memory::target::frame::LocalGcFrame
 //! [`Output`]: crate::memory::target::output::Output
+//! [`LocalOutput`]: crate::memory::target::output::LocalOutput
 //! [`GcFrame::scope`]: crate::memory::target::frame::GcFrame::scope
 //! [`GcFrame::output`]: crate::memory::target::frame::GcFrame::output
 //! [`Target`]: crate::memory::target::Target
@@ -199,33 +176,15 @@
 
 pub(crate) mod context;
 pub mod gc;
+pub mod scope;
 pub mod stack_frame;
 pub mod target;
 
-#[julia_version(since = "1.8")]
-use jl_sys::jl_ptls_t;
-#[julia_version(until = "1.7")]
-use jl_sys::jl_tls_states_t;
-use jlrs_macros::julia_version;
+use jl_sys::{jl_tls_states_t, jlrs_get_ptls_states};
 
-#[doc(hidden)]
-#[julia_version(since = "1.8")]
-pub type PTls = jl_ptls_t;
-
-#[doc(hidden)]
-#[julia_version(until = "1.7")]
 pub type PTls = *mut jl_tls_states_t;
 
-#[julia_version(until = "1.6")]
 #[inline]
 pub(crate) unsafe fn get_tls() -> PTls {
-    jl_sys::jl_get_ptls_states()
-}
-
-#[julia_version(since = "1.7")]
-#[inline]
-pub(crate) unsafe fn get_tls() -> PTls {
-    use std::ptr::NonNull;
-    let task = jl_sys::jl_get_current_task();
-    NonNull::new_unchecked(task).as_ref().ptls
+    jlrs_get_ptls_states()
 }

@@ -2,14 +2,17 @@
 
 use std::{marker::PhantomData, ptr::NonNull};
 
-use jl_sys::{jl_islayout_inline, jl_type_union, jl_uniontype_t, jl_uniontype_type};
+use jl_sys::{
+    jl_islayout_inline, jl_type_union, jl_uniontype_t, jl_uniontype_type, jlrs_union_a,
+    jlrs_union_b,
+};
 
 use super::{
     value::{ValueData, ValueResult},
     Ref,
 };
 use crate::{
-    catch::catch_exceptions,
+    catch::{catch_exceptions, unwrap_exc},
     data::managed::{private::ManagedPriv, value::Value, Managed},
     impl_julia_typecheck,
     memory::target::{Target, TargetResult},
@@ -31,19 +34,18 @@ impl<'scope> Union<'scope> {
     ///
     /// [`Union`]: crate::data::managed::union::Union
     /// [`DataType`]: crate::data::managed::datatype::DataType
-    pub fn new<'target, V, T>(target: T, types: V) -> ValueResult<'target, 'static, T>
+    pub fn new<'target, V, Tgt>(target: Tgt, types: V) -> ValueResult<'target, 'static, Tgt>
     where
         V: AsRef<[Value<'scope, 'static>]>,
-        T: Target<'target>,
+        Tgt: Target<'target>,
     {
         // Safety: if an exception is thrown it's caught, the result is immediately rooted
         unsafe {
             let types = types.as_ref();
 
             let callback = || jl_type_union(types.as_ptr() as *mut _, types.len());
-            let exc = |err: Value| err.unwrap_non_null(Private);
 
-            let res = match catch_exceptions(callback, exc) {
+            let res = match catch_exceptions(callback, unwrap_exc) {
                 Ok(ptr) => Ok(NonNull::new_unchecked(ptr)),
                 Err(e) => Err(e),
             };
@@ -64,13 +66,13 @@ impl<'scope> Union<'scope> {
     /// [`Union`]: crate::data::managed::union::Union
     /// [`DataType`]: crate::data::managed::datatype::DataType
     #[inline]
-    pub unsafe fn new_unchecked<'target, V, T>(
-        target: T,
+    pub unsafe fn new_unchecked<'target, V, Tgt>(
+        target: Tgt,
         types: V,
-    ) -> ValueData<'target, 'static, T>
+    ) -> ValueData<'target, 'static, Tgt>
     where
         V: AsRef<[Value<'scope, 'static>]>,
-        T: Target<'target>,
+        Tgt: Target<'target>,
     {
         let types = types.as_ref();
         let un = jl_type_union(types.as_ptr() as *mut _, types.len());
@@ -115,19 +117,13 @@ impl<'scope> Union<'scope> {
         comps
     }
 
-    /*inspect(Union):
-
-    a: Any (const)
-    b: Any (const)
-    */
-
     /// Unions are stored as binary trees, the arguments are stored as its leaves. This method
     /// returns one of its branches.
     #[inline]
     pub fn a(self) -> Value<'scope, 'static> {
         // Safety: the pointer points to valid data
         unsafe {
-            let a = self.unwrap_non_null(Private).as_ref().a;
+            let a = jlrs_union_a(self.unwrap(Private));
             debug_assert!(!a.is_null());
             Value::wrap_non_null(NonNull::new_unchecked(a), Private)
         }
@@ -139,7 +135,7 @@ impl<'scope> Union<'scope> {
     pub fn b(self) -> Value<'scope, 'static> {
         // Safety: the pointer points to valid data
         unsafe {
-            let b = self.unwrap_non_null(Private).as_ref().b;
+            let b = jlrs_union_b(self.unwrap(Private));
             debug_assert!(!b.is_null());
             Value::wrap_non_null(NonNull::new_unchecked(b), Private)
         }
@@ -151,7 +147,7 @@ impl_debug!(Union<'_>);
 
 impl<'scope> ManagedPriv<'scope, '_> for Union<'scope> {
     type Wraps = jl_uniontype_t;
-    type TypeConstructorPriv<'target, 'da> = Union<'target>;
+    type WithLifetimes<'target, 'da> = Union<'target>;
     const NAME: &'static str = "Union";
 
     // Safety: `inner` must not have been freed yet, the result must never be
@@ -235,11 +231,11 @@ impl_valid_layout!(UnionRef, Union, jl_uniontype_type);
 
 use crate::memory::target::TargetType;
 
-/// `Union` or `UnionRef`, depending on the target type `T`.
-pub type UnionData<'target, T> = <T as TargetType<'target>>::Data<'static, Union<'target>>;
+/// `Union` or `UnionRef`, depending on the target type `Tgt`.
+pub type UnionData<'target, Tgt> = <Tgt as TargetType<'target>>::Data<'static, Union<'target>>;
 
-/// `JuliaResult<Union>` or `JuliaResultRef<UnionRef>`, depending on the target type `T`.
-pub type UnionResult<'target, T> = TargetResult<'target, 'static, Union<'target>, T>;
+/// `JuliaResult<Union>` or `JuliaResultRef<UnionRef>`, depending on the target type `Tgt`.
+pub type UnionResult<'target, Tgt> = TargetResult<'target, 'static, Union<'target>, Tgt>;
 
 impl_ccall_arg_managed!(Union, 1);
 impl_into_typed!(Union);

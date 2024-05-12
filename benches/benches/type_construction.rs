@@ -1,12 +1,13 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use jlrs::{
     data::types::{
-        abstract_types::{AbstractSet, Integer, Number},
+        abstract_type::{AbstractSet, Integer, Number},
         construct_type::{ArrayTypeConstructor, ConstantIsize, ConstructType},
     },
     memory::target::frame::GcFrame,
     prelude::*,
 };
+#[cfg(not(target_os = "windows"))]
 use pprof::{
     criterion::{Output, PProfProfiler},
     flamegraph::Options,
@@ -14,7 +15,7 @@ use pprof::{
 
 #[inline(never)]
 fn construct_primitive_type_uncached(frame: &mut GcFrame, c: &mut Criterion) -> JlrsResult<()> {
-    frame.scope(|frame| {
+    frame.scope(|mut frame| {
         let output = frame.reusable_slot();
 
         c.bench_function("ConstructType_f64_uncached", |b| {
@@ -26,7 +27,7 @@ fn construct_primitive_type_uncached(frame: &mut GcFrame, c: &mut Criterion) -> 
 
 #[inline(never)]
 fn construct_primitive_type_cached(frame: &mut GcFrame, c: &mut Criterion) -> JlrsResult<()> {
-    frame.scope(|frame| {
+    frame.scope(|mut frame| {
         let output = frame.reusable_slot();
 
         c.bench_function("ConstructType_f64_cached", |b| {
@@ -38,7 +39,7 @@ fn construct_primitive_type_cached(frame: &mut GcFrame, c: &mut Criterion) -> Jl
 
 #[inline(never)]
 fn construct_abstract_type_uncached(frame: &mut GcFrame, c: &mut Criterion) -> JlrsResult<()> {
-    frame.scope(|frame| {
+    frame.scope(|mut frame| {
         let output = frame.reusable_slot();
 
         c.bench_function("ConstructType_number_uncached", |b| {
@@ -50,7 +51,7 @@ fn construct_abstract_type_uncached(frame: &mut GcFrame, c: &mut Criterion) -> J
 
 #[inline(never)]
 fn construct_abstract_type_cached(frame: &mut GcFrame, c: &mut Criterion) -> JlrsResult<()> {
-    frame.scope(|frame| {
+    frame.scope(|mut frame| {
         let output = frame.reusable_slot();
 
         c.bench_function("ConstructType_number_cached", |b| {
@@ -61,7 +62,7 @@ fn construct_abstract_type_cached(frame: &mut GcFrame, c: &mut Criterion) -> Jlr
 }
 #[inline(never)]
 fn construct_integer_uncached(frame: &mut GcFrame, c: &mut Criterion) -> JlrsResult<()> {
-    frame.scope(|frame| {
+    frame.scope(|mut frame| {
         let output = frame.reusable_slot();
 
         c.bench_function("ConstructType_integer_uncached", |b| {
@@ -73,7 +74,7 @@ fn construct_integer_uncached(frame: &mut GcFrame, c: &mut Criterion) -> JlrsRes
 
 #[inline(never)]
 fn construct_integer_cached(frame: &mut GcFrame, c: &mut Criterion) -> JlrsResult<()> {
-    frame.scope(|frame| {
+    frame.scope(|mut frame| {
         let output = frame.reusable_slot();
 
         c.bench_function("ConstructType_integer_cached", |b| {
@@ -88,7 +89,7 @@ fn construct_abstract_parametric_type_uncached(
     frame: &mut GcFrame,
     c: &mut Criterion,
 ) -> JlrsResult<()> {
-    frame.scope(|frame| {
+    frame.scope(|mut frame| {
         let output = frame.reusable_slot();
 
         c.bench_function("ConstructType_abstract_set_uncached", |b| {
@@ -103,7 +104,7 @@ fn construct_abstract_parametric_type_cached(
     frame: &mut GcFrame,
     c: &mut Criterion,
 ) -> JlrsResult<()> {
-    frame.scope(|frame| {
+    frame.scope(|mut frame| {
         let output = frame.reusable_slot();
 
         c.bench_function("ConstructType_abstract_set_cached", |b| {
@@ -115,7 +116,7 @@ fn construct_abstract_parametric_type_cached(
 
 #[inline(never)]
 fn construct_array_type_uncached(frame: &mut GcFrame, c: &mut Criterion) -> JlrsResult<()> {
-    frame.scope(|frame| {
+    frame.scope(|mut frame| {
         let output = frame.reusable_slot();
 
         c.bench_function("ConstructType_array_f64_3_uncached", |b| {
@@ -129,7 +130,7 @@ fn construct_array_type_uncached(frame: &mut GcFrame, c: &mut Criterion) -> Jlrs
 
 #[inline(never)]
 fn construct_array_type_cached(frame: &mut GcFrame, c: &mut Criterion) -> JlrsResult<()> {
-    frame.scope(|frame| {
+    frame.scope(|mut frame| {
         let output = frame.reusable_slot();
 
         c.bench_function("ConstructType_array_f64_3_cached", |b| {
@@ -140,13 +141,11 @@ fn construct_array_type_cached(frame: &mut GcFrame, c: &mut Criterion) -> JlrsRe
 }
 
 fn criterion_benchmark(c: &mut Criterion) {
-    unsafe {
-        let mut frame = StackFrame::new();
-        let mut julia = RuntimeBuilder::new().start().unwrap();
-        let mut julia = julia.instance(&mut frame);
-
-        julia
-            .scope(|mut frame| {
+    Builder::new()
+        .start_local()
+        .unwrap()
+        .with_stack(|mut stack| {
+            stack.scope(|mut frame| {
                 construct_primitive_type_uncached(&mut frame, c).unwrap();
                 construct_primitive_type_cached(&mut frame, c).unwrap();
                 construct_abstract_type_uncached(&mut frame, c).unwrap();
@@ -157,13 +156,11 @@ fn criterion_benchmark(c: &mut Criterion) {
                 construct_abstract_parametric_type_cached(&mut frame, c).unwrap();
                 construct_array_type_uncached(&mut frame, c).unwrap();
                 construct_array_type_cached(&mut frame, c).unwrap();
-
-                Ok(())
-            })
-            .unwrap();
-    }
+            });
+        })
 }
 
+#[cfg(not(target_os = "windows"))]
 fn opts() -> Option<Options<'static>> {
     let mut opts = Options::default();
     opts.image_width = Some(1920);
@@ -171,9 +168,17 @@ fn opts() -> Option<Options<'static>> {
     Some(opts)
 }
 
+#[cfg(not(target_os = "windows"))]
 criterion_group! {
     name = type_construction;
     config = Criterion::default().with_profiler(PProfProfiler::new(1000, Output::Flamegraph(opts())));
+    targets = criterion_benchmark
+}
+
+#[cfg(target_os = "windows")]
+criterion_group! {
+    name = type_construction;
+    config = Criterion::default();
     targets = criterion_benchmark
 }
 

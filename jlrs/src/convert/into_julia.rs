@@ -9,25 +9,29 @@
 //! [`Value::new`]: crate::data::managed::value::Value::new
 //! [`Value`]: crate::data::managed::value::Value
 
-use std::{ffi::c_void, ptr::NonNull};
+use std::{ffi::c_void, mem::MaybeUninit, ptr::NonNull};
 
 use jl_sys::{
-    jl_apply_type, jl_bool_type, jl_box_bool, jl_box_char, jl_box_float32, jl_box_float64,
-    jl_box_int16, jl_box_int32, jl_box_int64, jl_box_int8, jl_box_uint16, jl_box_uint32,
-    jl_box_uint64, jl_box_uint8, jl_box_voidpointer, jl_char_type, jl_float32_type,
-    jl_float64_type, jl_int16_type, jl_int32_type, jl_int64_type, jl_int8_type,
-    jl_new_struct_uninit, jl_uint16_type, jl_uint32_type, jl_uint64_type, jl_uint8_type,
-    jl_voidpointer_type,
+    jl_bool_type, jl_box_bool, jl_box_char, jl_box_float32, jl_box_float64, jl_box_int16,
+    jl_box_int32, jl_box_int64, jl_box_int8, jl_box_uint16, jl_box_uint32, jl_box_uint64,
+    jl_box_uint8, jl_box_voidpointer, jl_char_type, jl_float32_type, jl_float64_type,
+    jl_int16_type, jl_int32_type, jl_int64_type, jl_int8_type, jl_new_struct_uninit,
+    jl_uint16_type, jl_uint32_type, jl_uint64_type, jl_uint8_type, jl_voidpointer_type,
+    jlrs_box_long, jlrs_box_ulong,
 };
 
 use crate::{
-    data::managed::{
-        datatype::{DataType, DataTypeData},
-        private::ManagedPriv,
-        union_all::UnionAll,
-        value::{Value, ValueData},
+    data::{
+        managed::{
+            datatype::{DataType, DataTypeData},
+            private::ManagedPriv,
+            union_all::UnionAll,
+            value::ValueData,
+        },
+        types::construct_type::ConstructType,
     },
     memory::target::Target,
+    prelude::Managed,
     private::Private,
 };
 
@@ -41,20 +45,26 @@ use crate::{
 /// behavior. The type in Rust must always be `#[repr(C)]`. The `DataType` must be an isbits-type.
 ///
 /// [`Value::new`]: crate::data::managed::value::Value::new
+#[diagnostic::on_unimplemented(
+    message = "the trait bound `{Self}: IntoJulia` is not satisfied",
+    label = "the trait `IntoJulia` is not implemented for `{Self}`",
+    note = "Custom types that implement `IntoJulia` should be generated with JlrsCore.reflect",
+    note = "Do not implement `ForeignType`, `OpaqueType`, or `ParametricVariant` unless this type is exported to Julia with `julia_module!`"
+)]
 pub unsafe trait IntoJulia: Sized + 'static {
     /// Returns the associated Julia type of the implementor.
     ///
     /// The layout of that type and the Rust type must match exactly, and it must be an `isbits`
     /// type, otherwise this trait has been implemented incorrectly.
-    fn julia_type<'scope, T>(target: T) -> DataTypeData<'scope, T>
+    fn julia_type<'scope, Tgt>(target: Tgt) -> DataTypeData<'scope, Tgt>
     where
-        T: Target<'scope>;
+        Tgt: Target<'scope>;
 
     #[doc(hidden)]
     #[inline]
-    fn into_julia<'scope, T>(self, target: T) -> ValueData<'scope, 'static, T>
+    fn into_julia<'scope, Tgt>(self, target: Tgt) -> ValueData<'scope, 'static, Tgt>
     where
-        T: Target<'scope>,
+        Tgt: Target<'scope>,
     {
         // Safety: trait is implemented incorrectly if this is incorrect. A new instance of the
         // associated
@@ -62,13 +72,14 @@ pub unsafe trait IntoJulia: Sized + 'static {
             let ty = Self::julia_type(&target).as_managed();
             debug_assert!(ty.is_bits());
 
-            let instance = ty.instance();
-            if instance.is_none() {
-                let container = jl_new_struct_uninit(ty.unwrap(Private));
-                container.cast::<Self>().write(self);
-                target.data_from_ptr(NonNull::new_unchecked(container), Private)
+            if let Some(instance) = ty.instance() {
+                target.data_from_ptr(instance.unwrap_non_null(Private), Private)
             } else {
-                target.data_from_ptr(instance.unwrap().unwrap_non_null(Private), Private)
+                let container = jl_new_struct_uninit(ty.unwrap(Private));
+                debug_assert!(!container.is_null());
+                let container = NonNull::new_unchecked(container);
+                container.cast::<MaybeUninit<Self>>().as_mut().write(self);
+                target.data_from_ptr(container, Private)
             }
         }
     }
@@ -79,11 +90,11 @@ macro_rules! impl_into_julia {
         // Safety: These implemetations use a boxing function provided by Julia
         unsafe impl IntoJulia for $type {
             #[inline]
-            fn julia_type<'scope, T>(
-                target: T,
-            ) -> $crate::data::managed::datatype::DataTypeData<'scope, T>
+            fn julia_type<'scope, Tgt>(
+                target: Tgt,
+            ) -> $crate::data::managed::datatype::DataTypeData<'scope, Tgt>
             where
-                T: $crate::memory::target::Target<'scope>,
+                Tgt: $crate::memory::target::Target<'scope>,
             {
                 unsafe {
                     target.data_from_ptr(
@@ -94,12 +105,12 @@ macro_rules! impl_into_julia {
             }
 
             #[inline]
-            fn into_julia<'scope, T>(
+            fn into_julia<'scope, Tgt>(
                 self,
-                target: T,
-            ) -> $crate::data::managed::value::ValueData<'scope, 'static, T>
+                target: Tgt,
+            ) -> $crate::data::managed::value::ValueData<'scope, 'static, Tgt>
             where
-                T: $crate::memory::target::Target<'scope>,
+                Tgt: $crate::memory::target::Target<'scope>,
             {
                 unsafe {
                     target.data_from_ptr(
@@ -127,39 +138,35 @@ impl_into_julia!(f64, jl_box_float64, jl_float64_type);
 impl_into_julia!(*mut c_void, jl_box_voidpointer, jl_voidpointer_type);
 
 #[cfg(target_pointer_width = "32")]
-impl_into_julia!(usize, jl_box_uint32, jl_uint32_type);
+impl_into_julia!(usize, jlrs_box_ulong, jl_uint32_type);
 
 #[cfg(target_pointer_width = "64")]
-impl_into_julia!(usize, jl_box_uint64, jl_uint64_type);
+impl_into_julia!(usize, jlrs_box_ulong, jl_uint64_type);
 
 #[cfg(target_pointer_width = "32")]
-impl_into_julia!(isize, jl_box_int32, jl_int32_type);
+impl_into_julia!(isize, jlrs_box_long, jl_int32_type);
 
 #[cfg(target_pointer_width = "64")]
-impl_into_julia!(isize, jl_box_int64, jl_int64_type);
+impl_into_julia!(isize, jlrs_box_long, jl_int64_type);
 
 // Safety: *mut T and Ptr{T} have the same layout
-unsafe impl<U: IntoJulia> IntoJulia for *mut U {
+unsafe impl<T: IntoJulia + ConstructType> IntoJulia for *mut T {
     #[inline]
-    fn julia_type<'scope, T>(target: T) -> DataTypeData<'scope, T>
+    fn julia_type<'scope, Tgt>(target: Tgt) -> DataTypeData<'scope, Tgt>
     where
-        T: Target<'scope>,
+        Tgt: Target<'scope>,
     {
-        let ptr_ua = UnionAll::pointer_type(&target);
-        let inner_ty = U::julia_type(&target);
-        let params = &mut [inner_ty];
-        let param_ptr = params.as_mut_ptr().cast();
+        target.with_local_scope::<_, _, 1>(|target, mut frame| {
+            let ptr_ua = UnionAll::pointer_type(&frame);
+            let inner_ty = T::construct_type(&mut frame);
 
-        // Safety: Not rooting the result is fine. The result must be a concrete type which is
-        // globally rooted.
-        unsafe {
-            let applied = jl_apply_type(ptr_ua.unwrap(Private).cast(), param_ptr, 1);
-            debug_assert!(!applied.is_null());
-            let val = Value::wrap_non_null(NonNull::new_unchecked(applied), Private);
-            debug_assert!(val.is::<DataType>());
-            let ty = val.cast_unchecked::<DataType>();
-            debug_assert!(ty.is_concrete_type());
-            target.data_from_ptr(ty.unwrap_non_null(Private), Private)
-        }
+            unsafe {
+                let ty = ptr_ua.apply_types_unchecked(&frame, [inner_ty]).as_value();
+                debug_assert!(ty.is::<DataType>());
+                let ty = ty.cast_unchecked::<DataType>();
+                debug_assert!(ty.is_concrete_type());
+                ty.root(target)
+            }
+        })
     }
 }

@@ -6,22 +6,14 @@
 //!
 //! ```
 //! # use jlrs::prelude::*;
-//! # use jlrs::util::test::JULIA;
 //! # fn main() {
-//! # JULIA.with(|j| {
-//! # let mut julia = j.borrow_mut();
-//! # let mut frame = StackFrame::new();
-//! # let mut julia = julia.instance(&mut frame);
-//! julia
-//!     .scope(|mut frame| {
-//!         let tup = Tuple2(2i32, true);
-//!         let val = Value::new(&mut frame, tup);
-//!         assert!(val.is::<Tuple2<i32, bool>>());
-//!         assert!(val.unbox::<Tuple2<i32, bool>>().is_ok());
-//!         Ok(())
-//!     })
-//!     .unwrap();
-//! # });
+//! # let mut julia = Builder::new().start_local().unwrap();
+//! julia.local_scope::<_, 1>(|mut frame| {
+//!     let tup = Tuple2(2i32, true);
+//!     let val = Value::new(&mut frame, tup);
+//!     assert!(val.is::<Tuple2<i32, bool>>());
+//!     assert!(val.unbox::<Tuple2<i32, bool>>().is_ok());
+//! });
 //! # }
 //! ```
 //!
@@ -29,20 +21,24 @@
 
 use std::{marker::PhantomData, ptr::NonNull};
 
-use jl_sys::{jl_apply_tuple_type_v, jl_tuple_typename, jlrs_tuple_of};
+use jl_sys::{jl_apply_tuple_type_v, jlrs_tuple_of};
 
 use crate::{
-    catch::catch_exceptions,
+    catch::{catch_exceptions, unwrap_exc},
     data::{
         managed::{
             datatype::DataType,
             private::ManagedPriv as _,
+            type_name::TypeName,
             value::{Value, ValueData, ValueResult},
-            Managed as _,
         },
-        types::{construct_type::ConstructType, typecheck::Typecheck},
+        types::{
+            construct_type::{ConstructType, TypeVarEnv},
+            typecheck::Typecheck,
+        },
     },
-    memory::target::Target,
+    memory::target::{unrooted::Unrooted, Target},
+    prelude::Managed,
     private::Private,
 };
 
@@ -53,20 +49,19 @@ pub struct Tuple;
 
 impl Tuple {
     /// Create a new tuple from the contents of `values`.
-    pub fn new<'target, 'current, 'borrow, 'value, 'data, V, T>(
-        target: T,
+    pub fn new<'target, 'current, 'borrow, 'value, 'data, V, Tgt>(
+        target: Tgt,
         values: V,
-    ) -> ValueResult<'target, 'data, T>
+    ) -> ValueResult<'target, 'data, Tgt>
     where
         V: AsRef<[Value<'value, 'data>]>,
-        T: Target<'target>,
+        Tgt: Target<'target>,
     {
         unsafe {
             let values = values.as_ref();
             let callback = || Self::new_unchecked(&target, values);
-            let exc = |err: Value| err.unwrap_non_null(Private);
 
-            match catch_exceptions(callback, exc) {
+            match catch_exceptions(callback, unwrap_exc) {
                 Ok(tup) => Ok(target.data_from_ptr(tup.ptr(), Private)),
                 Err(err) => Err(target.data_from_ptr(err, Private)),
             }
@@ -74,19 +69,18 @@ impl Tuple {
     }
 
     /// Create a new tuple from the contents of `values`.
-    pub unsafe fn new_unchecked<'target, 'current, 'borrow, 'value, 'data, V, T>(
-        target: T,
+    pub unsafe fn new_unchecked<'target, 'current, 'borrow, 'value, 'data, V, Tgt>(
+        target: Tgt,
         values: V,
-    ) -> ValueData<'target, 'data, T>
+    ) -> ValueData<'target, 'data, Tgt>
     where
         V: AsRef<[Value<'value, 'data>]>,
-        T: Target<'target>,
+        Tgt: Target<'target>,
     {
         let values = values.as_ref();
         let n = values.len();
         let values_ptr = values.as_ptr();
-        let tuple: *mut jl_sys::_jl_value_t =
-            jlrs_tuple_of(values_ptr as *const _ as *mut _, n as _);
+        let tuple: *mut jl_sys::jl_value_t = jlrs_tuple_of(values_ptr as *const _ as *mut _, n);
 
         target.data_from_ptr(NonNull::new_unchecked(tuple), Private)
     }
@@ -95,7 +89,7 @@ impl Tuple {
 unsafe impl Typecheck for Tuple {
     #[inline]
     fn typecheck(t: DataType) -> bool {
-        unsafe { t.unwrap_non_null(Private).as_ref().name == jl_tuple_typename }
+        unsafe { t.type_name() == TypeName::of_tuple(&Unrooted::new()) }
     }
 }
 
@@ -109,11 +103,11 @@ macro_rules! count {
 }
 
 macro_rules! check {
-    ($fieldtypes:expr, $n:expr, $t:ident, $($x:ident),+) => {
-        <$t>::valid_field($fieldtypes[$n - 1 - count!($($x),+)].unwrap().as_managed()) && check!($fieldtypes, $n, $($x),+)
+    ($fieldtypes:expr, $unrooted:expr, $n:expr, $t:ident, $($x:ident),+) => {
+        <$t>::valid_field($fieldtypes.get($unrooted, $n - 1 - count!($($x),+)).unwrap().as_managed()) && check!($fieldtypes, $unrooted, $n, $($x),+)
     };
-    ($fieldtypes:expr, $n:expr, $t:ident) => {
-        <$t>::valid_field($fieldtypes[$n - 1].unwrap().as_managed())
+    ($fieldtypes:expr, $unrooted:expr, $n:expr, $t:ident) => {
+        <$t>::valid_field($fieldtypes.get($unrooted, $n - 1).unwrap().as_managed())
     };
 }
 
@@ -130,7 +124,7 @@ macro_rules! impl_tuple {
 
         unsafe impl<$($types),+> $crate::data::layout::is_bits::IsBits for $name<$($types),+>
         where
-            $($types: $crate::data::layout::is_bits::IsBits),+
+            $($types: Clone + ::std::fmt::Debug + $crate::data::layout::is_bits::IsBits + $crate::data::layout::valid_layout::ValidField),+
         {}
 
         unsafe impl<$($types),+> $crate::convert::into_julia::IntoJulia for $name<$($types),+>
@@ -138,11 +132,11 @@ macro_rules! impl_tuple {
             $($types: $crate::convert::into_julia::IntoJulia + $crate::data::types::construct_type::ConstructType + ::std::fmt::Debug + Clone),+
         {
             #[inline]
-            fn julia_type<'scope, T>(
-                target: T,
-            ) -> $crate::data::managed::datatype::DataTypeData<'scope, T>
+            fn julia_type<'scope, Tgt>(
+                target: Tgt,
+            ) -> $crate::data::managed::datatype::DataTypeData<'scope, Tgt>
             where
-                T: $crate::memory::target::Target<'scope>
+                Tgt: $crate::memory::target::Target<'scope>
             {
                 unsafe {
                     <Self as $crate::data::types::construct_type::ConstructType>::construct_type(&target).as_value().cast_unchecked::<DataType>().root(target)
@@ -157,18 +151,16 @@ macro_rules! impl_tuple {
             fn valid_layout(v: $crate::data::managed::value::Value) -> bool {
                 unsafe {
                     if v.is::<$crate::data::managed::datatype::DataType>() {
+                        let unrooted = $crate::memory::target::unrooted::Unrooted::new();
                         let dt = v.cast_unchecked::<$crate::data::managed::datatype::DataType>();
-                        let global = v.unrooted_target();
-                        let fieldtypes = dt.field_types(global);
+                        let fieldtypes = dt.field_types();
                         let n = count!($($types),+);
-                        if fieldtypes.as_managed().len() != n {
+                        if fieldtypes.len() != n {
                             return false;
                         }
 
-
-                        let types = fieldtypes.as_managed();
-                        let types = types.data().as_slice();
-                        if !check!(types, n, $($types),+) {
+                        let types = fieldtypes.data();
+                        if !check!(types, unrooted, n, $($types),+) {
                             return false
                         }
 
@@ -202,28 +194,26 @@ macro_rules! impl_tuple {
             $($types: $crate::data::layout::valid_layout::ValidField + Clone + ::std::fmt::Debug),+
         {
             fn valid_field(v: $crate::data::managed::value::Value) -> bool {
-                unsafe {
-                    if v.is::<$crate::data::managed::datatype::DataType>() {
+                if v.is::<$crate::data::managed::datatype::DataType>() {
+                    unsafe {
+                        let unrooted = $crate::memory::target::unrooted::Unrooted::new();
                         let dt = v.cast_unchecked::<$crate::data::managed::datatype::DataType>();
-                        let global = v.unrooted_target();
-                        let fieldtypes = dt.field_types(global);
+                        let fieldtypes = dt.field_types();
                         let n = count!($($types),+);
-                        if fieldtypes.as_managed().len() != n {
+                        if fieldtypes.len() != n {
                             return false;
                         }
 
-
-                        let types = fieldtypes.as_managed();
-                        let types = types.data().as_slice();
-                        if !check!(types, n, $($types),+) {
+                        let types = fieldtypes.data();
+                        if !check!(types, unrooted, n, $($types),+) {
                             return false
                         }
 
                         return true
                     }
-
-                    false
                 }
+
+                false
             }
         }
 
@@ -264,12 +254,34 @@ macro_rules! impl_tuple {
                     ];
 
                     unsafe {
-                        Ok(target.data_from_ptr(
+                        target.data_from_ptr(
                             ::std::ptr::NonNull::new_unchecked(::jl_sys::jl_apply_tuple_type_v(types.as_mut_ptr().cast(), types.len()).cast()),
                             $crate::private::Private,
-                        ))
+                        )
                     }
-                }).unwrap()
+                })
+            }
+
+            fn construct_type_with_env_uncached<'target, Tgt>(
+                target: Tgt,
+                env: &$crate::data::types::construct_type::TypeVarEnv,
+            ) -> $crate::data::managed::value::ValueData<'target, 'static, Tgt>
+            where
+                Tgt: $crate::memory::target::Target<'target> {
+                    const N: usize = count!($($types),*);
+
+                    target.with_local_scope::<_, _, N>(|target, mut frame| {
+                        let types = &mut [
+                            $(<$types as $crate::data::types::construct_type::ConstructType>::construct_type_with_env(&mut frame, env)),+
+                        ];
+
+                        unsafe {
+                            target.data_from_ptr(
+                                ::std::ptr::NonNull::new_unchecked(::jl_sys::jl_apply_tuple_type_v(types.as_mut_ptr().cast(), types.len()).cast()),
+                                $crate::private::Private,
+                            )
+                        }
+                    })
             }
 
             #[inline]
@@ -291,11 +303,11 @@ macro_rules! impl_tuple {
         unsafe impl $crate::convert::into_julia::IntoJulia for $name
         {
             #[inline]
-            fn julia_type<'scope, T>(
-                target: T,
-            ) -> $crate::data::managed::datatype::DataTypeData<'scope, T>
+            fn julia_type<'scope, Tgt>(
+                target: Tgt,
+            ) -> $crate::data::managed::datatype::DataTypeData<'scope, Tgt>
             where
-                T: $crate::memory::target::Target<'scope>
+                Tgt: $crate::memory::target::Target<'scope>
             {
                 unsafe {
                     let ptr = $crate::data::managed::datatype::DataType::emptytuple_type(&target).unwrap_non_null($crate::private::Private);
@@ -304,9 +316,9 @@ macro_rules! impl_tuple {
             }
 
             #[inline]
-            fn into_julia<'scope, T>(self, target: T) -> $crate::data::managed::value::ValueData<'scope, 'static, T>
+            fn into_julia<'scope, Tgt>(self, target: Tgt) -> $crate::data::managed::value::ValueData<'scope, 'static, Tgt>
             where
-                T: $crate::memory::target::Target<'scope>,
+                Tgt: $crate::memory::target::Target<'scope>,
             {
                 unsafe {
                     let ptr = $crate::data::managed::value::Value::emptytuple(&target).unwrap_non_null($crate::private::Private);
@@ -386,6 +398,15 @@ macro_rules! impl_tuple {
             where
                 Tgt: $crate::memory::target::Target<'target>,
             {
+                $crate::data::managed::datatype::DataType::emptytuple_type(&target).as_value().root(target)
+            }
+
+            fn construct_type_with_env_uncached<'target, Tgt>(
+                target: Tgt,
+                _env: &$crate::data::types::construct_type::TypeVarEnv,
+            ) -> $crate::data::managed::value::ValueData<'target, 'static, Tgt>
+            where
+                Tgt: $crate::memory::target::Target<'target> {
                 $crate::data::managed::datatype::DataType::emptytuple_type(&target).as_value().root(target)
             }
 
@@ -489,14 +510,29 @@ unsafe impl<T: ConstructType, const N: usize> ConstructType for NTuple<T, N> {
         Tgt: Target<'target>,
     {
         unsafe {
-            target
-                .with_local_scope::<_, _, 1>(|target, mut frame| {
-                    let ty = T::construct_type(&mut frame);
-                    let types = [ty; N];
-                    let applied = jl_apply_tuple_type_v(&types as *const _ as *mut _, N);
-                    Ok(target.data_from_ptr(NonNull::new_unchecked(applied.cast()), Private))
-                })
-                .unwrap_unchecked()
+            target.with_local_scope::<_, _, 1>(|target, mut frame| {
+                let ty = T::construct_type(&mut frame);
+                let types = [ty; N];
+                let applied = jl_apply_tuple_type_v(&types as *const _ as *mut _, N);
+                target.data_from_ptr(NonNull::new_unchecked(applied.cast()), Private)
+            })
+        }
+    }
+
+    fn construct_type_with_env_uncached<'target, Tgt>(
+        target: Tgt,
+        env: &TypeVarEnv,
+    ) -> ValueData<'target, 'static, Tgt>
+    where
+        Tgt: Target<'target>,
+    {
+        unsafe {
+            target.with_local_scope::<_, _, 1>(|target, mut frame| {
+                let ty = T::construct_type_with_env(&mut frame, env);
+                let types = [ty; N];
+                let applied = jl_apply_tuple_type_v(&types as *const _ as *mut _, N);
+                target.data_from_ptr(NonNull::new_unchecked(applied.cast()), Private)
+            })
         }
     }
 

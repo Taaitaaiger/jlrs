@@ -7,40 +7,22 @@
 
 use std::{marker::PhantomData, ptr::NonNull};
 
-use cfg_if::cfg_if;
-#[julia_version(since = "1.7")]
-use jl_sys::jl_opaque_closure_typename;
 #[julia_version(until = "1.6")]
 use jl_sys::jl_vararg_typename;
 use jl_sys::{
     jl_array_typename, jl_llvmpointer_typename, jl_namedtuple_typename, jl_pointer_typename,
     jl_tuple_typename, jl_type_typename, jl_typename_t, jl_typename_type, jl_vecelement_typename,
+    jlrs_typename_module, jlrs_typename_name, jlrs_typename_names, jlrs_typename_wrapper,
 };
 use jlrs_macros::julia_version;
 
-use super::Ref;
+use super::{simple_vector::SimpleVector, value::Value, Ref};
 use crate::{
-    data::managed::{
-        module::Module, private::ManagedPriv, simple_vector::SimpleVector, symbol::Symbol,
-    },
+    data::managed::{module::Module, private::ManagedPriv, symbol::Symbol},
     impl_julia_typecheck,
     memory::target::{Target, TargetResult},
     private::Private,
 };
-
-cfg_if! {
-    if #[cfg(feature = "extra-fields")] {
-        use crate::data::managed::{simple_vector::{SimpleVectorRef, SimpleVectorData}};
-    }
-}
-
-#[julia_version(since = "1.7")]
-cfg_if! {
-    if #[cfg(feature = "extra-fields")] {
-        use std::sync::atomic::Ordering;
-        use crate::data::managed::value::{ValueData, Value, ValueRef};
-    }
-}
 
 /// Describes the syntactic structure of a type and stores all data common to different
 /// instantiations of the type.
@@ -49,34 +31,23 @@ cfg_if! {
 pub struct TypeName<'scope>(NonNull<jl_typename_t>, PhantomData<&'scope ()>);
 
 impl<'scope> TypeName<'scope> {
-    /*
-    inspect(Core.TypeName):
-
-    name: Symbol (const)
-    module: Module (const)
-    names: Core.SimpleVector (const)
-    atomicfields: Ptr{Nothing} (const)
-    constfields: Ptr{Nothing} (const)
-    wrapper: Type (const)
-    Typeofwrapper: Type (mut, atomic)
-    cache: Core.SimpleVector (mut, atomic)
-    linearcache: Core.SimpleVector (mut, atomic)
-    mt: Core.MethodTable (const)
-    partial: Any (mut)
-    hash: Int64 (const)
-    n_uninitialized: Int32 (const)
-    flags: UInt8 (const)
-    max_methods: UInt8 (mut)
-    */
-
     /// The `name` field.
     #[inline]
     pub fn name(self) -> Symbol<'scope> {
         // Safety: the pointer points to valid data
         unsafe {
-            let name = self.unwrap_non_null(Private).as_ref().name;
-            debug_assert!(!name.is_null());
+            let name = jlrs_typename_name(self.unwrap(Private));
             Symbol::wrap_non_null(NonNull::new_unchecked(name), Private)
+        }
+    }
+
+    /// The `name` field.
+    #[inline]
+    pub fn names(self) -> SimpleVector<'scope> {
+        // Safety: the pointer points to valid data
+        unsafe {
+            let names = jlrs_typename_names(self.unwrap(Private));
+            SimpleVector::wrap_non_null(NonNull::new_unchecked(names), Private)
         }
     }
 
@@ -85,20 +56,18 @@ impl<'scope> TypeName<'scope> {
     pub fn module(self) -> Module<'scope> {
         // Safety: the pointer points to valid data
         unsafe {
-            let module = self.unwrap_non_null(Private).as_ref().module;
-            debug_assert!(!module.is_null());
+            let module = jlrs_typename_module(self.unwrap(Private));
             Module::wrap_non_null(NonNull::new_unchecked(module), Private)
         }
     }
 
-    /// Field names.
+    /// The `module` field.
     #[inline]
-    pub fn names(self) -> SimpleVector<'scope> {
+    pub fn wrapper(self) -> Value<'scope, 'static> {
         // Safety: the pointer points to valid data
         unsafe {
-            let names = self.unwrap_non_null(Private).as_ref().names;
-            debug_assert!(!names.is_null());
-            SimpleVector::wrap_non_null(NonNull::new_unchecked(names), Private)
+            let module = jlrs_typename_wrapper(self.unwrap(Private));
+            Value::wrap_non_null(NonNull::new_unchecked(module), Private)
         }
     }
 
@@ -107,7 +76,7 @@ impl<'scope> TypeName<'scope> {
     #[inline]
     pub fn atomicfields(self) -> *const u32 {
         // Safety: the pointer points to valid data
-        unsafe { self.unwrap_non_null(Private).as_ref().atomicfields }
+        unsafe { jl_sys::jlrs_typename_atomicfields(self.unwrap(Private)) }
     }
 
     #[julia_version(since = "1.8")]
@@ -115,157 +84,7 @@ impl<'scope> TypeName<'scope> {
     #[inline]
     pub fn constfields(self) -> *const u32 {
         // Safety: the pointer points to valid data
-        unsafe { self.unwrap_non_null(Private).as_ref().constfields }
-    }
-
-    /// Either the only instantiation of the type (if no parameters) or a `UnionAll` accepting
-    /// parameters to make an instantiation.
-    #[cfg(feature = "extra-fields")]
-    #[inline]
-    pub fn wrapper(self) -> Value<'scope, 'static> {
-        // Safety: the pointer points to valid data
-        unsafe {
-            let wrapper = self.unwrap_non_null(Private).as_ref().wrapper;
-            debug_assert!(!wrapper.is_null());
-            Value::wrap_non_null(NonNull::new_unchecked(wrapper), Private)
-        }
-    }
-
-    #[julia_version(since = "1.9")]
-    #[cfg(feature = "extra-fields")]
-    /// cache for Type{wrapper}
-    pub fn typeof_wrapper<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
-    where
-        T: Target<'target>,
-    {
-        // Safety: the pointer points to valid data
-        unsafe {
-            let typeof_wrapper = self
-                .unwrap_non_null(Private)
-                .as_ref()
-                .Typeofwrapper
-                .load(Ordering::Relaxed);
-
-            let typeof_wrapper = NonNull::new(typeof_wrapper)?;
-            Some(ValueRef::wrap(typeof_wrapper).root(target))
-        }
-    }
-
-    #[cfg(feature = "extra-fields")]
-    #[julia_version(until = "1.6")]
-    /// Sorted array.
-    #[inline]
-    pub fn cache<'target, T>(self, target: T) -> SimpleVectorData<'target, T>
-    where
-        T: Target<'target>,
-    {
-        // Safety: the pointer points to valid data
-        unsafe {
-            let cache = self.unwrap_non_null(Private).as_ref().cache;
-            debug_assert!(!cache.is_null());
-            SimpleVectorRef::wrap(NonNull::new_unchecked(cache)).root(target)
-        }
-    }
-
-    #[cfg(feature = "extra-fields")]
-    #[julia_version(since = "1.7")]
-    /// Sorted array.
-    #[inline]
-    pub fn cache<'target, T>(self, target: T) -> SimpleVectorData<'target, T>
-    where
-        T: Target<'target>,
-    {
-        // Safety: the pointer points to valid data
-        unsafe {
-            let cache = self
-                .unwrap_non_null(Private)
-                .as_ref()
-                .cache
-                .load(Ordering::Relaxed);
-            debug_assert!(!cache.is_null());
-            SimpleVectorRef::wrap(NonNull::new_unchecked(cache)).root(target)
-        }
-    }
-
-    #[julia_version(until = "1.6")]
-    #[cfg(feature = "extra-fields")]
-    /// Unsorted array.
-    #[inline]
-    pub fn linear_cache<'target, T>(self, target: T) -> SimpleVectorData<'target, T>
-    where
-        T: Target<'target>,
-    {
-        // Safety: the pointer points to valid data
-        unsafe {
-            let cache = self.unwrap_non_null(Private).as_ref().linearcache;
-            debug_assert!(!cache.is_null());
-            SimpleVectorRef::wrap(NonNull::new_unchecked(cache)).root(target)
-        }
-    }
-
-    #[julia_version(since = "1.7")]
-    #[cfg(feature = "extra-fields")]
-    /// Unsorted array.
-    #[inline]
-    pub fn linear_cache<'target, T>(self, target: T) -> SimpleVectorData<'target, T>
-    where
-        T: Target<'target>,
-    {
-        // Safety: the pointer points to valid data
-        unsafe {
-            let cache = self
-                .unwrap_non_null(Private)
-                .as_ref()
-                .linearcache
-                .load(Ordering::Relaxed);
-            debug_assert!(!cache.is_null());
-            SimpleVectorRef::wrap(NonNull::new_unchecked(cache)).root(target)
-        }
-    }
-
-    /// The `mt` field.
-    #[cfg(feature = "extra-fields")]
-    #[inline]
-    pub fn mt<'target, T>(self, target: T) -> ValueData<'target, 'static, T>
-    where
-        T: Target<'target>,
-    {
-        // Safety: the pointer points to valid data
-        unsafe {
-            let mt = self.unwrap_non_null(Private).as_ref().mt;
-            debug_assert!(!mt.is_null());
-            ValueRef::wrap(NonNull::new_unchecked(mt.cast())).root(target)
-        }
-    }
-
-    /// Incomplete instantiations of this type.
-    #[cfg(feature = "extra-fields")]
-    #[inline]
-    pub fn partial<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
-    where
-        T: Target<'target>,
-    {
-        // Safety: the pointer points to valid data
-        unsafe {
-            let partial = self.unwrap_non_null(Private).as_ref().partial;
-            let partial = NonNull::new(partial)?;
-            Some(ValueRef::wrap(partial.cast()).root(target))
-        }
-    }
-
-    /// The `hash` field.
-    #[inline]
-    pub fn hash(self) -> isize {
-        // Safety: the pointer points to valid data
-        unsafe { self.unwrap_non_null(Private).as_ref().hash }
-    }
-
-    #[julia_version(since = "1.7")]
-    /// The `n_uninitialized` field.
-    #[inline]
-    pub fn n_uninitialized(self) -> i32 {
-        // Safety: the pointer points to valid data
-        unsafe { self.unwrap_non_null(Private).as_ref().n_uninitialized }
+        unsafe { jl_sys::jlrs_typename_constfields(self.unwrap(Private)) }
     }
 
     #[julia_version(since = "1.7")]
@@ -273,7 +92,7 @@ impl<'scope> TypeName<'scope> {
     #[inline]
     pub fn is_abstract(self) -> bool {
         // Safety: the pointer points to valid data
-        unsafe { self.unwrap_non_null(Private).as_ref().abstract_() != 0 }
+        unsafe { jl_sys::jlrs_typename_abstract(self.unwrap(Private)) != 0 }
     }
 
     #[julia_version(since = "1.7")]
@@ -281,7 +100,7 @@ impl<'scope> TypeName<'scope> {
     #[inline]
     pub fn is_mutable(self) -> bool {
         // Safety: the pointer points to valid data
-        unsafe { self.unwrap_non_null(Private).as_ref().mutabl() != 0 }
+        unsafe { jl_sys::jlrs_typename_mutable(self.unwrap(Private)) != 0 }
     }
 
     #[julia_version(since = "1.7")]
@@ -289,16 +108,16 @@ impl<'scope> TypeName<'scope> {
     #[inline]
     pub fn mayinlinealloc(self) -> bool {
         // Safety: the pointer points to valid data
-        unsafe { self.unwrap_non_null(Private).as_ref().mayinlinealloc() != 0 }
+        unsafe { jl_sys::jlrs_typename_mayinlinealloc(self.unwrap(Private)) != 0 }
     }
 }
 
 impl<'base> TypeName<'base> {
     /// The typename of the `UnionAll` `Type`.
     #[inline]
-    pub fn of_type<T>(_: &T) -> Self
+    pub fn of_type<Tgt>(_: &Tgt) -> Self
     where
-        T: Target<'base>,
+        Tgt: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_type_typename), Private) }
@@ -306,9 +125,9 @@ impl<'base> TypeName<'base> {
 
     /// The typename of the `DataType` `Tuple`.
     #[inline]
-    pub fn of_tuple<T>(_: &T) -> Self
+    pub fn of_tuple<Tgt>(_: &Tgt) -> Self
     where
-        T: Target<'base>,
+        Tgt: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_tuple_typename), Private) }
@@ -316,9 +135,9 @@ impl<'base> TypeName<'base> {
 
     /// The typename of the `UnionAll` `VecElement`.
     #[inline]
-    pub fn of_vecelement<T>(_: &T) -> Self
+    pub fn of_vecelement<Tgt>(_: &Tgt) -> Self
     where
-        T: Target<'base>,
+        Tgt: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_vecelement_typename), Private) }
@@ -327,9 +146,9 @@ impl<'base> TypeName<'base> {
     #[julia_version(until = "1.6")]
     /// The typename of the `UnionAll` `Vararg`.
     #[inline]
-    pub fn of_vararg<T>(_: &T) -> Self
+    pub fn of_vararg<Tgt>(_: &Tgt) -> Self
     where
-        T: Target<'base>,
+        Tgt: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_vararg_typename), Private) }
@@ -337,30 +156,19 @@ impl<'base> TypeName<'base> {
 
     /// The typename of the `UnionAll` `Array`.
     #[inline]
-    pub fn of_array<T>(_: &T) -> Self
+    pub fn of_array<Tgt>(_: &Tgt) -> Self
     where
-        T: Target<'base>,
+        Tgt: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_array_typename), Private) }
     }
 
-    #[julia_version(since = "1.7")]
     /// The typename of the `UnionAll` `Ptr`.
     #[inline]
-    pub fn of_opaque_closure<T>(_: &T) -> Self
+    pub fn of_pointer<Tgt>(_: &Tgt) -> Self
     where
-        T: Target<'base>,
-    {
-        // Safety: global constant
-        unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_opaque_closure_typename), Private) }
-    }
-
-    /// The typename of the `UnionAll` `Ptr`.
-    #[inline]
-    pub fn of_pointer<T>(_: &T) -> Self
-    where
-        T: Target<'base>,
+        Tgt: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_pointer_typename), Private) }
@@ -368,9 +176,9 @@ impl<'base> TypeName<'base> {
 
     /// The typename of the `UnionAll` `LLVMPtr`.
     #[inline]
-    pub fn of_llvmpointer<T>(_: &T) -> Self
+    pub fn of_llvmpointer<Tgt>(_: &Tgt) -> Self
     where
-        T: Target<'base>,
+        Tgt: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_llvmpointer_typename), Private) }
@@ -378,9 +186,9 @@ impl<'base> TypeName<'base> {
 
     /// The typename of the `UnionAll` `NamedTuple`.
     #[inline]
-    pub fn of_namedtuple<T>(_: &T) -> Self
+    pub fn of_namedtuple<Tgt>(_: &Tgt) -> Self
     where
-        T: Target<'base>,
+        Tgt: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_namedtuple_typename), Private) }
@@ -392,7 +200,7 @@ impl_debug!(TypeName<'_>);
 
 impl<'scope> ManagedPriv<'scope, '_> for TypeName<'scope> {
     type Wraps = jl_typename_t;
-    type TypeConstructorPriv<'target, 'da> = TypeName<'target>;
+    type WithLifetimes<'target, 'da> = TypeName<'target>;
     const NAME: &'static str = "TypeName";
 
     // Safety: `inner` must not have been freed yet, the result must never be
@@ -421,11 +229,12 @@ impl_valid_layout!(TypeNameRef, TypeName, jl_typename_type);
 
 use crate::memory::target::TargetType;
 
-/// `TypeName` or `TypeNameRef`, depending on the target type `T`.
-pub type TypeNameData<'target, T> = <T as TargetType<'target>>::Data<'static, TypeName<'target>>;
+/// `TypeName` or `TypeNameRef`, depending on the target type `Tgt`.
+pub type TypeNameData<'target, Tgt> =
+    <Tgt as TargetType<'target>>::Data<'static, TypeName<'target>>;
 
-/// `JuliaResult<TypeName>` or `JuliaResultRef<TypeNameRef>`, depending on the target type `T`.
-pub type TypeNameResult<'target, T> = TargetResult<'target, 'static, TypeName<'target>, T>;
+/// `JuliaResult<TypeName>` or `JuliaResultRef<TypeNameRef>`, depending on the target type `Tgt`.
+pub type TypeNameResult<'target, Tgt> = TargetResult<'target, 'static, TypeName<'target>, Tgt>;
 
 impl_ccall_arg_managed!(TypeName, 1);
 impl_into_typed!(TypeName);

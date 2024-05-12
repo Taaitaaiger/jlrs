@@ -20,10 +20,7 @@
 //! }
 //!
 //! impl ExportedType {
-//!     // Methods can take `self` by (mutable) reference. Methods that do so must return a
-//!     // `RustResult` because the borrow is tracked to prevent aliasing a mutable borrow, if
-//!     // this fails an error is returned.
-//!     pub fn takes_mut_self(&mut self, arg2: usize) -> RustResultRet<Nothing> {
+//!     pub fn takes_mut_self(&mut self, arg2: usize) -> JlrsResult<Nothing> {
 //!         todo!()
 //!     }
 //!
@@ -60,7 +57,6 @@ use std::{
     ptr::NonNull,
 };
 
-use cfg_if::cfg_if;
 use fnv::FnvHashMap;
 #[julia_version(except = ["1.7"])]
 use jl_sys::jl_gc_schedule_foreign_sweepfunc;
@@ -76,7 +72,7 @@ use super::{
     typecheck::Typecheck,
 };
 use crate::{
-    convert::{into_jlrs_result::IntoJlrsResult, into_julia::IntoJulia, unbox::Unbox},
+    convert::{into_julia::IntoJulia, unbox::Unbox},
     data::{
         layout::valid_layout::ValidLayout,
         managed::{
@@ -210,16 +206,14 @@ where
     where
         Tgt: Target<'target>,
     {
-        target
-            .with_local_scope::<_, _, 2>(|target, mut frame| {
-                let mut svec = unsafe { SimpleVector::with_capacity_uninit(&mut frame, 1) };
-                let tvar = Self::construct_type(&mut frame);
-                unsafe {
-                    svec.data_mut().set(0, Some(tvar)).unwrap();
-                }
-                Ok(svec.root(target))
-            })
-            .unwrap()
+        target.with_local_scope::<_, _, 2>(|target, mut frame| {
+            let svec = unsafe { SimpleVector::with_capacity_uninit(&mut frame, 1) };
+            let tvar = Self::construct_type(&mut frame);
+            unsafe {
+                svec.data().set(0, Some(tvar)).unwrap();
+            }
+            svec.root(target)
+        })
     }
 }
 
@@ -240,19 +234,17 @@ where
     where
         Tgt: Target<'target>,
     {
-        target
-            .with_local_scope::<_, _, 3>(|target, mut frame| {
-                let mut svec = unsafe { SimpleVector::with_capacity_uninit(&mut frame, 2) };
-                let tvar_1 = TypeVarConstructor::<N0, U0, L0>::construct_type(&mut frame);
-                let tvar_2 = TypeVarConstructor::<N1, U1, L1>::construct_type(&mut frame);
-                unsafe {
-                    let mut svec_ref = svec.data_mut();
-                    svec_ref.set(0, Some(tvar_1)).unwrap();
-                    svec_ref.set(1, Some(tvar_2)).unwrap();
-                }
-                Ok(svec.root(target))
-            })
-            .unwrap()
+        target.with_local_scope::<_, _, 3>(|target, mut frame| {
+            let svec = unsafe { SimpleVector::with_capacity_uninit(&mut frame, 2) };
+            let tvar_1 = TypeVarConstructor::<N0, U0, L0>::construct_type(&mut frame);
+            let tvar_2 = TypeVarConstructor::<N1, U1, L1>::construct_type(&mut frame);
+            unsafe {
+                let svec_ref = svec.data();
+                svec_ref.set(0, Some(tvar_1)).unwrap();
+                svec_ref.set(1, Some(tvar_2)).unwrap();
+            }
+            svec.root(target)
+        })
     }
 }
 
@@ -277,21 +269,19 @@ where
     where
         Tgt: Target<'target>,
     {
-        target
-            .with_local_scope::<_, _, 4>(|target, mut frame| {
-                let mut svec = unsafe { SimpleVector::with_capacity_uninit(&mut frame, 3) };
-                let tvar_1 = TypeVarConstructor::<N0, U0, L0>::construct_type(&mut frame);
-                let tvar_2 = TypeVarConstructor::<N1, U1, L1>::construct_type(&mut frame);
-                let tvar_3 = TypeVarConstructor::<N2, U2, L2>::construct_type(&mut frame);
-                unsafe {
-                    let mut svec_ref = svec.data_mut();
-                    svec_ref.set(0, Some(tvar_1)).unwrap();
-                    svec_ref.set(1, Some(tvar_2)).unwrap();
-                    svec_ref.set(2, Some(tvar_3)).unwrap();
-                }
-                Ok(svec.root(target))
-            })
-            .unwrap()
+        target.with_local_scope::<_, _, 4>(|target, mut frame| {
+            let svec = unsafe { SimpleVector::with_capacity_uninit(&mut frame, 3) };
+            let tvar_1 = TypeVarConstructor::<N0, U0, L0>::construct_type(&mut frame);
+            let tvar_2 = TypeVarConstructor::<N1, U1, L1>::construct_type(&mut frame);
+            let tvar_3 = TypeVarConstructor::<N2, U2, L2>::construct_type(&mut frame);
+            unsafe {
+                let svec_ref = svec.data();
+                svec_ref.set(0, Some(tvar_1)).unwrap();
+                svec_ref.set(1, Some(tvar_2)).unwrap();
+                svec_ref.set(2, Some(tvar_3)).unwrap();
+            }
+            svec.root(target)
+        })
     }
 }
 
@@ -305,16 +295,14 @@ where
     where
         Tgt: Target<'target>,
     {
-        target
-            .with_local_scope::<_, _, 2>(|target, mut frame| {
-                let mut svec = unsafe { SimpleVector::with_capacity_uninit(&mut frame, 1) };
-                let tvar = TypeVarConstructor::<N>::construct_type(&mut frame);
-                unsafe {
-                    svec.data_mut().set(0, Some(tvar)).unwrap();
-                }
-                Ok(svec.root(target))
-            })
-            .unwrap()
+        target.with_local_scope::<_, _, 2>(|target, mut frame| {
+            let svec = unsafe { SimpleVector::with_capacity_uninit(&mut frame, 1) };
+            let tvar = TypeVarConstructor::<N>::construct_type(&mut frame);
+            unsafe {
+                svec.data().set(0, Some(tvar)).unwrap();
+            }
+            svec.root(target)
+        })
     }
 }
 
@@ -326,16 +314,14 @@ where
     where
         Tgt: Target<'target>,
     {
-        target
-            .with_local_scope::<_, _, 2>(|target, mut frame| {
-                let mut svec = unsafe { SimpleVector::with_capacity_uninit(&mut frame, 1) };
-                let tvar = TypeVarConstructor::<N>::construct_type(&mut frame);
-                unsafe {
-                    svec.data_mut().set(0, Some(tvar)).unwrap();
-                }
-                Ok(svec.root(target))
-            })
-            .unwrap()
+        target.with_local_scope::<_, _, 2>(|target, mut frame| {
+            let svec = unsafe { SimpleVector::with_capacity_uninit(&mut frame, 1) };
+            let tvar = TypeVarConstructor::<N>::construct_type(&mut frame);
+            unsafe {
+                svec.data().set(0, Some(tvar)).unwrap();
+            }
+            svec.root(target)
+        })
     }
 }
 
@@ -350,19 +336,17 @@ where
     where
         Tgt: Target<'target>,
     {
-        target
-            .with_local_scope::<_, _, 3>(|target, mut frame| {
-                let mut svec = unsafe { SimpleVector::with_capacity_uninit(&mut frame, 2) };
-                let tvar_1 = TypeVarConstructor::<N0>::construct_type(&mut frame);
-                let tvar_2 = TypeVarConstructor::<N1>::construct_type(&mut frame);
-                unsafe {
-                    let mut svec_ref = svec.data_mut();
-                    svec_ref.set(0, Some(tvar_1)).unwrap();
-                    svec_ref.set(1, Some(tvar_2)).unwrap();
-                }
-                Ok(svec.root(target))
-            })
-            .unwrap()
+        target.with_local_scope::<_, _, 3>(|target, mut frame| {
+            let svec = unsafe { SimpleVector::with_capacity_uninit(&mut frame, 2) };
+            let tvar_1 = TypeVarConstructor::<N0>::construct_type(&mut frame);
+            let tvar_2 = TypeVarConstructor::<N1>::construct_type(&mut frame);
+            unsafe {
+                let svec_ref = svec.data();
+                svec_ref.set(0, Some(tvar_1)).unwrap();
+                svec_ref.set(1, Some(tvar_2)).unwrap();
+            }
+            svec.root(target)
+        })
     }
 }
 
@@ -380,21 +364,19 @@ where
     where
         Tgt: Target<'target>,
     {
-        target
-            .with_local_scope::<_, _, 4>(|target, mut frame| {
-                let mut svec = unsafe { SimpleVector::with_capacity_uninit(&mut frame, 3) };
-                let tvar_1 = TypeVarConstructor::<N0>::construct_type(&mut frame);
-                let tvar_2 = TypeVarConstructor::<N1>::construct_type(&mut frame);
-                let tvar_3 = TypeVarConstructor::<N2>::construct_type(&mut frame);
-                unsafe {
-                    let mut svec_ref = svec.data_mut();
-                    svec_ref.set(0, Some(tvar_1)).unwrap();
-                    svec_ref.set(1, Some(tvar_2)).unwrap();
-                    svec_ref.set(2, Some(tvar_3)).unwrap();
-                }
-                Ok(svec.root(target))
-            })
-            .unwrap()
+        target.with_local_scope::<_, _, 4>(|target, mut frame| {
+            let svec = unsafe { SimpleVector::with_capacity_uninit(&mut frame, 3) };
+            let tvar_1 = TypeVarConstructor::<N0>::construct_type(&mut frame);
+            let tvar_2 = TypeVarConstructor::<N1>::construct_type(&mut frame);
+            let tvar_3 = TypeVarConstructor::<N2>::construct_type(&mut frame);
+            unsafe {
+                let svec_ref = svec.data();
+                svec_ref.set(0, Some(tvar_1)).unwrap();
+                svec_ref.set(1, Some(tvar_2)).unwrap();
+                svec_ref.set(2, Some(tvar_3)).unwrap();
+            }
+            svec.root(target)
+        })
     }
 }
 
@@ -540,7 +522,7 @@ macro_rules! expand_type_bound {
     };
     ($nth:expr, $frame:expr, $svec_ref:expr, $t:literal >: $lb:ty, $($rest:tt)*) => {
         {
-            type Ctor = $crate::data::types::construct_type::TypeVarConstructor::<$crate::data::types::construct_type::ConstantChar<$t>, $crate::data::types::abstract_types::AnyType, $lb>;
+            type Ctor = $crate::data::types::construct_type::TypeVarConstructor::<$crate::data::types::construct_type::ConstantChar<$t>, $crate::data::types::abstract_type::AnyType, $lb>;
             let tvar = <Ctor as $crate::data::types::construct_type::ConstructType>::construct_type($frame);
             $svec_ref.set($nth, Some(tvar)).unwrap();
         }
@@ -548,7 +530,7 @@ macro_rules! expand_type_bound {
     };
     ($nth:expr, $frame:expr, $svec_ref:expr, $t:literal >: $lb:ty) => {
         {
-            type Ctor = $crate::data::types::construct_type::TypeVarConstructor::<$crate::data::types::construct_type::ConstantChar<$t>, $crate::data::types::abstract_types::AnyType, $lb>;
+            type Ctor = $crate::data::types::construct_type::TypeVarConstructor::<$crate::data::types::construct_type::ConstantChar<$t>, $crate::data::types::abstract_type::AnyType, $lb>;
             let tvar = <Ctor as $crate::data::types::construct_type::ConstructType>::construct_type($frame);
             $svec_ref.set($nth, Some(tvar)).unwrap();
         }
@@ -594,15 +576,15 @@ macro_rules! impl_type_parameters {
             const N: usize = $crate::count_exprs!($($t)+);
             const M: usize = N + 1;
             target.with_local_scope::<_, _, M>(|target, mut frame| unsafe {
-                let mut svec = $crate::data::managed::simple_vector::SimpleVector::with_capacity_uninit(&mut frame, N);
+                let svec = $crate::data::managed::simple_vector::SimpleVector::with_capacity_uninit(&mut frame, N);
 
                 {
-                    let mut svec_ref = svec.data_mut();
+                    let mut svec_ref = svec.data();
                     $crate::expand_type_bound!(0, &mut frame, svec_ref, $($t)+);
                 }
 
-                Ok(svec.root(target))
-            }).unwrap()
+                svec.root(target)
+            })
         }
     };
 }
@@ -631,15 +613,15 @@ macro_rules! impl_variant_parameters {
             const M: usize = N + 1;
 
             target.with_local_scope::<_, _, M>(|target, mut frame| unsafe {
-                let mut svec = $crate::data::managed::simple_vector::SimpleVector::with_capacity_uninit(&mut frame, N);
+                let svec = $crate::data::managed::simple_vector::SimpleVector::with_capacity_uninit(&mut frame, N);
 
                 {
-                    let mut svec_ref = svec.data_mut();
+                    let mut svec_ref = svec.data();
                     $crate::expand_type_bound!(0, &mut frame, svec_ref, $($t)+);
                 }
 
-                Ok(svec.root(target))
-            }).unwrap()
+                svec.root(target)
+            })
         }
     };
 }
@@ -706,6 +688,16 @@ pub unsafe trait ParametricVariant: ParametricBase {
 ///
 /// [`Ref::leak`]: crate::data::managed::Ref::leak
 /// [`write_barrier`]: crate::memory::gc::write_barrier
+
+#[diagnostic::on_unimplemented(
+    message = "the trait bound `{Self}: ForeignLayout` is not satisfied",
+    label = "the trait `ForeignLayout` is not implemented for `{Self}`",
+    note = "Unless you are calling a function that explicitly takes an implementation of \
+    `ForeignType`, this diagnostic is likely incorrect",
+    note = "It is more likely that the issue lies with not implementing `ValidLayout`, `IntoJulia`, `Typecheck`, `Unbox` or `ConstructType`",
+    note = "Custom types that implement the traits mentioned in the previous note should be generated with JlrsCore.reflect",
+    note = "Do not implement `ForeignType`, `OpaqueType`, or `ParametricVariant` unless this type is exported to Julia with `julia_module!`"
+)]
 pub unsafe trait ForeignType: Sized + Send + 'static {
     #[doc(hidden)]
     const TYPE_FN: Option<unsafe fn() -> DataType<'static>> = None;
@@ -874,24 +866,12 @@ where
     let large = U::LARGE as _;
     let has_pointers = U::HAS_POINTERS as _;
 
-    cfg_if! {
-        if #[cfg(feature = "c-unwind")] {
-            unsafe extern "C-unwind" fn mark<T: ForeignType>(ptls: PTls, value: *mut jl_value_t) -> usize {
-                T::mark(ptls, NonNull::new_unchecked(value.cast()).as_ref())
-            }
+    unsafe extern "C" fn mark<T: ForeignType>(ptls: PTls, value: *mut jl_value_t) -> usize {
+        T::mark(ptls, NonNull::new_unchecked(value.cast()).as_ref())
+    }
 
-            unsafe extern "C-unwind" fn sweep<T: ForeignType>(value: *mut jl_value_t) {
-                do_sweep::<T>(&mut *value.cast())
-            }
-        } else {
-            unsafe extern "C" fn mark<T: ForeignType>(ptls: PTls, value: *mut jl_value_t) -> usize {
-                T::mark(ptls, NonNull::new_unchecked(value.cast()).as_ref())
-            }
-
-            unsafe extern "C" fn sweep<T: ForeignType>(value: *mut jl_value_t) {
-                do_sweep::<T>(&mut *value.cast())
-            }
-        }
+    unsafe extern "C" fn sweep<T: ForeignType>(value: *mut jl_value_t) {
+        do_sweep::<T>(&mut *value.cast())
     }
 
     let super_type = jl_any_type;
@@ -900,8 +880,8 @@ where
         name.unwrap(Private),
         module.unwrap(Private),
         super_type,
-        Some(mark::<U>),
-        Some(sweep::<U>),
+        mark::<U>,
+        sweep::<U>,
         has_pointers,
         large,
     );
@@ -926,45 +906,43 @@ where
         return target.data_from_ptr(ty.unwrap_non_null(Private), Private);
     }
 
-    target
-        .with_local_scope::<_, _, 1>(|target, mut frame| {
-            let super_type = U::super_type(&mut frame).unwrap(Private);
+    target.with_local_scope::<_, _, 1>(|target, mut frame| {
+        let super_type = U::super_type(&mut frame).unwrap(Private);
 
-            #[cfg(feature = "julia-1-6")]
-            let ty = jl_new_datatype(
-                name.unwrap(Private),
-                module.unwrap(Private),
-                super_type,
-                jl_emptysvec,
-                jl_emptysvec,
-                jl_emptysvec,
-                0,
-                1,
-                0,
-            );
+        #[cfg(feature = "julia-1-6")]
+        let ty = jl_new_datatype(
+            name.unwrap(Private),
+            module.unwrap(Private),
+            super_type,
+            jl_emptysvec,
+            jl_emptysvec,
+            jl_emptysvec,
+            0,
+            1,
+            0,
+        );
 
-            #[cfg(not(feature = "julia-1-6"))]
-            let ty = jl_new_datatype(
-                name.unwrap(Private),
-                module.unwrap(Private),
-                super_type,
-                jl_emptysvec,
-                jl_emptysvec,
-                jl_emptysvec,
-                jl_emptysvec,
-                0,
-                1,
-                0,
-            );
+        #[cfg(not(feature = "julia-1-6"))]
+        let ty = jl_new_datatype(
+            name.unwrap(Private),
+            module.unwrap(Private),
+            super_type,
+            jl_emptysvec,
+            jl_emptysvec,
+            jl_emptysvec,
+            jl_emptysvec,
+            0,
+            1,
+            0,
+        );
 
-            debug_assert!(!ty.is_null());
-            FOREIGN_TYPE_REGISTRY
-                .get_unchecked()
-                .insert::<U>(DataType::wrap_non_null(NonNull::new_unchecked(ty), Private));
+        debug_assert!(!ty.is_null());
+        FOREIGN_TYPE_REGISTRY
+            .get_unchecked()
+            .insert::<U>(DataType::wrap_non_null(NonNull::new_unchecked(ty), Private));
 
-            Ok(target.data_from_ptr(NonNull::new_unchecked(ty), Private))
-        })
-        .unwrap()
+        target.data_from_ptr(NonNull::new_unchecked(ty), Private)
+    })
 }
 
 unsafe fn create_parametric_opaque_variant<'target, U, Tgt>(
@@ -984,27 +962,27 @@ where
         panic!("Type {} was not registered", name.as_str().unwrap());
     }
 
-    target
-        .with_local_scope::<_, _, 3>(|target, mut frame| {
-            let params = U::variant_parameters(&mut frame);
-            let params_slice = params.data().as_slice_non_null_managed();
+    target.with_local_scope::<_, _, 3>(|target, mut frame| {
+        let params = U::variant_parameters(&mut frame);
+        let params = params.data();
+        let params_slice = params.as_atomic_slice().assume_immutable_non_null();
 
-            let ty = base_ty.unwrap_unchecked();
+        let ty = base_ty.unwrap_unchecked();
 
-            let ty = UnionAll::rewrap(&mut frame, ty);
+        let ty = UnionAll::rewrap(&mut frame, ty);
 
-            let ty = ty
-                .apply_type(&mut frame, params_slice)
-                .into_jlrs_result()?
-                .cast::<DataType>()?;
+        let ty = ty
+            .apply_type(&mut frame, params_slice)
+            .unwrap()
+            .cast::<DataType>()
+            .unwrap();
 
-            FOREIGN_TYPE_REGISTRY
-                .get_unchecked()
-                .insert::<U>(erase_scope_lifetime(ty));
+        FOREIGN_TYPE_REGISTRY
+            .get_unchecked()
+            .insert::<U>(erase_scope_lifetime(ty));
 
-            Ok(ty.root(target))
-        })
-        .unwrap()
+        ty.root(target)
+    })
 }
 
 unsafe fn create_parametric_opaque_type<'target, U, Tgt>(
@@ -1020,49 +998,44 @@ where
         return target.data_from_ptr(ty.unwrap_non_null(Private), Private);
     }
 
-    target
-        .with_local_scope::<_, _, 2>(|target, mut frame| {
-            let super_type = U::super_type(&mut frame);
-            let bounds = U::type_parameters(&mut frame);
+    target.with_local_scope::<_, _, 2>(|target, mut frame| {
+        let super_type = U::super_type(&mut frame);
+        let bounds = U::type_parameters(&mut frame);
 
-            #[cfg(feature = "julia-1-6")]
-            let ty = jl_new_datatype(
-                name.unwrap(Private),
-                module.unwrap(Private),
-                super_type.unwrap(Private),
-                bounds.unwrap(Private),
-                jl_emptysvec,
-                jl_emptysvec,
-                0,
-                1,
-                0,
-            );
+        #[cfg(feature = "julia-1-6")]
+        let ty = jl_new_datatype(
+            name.unwrap(Private),
+            module.unwrap(Private),
+            super_type.unwrap(Private),
+            bounds.unwrap(Private),
+            jl_emptysvec,
+            jl_emptysvec,
+            0,
+            1,
+            0,
+        );
 
-            #[cfg(not(feature = "julia-1-6"))]
-            let ty = jl_new_datatype(
-                name.unwrap(Private),
-                module.unwrap(Private),
-                super_type.unwrap(Private),
-                bounds.unwrap(Private),
-                jl_emptysvec,
-                jl_emptysvec,
-                jl_emptysvec,
-                0,
-                1,
-                0,
-            );
+        #[cfg(not(feature = "julia-1-6"))]
+        let ty = jl_new_datatype(
+            name.unwrap(Private),
+            module.unwrap(Private),
+            super_type.unwrap(Private),
+            bounds.unwrap(Private),
+            jl_emptysvec,
+            jl_emptysvec,
+            jl_emptysvec,
+            0,
+            1,
+            0,
+        );
 
-            debug_assert!(!ty.is_null());
-            FOREIGN_TYPE_REGISTRY
-                .get_unchecked()
-                .insert::<Key<U::Key>>(DataType::wrap_non_null(
-                    NonNull::new_unchecked(ty),
-                    Private,
-                ));
+        debug_assert!(!ty.is_null());
+        FOREIGN_TYPE_REGISTRY
+            .get_unchecked()
+            .insert::<Key<U::Key>>(DataType::wrap_non_null(NonNull::new_unchecked(ty), Private));
 
-            Ok(target.data_from_ptr::<DataType>(NonNull::new_unchecked(ty), Private))
-        })
-        .unwrap()
+        target.data_from_ptr::<DataType>(NonNull::new_unchecked(ty), Private)
+    })
 }
 
 pub(crate) unsafe fn create_foreign_type_internal<'target, U, Tgt>(
@@ -1076,24 +1049,13 @@ where
 {
     let large = U::LARGE as _;
     let has_pointers = U::HAS_POINTERS as _;
-    cfg_if! {
-        if #[cfg(feature = "c-unwind")] {
-            unsafe extern "C-unwind" fn mark<T: ForeignType>(ptls: PTls, value: *mut jl_value_t) -> usize {
-                T::mark(ptls, NonNull::new_unchecked(value.cast()).as_ref())
-            }
 
-            unsafe extern "C-unwind" fn sweep<T: ForeignType>(value: *mut jl_value_t) {
-                do_sweep::<T>(&mut *value.cast())
-            }
-        } else {
-            unsafe extern "C" fn mark<T: ForeignType>(ptls: PTls, value: *mut jl_value_t) -> usize {
-                T::mark(ptls, NonNull::new_unchecked(value.cast()).as_ref())
-            }
+    unsafe extern "C" fn mark<T: ForeignType>(ptls: PTls, value: *mut jl_value_t) -> usize {
+        T::mark(ptls, NonNull::new_unchecked(value.cast()).as_ref())
+    }
 
-            unsafe extern "C" fn sweep<T: ForeignType>(value: *mut jl_value_t) {
-                do_sweep::<T>(&mut *value.cast())
-            }
-        }
+    unsafe extern "C" fn sweep<T: ForeignType>(value: *mut jl_value_t) {
+        do_sweep::<T>(&mut *value.cast())
     }
 
     let super_type = jl_any_type;
@@ -1102,8 +1064,8 @@ where
         name.unwrap(Private),
         module.unwrap(Private),
         super_type,
-        Some(mark::<U>),
-        Some(sweep::<U>),
+        mark::<U>,
+        sweep::<U>,
         has_pointers,
         large,
     );
@@ -1120,28 +1082,16 @@ where
         return true;
     }
 
-    cfg_if! {
-        if #[cfg(feature = "c-unwind")] {
-            unsafe extern "C-unwind" fn mark<T: ForeignType>(ptls: PTls, value: *mut jl_value_t) -> usize {
-                T::mark(ptls, NonNull::new_unchecked(value.cast()).as_ref())
-            }
+    unsafe extern "C" fn mark<T: ForeignType>(ptls: PTls, value: *mut jl_value_t) -> usize {
+        T::mark(ptls, NonNull::new_unchecked(value.cast()).as_ref())
+    }
 
-            unsafe extern "C-unwind" fn sweep<T: ForeignType>(value: *mut jl_value_t) {
-                do_sweep::<T>(&mut *value.cast())
-            }
-        } else {
-            unsafe extern "C" fn mark<T: ForeignType>(ptls: PTls, value: *mut jl_value_t) -> usize {
-                T::mark(ptls, NonNull::new_unchecked(value.cast()).as_ref())
-            }
-
-            unsafe extern "C" fn sweep<T: ForeignType>(value: *mut jl_value_t) {
-                do_sweep::<T>(&mut *value.cast())
-            }
-        }
+    unsafe extern "C" fn sweep<T: ForeignType>(value: *mut jl_value_t) {
+        do_sweep::<T>(&mut *value.cast())
     }
 
     let ty = datatype.unwrap(Private);
-    let ret = jl_reinit_foreign_type(ty, Some(mark::<U>), Some(sweep::<U>));
+    let ret = jl_reinit_foreign_type(ty, mark::<U>, sweep::<U>);
     if ret != 0 {
         FOREIGN_TYPE_REGISTRY
             .get_unchecked()
@@ -1223,9 +1173,9 @@ where
 
 unsafe impl<F: ParametricVariant> IntoJulia for F {
     #[inline]
-    fn julia_type<'scope, T>(target: T) -> DataTypeData<'scope, T>
+    fn julia_type<'scope, Tgt>(target: Tgt) -> DataTypeData<'scope, Tgt>
     where
-        T: Target<'scope>,
+        Tgt: Target<'scope>,
     {
         unsafe {
             FOREIGN_TYPE_REGISTRY
@@ -1236,9 +1186,9 @@ unsafe impl<F: ParametricVariant> IntoJulia for F {
         }
     }
 
-    fn into_julia<'scope, T>(self, target: T) -> ValueData<'scope, 'static, T>
+    fn into_julia<'scope, Tgt>(self, target: Tgt) -> ValueData<'scope, 'static, Tgt>
     where
-        T: Target<'scope>,
+        Tgt: Target<'scope>,
     {
         unsafe {
             let sz = std::mem::size_of::<Self>();
@@ -1372,10 +1322,26 @@ unsafe impl<T: ParametricVariant> ConstructType for T {
             Some(
                 FOREIGN_TYPE_REGISTRY
                     .get_unchecked()
-                    .find::<T>()
-                    .unwrap()
+                    .find::<T>()?
                     .as_value(),
             )
+        }
+    }
+
+    fn construct_type_with_env_uncached<'target, Tgt>(
+        target: Tgt,
+        _env: &super::construct_type::TypeVarEnv,
+    ) -> ValueData<'target, 'static, Tgt>
+    where
+        Tgt: Target<'target>,
+    {
+        unsafe {
+            FOREIGN_TYPE_REGISTRY
+                .get_unchecked()
+                .find::<T>()
+                .unwrap()
+                .as_value()
+                .root(target)
         }
     }
 }

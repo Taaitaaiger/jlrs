@@ -1,5 +1,5 @@
 mod util;
-#[cfg(feature = "sync-rt")]
+#[cfg(feature = "local-rt")]
 mod tests {
     use jlrs::{data::managed::union_all::UnionAll, prelude::*};
 
@@ -13,6 +13,7 @@ mod tests {
                     let mut jlrs = j.borrow_mut();
 
                     jlrs.instance(&mut frame)
+                        .returning::<JlrsResult<_>>()
                         .scope(|frame| {
                             let v1 = Value::$func(&frame);
                             let v2 = unsafe {
@@ -35,6 +36,7 @@ mod tests {
                     let mut jlrs = j.borrow_mut();
 
                     jlrs.instance(&mut frame)
+                        .returning::<JlrsResult<_>>()
                         .scope(|frame| {
                             #[allow(unused_unsafe)]
                             unsafe {
@@ -60,6 +62,7 @@ mod tests {
                     let mut jlrs = j.borrow_mut();
 
                     jlrs.instance(&mut frame)
+                        .returning::<JlrsResult<_>>()
                         .scope(|frame| {
                             #[allow(unused_unsafe)]
                             unsafe {
@@ -85,6 +88,7 @@ mod tests {
                     let mut jlrs = j.borrow_mut();
 
                     jlrs.instance(&mut frame)
+                        .returning::<JlrsResult<_>>()
                         .scope(|frame| {
                             let v1 = UnionAll::$func(&frame);
                             let v2 = unsafe {
@@ -107,6 +111,7 @@ mod tests {
                     let mut jlrs = j.borrow_mut();
 
                     jlrs.instance(&mut frame)
+                        .returning::<JlrsResult<_>>()
                         .scope(|frame| {
                             let v1 = UnionAll::$func(&frame);
                             let v2 = unsafe {
@@ -129,6 +134,7 @@ mod tests {
                     let mut jlrs = j.borrow_mut();
 
                     jlrs.instance(&mut frame)
+                        .returning::<JlrsResult<_>>()
                         .scope(|frame| {
                             let v1 = DataType::$func(&frame);
                             let v2 = unsafe {
@@ -179,34 +185,12 @@ mod tests {
     impl_datatype_constant_isa_test!(any_type, "DataType");
     impl_datatype_constant_isa_test!(typename_type, "DataType");
     impl_datatype_constant_isa_test!(symbol_type, "DataType");
-    impl_datatype_constant_isa_test!(ssavalue_type, "DataType");
-    #[cfg(any(
-        feature = "julia-1-6",
-        feature = "julia-1-7",
-        feature = "julia-1-8",
-        feature = "julia-1-9"
-    ))]
-    impl_datatype_constant_isa_test!(abstractslot_type, "DataType");
-    impl_datatype_constant_isa_test!(slotnumber_type, "DataType");
-    #[cfg(any(
-        feature = "julia-1-6",
-        feature = "julia-1-7",
-        feature = "julia-1-8",
-        feature = "julia-1-9"
-    ))]
-    impl_datatype_constant_isa_test!(typedslot_type, "DataType");
     impl_datatype_constant_isa_test!(simplevector_type, "DataType");
     impl_datatype_constant_isa_test!(anytuple_type, "DataType");
     impl_datatype_constant_isa_test!(tuple_type, "DataType");
     impl_datatype_constant_isa_test!(emptytuple_type, "DataType");
     impl_datatype_constant_isa_test!(function_type, "DataType");
-    impl_datatype_constant_isa_test!(builtin_type, "DataType");
-    impl_datatype_constant_isa_test!(method_instance_type, "DataType");
-    impl_datatype_constant_isa_test!(code_instance_type, "DataType");
-    impl_datatype_constant_isa_test!(code_info_type, "DataType");
-    impl_datatype_constant_isa_test!(method_type, "DataType");
     impl_datatype_constant_isa_test!(module_type, "DataType");
-    impl_datatype_constant_isa_test!(weakref_type, "DataType");
     impl_datatype_constant_isa_test!(abstractstring_type, "DataType");
     impl_datatype_constant_isa_test!(string_type, "DataType");
     impl_datatype_constant_isa_test!(errorexception_type, "DataType");
@@ -216,7 +200,6 @@ mod tests {
     impl_datatype_constant_isa_test!(typeerror_type, "DataType");
     impl_datatype_constant_isa_test!(methoderror_type, "DataType");
     impl_datatype_constant_isa_test!(undefvarerror_type, "DataType");
-    impl_datatype_constant_isa_test!(lineinfonode_type, "DataType");
     impl_datatype_constant_isa_test!(boundserror_type, "DataType");
     impl_datatype_constant_isa_test!(bool_type, "DataType");
     impl_datatype_constant_isa_test!(char_type, "DataType");
@@ -238,19 +221,6 @@ mod tests {
     impl_datatype_constant_isa_test!(voidpointer_type, "DataType");
     impl_datatype_constant_isa_test!(task_type, "DataType");
     impl_datatype_constant_isa_test!(expr_type, "DataType");
-    impl_datatype_constant_isa_test!(globalref_type, "DataType");
-    impl_datatype_constant_isa_test!(linenumbernode_type, "DataType");
-    impl_datatype_constant_isa_test!(gotonode_type, "DataType");
-    impl_datatype_constant_isa_test!(phinode_type, "DataType");
-    impl_datatype_constant_isa_test!(pinode_type, "DataType");
-    impl_datatype_constant_isa_test!(phicnode_type, "DataType");
-    impl_datatype_constant_isa_test!(upsilonnode_type, "DataType");
-    impl_datatype_constant_isa_test!(quotenode_type, "DataType");
-    impl_datatype_constant_isa_test!(newvarnode_type, "DataType");
-    impl_datatype_constant_isa_test!(intrinsic_type, "DataType");
-    impl_datatype_constant_isa_test!(methtable_type, "DataType");
-    impl_datatype_constant_isa_test!(typemap_level_type, "DataType");
-    impl_datatype_constant_isa_test!(typemap_entry_type, "DataType");
 
     #[test]
     fn constant_tests() {
@@ -288,50 +258,27 @@ mod tests {
         any_type();
         typename_type();
         symbol_type();
-        ssavalue_type();
-        #[cfg(any(
-            feature = "julia-1-6",
-            feature = "julia-1-7",
-            feature = "julia-1-8",
-            feature = "julia-1-9"
-        ))]
-        abstractslot_type();
-        slotnumber_type();
-        #[cfg(any(
-            feature = "julia-1-6",
-            feature = "julia-1-7",
-            feature = "julia-1-8",
-            feature = "julia-1-9"
-        ))]
-        typedslot_type();
         simplevector_type();
         anytuple_type();
         tuple_type();
         emptytuple_type();
         function_type();
-        builtin_type();
-        method_instance_type();
-        code_instance_type();
-        code_info_type();
-        method_type();
         module_type();
-        weakref_type();
         abstractstring_type();
         string_type();
-        errorexception_type();
         argumenterror_type();
         loaderror_type();
         initerror_type();
         typeerror_type();
         methoderror_type();
         undefvarerror_type();
-        lineinfonode_type();
         boundserror_type();
         bool_type();
         char_type();
         int8_type();
         uint8_type();
         int16_type();
+        errorexception_type();
         uint16_type();
         int32_type();
         uint32_type();
@@ -347,18 +294,5 @@ mod tests {
         voidpointer_type();
         task_type();
         expr_type();
-        globalref_type();
-        linenumbernode_type();
-        gotonode_type();
-        phinode_type();
-        pinode_type();
-        phicnode_type();
-        upsilonnode_type();
-        quotenode_type();
-        newvarnode_type();
-        intrinsic_type();
-        methtable_type();
-        typemap_level_type();
-        typemap_entry_type();
     }
 }

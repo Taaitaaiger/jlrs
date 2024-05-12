@@ -1,5 +1,5 @@
 mod util;
-#[cfg(feature = "sync-rt")]
+#[cfg(feature = "local-rt")]
 mod tests {
     use jlrs::prelude::*;
 
@@ -11,6 +11,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| unsafe {
                     Value::eval_string(&mut frame, "1 + 1").into_jlrs_result()?;
 
@@ -26,6 +27,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| unsafe {
                     Value::eval_string(&mut frame, "1 + \"a\"").into_jlrs_result()?;
 

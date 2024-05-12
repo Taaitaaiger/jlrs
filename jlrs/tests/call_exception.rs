@@ -1,5 +1,5 @@
 mod util;
-#[cfg(feature = "sync-rt")]
+#[cfg(feature = "local-rt")]
 mod tests {
     use jlrs::prelude::*;
 
@@ -11,6 +11,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| unsafe {
                     let func = Module::main(&frame)
                         .submodule(&frame, "JlrsTests")?
@@ -32,6 +33,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| unsafe {
                     let arg = Value::new(&mut frame, 1usize);
                     let kw = named_tuple!(&mut frame, "a" => arg);
@@ -57,6 +59,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| unsafe {
                     let arg = Value::new(&mut frame, 1usize);
                     let func = Module::main(&frame)
@@ -79,6 +82,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| unsafe {
                     let arg = Value::new(&mut frame, 1usize);
                     let kw = named_tuple!(&mut frame, "a" => arg);
@@ -104,6 +108,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| unsafe {
                     let arg = Value::new(&mut frame, 1usize);
                     let func = Module::main(&frame)
@@ -126,6 +131,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| unsafe {
                     let arg = Value::new(&mut frame, 1usize);
                     let kw = named_tuple!(&mut frame, "a" => arg);
@@ -151,6 +157,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| unsafe {
                     let arg = Value::new(&mut frame, 1usize);
                     let func = Module::main(&frame)
@@ -173,6 +180,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| unsafe {
                     let arg = Value::new(&mut frame, 1usize);
                     let kw = named_tuple!(&mut frame, "a" => arg);
@@ -198,6 +206,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| unsafe {
                     let func = Module::main(&frame)
                         .submodule(&frame, "JlrsTests")?
@@ -219,6 +228,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| unsafe {
                     let arg = Value::new(&mut frame, 1usize);
                     let kw = named_tuple!(&mut frame, "a" => arg);
@@ -244,6 +254,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| unsafe {
                     let not_a_func = Value::new(&mut frame, 1usize);
                     let res = not_a_func.call0(&mut frame);

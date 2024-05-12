@@ -1,6 +1,6 @@
-#![cfg(feature = "sync-rt")]
+#![cfg(feature = "local-rt")]
 mod tests {
-    use jlrs::runtime::builder::RuntimeBuilder;
+    use jlrs::runtime::builder::Builder;
 
     #[test]
     fn init_with_image() {
@@ -8,12 +8,7 @@ mod tests {
             let bindir = format!("{}/bin", julia_dir);
             let image_path = format!("{}/lib/julia/system.so", julia_dir);
 
-            unsafe {
-                assert!(RuntimeBuilder::new()
-                    .image(bindir, image_path)
-                    .start()
-                    .is_err())
-            }
+            unsafe { assert!(Builder::new().image(bindir, image_path).is_err()) }
         } else {
             println!("Skipping image test because JULIA_DIR environment variable is not set.");
         }

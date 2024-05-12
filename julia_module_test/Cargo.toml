@@ -1,7 +1,7 @@
 [package]
 name = "julia_module_test"
 version = "0.1.0"
-edition = "2018"
+edition = "2021"
 
 [profile.release]
 panic = "abort"
@@ -13,10 +13,13 @@ julia-1-7 = ["jlrs/julia-1-7"]
 julia-1-8 = ["jlrs/julia-1-8"]
 julia-1-9 = ["jlrs/julia-1-9"]
 julia-1-10 = ["jlrs/julia-1-10"]
+julia-1-11 = ["jlrs/julia-1-11"]
+julia-1-12 = ["jlrs/julia-1-12"]
 windows = ["jlrs/windows"]
+lto = ["jlrs/lto"]
 
 [lib]
 crate-type = ["cdylib"]
 
 [dependencies]
-jlrs = { path = "../jlrs", features = ["ccall", "uv"] }
+jlrs = { path = "../jlrs", features = ["ccall"] }

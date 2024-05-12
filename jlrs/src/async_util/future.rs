@@ -1,34 +1,194 @@
-use std::{ffi::c_void, fmt::Display, marker::PhantomData, pin::Pin, ptr::NonNull, sync::Arc};
-
-use futures::{
+use std::{
+    ffi::c_void,
+    fmt::Display,
+    future::Future,
+    marker::PhantomData,
+    pin::Pin,
+    ptr::NonNull,
+    sync::Arc,
     task::{Context, Poll, Waker},
-    Future,
 };
-use jl_sys::{jl_call, jl_call1, jl_exception_occurred};
+
+use jl_sys::{jl_call, jl_call1, jl_exception_occurred, jl_get_current_task};
 use jlrs_macros::julia_version;
 
 use crate::{
     args::Values,
     call::{Call, WithKeywords},
+    catch::catch_exceptions,
     data::managed::{
         erase_scope_lifetime,
         module::{JlrsCore, Module},
         private::ManagedPriv,
-        task::Task,
         value::Value,
         Managed,
     },
     error::{JuliaResult, CANNOT_DISPLAY_VALUE},
     gc_safe::GcSafeMutex,
-    memory::target::{frame::AsyncGcFrame, private::TargetPriv, unrooted::Unrooted},
+    memory::{
+        gc::{gc_safe_with, gc_unsafe_with},
+        get_tls,
+        target::{frame::AsyncGcFrame, private::TargetPriv, unrooted::Unrooted},
+        PTls,
+    },
     private::Private,
 };
+
+pub struct GcSafeFuture<T, F>
+where
+    F: Future<Output = T>,
+{
+    fut: F,
+    ptls: PTls,
+    _marker_t: PhantomData<T>,
+}
+
+impl<T, F> GcSafeFuture<T, F>
+where
+    F: Future<Output = T>,
+{
+    pub unsafe fn new(fut: F) -> Self {
+        debug_assert!(!jl_get_current_task().is_null(), "invalid_thread");
+        let ptls = get_tls();
+        GcSafeFuture {
+            fut,
+            ptls,
+            _marker_t: PhantomData,
+        }
+    }
+}
+
+impl<T, F> Future for GcSafeFuture<T, F>
+where
+    F: Future<Output = T>,
+{
+    type Output = T;
+
+    // Poll in GC-safe state to allow Julia to collect garbage on this thread.
+    fn poll(
+        self: Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Self::Output> {
+        unsafe {
+            gc_safe_with(self.ptls, || {
+                let pinned: Pin<&mut F> =
+                    std::pin::Pin::new_unchecked(&mut self.get_unchecked_mut().fut);
+                pinned.poll(cx)
+            })
+        }
+    }
+}
+
+pub struct TryCatchFuture<T, F, E, H>
+where
+    F: Future<Output = T>,
+    H: for<'exc> FnOnce(Value<'exc, 'static>) -> E,
+{
+    fut: F,
+    on_error: H,
+    _marker_t: PhantomData<T>,
+    _marker_e: PhantomData<E>,
+}
+
+impl<T, F, E, H> TryCatchFuture<T, F, E, H>
+where
+    F: Future<Output = T>,
+    H: for<'exc> FnOnce(Value<'exc, 'static>) -> E,
+    H: Clone,
+{
+    pub unsafe fn new(fut: F, on_error: H) -> Self {
+        debug_assert!(!jl_get_current_task().is_null(), "invalid_thread");
+        TryCatchFuture {
+            fut,
+            on_error,
+            _marker_t: PhantomData,
+            _marker_e: PhantomData,
+        }
+    }
+}
+
+impl<T, F, E, H> Future for TryCatchFuture<T, F, E, H>
+where
+    F: Future<Output = T>,
+    H: for<'exc> FnOnce(Value<'exc, 'static>) -> E,
+    H: Clone,
+{
+    type Output = Result<T, E>;
+
+    // Poll in GC-safe state to allow Julia to collect garbage on this thread.
+    fn poll(
+        self: Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Self::Output> {
+        unsafe {
+            let s = self.get_unchecked_mut();
+            let on_error = s.on_error.clone();
+            let pinned: Pin<&mut F> = std::pin::Pin::new_unchecked(&mut s.fut);
+
+            let res = catch_exceptions(
+                || pinned.poll(cx).map(|v| Ok(v)),
+                |e| std::task::Poll::Ready(Err(on_error(e))),
+            );
+
+            match res {
+                Ok(v) => v,
+                Err(e) => e,
+            }
+        }
+    }
+}
+
+pub struct GcUnsafeFuture<T, F>
+where
+    F: Future<Output = T>,
+{
+    fut: F,
+    ptls: PTls,
+    _marker_t: PhantomData<T>,
+}
+
+impl<T, F> GcUnsafeFuture<T, F>
+where
+    F: Future<Output = T>,
+{
+    pub fn new(fut: F) -> Self {
+        unsafe {
+            debug_assert!(!jl_get_current_task().is_null(), "invalid_thread");
+            let ptls = get_tls();
+            GcUnsafeFuture {
+                fut,
+                ptls,
+                _marker_t: PhantomData,
+            }
+        }
+    }
+}
+
+impl<T, F> Future for GcUnsafeFuture<T, F>
+where
+    F: Future<Output = T>,
+{
+    type Output = T;
+
+    // Poll in GC-unsafe state to allow calling into Julia
+    fn poll(
+        self: Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Self::Output> {
+        unsafe {
+            gc_unsafe_with(self.ptls, |_| {
+                let pinned: Pin<&mut F> =
+                    std::pin::Pin::new_unchecked(&mut self.get_unchecked_mut().fut);
+                pinned.poll(cx)
+            })
+        }
+    }
+}
 
 pub(crate) struct TaskState<'frame, 'data> {
     completed: bool,
     waker: Option<Waker>,
-    task: Option<Task<'frame>>,
-    _marker: PhantomData<&'data ()>,
+    task: Option<Value<'frame, 'data>>,
 }
 
 enum AsyncMethod {
@@ -105,41 +265,6 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
         Self::new_future(frame, func, values, AsyncMethod::ScheduleAsync)
     }
 
-    pub(crate) fn new_posted(
-        frame: &mut AsyncGcFrame<'frame>,
-        fn_ptr: Value<'_, '_>,
-        task_ptr: Value<'_, '_>,
-    ) -> Self {
-        let shared_state = Arc::new(GcSafeMutex::new(TaskState {
-            completed: false,
-            waker: None,
-            task: None,
-            _marker: PhantomData,
-        }));
-
-        let state_ptr = Arc::into_raw(shared_state.clone()) as *mut c_void;
-        let state_ptr_boxed = Value::new(&mut *frame, state_ptr);
-
-        // Safety: module contents are globally rooted, and the function is guaranteed to be safe
-        // by the caller.
-        let task = unsafe {
-            JlrsCore::post_blocking(&frame)
-                .call3(&mut *frame, fn_ptr, task_ptr, state_ptr_boxed)
-                .unwrap_or_else(|e| {
-                    let msg = e.display_string_or(CANNOT_DISPLAY_VALUE);
-                    panic!("postblocking threw an exception: {}", msg)
-                })
-                .cast_unchecked::<Task>()
-        };
-
-        {
-            let mut locked = shared_state.lock();
-            locked.task = Some(task);
-        }
-
-        JuliaFuture { shared_state }
-    }
-
     #[inline]
     pub(crate) fn new_with_keywords<'kw, 'value, V, const N: usize>(
         frame: &mut AsyncGcFrame<'frame>,
@@ -202,7 +327,6 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
             completed: false,
             waker: None,
             task: None,
-            _marker: PhantomData,
         }));
         let state_ptr = Arc::into_raw(shared_state.clone()) as *mut c_void;
         let state_ptr_boxed = Value::new(&mut *frame, state_ptr);
@@ -230,12 +354,10 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
                 AsyncMethod::ScheduleAsyncLocal => JlrsCore::schedule_async_local(&frame),
             };
 
-            f.call(&mut *frame, values.as_ref())
-                .unwrap_or_else(|e| {
-                    let msg = e.display_string_or(CANNOT_DISPLAY_VALUE);
-                    panic!("{} threw an exception: {}", method, msg)
-                })
-                .cast_unchecked::<Task>()
+            f.call(&mut *frame, values.as_ref()).unwrap_or_else(|e| {
+                let msg = e.display_string_or(CANNOT_DISPLAY_VALUE);
+                panic!("{} threw an exception: {}", method, msg)
+            })
         };
 
         {
@@ -259,7 +381,6 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
             completed: false,
             waker: None,
             task: None,
-            _marker: PhantomData,
         }));
 
         let state_ptr = Arc::into_raw(shared_state.clone()) as *mut c_void;
@@ -280,9 +401,9 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
                 AsyncMethod::ScheduleAsyncLocal => JlrsCore::schedule_async_local(&frame),
             };
 
-            #[cfg(not(any(feature = "julia-1-10", feature = "julia-1-9")))]
+            #[cfg(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8"))]
             let kw_call = jl_sys::jl_get_kwsorter(f.datatype().unwrap(Private).cast());
-            #[cfg(any(feature = "julia-1-10", feature = "julia-1-9"))]
+            #[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8")))]
             let kw_call = jl_sys::jl_kwcall_func;
 
             // WithKeywords::call has to extend the provided arguments, it has been inlined so
@@ -313,7 +434,6 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
                     let msg = e.display_string_or(CANNOT_DISPLAY_VALUE);
                     panic!("{} threw an exception: {}", method, msg)
                 })
-                .cast_unchecked::<Task>()
         };
 
         {

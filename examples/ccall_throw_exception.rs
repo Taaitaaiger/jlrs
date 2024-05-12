@@ -33,28 +33,32 @@ pub unsafe extern "C" fn assert_less_than(a: i32, b: i32) {
 
 #[cfg(test)]
 mod tests {
+    use jlrs::memory::scope::LocalReturning;
+
     use super::*;
 
     #[test]
     fn call_assert_less_than() {
-        let mut jlrs = unsafe { RuntimeBuilder::new().start().unwrap() };
-        let mut frame = StackFrame::new();
-        let mut jlrs = jlrs.instance(&mut frame);
+        let mut jlrs = Builder::new().start_local().unwrap();
 
-        jlrs.scope(|mut frame| unsafe {
-            let assert_less_than_ptr =
-                Value::new(&mut frame, assert_less_than as *mut std::ffi::c_void);
+        jlrs.returning::<JlrsResult<_>>()
+            .local_scope::<_, 3>(|mut frame|{
+                let assert_less_than_ptr =
+                    Value::new(&mut frame, assert_less_than as *mut std::ffi::c_void);
 
-            let func = Value::eval_string(
-                &mut frame,
-                "throwing_func(fnptr::Ptr{Cvoid}) = ccall(fnptr, Cvoid, (Int32, Int32), 2, 1)",
-            )
-            .into_jlrs_result()?;
+                    unsafe {
+                        let func = Value::eval_string(
+                            &mut frame,
+                            "throwing_func(fnptr::Ptr{Cvoid}) = ccall(fnptr, Cvoid, (Int32, Int32), 2, 1)",
+                        )
+                        .into_jlrs_result()?;
 
-            let output = func.call1(&mut frame, assert_less_than_ptr);
-            assert!(output.is_err());
-            Ok(())
-        })
-        .unwrap();
+                    let output = func.call1(&mut frame, assert_less_than_ptr);
+                    assert!(output.is_err());
+                }
+
+                Ok(())
+            })
+            .unwrap();
     }
 }

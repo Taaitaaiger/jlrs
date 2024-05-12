@@ -1,5 +1,5 @@
 mod util;
-#[cfg(feature = "sync-rt")]
+#[cfg(feature = "local-rt")]
 mod tests {
     use jlrs::{
         data::managed::{type_var::TypeVar, union_all::UnionAll},
@@ -13,6 +13,7 @@ mod tests {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| unsafe {
                     let atype = UnionAll::array_type(&frame);
                     let body = atype.body();
@@ -44,6 +45,7 @@ mod tests {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| unsafe {
                     let v = Value::new(&mut frame, 3i8);
                     let args = [DataType::int8_type(&frame).as_value()];
@@ -72,6 +74,7 @@ mod tests {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| unsafe {
                     let ty1 = Value::new(&mut frame, 1isize);
                     let ty2 = Value::new(&mut frame, 2isize);

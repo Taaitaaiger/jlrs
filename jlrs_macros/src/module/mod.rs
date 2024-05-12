@@ -13,8 +13,8 @@ use syn::{
     punctuated::Punctuated,
     spanned::Spanned,
     token::{Brace, Bracket, Comma},
-    AttrStyle, Attribute, Error, Expr, ExprLit, FnArg, GenericArgument, Ident, ItemFn, Lit, Meta,
-    Path, PathArguments, Result, ReturnType, Signature, Token, Type, TypeImplTrait, TypeParamBound,
+    AttrStyle, Attribute, Error, Expr, ExprLit, FnArg, Ident, ItemFn, Lit, Meta, Path, Result,
+    ReturnType, Signature, Token, Type,
 };
 
 use self::parameters::{Apply, ResolvedParameterList};
@@ -133,7 +133,8 @@ impl ExportedType {
                     {
                         let params = <#ty as ::jlrs::data::types::foreign_type::ParametricVariant>::variant_parameters(&mut output);
                         let params = ::jlrs::data::managed::erase_scope_lifetime(params);
-                        let param_slice = params.value_slice_unchecked();
+                        let params = params.data();
+                        let param_slice = params.as_atomic_slice().assume_immutable_non_null();
                         let dt = ua.apply_types_unchecked(&mut output, param_slice).cast::<::jlrs::data::managed::datatype::DataType>().unwrap();
                         let dt = ::jlrs::data::managed::erase_scope_lifetime(dt);
 
@@ -193,11 +194,46 @@ impl Parse for ExportedType {
     }
 }
 
+#[derive(Debug)]
+enum MacroOrType {
+    Macro(syn::Macro),
+    Type(syn::Ident),
+}
+impl Parse for MacroOrType {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let fork = input.fork();
+        if let Ok(m) = input.parse() {
+            Ok(MacroOrType::Macro(m))
+        } else {
+            let t = fork.parse()?;
+            Ok(MacroOrType::Type(t))
+        }
+    }
+}
+
+#[derive(Debug)]
+struct TypeVarEnv {
+    _use_token: Option<Token![use]>,
+    macro_or_type: MacroOrType,
+}
+
+impl Parse for TypeVarEnv {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let use_token = input.parse()?;
+        let macro_or_type = input.parse()?;
+
+        Ok(Self {
+            _use_token: use_token,
+            macro_or_type,
+        })
+    }
+}
 struct ExportedFunction {
     func: Signature,
     _as_token: Option<Token![as]>,
     name_override: Option<RenameFragments>,
     exclamation_mark_token: Option<Token![!]>,
+    type_var_env: Option<TypeVarEnv>,
 }
 
 impl Parse for ExportedFunction {
@@ -205,25 +241,31 @@ impl Parse for ExportedFunction {
         let func = input.parse()?;
 
         let lookahead = input.lookahead1();
-        if lookahead.peek(Token![as]) {
+        let (as_token, name_override, exclamation_mark_token) = if lookahead.peek(Token![as]) {
             let as_token = input.parse()?;
             let name_override = RenameFragments::parse_separated_nonempty(input)?;
             let exclamation_mark_token = input.parse()?;
 
-            Ok(ExportedFunction {
-                func,
-                _as_token: Some(as_token),
-                name_override: Some(name_override),
-                exclamation_mark_token,
-            })
+            (as_token, Some(name_override), exclamation_mark_token)
         } else {
-            Ok(ExportedFunction {
-                func,
-                _as_token: None,
-                name_override: None,
-                exclamation_mark_token: None,
-            })
-        }
+            (None, None, None)
+        };
+
+        let lookahead = input.lookahead1();
+        let type_var_env = if lookahead.peek(Token![use]) {
+            let i = Some(input.parse()?);
+            i
+        } else {
+            None
+        };
+
+        Ok(ExportedFunction {
+            func,
+            _as_token: as_token,
+            name_override: name_override,
+            exclamation_mark_token,
+            type_var_env,
+        })
     }
 }
 
@@ -293,40 +335,58 @@ impl ExportedFunction {
                 }
             };
 
+            let env_expr: Expr = if let Some(x) = self.type_var_env.as_ref() {
+                match &x.macro_or_type {
+                    MacroOrType::Macro(m) => {
+                        parse_quote! { <#m as ::jlrs::data::types::construct_type::TypeVars>::into_env(&mut frame) }
+                    }
+                    MacroOrType::Type(t) => {
+                        parse_quote! { <#t as ::jlrs::data::types::construct_type::TypeVars>::into_env(&mut frame) }
+                    }
+                }
+            } else {
+                parse_quote! { ::jlrs::data::types::construct_type::TypeVarEnv::empty(&frame) }
+            };
+
             let ex = parse_quote! {
                 {
                     let name = Symbol::new(&frame, #rename);
                     let type_type = ::jlrs::data::managed::union_all::UnionAll::type_type(&frame).as_value();
+                    let any_type = ::jlrs::data::managed::datatype::DataType::any_type(&frame).as_value();
 
                     #invoke_fn
 
                     let func = Value::new(&mut frame, invoke as *mut ::std::ffi::c_void);
 
                     unsafe {
-                        let mut ccall_arg_types = ::jlrs::data::managed::array::Array::new_for_unchecked(
+                        let env = #env_expr;
+                        let mut ccall_arg_types = ::jlrs::data::managed::array::Vector::new_for_unchecked(
                             &mut frame,
+                            type_type,
                             #n_args,
-                            type_type);
+                        );
 
-                        let mut ccall_arg_types_ref = ccall_arg_types.value_data_mut().unwrap();
+                        let mut ccall_arg_types_ref = ccall_arg_types.indeterminate_data_mut();
 
-                        let mut julia_arg_types = ::jlrs::data::managed::array::Array::new_for_unchecked(
+                        let mut julia_arg_types = ::jlrs::data::managed::array::Vector::new_for_unchecked(
                             &mut frame,
+                            any_type,
                             #n_args,
-                            type_type);
+                        );
 
-                        let mut julia_arg_types_ref = julia_arg_types.value_data_mut().unwrap();
+                        let mut julia_arg_types_ref = julia_arg_types.indeterminate_data_mut();
 
                         #(
-                            ccall_arg_types_ref.set(#ccall_arg_idx, Some(#ccall_arg_types.as_value())).unwrap();
-                            julia_arg_types_ref.set(#julia_arg_idx, Some(#function_arg_types.as_value())).unwrap();
+                            let t1 = #ccall_arg_types.as_value();
+                            ccall_arg_types_ref.set_value(&mut frame, #ccall_arg_idx, t1).unwrap().into_jlrs_result().unwrap();
+                            let t2 = #function_arg_types.as_value();
+                            julia_arg_types_ref.set_value(&mut frame, #julia_arg_idx, t2).unwrap().into_jlrs_result().unwrap();
                         )*
 
                         let ccall_return_type = #ccall_ret_type;
                         let julia_return_type = #julia_ret_type;
 
                         let module = #override_module_fragment;
-                        let nothing = ::jlrs::data::managed::value::Value::nothing(&frame);
 
                         let false_v = ::jlrs::data::managed::value::Value::false_v(&frame);
                         function_info_ty.instantiate_unchecked(&mut frame, [
@@ -337,7 +397,7 @@ impl ExportedFunction {
                             julia_return_type.as_value(),
                             func,
                             module.as_value(),
-                            false_v
+                            env.to_svec().as_value(),
                         ])
                     }
                 }
@@ -354,10 +414,8 @@ impl ExportedFunction {
                     frame.scope(|mut frame| {
                         let instance = #expr;
                         let n = offset + #start + #idx;
-                        accessor.set(n, Some(instance)).unwrap();
-
-                        Ok(())
-                    }).unwrap();
+                        accessor.set_value(&mut frame, n, instance).unwrap().into_jlrs_result().unwrap();
+                    });
                 }
             }
         }).collect::<Vec<_>>();
@@ -382,6 +440,7 @@ struct ExportedMethod {
     _as_token: Option<Token![as]>,
     name_override: Option<RenameFragments>,
     exclamation_mark_token: Option<Token![!]>,
+    type_var_env: Option<TypeVarEnv>,
 }
 
 impl Parse for ExportedMethod {
@@ -391,29 +450,32 @@ impl Parse for ExportedMethod {
         let func = input.parse()?;
 
         let lookahead = input.lookahead1();
-        if lookahead.peek(Token![as]) {
+        let (as_token, name_override, exclamation_mark_token) = if lookahead.peek(Token![as]) {
             let as_token = input.parse()?;
             let name_override = RenameFragments::parse_separated_nonempty(input)?;
             let exclamation_mark_token = input.parse()?;
 
-            Ok(ExportedMethod {
-                _in_token: in_token,
-                parent,
-                func,
-                _as_token: Some(as_token),
-                name_override: Some(name_override),
-                exclamation_mark_token,
-            })
+            (as_token, Some(name_override), exclamation_mark_token)
         } else {
-            Ok(ExportedMethod {
-                _in_token: in_token,
-                parent,
-                func,
-                _as_token: None,
-                name_override: None,
-                exclamation_mark_token: None,
-            })
-        }
+            (None, None, None)
+        };
+
+        let lookahead = input.lookahead1();
+        let type_var_env = if lookahead.peek(Token![use]) {
+            Some(input.parse()?)
+        } else {
+            None
+        };
+
+        Ok(ExportedMethod {
+            _in_token: in_token,
+            parent,
+            func,
+            _as_token: as_token,
+            name_override: name_override,
+            exclamation_mark_token,
+            type_var_env,
+        })
     }
 }
 
@@ -461,41 +523,59 @@ impl ExportedMethod {
 
             let (ccall_arg_types, julia_arg_types, invoke_fn) = method_arg_type_fragments_in_env(self, &resolver, untracked_self, gc_safe);
 
+            let env_expr: Expr = if let Some(x) = self.type_var_env.as_ref() {
+                match &x.macro_or_type {
+                    MacroOrType::Macro(m) => {
+                        parse_quote! { <#m as ::jlrs::data::types::construct_type::TypeVars>::into_env(&mut frame) }
+                    }
+                    MacroOrType::Type(t) => {
+                        parse_quote! { <#t as ::jlrs::data::types::construct_type::TypeVars>::into_env(&mut frame) }
+                    }
+                }
+            } else {
+                parse_quote! { ::jlrs::data::types::construct_type::TypeVarEnv::empty(&frame) }
+            };
+
             let ex = parse_quote! {
                 {
                     let unrooted = frame.unrooted();
                     let name = Symbol::new(&frame, #rename);
                     let type_type = ::jlrs::data::managed::union_all::UnionAll::type_type(&unrooted).as_value();
+                    let any_type = ::jlrs::data::managed::datatype::DataType::any_type(&frame).as_value();
 
                     #invoke_fn;
 
                     let func = Value::new(&mut frame, invoke as *mut ::std::ffi::c_void);
 
                     unsafe {
-                        let mut ccall_arg_types = ::jlrs::data::managed::array::Array::new_for_unchecked(
+                        let env = #env_expr;
+                        let mut ccall_arg_types = ::jlrs::data::managed::array::Vector::new_for_unchecked(
                             &mut frame,
+                            type_type,
                             #n_args,
-                            type_type);
+                        );
 
-                        let mut ccall_arg_types_ref = ccall_arg_types.value_data_mut().unwrap();
+                        let mut ccall_arg_types_ref = ccall_arg_types.indeterminate_data_mut();
 
-                        let mut julia_arg_types = ::jlrs::data::managed::array::Array::new_for_unchecked(
+                        let mut julia_arg_types = ::jlrs::data::managed::array::Vector::new_for_unchecked(
                             &mut frame,
+                            any_type,
                             #n_args,
-                            type_type);
+                        );
 
-                        let mut julia_arg_types_ref = julia_arg_types.value_data_mut().unwrap();
+                        let mut julia_arg_types_ref = julia_arg_types.indeterminate_data_mut();
 
                         #(
-                            ccall_arg_types_ref.set(#ccall_arg_idx, Some(#ccall_arg_types.as_value())).unwrap();
-                            julia_arg_types_ref.set(#julia_arg_idx, Some(#julia_arg_types.as_value())).unwrap();
+                            let t1 = #ccall_arg_types.as_value();
+                            ccall_arg_types_ref.set_value(&mut frame, #ccall_arg_idx, t1).unwrap().into_jlrs_result().unwrap();
+                            let t2 = #julia_arg_types.as_value();
+                            julia_arg_types_ref.set_value(&mut frame, #julia_arg_idx, t2).unwrap().into_jlrs_result().unwrap();
                         )*
 
                         let ccall_return_type = #ccall_ret_type;
                         let julia_return_type = #julia_ret_type;
 
                         let module = #override_module_fragment;
-                        let nothing = ::jlrs::data::managed::value::Value::nothing(&frame);
 
                         let false_v = ::jlrs::data::managed::value::Value::false_v(&frame);
                         function_info_ty.instantiate_unchecked(&mut frame, [
@@ -506,7 +586,7 @@ impl ExportedMethod {
                             julia_return_type,
                             func,
                             module.as_value(),
-                            false_v
+                            env.to_svec().as_value(),
                         ])
                     }
                 }
@@ -525,183 +605,8 @@ impl ExportedMethod {
                         let start = #start;
                         let idx = #idx;
                         let n = offset + start + idx;
-                        accessor.set(n, Some(instance)).unwrap();
-
-                        Ok(())
-                    }).unwrap();
-                }
-            }
-        }).collect::<Vec<_>>();
-
-        let n_unique = exprs.len();
-        *offset += n_unique;
-        let ex = parse_quote! {
-            {
-                accessor.grow_end_unchecked(#n_unique);
-                #(#exprs)*
-            }
-        };
-
-        Ok(ex)
-    }
-}
-
-struct ExportedAsyncCallback {
-    _async_token: Token![async],
-    func: Signature,
-    _as_token: Option<Token![as]>,
-    name_override: Option<RenameFragments>,
-    exclamation_mark_token: Option<Token![!]>,
-}
-
-impl Parse for ExportedAsyncCallback {
-    fn parse(input: ParseStream) -> Result<Self> {
-        let async_token = input.parse()?;
-        let func = input.parse()?;
-
-        let lookahead = input.lookahead1();
-        if lookahead.peek(Token![as]) {
-            let as_token = input.parse()?;
-            let name_override = RenameFragments::parse_separated_nonempty(input)?;
-            let exclamation_mark_token = input.parse()?;
-
-            Ok(ExportedAsyncCallback {
-                _async_token: async_token,
-                func,
-                _as_token: Some(as_token),
-                name_override: Some(name_override),
-                exclamation_mark_token,
-            })
-        } else {
-            Ok(ExportedAsyncCallback {
-                _async_token: async_token,
-                func,
-                _as_token: None,
-                name_override: None,
-                exclamation_mark_token: None,
-            })
-        }
-    }
-}
-
-impl ExportedAsyncCallback {
-    fn init_with_env(
-        &self,
-        generic: &GenericEnvironment,
-        env: Option<&ParameterEnvironment>,
-        offset: &mut usize,
-    ) -> Result<Expr> {
-        let n_args = self.func.inputs.len();
-        let name_ident = &self.func.ident;
-        let start = *offset;
-
-        let override_module_fragment = override_module_fragment(&self.name_override);
-        let mut rename = self
-            .name_override
-            .as_ref()
-            .map(|parts| parts.last())
-            .flatten()
-            .unwrap_or(name_ident)
-            .to_string();
-
-        if self.exclamation_mark_token.is_some() {
-            rename.push('!')
-        }
-
-        let env = ParameterEnvironment::new(generic, env);
-        let n_combinations = env.n_combinations();
-
-        let mut list = ParameterList::new(&env);
-        let mut resolver = list.resolver();
-
-        let exprs = (0..n_combinations).map(|i| -> Result<Expr> {
-            env.nth_combination(&mut list, i);
-            list.resolve(&mut resolver);
-
-            let (inner_ret_ty, ccall_arg_types, julia_arg_types, invoke_fn) =
-                async_callback_arg_type_fragments_in_env(self,  &resolver)?;
-
-            let ccall_arg_idx = 0..n_args;
-            let julia_arg_idx = 0..n_args;
-
-            let ccall_ret_type: Expr = parse_quote! {
-                <::jlrs::ccall::AsyncCCall as ::jlrs::data::types::construct_type::ConstructType>::construct_type(&mut frame)
-            };
-            let julia_ret_type: Expr = parse_quote! {
-                <#inner_ret_ty as ::jlrs::data::types::construct_type::ConstructType>::construct_type(&mut frame)
-            };
-
-            let first_arg: Expr = syn::parse_quote! {
-                <*mut ::std::ffi::c_void as ::jlrs::data::types::construct_type::ConstructType>::construct_type(&mut frame)
-            };
-
-            let ex = parse_quote! {
-                {
-                    let unrooted = frame.unrooted();
-                    let name = Symbol::new(&frame, #rename);
-                    let type_type = ::jlrs::data::managed::union_all::UnionAll::type_type(&unrooted).as_value();
-
-                    #invoke_fn;
-
-                    let func = Value::new(&mut frame, invoke as *mut ::std::ffi::c_void);
-
-                    unsafe {
-                        let mut ccall_arg_types = ::jlrs::data::managed::array::Array::new_for_unchecked(
-                            &mut frame,
-                            #n_args + 1,
-                            type_type);
-
-                        let mut ccall_arg_types_ref = ccall_arg_types.value_data_mut().unwrap();
-
-                        let mut julia_arg_types = ::jlrs::data::managed::array::Array::new_for_unchecked(
-                            &mut frame,
-                            #n_args,
-                            type_type);
-
-                        let mut julia_arg_types_ref = julia_arg_types.value_data_mut().unwrap();
-
-                        ccall_arg_types_ref.set(0, Some(#first_arg)).unwrap();
-                        #(
-                            ccall_arg_types_ref.set(#ccall_arg_idx + 1, Some(#ccall_arg_types.as_value())).unwrap();
-                            julia_arg_types_ref.set(#julia_arg_idx, Some(#julia_arg_types.as_value())).unwrap();
-                        )*
-
-                        let ccall_return_type = #ccall_ret_type;
-                        let julia_return_type = #julia_ret_type;
-
-                        let module = #override_module_fragment;
-                        let nothing = ::jlrs::data::managed::value::Value::nothing(&frame);
-
-                        let true_v = ::jlrs::data::managed::value::Value::true_v(&frame);
-                        function_info_ty.instantiate_unchecked(&mut frame, [
-                            name.as_value(),
-                            ccall_arg_types.as_value(),
-                            julia_arg_types.as_value(),
-                            ccall_return_type,
-                            julia_return_type,
-                            func,
-                            module.as_value(),
-                            true_v
-                        ])
-                    }
-                }
-            };
-
-            Ok(ex)
-        }).collect::<Result<Vec<_>>>()?
-        .into_iter()
-        .unique()
-        .enumerate()
-        .map(|(idx, expr)| -> Expr {
-            parse_quote! {
-                {
-                    frame.scope(|mut frame| {
-                        let instance = #expr;
-                        let n = offset + #start + #idx;
-                        accessor.set(n, Some(instance)).unwrap();
-
-                        Ok(())
-                    }).unwrap();
+                        accessor.set_value(&mut frame, n, instance).unwrap().into_jlrs_result().unwrap();
+                    });
                 }
             }
         }).collect::<Vec<_>>();
@@ -943,12 +848,7 @@ impl<'a> GenericEnvironment<'a> {
         let items: Vec<_> = generics
             .items
             .iter()
-            .filter(|f| {
-                f.is_exported_fn()
-                    || f.is_exported_method()
-                    || f.is_exported_type()
-                    || f.is_exported_async_callback()
-            })
+            .filter(|f| f.is_exported_fn() || f.is_exported_method() || f.is_exported_type())
             .collect();
 
         let subenvs: Vec<_> = generics
@@ -1098,38 +998,6 @@ impl<'a> GenericEnvironment<'a> {
 
         Ok(ex)
     }
-
-    fn init_async_callback_fragments_env(
-        &'a self,
-        env: Option<&ParameterEnvironment<'a>>,
-        offset: &mut usize,
-    ) -> Result<Expr> {
-        let mut sup_exprs = vec![];
-
-        for sub_env in self.subenvs.iter() {
-            let env = ParameterEnvironment::new(self, env);
-            let ex = sub_env.init_async_callback_fragments_env(Some(&env), offset)?;
-            sup_exprs.push(ex);
-        }
-
-        let exprs = self
-            .items
-            .iter()
-            .copied()
-            .filter(|it| it.is_exported_async_callback())
-            .map(|it| it.get_exported_async_callback())
-            .map(|it| it.init_with_env(self, env, offset))
-            .collect::<Result<Vec<_>>>()?;
-
-        let ex = parse_quote! {
-            {
-                #(#sup_exprs;)*
-                #(#exprs;)*
-            }
-        };
-
-        Ok(ex)
-    }
 }
 
 impl Parse for ExportedGenerics {
@@ -1163,7 +1031,6 @@ enum ModuleItem {
     ExportedType(ExportedType),
     ExportedFunction(ExportedFunction),
     ExportedMethod(ExportedMethod),
-    ExportedAsyncCallback(ExportedAsyncCallback),
     ExportedConst(ExportedConst),
     ExportedGlobal(ExportedGlobal),
     ItemWithAttrs(ItemWithAttrs),
@@ -1221,32 +1088,6 @@ impl ModuleItem {
                 if item.is_exported_method() =>
             {
                 (item.get_exported_method().0, Some(attrs.as_ref()))
-            }
-            _ => panic!(),
-        }
-    }
-
-    fn is_exported_async_callback(&self) -> bool {
-        match self {
-            ModuleItem::ExportedAsyncCallback(_) => true,
-            ModuleItem::ItemWithAttrs(ItemWithAttrs { item, .. })
-                if item.is_exported_async_callback() =>
-            {
-                true
-            }
-            _ => false,
-        }
-    }
-
-    fn get_exported_async_callback(&self) -> &ExportedAsyncCallback {
-        match self {
-            ModuleItem::ExportedAsyncCallback(ref exported_async_callback) => {
-                exported_async_callback
-            }
-            ModuleItem::ItemWithAttrs(ItemWithAttrs { item, .. })
-                if item.is_exported_async_callback() =>
-            {
-                item.get_exported_async_callback()
             }
             _ => panic!(),
         }
@@ -1403,8 +1244,6 @@ impl Parse for ModuleItem {
             input.parse().map(ModuleItem::ExportedFunction)
         } else if lookahead.peek(Token![in]) {
             input.parse().map(ModuleItem::ExportedMethod)
-        } else if lookahead.peek(Token![async]) {
-            input.parse().map(ModuleItem::ExportedAsyncCallback)
         } else if lookahead.peek(Token![const]) {
             input.parse().map(ModuleItem::ExportedConst)
         } else if lookahead.peek(Token![type]) {
@@ -1445,9 +1284,6 @@ impl JuliaModule {
         let fn_fragments = FunctionFragments::generate(&self, init_fn)?;
         let generic_fn_fragments = FunctionFragments::generate_generic(&self, init_fn)?;
         let method_fragments = MethodFragments::generate(&self, init_fn);
-        let async_callback_fragments = AsyncCallbackFragments::generate(&self, init_fn)?;
-        let generic_async_callback_fragments =
-            AsyncCallbackFragments::generate_generic(&self, init_fn)?;
         let generic_method_fragments = MethodFragments::generate_generic(&self, init_fn)?;
         let type_fragments = TypeFragments::generate(&self, init_fn);
         let generic_type_fragments = TypeFragments::generate_generic(&self, init_fn);
@@ -1472,12 +1308,6 @@ impl JuliaModule {
         let method_init_fn_ident = method_fragments.init_methods_fn_ident;
         let generic_method_init_fn = generic_method_fragments.init_methods_fn;
         let generic_method_init_fn_ident = generic_method_fragments.init_methods_fn_ident;
-        let async_callback_init_fn = async_callback_fragments.init_async_callbacks_fn;
-        let async_callback_init_fn_ident = async_callback_fragments.init_async_callbacks_fn_ident;
-        let generic_async_callback_init_fn =
-            generic_async_callback_fragments.init_async_callbacks_fn;
-        let generic_async_callback_init_fn_ident =
-            generic_async_callback_fragments.init_async_callbacks_fn_ident;
         let const_init_fn = const_fragments.const_init_fn;
         let const_init_fn_ident = const_fragments.const_init_ident;
         let alias_init_fn = alias_fragments.alias_init_fn;
@@ -1544,10 +1374,6 @@ impl JuliaModule {
 
                 #generic_method_init_fn
 
-                #async_callback_init_fn
-
-                #generic_async_callback_init_fn
-
                 #const_init_fn
 
                 #alias_init_fn
@@ -1563,12 +1389,12 @@ impl JuliaModule {
                 }
 
                 let mut stack_frame = ::jlrs::memory::stack_frame::StackFrame::new();
-                let mut ccall = ::jlrs::ccall::CCall::new(&mut stack_frame);
+                let mut ccall = ::jlrs::runtime::handle::ccall::CCall::new(&mut stack_frame);
 
-                ccall.init_jlrs(&::jlrs::InstallJlrsCore::Default, Some(module));
+                ccall.init_jlrs(&::jlrs::InstallJlrsCore::Default);
 
                 ccall.scope(|mut frame| {
-                    let wrap_mod = ::jlrs::data::managed::module::JlrsCore::module(&frame)
+                    let wrap_mod = ::jlrs::data::managed::module::Module::jlrs_core(&frame)
                         .submodule(&frame, "Wrap")
                         .unwrap()
                         .as_managed();
@@ -1597,15 +1423,13 @@ impl JuliaModule {
                     #invoke_global_init;
                     #invoke_alias_init;
 
-                    let mut arr = ::jlrs::data::managed::array::Array::new_for_unchecked(&mut frame, 0, function_info_ty.as_value());
+                    let mut arr = ::jlrs::data::managed::array::Vector::new_for_unchecked(&mut frame, function_info_ty.as_value(), 0);
                     #function_init_fn_ident(&mut frame, &mut arr, module, function_info_ty);
                     #generic_function_init_fn_ident(&mut frame, &mut arr, module, function_info_ty);
                     #method_init_fn_ident(&mut frame, &mut arr, module, function_info_ty);
                     #generic_method_init_fn_ident(&mut frame, &mut arr, module, function_info_ty);
-                    #async_callback_init_fn_ident(&mut frame, &mut arr, module, function_info_ty);
-                    #generic_async_callback_init_fn_ident(&mut frame, &mut arr, module, function_info_ty);
 
-                    let mut doc_items = ::jlrs::data::managed::array::Array::new_for_unchecked(&mut frame, 0, doc_item_ty.as_value());
+                    let mut doc_items = ::jlrs::data::managed::array::Vector::new_for_unchecked(&mut frame, doc_item_ty.as_value(), 0);
                     if precompiling == 1 {
                         #doc_init_fn_ident(&mut frame, &mut doc_items, module, doc_item_ty);
                     }
@@ -1650,13 +1474,6 @@ impl JuliaModule {
             .iter()
             .filter(|it| it.is_exported_method())
             .map(|it| it.get_exported_method())
-    }
-
-    fn get_exported_async_callbacks(&self) -> impl Iterator<Item = &ExportedAsyncCallback> {
-        self.items
-            .iter()
-            .filter(|it| it.is_exported_async_callback())
-            .map(|it| it.get_exported_async_callback())
     }
 
     fn get_exported_types(&self) -> impl Iterator<Item = &ExportedType> {
@@ -1726,20 +1543,20 @@ impl DocFragments {
         let init_docs_fn = parse_quote! {
             unsafe fn #init_docs_fn_ident(
                 frame: &mut ::jlrs::memory::target::frame::GcFrame,
-                array: &mut ::jlrs::data::managed::array::Array<'_, 'static>,
+                array: &mut ::jlrs::data::managed::array::Vector<'_, 'static>,
                 module: ::jlrs::data::managed::module::Module,
                 doc_item_ty: ::jlrs::data::managed::datatype::DataType,
             ) {
+                use ::jlrs::data::managed::array::{data::accessor::{AccessorMut1D as _, AccessorMut as _, Accessor as _}, dimensions::Dims as _};
+
                 frame.scope(move |mut frame| {
-                    array.grow_end_unchecked(#n_docs);
                     let mut accessor = array.indeterminate_data_mut();
+                    accessor.grow_end_unchecked(#n_docs);
 
                     #(
                         #fragments
                     )*
-
-                    Ok(())
-                }).unwrap()
+                })
             }
         };
 
@@ -1769,17 +1586,17 @@ impl FunctionFragments {
         let init_functions_fn = parse_quote! {
             unsafe fn #init_functions_fn_ident(
                 frame: &mut ::jlrs::memory::target::frame::GcFrame,
-                array: &mut ::jlrs::data::managed::array::Array<'_, 'static>,
+                array: &mut ::jlrs::data::managed::array::Vector<'_, 'static>,
                 module: ::jlrs::data::managed::module::Module,
                 function_info_ty: ::jlrs::data::managed::datatype::DataType,
             ) {
-                frame.scope(move |mut frame| {
-                    array.grow_end_unchecked(#n_functions);
-                    let mut accessor = array.value_data_mut().unwrap();
-                    #(#fragments)*
+                use ::jlrs::data::managed::array::data::accessor::{AccessorMut1D as _, AccessorMut as _, AccessorMut as _};
 
-                    Ok(())
-                }).unwrap()
+                frame.scope(|mut frame| {
+                    let mut accessor = array.indeterminate_data_mut();
+                    accessor.grow_end_unchecked(#n_functions);
+                    #(#fragments)*
+                })
             }
         };
 
@@ -1804,16 +1621,16 @@ impl FunctionFragments {
         let init_functions_fn = parse_quote! {
             unsafe fn #init_functions_fn_ident(
                 frame: &mut ::jlrs::memory::target::frame::GcFrame,
-                array: &mut ::jlrs::data::managed::array::Array<'_, 'static>,
+                array: &mut ::jlrs::data::managed::array::Vector<'_, 'static>,
                 module: ::jlrs::data::managed::module::Module,
                 function_info_ty: ::jlrs::data::managed::datatype::DataType,
             ) {
+                use ::jlrs::data::managed::array::{data::accessor::{AccessorMut1D as _, AccessorMut as _, Accessor as _}, dimensions::Dims as _};
                 frame.scope(move |mut frame| {
-                    let mut accessor = array.value_data_mut().unwrap();
-                    let offset = ::jlrs::data::managed::array::dimensions::Dims::size(&accessor.dimensions());
+                    let mut accessor = array.indeterminate_data_mut();
+                    let offset = accessor.array().dimensions().size();
                     #(#init_functions_fragments)*
-                    Ok(())
-                }).unwrap()
+                })
             }
         };
 
@@ -1844,21 +1661,22 @@ impl MethodFragments {
         let init_methods_fn = parse_quote! {
             unsafe fn #init_methods_fn_ident(
                 frame: &mut ::jlrs::memory::target::frame::GcFrame,
-                array: &mut ::jlrs::data::managed::array::Array<'_, 'static>,
+                array: &mut ::jlrs::data::managed::array::Vector<'_, 'static>,
                 module: ::jlrs::data::managed::module::Module,
                 function_info_ty: ::jlrs::data::managed::datatype::DataType,
             ) {
+                use ::jlrs::data::managed::array::{data::accessor::{AccessorMut1D as _, AccessorMut as _, Accessor as _}, dimensions::Dims as _};
+
                 frame.scope(move |mut frame| {
-                    array.grow_end_unchecked(#n_methods);
-                    let mut accessor = array.value_data_mut().unwrap();
-                    let offset = ::jlrs::data::managed::array::dimensions::Dims::size(&accessor.dimensions()) - #n_methods;
+                    // DONE
+                    let mut accessor = array.indeterminate_data_mut();
+                    let offset = accessor.array().dimensions().size();
+                    accessor.grow_end_unchecked(#n_methods);
 
                     #(
                         #method_init_fragments
                     )*
-
-                    Ok(())
-                }).unwrap()
+                })
             }
         };
 
@@ -1883,107 +1701,23 @@ impl MethodFragments {
         let init_methods_fn = parse_quote! {
             unsafe fn #init_methods_fn_ident(
                 frame: &mut ::jlrs::memory::target::frame::GcFrame,
-                array: &mut ::jlrs::data::managed::array::Array<'_, 'static>,
+                array: &mut ::jlrs::data::managed::array::Vector<'_, 'static>,
                 module: ::jlrs::data::managed::module::Module,
                 function_info_ty: ::jlrs::data::managed::datatype::DataType,
             ) {
+                use ::jlrs::data::managed::array::{data::accessor::{AccessorMut1D as _, AccessorMut as _, Accessor as _}, dimensions::Dims as _};
+
                 frame.scope(move |mut frame| {
-                    let mut accessor = array.value_data_mut().unwrap();
-                    let offset = ::jlrs::data::managed::array::dimensions::Dims::size(&accessor.dimensions());
+                    let mut accessor = array.indeterminate_data_mut();
+                    let offset = accessor.array().dimensions().size();
                     #(#init_methods_fragments)*
-                    Ok(())
-                }).unwrap()
+                })
             }
         };
 
         let fragments = MethodFragments {
             init_methods_fn_ident,
             init_methods_fn,
-        };
-
-        Ok(fragments)
-    }
-}
-
-struct AsyncCallbackFragments {
-    init_async_callbacks_fn_ident: Ident,
-    init_async_callbacks_fn: ItemFn,
-}
-
-impl AsyncCallbackFragments {
-    fn generate(module: &JuliaModule, init_fn: &InitFn) -> Result<Self> {
-        let init_async_callbacks_fn_ident = format_ident!("{}_async_callbacks", init_fn.init_fn);
-        let n_async_callbacks = module.get_exported_async_callbacks().count();
-
-        let async_callback_init_fragments = module
-            .get_exported_async_callbacks()
-            .enumerate()
-            .map(async_callback_info_fragment);
-
-        let mut fragments = Vec::with_capacity(n_async_callbacks);
-        for fragment in async_callback_init_fragments {
-            fragments.push(fragment?);
-        }
-
-        let init_async_callbacks_fn = parse_quote! {
-            unsafe fn #init_async_callbacks_fn_ident(
-                frame: &mut ::jlrs::memory::target::frame::GcFrame,
-                array: &mut ::jlrs::data::managed::array::Array<'_, 'static>,
-                module: ::jlrs::data::managed::module::Module,
-                function_info_ty: ::jlrs::data::managed::datatype::DataType,
-            ) {
-                frame.scope(move |mut frame| {
-                    array.grow_end_unchecked(#n_async_callbacks);
-                    let mut accessor = array.value_data_mut().unwrap();
-                    let offset = ::jlrs::data::managed::array::dimensions::Dims::size(&accessor.dimensions()) - #n_async_callbacks;
-
-                    #(
-                        #fragments
-                    )*
-
-                    Ok(())
-                }).unwrap()
-            }
-        };
-
-        Ok(AsyncCallbackFragments {
-            init_async_callbacks_fn_ident,
-            init_async_callbacks_fn,
-        })
-    }
-
-    fn generate_generic(info: &JuliaModule, init_fn: &InitFn) -> Result<Self> {
-        let mut offset = 0;
-
-        let init_async_callbacks_fn_ident =
-            format_ident!("{}_generic_async_callbacks", init_fn.init_fn);
-        let init_async_callback_fragments = info
-            .get_exported_generics()
-            .map(|g| {
-                g.to_generic_environment()
-                    .init_async_callback_fragments_env(None, &mut offset)
-            })
-            .collect::<Result<Vec<_>>>()?;
-
-        let init_async_callbacks_fn = parse_quote! {
-            unsafe fn #init_async_callbacks_fn_ident(
-                frame: &mut ::jlrs::memory::target::frame::GcFrame,
-                array: &mut ::jlrs::data::managed::array::Array<'_, 'static>,
-                module: ::jlrs::data::managed::module::Module,
-                function_info_ty: ::jlrs::data::managed::datatype::DataType,
-            ) {
-                frame.scope(move |mut frame| {
-                    let mut accessor = array.value_data_mut().unwrap();
-                    let offset = ::jlrs::data::managed::array::dimensions::Dims::size(&accessor.dimensions());
-                    #(#init_async_callback_fragments)*
-                    Ok(())
-                }).unwrap()
-            }
-        };
-
-        let fragments = AsyncCallbackFragments {
-            init_async_callbacks_fn_ident,
-            init_async_callbacks_fn,
         };
 
         Ok(fragments)
@@ -2013,9 +1747,7 @@ impl TypeFragments {
                     #(
                         #init_types_fragments
                     )*
-
-                    Ok(())
-                }).unwrap();
+                });
             }
         };
 
@@ -2027,15 +1759,14 @@ impl TypeFragments {
                 frame: &mut ::jlrs::memory::target::frame::GcFrame,
                 module: jlrs::data::managed::module::Module
             ) {
-                frame.scope(|frame| {
+
+                frame.scope(|mut frame| {
                     let mut output = frame.output();
 
                     #(
                         #reinit_types_fragments
                     )*
-
-                    Ok(())
-                }).unwrap();
+                });
             }
         };
 
@@ -2059,15 +1790,14 @@ impl TypeFragments {
                 frame: &mut ::jlrs::memory::target::frame::GcFrame,
                 module: ::jlrs::data::managed::module::Module,
             ) {
+
                 frame.scope(|mut frame| {
                     let mut output = frame.output();
 
                     #(
                         #init_types_fragments
                     )*
-
-                    Ok(())
-                }).unwrap();
+                });
             }
         };
 
@@ -2082,15 +1812,14 @@ impl TypeFragments {
                 frame: &mut ::jlrs::memory::target::frame::GcFrame,
                 module: jlrs::data::managed::module::Module
             ) {
+
                 frame.scope(|mut frame| {
                     let mut output = frame.output();
 
                     #(
                         #reinit_types_fragments
                     )*
-
-                    Ok(())
-                }).unwrap();
+                });
             }
         };
 
@@ -2119,6 +1848,7 @@ impl ConstFragments {
                 frame: &mut ::jlrs::memory::target::frame::GcFrame,
                 module: ::jlrs::data::managed::module::Module,
             ) {
+
                 #(
                     #const_init_fragments
                 )*
@@ -2148,6 +1878,7 @@ impl AliasFragments {
                 frame: &::jlrs::memory::target::frame::GcFrame,
                 module: ::jlrs::data::managed::module::Module,
             ) {
+
                 #(
                     #const_init_fragments
                 )*
@@ -2177,6 +1908,7 @@ impl GlobalFragments {
                 frame: &mut ::jlrs::memory::target::frame::GcFrame,
                 module: ::jlrs::data::managed::module::Module,
             ) {
+
                 #(
                     #global_init_fragments
                 )*
@@ -2220,11 +1952,9 @@ fn doc_info_fragment((index, info): (usize, &ItemWithAttrs)) -> Result<Expr> {
                             let doc = ::jlrs::data::managed::string::JuliaString::new(&mut frame, #doc);
 
                             let doc_it = doc_item_ty.instantiate_unchecked(&mut frame, [module.as_value(), item.as_value(), signature, doc.as_value()]);
-                            accessor.set_value_unchecked(#index, Some(doc_it)).unwrap();
+                            accessor.set_value(&mut frame, #index, doc_it).unwrap().into_jlrs_result().unwrap();
                         }
-
-                        Ok(())
-                    }).unwrap();
+                    });
                 }
             };
 
@@ -2258,11 +1988,9 @@ fn doc_info_fragment((index, info): (usize, &ItemWithAttrs)) -> Result<Expr> {
                             let doc = ::jlrs::data::managed::string::JuliaString::new(&mut frame, #doc);
 
                             let doc_it = doc_item_ty.instantiate_unchecked(&mut frame, [module.as_value(), item.as_value(), signature, doc.as_value()]);
-                            accessor.set_value_unchecked(#index, Some(doc_it)).unwrap();
+                            accessor.set_value(&mut frame, #index, doc_it).unwrap().into_jlrs_result().unwrap();
                         }
-
-                        Ok(())
-                    }).unwrap();
+                    });
                 }
 
             };
@@ -2297,50 +2025,9 @@ fn doc_info_fragment((index, info): (usize, &ItemWithAttrs)) -> Result<Expr> {
                             let doc = ::jlrs::data::managed::string::JuliaString::new(&mut frame, #doc);
 
                             let doc_it = doc_item_ty.instantiate_unchecked(&mut frame, [module.as_value(), item.as_value(), signature, doc.as_value()]);
-                            accessor.set_value_unchecked(#index, Some(doc_it)).unwrap();
+                            accessor.set_value(&mut frame, #index, doc_it).unwrap().into_jlrs_result().unwrap();
                         }
-
-                        Ok(())
-                    }).unwrap();
-                }
-
-            };
-
-            Ok(q)
-        }
-        ModuleItem::ExportedAsyncCallback(func) => {
-            let name_ident = &func.func.ident;
-
-            let override_module_fragment = override_module_fragment(&func.name_override);
-            let mut rename = func
-                .name_override
-                .as_ref()
-                .map(|parts| parts.last())
-                .flatten()
-                .unwrap_or(name_ident)
-                .to_string();
-
-            if func.exclamation_mark_token.is_some() {
-                rename.push('!')
-            }
-
-            let doc = info.get_docstr()?;
-
-            let q = parse_quote! {
-                {
-                    frame.scope(|mut frame| {
-                        unsafe {
-                            let module = #override_module_fragment;
-                            let item = ::jlrs::data::managed::symbol::Symbol::new(&frame, #rename);
-                            let signature = ::jlrs::data::managed::value::Value::bottom_type(&frame);
-                            let doc = ::jlrs::data::managed::string::JuliaString::new(&mut frame, #doc);
-
-                            let doc_it = doc_item_ty.instantiate_unchecked(&mut frame, [module.as_value(), item.as_value(), signature, doc.as_value()]);
-                            accessor.set_value_unchecked(#index, Some(doc_it)).unwrap();
-                        }
-
-                        Ok(())
-                    }).unwrap();
+                    });
                 }
 
             };
@@ -2361,11 +2048,9 @@ fn doc_info_fragment((index, info): (usize, &ItemWithAttrs)) -> Result<Expr> {
                             let doc = ::jlrs::data::managed::string::JuliaString::new(&mut frame, #doc);
 
                             let doc_it = doc_item_ty.instantiate_unchecked(&mut frame, [module.as_value(), item.as_value(), signature, doc.as_value()]);
-                            accessor.set_value_unchecked(#index, Some(doc_it)).unwrap();
+                            accessor.set_value(&mut frame, #index, doc_it).unwrap().into_jlrs_result().unwrap();
                         }
-
-                        Ok(())
-                    }).unwrap();
+                    });
                 }
 
             };
@@ -2386,11 +2071,9 @@ fn doc_info_fragment((index, info): (usize, &ItemWithAttrs)) -> Result<Expr> {
                             let doc = ::jlrs::data::managed::string::JuliaString::new(&mut frame, #doc);
 
                             let doc_it = doc_item_ty.instantiate_unchecked(&mut frame, [module.as_value(), item.as_value(), signature, doc.as_value()]);
-                            accessor.set_value_unchecked(#index, Some(doc_it)).unwrap();
+                            accessor.set_value(&mut frame, #index, doc_it).unwrap().into_jlrs_result().unwrap();
                         }
-
-                        Ok(())
-                    }).unwrap();
+                    });
                 }
 
             };
@@ -2462,11 +2145,25 @@ fn function_info_fragment(
         }
     };
 
+    let env_expr: Expr = if let Some(x) = info.type_var_env.as_ref() {
+        match &x.macro_or_type {
+            MacroOrType::Macro(m) => {
+                parse_quote! { <#m as ::jlrs::data::types::construct_type::TypeVars>::into_env(&mut frame) }
+            }
+            MacroOrType::Type(t) => {
+                parse_quote! { <#t as ::jlrs::data::types::construct_type::TypeVars>::into_env(&mut frame) }
+            }
+        }
+    } else {
+        parse_quote! { ::jlrs::data::types::construct_type::TypeVarEnv::empty(&frame) }
+    };
+
     let expr = parse_quote! {
         {
-            frame.scope(|mut frame| {
+            (&mut frame).scope(|mut frame| {
                 let name = Symbol::new(&frame, #rename);
                 let type_type = ::jlrs::data::managed::union_all::UnionAll::type_type(&frame).as_value();
+                let any_type = ::jlrs::data::managed::datatype::DataType::any_type(&frame).as_value();
                 // Ensure a compile error happens if the signatures of the function don't match.
 
                 #invoke_fn
@@ -2474,30 +2171,35 @@ fn function_info_fragment(
                 let func = Value::new(&mut frame, invoke as *mut ::std::ffi::c_void);
 
                 unsafe {
-                    let mut ccall_arg_types = ::jlrs::data::managed::array::Array::new_for_unchecked(
+                    let env = #env_expr;
+
+                    let mut ccall_arg_types = ::jlrs::data::managed::array::Vector::new_for_unchecked(
                         &mut frame,
+                        type_type,
                         #n_args,
-                        type_type);
+                    );
 
-                    let mut ccall_arg_types_ref = ccall_arg_types.value_data_mut().unwrap();
+                    let mut ccall_arg_types_ref = ccall_arg_types.indeterminate_data_mut();
 
-                    let mut julia_arg_types = ::jlrs::data::managed::array::Array::new_for_unchecked(
+                    let mut julia_arg_types = ::jlrs::data::managed::array::Vector::new_for_unchecked(
                         &mut frame,
+                        any_type,
                         #n_args,
-                        type_type);
+                    );
 
-                    let mut julia_arg_types_ref = julia_arg_types.value_data_mut().unwrap();
+                    let mut julia_arg_types_ref = julia_arg_types.indeterminate_data_mut();
 
                     #(
-                        ccall_arg_types_ref.set(#ccall_arg_idx, Some(#ccall_arg_types.as_value())).unwrap();
-                        julia_arg_types_ref.set(#julia_arg_idx, Some(#julia_arg_types.as_value())).unwrap();
+                        let t1 = #ccall_arg_types.as_value();
+                        ccall_arg_types_ref.set_value(&mut frame, #ccall_arg_idx, t1).unwrap().into_jlrs_result().unwrap();
+                        let t2 = #julia_arg_types.as_value();
+                        julia_arg_types_ref.set_value(&mut frame, #julia_arg_idx, t2).unwrap().into_jlrs_result().unwrap();
                     )*
 
                     let ccall_return_type = #ccall_ret_type;
                     let julia_return_type = #julia_ret_type;
 
                     let module = #override_module_fragment;
-                    let nothing = ::jlrs::data::managed::value::Value::nothing(&frame);
 
                     let false_v = ::jlrs::data::managed::value::Value::false_v(&frame);
                     let instance = function_info_ty.instantiate_unchecked(&mut frame, [
@@ -2508,15 +2210,13 @@ fn function_info_fragment(
                         julia_return_type.as_value(),
                         func,
                         module.as_value(),
-                        false_v
+                        env.to_svec().as_value(),
                     ]);
 
                     let n = #index;
-                    accessor.set(n, Some(instance)).unwrap();
+                    accessor.set_value(&mut frame, n, instance).unwrap().into_jlrs_result().unwrap();
                 }
-
-                Ok(())
-            }).unwrap();
+            });
         }
     };
 
@@ -2545,9 +2245,9 @@ fn override_module_fragment(name_override: &Option<RenameFragments>) -> Expr {
 
             #(
                 module = module
-                .submodule(&frame, #modules)
-                .expect("Submodule does not exist")
-                .as_managed();
+                    .submodule(&frame, #modules)
+                    .expect("Submodule does not exist")
+                    .as_managed();
             )*
 
             module
@@ -2570,76 +2270,24 @@ fn return_type_fragments(ret_ty: &ReturnType) -> (Expr, Expr) {
         ReturnType::Type(_, ref ty) => {
             let span = ty.span();
             let ccall_ret_type = parse_quote_spanned! {
-                span=> <<#ty as ::jlrs::convert::ccall_types::CCallReturn>::CCallReturnType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(&mut frame)
+                span=> if env.is_empty() {
+                    <<#ty as ::jlrs::convert::ccall_types::CCallReturn>::CCallReturnType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(&mut frame)
+                } else {
+                    <<#ty as ::jlrs::convert::ccall_types::CCallReturn>::CCallReturnType as ::jlrs::data::types::construct_type::ConstructType>::construct_type_with_env(&mut frame, &env)
+                }
+
             };
             let julia_ret_type = parse_quote_spanned! {
-                span=> <<#ty as ::jlrs::convert::ccall_types::CCallReturn>::FunctionReturnType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(&mut frame)
+                span=> if env.is_empty() {
+                    <<#ty as ::jlrs::convert::ccall_types::CCallReturn>::FunctionReturnType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(&mut frame)
+                } else {
+                    <<#ty as ::jlrs::convert::ccall_types::CCallReturn>::FunctionReturnType as ::jlrs::data::types::construct_type::ConstructType>::construct_type_with_env(&mut frame, &env)
+                }
+
             };
 
             (ccall_ret_type, julia_ret_type)
         }
-    }
-}
-
-// FIXME
-fn extract_return_type_from_impl_trait(timplt: &TypeImplTrait) -> Option<Type> {
-    for bound in timplt.bounds.iter() {
-        match bound {
-            TypeParamBound::Trait(t) => {
-                let segment = t.path.segments.last();
-                if segment.is_none() {
-                    continue;
-                }
-
-                match &segment.unwrap().arguments {
-                    PathArguments::AngleBracketed(p) => match p.args.last() {
-                        Some(GenericArgument::Type(ref t)) => return Some(t.clone()),
-                        _ => continue,
-                    },
-                    _ => continue,
-                }
-            }
-            _ => continue,
-        }
-    }
-
-    None
-}
-
-fn extract_inner_return_type_from_path(path: &Path) -> Option<Type> {
-    if let Some(segment) = path.segments.last() {
-        match segment.arguments {
-            PathArguments::AngleBracketed(ref args) => {
-                if let Some(arg) = args.args.first() {
-                    match arg {
-                        GenericArgument::Type(t) => match t {
-                            &Type::ImplTrait(ref timplt) => {
-                                return extract_return_type_from_impl_trait(timplt)
-                            }
-                            _ => (),
-                        },
-                        _ => (),
-                    }
-                }
-            }
-            _ => (),
-        }
-    }
-
-    None
-}
-
-fn extract_inner_return_type(ty: &Type) -> Option<Type> {
-    match ty {
-        Type::Path(ref p) => extract_inner_return_type_from_path(&p.path),
-        _ => None,
-    }
-}
-
-fn async_callback_return_type_fragments(ret_ty: &ReturnType) -> Option<Type> {
-    match ret_ty {
-        ReturnType::Type(_, ty) => extract_inner_return_type(&*ty),
-        _ => None,
     }
 }
 
@@ -2668,7 +2316,11 @@ fn arg_type_fragments<'a>(
         })
         .map(|ty| {
             parse_quote! {
-                <<#ty as ::jlrs::convert::ccall_types::CCallArg>::CCallArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(&mut frame)
+                if env.is_empty() {
+                    <<#ty as ::jlrs::convert::ccall_types::CCallArg>::CCallArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(&mut frame)
+                } else {
+                    <<#ty as ::jlrs::convert::ccall_types::CCallArg>::CCallArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type_with_env(&mut frame, &env)
+                }
             }
         });
 
@@ -2680,7 +2332,11 @@ fn arg_type_fragments<'a>(
         })
         .map(|ty| {
             parse_quote! {
-                <<#ty as ::jlrs::convert::ccall_types::CCallArg>::FunctionArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(&mut frame)
+                if env.is_empty() {
+                    <<#ty as ::jlrs::convert::ccall_types::CCallArg>::FunctionArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(&mut frame)
+                } else {
+                    <<#ty as ::jlrs::convert::ccall_types::CCallArg>::FunctionArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type_with_env(&mut frame, &env)
+                }
             }
         });
 
@@ -2779,42 +2435,61 @@ fn method_info_fragment<'a>(
     let (ccall_arg_types, julia_arg_types, invoke_fn) =
         method_arg_type_fragments(info, untracked_self, gc_safe);
 
+    let env_expr: Expr = if let Some(x) = info.type_var_env.as_ref() {
+        match &x.macro_or_type {
+            MacroOrType::Macro(m) => {
+                parse_quote! { <#m as ::jlrs::data::types::construct_type::TypeVars>::into_env(&mut frame) }
+            }
+            MacroOrType::Type(t) => {
+                parse_quote! { <#t as ::jlrs::data::types::construct_type::TypeVars>::into_env(&mut frame) }
+            }
+        }
+    } else {
+        parse_quote! { ::jlrs::data::types::construct_type::TypeVarEnv::empty(&frame) }
+    };
+
     parse_quote! {
         {
             frame.scope(|mut frame| {
                 let unrooted = frame.unrooted();
                 let name = Symbol::new(&frame, #rename);
                 let type_type = ::jlrs::data::managed::union_all::UnionAll::type_type(&unrooted).as_value();
+                let any_type = ::jlrs::data::managed::datatype::DataType::any_type(&frame).as_value();
 
                 #invoke_fn;
 
                 let func = Value::new(&mut frame, invoke as *mut ::std::ffi::c_void);
 
                 unsafe {
-                    let mut ccall_arg_types = ::jlrs::data::managed::array::Array::new_for_unchecked(
+                    let env = #env_expr;
+
+                    let mut ccall_arg_types = ::jlrs::data::managed::array::Vector::new_for_unchecked(
                         &mut frame,
+                        type_type,
                         #n_args,
-                        type_type);
+                    );
 
-                    let mut ccall_arg_types_ref = ccall_arg_types.value_data_mut().unwrap();
+                    let mut ccall_arg_types_ref = ccall_arg_types.indeterminate_data_mut();
 
-                    let mut julia_arg_types = ::jlrs::data::managed::array::Array::new_for_unchecked(
+                    let mut julia_arg_types = ::jlrs::data::managed::array::Vector::new_for_unchecked(
                         &mut frame,
+                        any_type,
                         #n_args,
-                        type_type);
+                    );
 
-                    let mut julia_arg_types_ref = julia_arg_types.value_data_mut().unwrap();
+                    let mut julia_arg_types_ref = julia_arg_types.indeterminate_data_mut();
 
                     #(
-                        ccall_arg_types_ref.set(#ccall_arg_idx, Some(#ccall_arg_types.as_value())).unwrap();
-                        julia_arg_types_ref.set(#julia_arg_idx, Some(#julia_arg_types.as_value())).unwrap();
+                        let t1 = #ccall_arg_types.as_value();
+                        ccall_arg_types_ref.set_value(&mut frame, #ccall_arg_idx, t1).unwrap().into_jlrs_result().unwrap();
+                        let t2 = #julia_arg_types.as_value();
+                        julia_arg_types_ref.set_value(&mut frame, #julia_arg_idx, t2).unwrap().into_jlrs_result().unwrap();
                     )*
 
                     let ccall_return_type = #ccall_ret_type;
                     let julia_return_type = #julia_ret_type;
 
                     let module = #override_module_fragment;
-                    let nothing = ::jlrs::data::managed::value::Value::nothing(&frame);
 
                     let false_v = ::jlrs::data::managed::value::Value::false_v(&frame);
                     let instance = function_info_ty.instantiate_unchecked(&mut frame, [
@@ -2825,126 +2500,15 @@ fn method_info_fragment<'a>(
                         julia_return_type,
                         func,
                         module.as_value(),
-                        false_v
+                        env.to_svec().as_value(),
                     ]);
 
                     let n = #index + offset;
-                    accessor.set(n, Some(instance)).unwrap();
+                    accessor.set_value(&mut frame, n, instance).unwrap().into_jlrs_result().unwrap();
                 }
-
-                Ok(())
-            }).unwrap();
+            });
         }
     }
-}
-
-fn async_callback_info_fragment((index, info): (usize, &ExportedAsyncCallback)) -> Result<Expr> {
-    let n_args = info.func.inputs.len();
-    let name_ident = &info.func.ident;
-
-    let override_module_fragment = override_module_fragment(&info.name_override);
-    let mut rename = info
-        .name_override
-        .as_ref()
-        .map(|parts| parts.last())
-        .flatten()
-        .unwrap_or(name_ident)
-        .to_string();
-
-    if info.exclamation_mark_token.is_some() {
-        rename.push('!')
-    }
-
-    let ret_ty = &info.func.output;
-    let inner_ret_ty = async_callback_return_type_fragments(ret_ty);
-    if inner_ret_ty.is_none() {
-        return Ok(parse_quote_spanned! {
-            name_ident.span() => {
-                compile_error!("Async callback must return JlrsResult<impl AsyncCallback<T>> where T is some type that implements IntoJulia");
-            }
-        });
-    }
-
-    let inner_ret_ty = inner_ret_ty.unwrap();
-    let ccall_ret_type: Expr = parse_quote! {
-        <::jlrs::ccall::AsyncCCall as ::jlrs::data::types::construct_type::ConstructType>::construct_type(&mut frame)
-    };
-    let julia_ret_type: Expr = parse_quote! {
-        <#inner_ret_ty as ::jlrs::data::types::construct_type::ConstructType>::construct_type(&mut frame)
-    };
-
-    let (ccall_arg_types, julia_arg_types, invoke_fn) =
-        async_callback_arg_type_fragments(info, &inner_ret_ty)?;
-
-    let first_arg: Expr = syn::parse_quote! {
-        <*mut ::std::ffi::c_void as ::jlrs::data::types::construct_type::ConstructType>::construct_type(&mut frame)
-    };
-
-    let ccall_arg_idx = 0..n_args;
-    let julia_arg_idx = 0..n_args;
-
-    let q = parse_quote! {
-        {
-            frame.scope(|mut frame| {
-                let unrooted = frame.unrooted();
-                let name = Symbol::new(&frame, #rename);
-                let type_type = ::jlrs::data::managed::union_all::UnionAll::type_type(&unrooted).as_value();
-
-                #invoke_fn;
-
-                let func = Value::new(&mut frame, invoke as *mut ::std::ffi::c_void);
-
-                unsafe {
-                    let mut ccall_arg_types = ::jlrs::data::managed::array::Array::new_for_unchecked(
-                        &mut frame,
-                        #n_args + 1,
-                        type_type);
-
-                    let mut ccall_arg_types_ref = ccall_arg_types.value_data_mut().unwrap();
-
-                    let mut julia_arg_types = ::jlrs::data::managed::array::Array::new_for_unchecked(
-                        &mut frame,
-                        #n_args,
-                        type_type);
-
-                    let mut julia_arg_types_ref = julia_arg_types.value_data_mut().unwrap();
-
-                    ccall_arg_types_ref.set(0, Some(#first_arg)).unwrap();
-                    #(
-                        ccall_arg_types_ref.set(#ccall_arg_idx + 1, Some(#ccall_arg_types.as_value())).unwrap();
-                        julia_arg_types_ref.set(#julia_arg_idx, Some(#julia_arg_types.as_value())).unwrap();
-                    )*
-
-                    let ccall_return_type = #ccall_ret_type;
-                    let julia_return_type = #julia_ret_type;
-
-                    let module = #override_module_fragment;
-
-                    let true_v = ::jlrs::data::managed::value::Value::true_v(&frame);
-                    let nothing = ::jlrs::data::managed::value::Value::nothing(&frame);
-
-                    let instance = function_info_ty.instantiate_unchecked(&mut frame, [
-                        name.as_value(),
-                        ccall_arg_types.as_value(),
-                        julia_arg_types.as_value(),
-                        ccall_return_type,
-                        julia_return_type,
-                        func,
-                        module.as_value(),
-                        true_v
-                    ]);
-
-
-                    let n = #index + offset;
-                    accessor.set(n, Some(instance)).unwrap();
-                }
-
-                Ok(())
-            }).unwrap();
-        }
-    };
-
-    Ok(q)
 }
 
 fn const_info_fragment(info: &ExportedConst) -> Expr {
@@ -2961,10 +2525,7 @@ fn const_info_fragment(info: &ExportedConst) -> Expr {
                 unsafe {
                     module.set_const_unchecked(#rename, value);
                 }
-
-                Ok(())
-
-            }).unwrap();
+            });
         }
     }
 }
@@ -2997,10 +2558,7 @@ fn global_info_fragment(info: &ExportedGlobal) -> Expr {
                 unsafe {
                     module.set_global_unchecked(#rename, value);
                 }
-
-                Ok(())
-
-            }).unwrap();
+            });
         }
     }
 }
@@ -3037,13 +2595,21 @@ fn method_arg_type_fragments<'a>(
                     let ty = &ty.ty;
                     let span = ty.span();
                     parse_quote_spanned! {
-                        span=> <<#ty as ::jlrs::convert::ccall_types::CCallArg>::CCallArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(&mut frame)
+                        span=> if env.is_empty() {
+                            <<#ty as ::jlrs::convert::ccall_types::CCallArg>::CCallArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(&mut frame)
+                        } else {
+                            <<#ty as ::jlrs::convert::ccall_types::CCallArg>::CCallArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type_with_env(&mut frame, &env)
+                        }
                     }
                 },
                 _ => {
                     let span = parent.span();
                     parse_quote_spanned! {
-                        span=> <<TypedValue::<#parent> as ::jlrs::convert::ccall_types::CCallArg>::CCallArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(&mut frame)
+                        span=> if env.is_empty() {
+                            <<TypedValue::<#parent> as ::jlrs::convert::ccall_types::CCallArg>::CCallArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(&mut frame)
+                        } else {
+                            <<TypedValue::<#parent> as ::jlrs::convert::ccall_types::CCallArg>::CCallArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type_with_env(&mut frame, &env)
+                        }
                     }
                 },
             }
@@ -3057,13 +2623,21 @@ fn method_arg_type_fragments<'a>(
                     let ty = &ty.ty;
                     let span = ty.span();
                     parse_quote_spanned! {
-                        span=> <<#ty as ::jlrs::convert::ccall_types::CCallArg>::FunctionArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(&mut frame)
+                        span=> if env.is_empty() {
+                            <<#ty as ::jlrs::convert::ccall_types::CCallArg>::FunctionArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(&mut frame)
+                        } else{
+                            <<#ty as ::jlrs::convert::ccall_types::CCallArg>::FunctionArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type_with_env(&mut frame, &env)
+                        }
                     }
                 },
                 _ => {
                     let span = parent.span();
                     parse_quote_spanned! {
-                        span=> <<::jlrs::data::managed::value::typed::TypedValue<#parent> as ::jlrs::convert::ccall_types::CCallArg>::FunctionArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(&mut frame)
+                        span=> if env.is_empty() {
+                            <<::jlrs::data::managed::value::typed::TypedValue<#parent> as ::jlrs::convert::ccall_types::CCallArg>::FunctionArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(&mut frame)
+                        } else{
+                            <<::jlrs::data::managed::value::typed::TypedValue<#parent> as ::jlrs::convert::ccall_types::CCallArg>::FunctionArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type_with_env(&mut frame, &env)
+                        }
                     }
                 },
             }
@@ -3113,13 +2687,25 @@ fn method_arg_type_fragments_in_env<'a>(
                     let ty = resolver.apply(ty.ty.as_ref());
                     let span = ty.span();
                     parse_quote_spanned! {
-                        span=> <<#ty as ::jlrs::convert::ccall_types::CCallArg>::CCallArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(&mut frame)
+                        span=> if env.is_empty() {
+
+                            <<#ty as ::jlrs::convert::ccall_types::CCallArg>::CCallArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(&mut frame)
+                        } else {
+                            <<#ty as ::jlrs::convert::ccall_types::CCallArg>::CCallArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type_with_env(&mut frame, &env)
+
+                        }
                     }
                 },
                 _ => {
                     let span = parent.span();
                     parse_quote_spanned! {
-                        span=> <<TypedValue::<#parent> as ::jlrs::convert::ccall_types::CCallArg>::CCallArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(&mut frame)
+                        span=> if env.is_empty() {
+
+                            <<TypedValue::<#parent> as ::jlrs::convert::ccall_types::CCallArg>::CCallArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(&mut frame)
+                        } else {
+                            <<TypedValue::<#parent> as ::jlrs::convert::ccall_types::CCallArg>::CCallArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type_with_env(&mut frame, &env)
+
+                        }
                     }
                 },
             }
@@ -3133,255 +2719,31 @@ fn method_arg_type_fragments_in_env<'a>(
                     let ty = resolver.apply(ty.ty.as_ref());
                     let span = ty.span();
                     parse_quote_spanned! {
-                        span=> <<#ty as ::jlrs::convert::ccall_types::CCallArg>::FunctionArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(&mut frame)
+                        span=> if env.is_empty() {
+
+                            <<#ty as ::jlrs::convert::ccall_types::CCallArg>::FunctionArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(&mut frame)
+                        } else {
+                            <<#ty as ::jlrs::convert::ccall_types::CCallArg>::FunctionArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type_with_env(&mut frame, &env)
+
+                        }
                     }
                 },
                 _ => {
                     let span = parent2.span();
                     parse_quote_spanned! {
-                        span=> <<::jlrs::data::managed::value::typed::TypedValue<#parent2> as ::jlrs::convert::ccall_types::CCallArg>::FunctionArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(&mut frame)
+                        span=> if env.is_empty() {
+
+                            <<::jlrs::data::managed::value::typed::TypedValue<#parent2> as ::jlrs::convert::ccall_types::CCallArg>::FunctionArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(&mut frame)
+                        } else {
+                            <<::jlrs::data::managed::value::typed::TypedValue<#parent2> as ::jlrs::convert::ccall_types::CCallArg>::FunctionArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type_with_env(&mut frame, &env)
+
+                        }
                     }
                 },
             }
         });
 
     (ccall_arg_types, julia_arg_types, invoke_fn)
-}
-
-fn async_callback_arg_type_fragments<'a>(
-    info: &'a ExportedAsyncCallback,
-    inner_ret_ty: &Type,
-) -> Result<(
-    impl 'a + Iterator<Item = Expr>,
-    impl 'a + Iterator<Item = Expr>,
-    ItemFn,
-)> {
-    let inputs = &info.func.inputs;
-    let n_args = inputs.len();
-
-    if n_args > 0 {
-        if let FnArg::Receiver(r) = inputs.first().unwrap() {
-            Err(syn::Error::new_spanned(
-                r.to_token_stream(),
-                "async callback must be a free-standing function",
-            ))?;
-        }
-    }
-
-    let invoke_fn = invoke_async_callback(info, inner_ret_ty);
-
-    let ccall_arg_types = inputs
-        .iter()
-        .map(move |arg| {
-            match arg {
-                FnArg::Typed(ty) => {
-                    let ty = &ty.ty;
-                    parse_quote! {
-                        <<#ty as ::jlrs::convert::ccall_types::CCallArg>::CCallArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(&mut frame)
-                    }
-                },
-                _ => unreachable!()
-            }
-        });
-
-    let julia_arg_types = inputs
-        .iter()
-        .map(move |arg| {
-            match arg {
-                FnArg::Typed(ty) => {
-                    let ty = &ty.ty;
-                    parse_quote! {
-                        <<#ty as ::jlrs::convert::ccall_types::CCallArg>::FunctionArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(&mut frame)
-                    }
-                },
-                _ => unreachable!()
-            }
-        });
-
-    Ok((ccall_arg_types, julia_arg_types, invoke_fn))
-}
-
-fn async_callback_arg_type_fragments_in_env<'a>(
-    info: &'a ExportedAsyncCallback,
-    resolver: &'a ResolvedParameterList,
-) -> Result<(
-    Type,
-    impl 'a + Iterator<Item = Expr>,
-    impl 'a + Iterator<Item = Expr>,
-    ItemFn,
-)> {
-    let inputs = resolver.apply(&info.func.inputs);
-    let n_args = inputs.len();
-
-    if n_args > 0 {
-        if let FnArg::Receiver(r) = inputs.first().unwrap() {
-            Err(syn::Error::new_spanned(
-                r.to_token_stream(),
-                "async callback must be a free-standing function",
-            ))?;
-        }
-    }
-
-    let ret_ty: &ReturnType = &info.func.output;
-    let inner_ret_ty = async_callback_return_type_fragments(ret_ty);
-    let Some(inner_ret_ty) = inner_ret_ty else {
-        Err(syn::Error::new_spanned(
-            ret_ty.to_token_stream(),
-            "Async callback must return JlrsResult<impl AsyncCallback<T>> where T is some type that implements IntoJulia",
-        ))?;
-        unreachable!()
-    };
-
-    let inner_ret_ty = resolver.apply(&inner_ret_ty);
-    let name = &info.func.ident;
-    let invoke_fn = invoke_async_callback_in_env(name, &inputs, &inner_ret_ty);
-
-    let ccall_arg_types = inputs
-        .clone()
-        .into_iter()
-        .map(move |arg| {
-            match arg {
-                FnArg::Typed(ty) => {
-                    let ty = &ty.ty;
-                    parse_quote! {
-                        <<#ty as ::jlrs::convert::ccall_types::CCallArg>::CCallArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(&mut frame)
-                    }
-                },
-                _ => unreachable!()
-            }
-        });
-
-    let julia_arg_types = inputs
-        .into_iter()
-        .map(move |arg| {
-            match arg {
-                FnArg::Typed(ty) => {
-                    let ty = &ty.ty;
-                    parse_quote! {
-                        <<#ty as ::jlrs::convert::ccall_types::CCallArg>::FunctionArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(&mut frame)
-                    }
-                },
-                _ => unreachable!()
-            }
-        });
-
-    Ok((inner_ret_ty, ccall_arg_types, julia_arg_types, invoke_fn))
-}
-
-// TODO: invoke fix exc
-// FIXME: require impl AsyncCallback
-fn invoke_async_callback(info: &ExportedAsyncCallback, ret_ty: &Type) -> ItemFn {
-    let name = &info.func.ident;
-    let args = &info.func.inputs;
-    let span = info.func.ident.span();
-    let mut extended_args = args.clone();
-    extended_args.insert(
-        0,
-        syn::parse_quote! { jlrs_async_condition_handle: ::jlrs::ccall::AsyncConditionHandle },
-    );
-
-    let names = args.iter().map(|arg| match arg {
-        FnArg::Typed(ty) => &ty.pat,
-        _ => unreachable!(),
-    });
-
-    let names = Punctuated::<_, Comma>::from_iter(names);
-
-    parse_quote_spanned! {
-        span=> unsafe extern "C" fn invoke(#extended_args) -> ::jlrs::ccall::AsyncCCall {
-            let join_handle: ::std::sync::Arc<::jlrs::ccall::DispatchHandle<#ret_ty>> = match #name(#names) {
-                Ok(callback) => {
-                    ::jlrs::ccall::CCall::dispatch_to_pool(move |dispatch_handle| {
-                        let handle = jlrs_async_condition_handle;
-                        let res: ::jlrs::error::JlrsResult<#ret_ty> = callback();
-                        unsafe { dispatch_handle.set(res); }
-                        ::jlrs::ccall::CCall::uv_async_send(handle.0);
-                    })
-                },
-                Err(e) => {
-                     ::jlrs::ccall::CCall::dispatch_to_pool(move |dispatch_handle| {
-                        let handle = jlrs_async_condition_handle;
-                        let res: ::jlrs::error::JlrsResult<#ret_ty> = Err(e);
-                        unsafe { dispatch_handle.set(res); }
-                        ::jlrs::ccall::CCall::uv_async_send(handle.0);
-                    })
-                }
-            };
-
-            let join_handle = ::std::sync::Arc::into_raw(join_handle);
-
-            unsafe extern "C" fn join_func(
-                handle: *mut ::jlrs::ccall::DispatchHandle<#ret_ty>
-            ) -> #ret_ty {
-                let handle = ::std::sync::Arc::from_raw(handle);
-                let res = handle.join();
-                <::jlrs::error::JlrsResult<#ret_ty> as ::jlrs::convert::ccall_types::CCallReturn>::return_or_throw(res)
-            }
-
-            ::jlrs::ccall::AsyncCCall {
-                join_handle: join_handle as *mut ::jlrs::ccall::DispatchHandle<#ret_ty> as *mut ::std::ffi::c_void,
-                join_func: join_func as *mut ::std::ffi::c_void
-            }
-        }
-    }
-}
-
-fn invoke_async_callback_in_env<'a>(
-    name: &Ident,
-    inputs: &Punctuated<FnArg, Token![,]>,
-    ret_ty: &Type,
-) -> ItemFn {
-    let span = name.span();
-    let mut extended_args = inputs.clone();
-    extended_args.insert(
-        0,
-        syn::parse_quote! { jlrs_async_condition_handle: ::jlrs::ccall::AsyncConditionHandle },
-    );
-
-    let names = inputs.iter().map(|arg| match arg {
-        FnArg::Typed(ty) => &ty.pat,
-        _ => unreachable!(),
-    });
-
-    let names = Punctuated::<_, Comma>::from_iter(names);
-
-    parse_quote_spanned! {
-        span=> unsafe extern "C" fn invoke(#extended_args) -> ::jlrs::ccall::AsyncCCall {
-            let join_handle: ::std::sync::Arc<::jlrs::ccall::DispatchHandle<#ret_ty>> = match #name(#names) {
-                Ok(callback) => {
-                    ::jlrs::ccall::CCall::dispatch_to_pool(move |dispatch_handle| {
-                        let handle = jlrs_async_condition_handle;
-                        let res = callback();
-                        unsafe { dispatch_handle.set(res); }
-                        ::jlrs::ccall::CCall::uv_async_send(handle.0);
-                    })
-                },
-                Err(e) => {
-                     ::jlrs::ccall::CCall::dispatch_to_pool(move |dispatch_handle| {
-                        let handle = jlrs_async_condition_handle;
-                        let res: ::jlrs::error::JlrsResult<#ret_ty> = Err(e);
-                        unsafe { dispatch_handle.set(res); }
-                        ::jlrs::ccall::CCall::uv_async_send(handle.0);
-                    })
-                }
-            };
-
-            let join_handle = ::std::sync::Arc::into_raw(join_handle);
-
-            unsafe extern "C" fn join_func(
-                handle: *mut ::jlrs::ccall::DispatchHandle<#ret_ty>
-            ) -> #ret_ty {
-                let handle = ::std::sync::Arc::from_raw(handle);
-                let res = handle.join();
-                <::jlrs::error::JlrsResult<#ret_ty> as ::jlrs::convert::ccall_types::CCallReturn>::return_or_throw(res)
-            }
-
-            ::jlrs::ccall::AsyncCCall {
-                join_handle: join_handle as *mut ::jlrs::ccall::DispatchHandle<#ret_ty> as *mut ::std::ffi::c_void,
-                join_func: join_func as *mut ::std::ffi::c_void
-            }
-        }
-    }
 }
 
 fn invoke_fn_no_self_method_fragment(info: &ExportedMethod, gc_safe: bool) -> ItemFn {
@@ -3509,7 +2871,7 @@ fn invoke_fn_ref_self_method_fragment(
                     let res = #call_expr;
                     <#ret_ty as ::jlrs::convert::ccall_types::CCallReturn>::return_or_throw(res)
                 },
-                Err(_) => ::jlrs::ccall::CCall::throw_borrow_exception()
+                Err(_) => ::jlrs::runtime::handle::ccall::CCall::throw_borrow_exception()
             }
         }
     }
@@ -3568,7 +2930,7 @@ fn invoke_fn_ref_self_method_fragment_in_env(
                     let res = #call_expr;
                     <#ret_ty as ::jlrs::convert::ccall_types::CCallReturn>::return_or_throw(res)
                 },
-                Err(_) => ::jlrs::ccall::CCall::throw_borrow_exception()
+                Err(_) => ::jlrs::runtime::handle::ccall::CCall::throw_borrow_exception()
             }
         }
     }
@@ -3626,7 +2988,7 @@ fn invoke_fn_move_self_method_fragment(
                     let res = #call_expr;
                     <#ret_ty as ::jlrs::convert::ccall_types::CCallReturn>::return_or_throw(res)
                 },
-                Err(_) => ::jlrs::ccall::CCall::throw_borrow_exception()
+                Err(_) => ::jlrs::runtime::handle::ccall::CCall::throw_borrow_exception()
             }
         }
     }
@@ -3685,7 +3047,7 @@ fn invoke_fn_move_self_method_fragment_in_env(
                     let res = #call_expr;
                     <#ret_ty as ::jlrs::convert::ccall_types::CCallReturn>::return_or_throw(res)
                 },
-                Err(_) => ::jlrs::ccall::CCall::throw_borrow_exception()
+                Err(_) => ::jlrs::runtime::handle::ccall::CCall::throw_borrow_exception()
             }
         }
     }
@@ -3743,7 +3105,7 @@ fn invoke_fn_mut_self_method_fragment(
                     let res = #call_expr;
                     <#ret_ty as ::jlrs::convert::ccall_types::CCallReturn>::return_or_throw(res)
                 },
-                Err(_) => ::jlrs::ccall::CCall::throw_borrow_exception()
+                Err(_) => ::jlrs::runtime::handle::ccall::CCall::throw_borrow_exception()
             }
         }
     }
@@ -3802,7 +3164,7 @@ fn invoke_fn_mut_self_method_fragment_in_env(
                     let res = #call_expr;
                     <#ret_ty as ::jlrs::convert::ccall_types::CCallReturn>::return_or_throw(res)
                 },
-                Err(_) => ::jlrs::ccall::CCall::throw_borrow_exception()
+                Err(_) => ::jlrs::runtime::handle::ccall::CCall::throw_borrow_exception()
             }
         }
     }

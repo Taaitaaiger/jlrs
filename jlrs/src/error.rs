@@ -1,6 +1,6 @@
 //! Everything related to errors.
 
-use std::error::Error as StdErr;
+use std::{error::Error as StdErr, pin::Pin, sync::Arc};
 
 use thiserror::Error;
 
@@ -15,6 +15,16 @@ pub(crate) static CANNOT_DISPLAY_VALUE: &'static str = "<Cannot display value>";
 /// Alias that is used for most `Result`s in this crate.
 pub type JlrsResult<T> = Result<T, Box<JlrsError>>;
 
+/// Convert `Pin<&mut JlrsResult<T>>` to `JlrsResult<Pin<&mut T>>`
+pub fn project_jlrs_result<T>(p: Pin<&mut JlrsResult<T>>) -> JlrsResult<Pin<&mut T>> {
+    unsafe {
+        match p.get_unchecked_mut() {
+            Ok(o) => Ok(Pin::new_unchecked(o)),
+            Err(e) => Err(e.clone())?,
+        }
+    }
+}
+
 /// Rooted Julia result or exception.
 ///
 /// Some functions from the Julia C API can throw exceptions. Many methods provided by jlrs will
@@ -28,7 +38,7 @@ pub type JuliaResultRef<'frame, 'data, V = ValueRef<'frame, 'data>> =
     Result<V, ValueRef<'frame, 'data>>;
 
 /// Runtime errors.
-#[derive(Debug, Error)]
+#[derive(Debug, Error, Clone)]
 pub enum RuntimeError {
     #[error("runtime can only be initialized once")]
     AlreadyInitialized,
@@ -36,17 +46,25 @@ pub enum RuntimeError {
     ChannelClosed,
     #[error("channel full")]
     ChannelFull,
+    #[error("an active instance already exists on this thread")]
+    AlreadyActive,
+    #[error("Julia has not been initialized yet")]
+    Inactive,
+    #[error("this thread is unknown to Julia")]
+    InvalidThread,
+    #[error("the current state does not allow creating new handles")]
+    IncorrectState,
 }
 
 /// IO errors.
-#[derive(Debug, Error)]
+#[derive(Debug, Error, Clone)]
 pub enum IOError {
     #[error("path does not exist: {path}")]
     NotFound { path: String },
 }
 
 /// Type errors.
-#[derive(Debug, Error)]
+#[derive(Debug, Error, Clone)]
 pub enum TypeError {
     #[error("expected a Function, {name} is a {ty}")]
     NotAFunction { name: String, ty: String },
@@ -81,7 +99,7 @@ pub enum TypeError {
 }
 
 /// Array layout errors.
-#[derive(Debug, Error)]
+#[derive(Debug, Error, Clone)]
 pub enum ArrayLayoutError {
     #[error("element type is {element_type}, which is not a bits union")]
     NotUnion { element_type: String },
@@ -91,18 +109,22 @@ pub enum ArrayLayoutError {
     NotBits { element_type: String },
     #[error("element type is {element_type}, which is stored inline")]
     NotPointer { element_type: String },
-    #[error("rank is {found}, not {provided}")]
+    #[error("element type is {element_type}, not {name}")]
+    NotManaged { element_type: String, name: String },
+    #[error("rank must be {provided}, got {found}")]
     RankMismatch { found: isize, provided: isize },
 }
 
 /// Data access errors.
-#[derive(Debug, Error)]
+#[derive(Debug, Error, Clone)]
 pub enum AccessError {
     #[error("{type_name} has no field named {field_name}")]
     NoSuchField {
         type_name: String,
         field_name: String,
     },
+    #[error("modules cannot be accessed by field")]
+    ModuleField,
     #[error("layout is invalid for {value_type}")]
     InvalidLayout { value_type: String },
     #[error("no value named {name} in {module}")]
@@ -141,7 +163,7 @@ pub enum AccessError {
 }
 
 /// Data instantiation errors.
-#[derive(Debug, Error)]
+#[derive(Debug, Error, Clone)]
 pub enum InstantiationError {
     #[error("cannot create array with DataType::instantiate")]
     ArrayNotSupported,
@@ -149,10 +171,12 @@ pub enum InstantiationError {
     NamedTupleSizeMismatch { n_names: usize, n_values: usize },
     #[error("expected a shape for {vec_size} elements, got a shape for {dim_size} elements")]
     ArraySizeMismatch { dim_size: usize, vec_size: usize },
+    #[error("expected dimensions of rank {expected}, got {found}")]
+    ArrayRankMismatch { expected: usize, found: usize },
 }
 
 /// Julia exception converted to a string.
-#[derive(Debug, Error)]
+#[derive(Debug, Error, Clone)]
 #[error("{msg}")]
 pub struct Exception {
     msg: String,
@@ -166,10 +190,10 @@ impl Exception {
 }
 
 /// All different errors.
-#[derive(Debug, Error)]
+#[derive(Debug, Error, Clone)]
 pub enum JlrsError {
     #[error("Other: {0}")]
-    Other(Box<dyn StdErr + 'static + Send + Sync>),
+    Other(Arc<dyn StdErr + 'static + Send + Sync>),
     #[error("Exception: {0}")]
     Exception(Exception),
     #[error("Runtime error: {0}")]
@@ -190,7 +214,7 @@ impl JlrsError {
     /// Convert an arbitrary error to `JlrsError::Other`.
     #[inline]
     pub fn other<E: StdErr + 'static + Send + Sync>(reason: E) -> Self {
-        JlrsError::Other(Box::new(reason))
+        JlrsError::Other(Arc::new(reason))
     }
 
     /// Convert an error message to `JlrsError::Exception`.
