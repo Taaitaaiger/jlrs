@@ -13,7 +13,7 @@ keywords = ["Julia", "math", "mathematics", "bindings", "ffi"]
 categories = ["api-bindings", "mathematics"]
 license = "MIT"
 edition = "2021"
-rust-version = "1.78"
+rust-version = "1.77"
 
 [features]
 default = []
@@ -74,6 +74,8 @@ jlrs-ndarray = ["ndarray"]
 jlrs-derive = ["jlrs-macros/derive"]
 # Compile the support library with support for cross-language LTO.
 lto = ["jl-sys/lto"]
+
+diagnostics = []
 
 # Target or link a specific Julia build or arch.
 

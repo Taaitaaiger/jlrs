@@ -12,7 +12,7 @@ readme = "../README.md"
 keywords = ["Julia", "math", "mathematics", "bindings", "ffi"]
 license = "MIT"
 edition = "2021"
-rust-version = "1.78"
+rust-version = "1.77"
 
 [features]
 default = []

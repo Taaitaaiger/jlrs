@@ -195,6 +195,12 @@ jobs:
         with:
           toolchain: ${{ matrix.rust }}
 
+      - name: Install JlrsCore
+        run: julia --color=yes -e 'using Pkg; Pkg.add("JlrsCore"); VERSION >= v"1.5-" && !isdir(joinpath(DEPOT_PATH[1], "registries", "General")) && Pkg.Registry.add("General")'
+        shell: bash
+        env:
+          JULIA_PKG_SERVER: ""
+
       - name: Run tests
         run: |
           cargo test --features full,julia-1-6 --verbose
@@ -221,6 +227,12 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ matrix.rust }}
+
+      - name: Install JlrsCore
+        run: julia --color=yes -e 'using Pkg; Pkg.add("JlrsCore"); VERSION >= v"1.5-" && !isdir(joinpath(DEPOT_PATH[1], "registries", "General")) && Pkg.Registry.add("General")'
+        shell: bash
+        env:
+          JULIA_PKG_SERVER: ""
 
       - name: Run tests
         run: |
