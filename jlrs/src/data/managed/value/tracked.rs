@@ -20,6 +20,7 @@ use crate::{
     private::Private,
 };
 
+// TODO: Clone
 /// Immutable tracked data.
 #[repr(transparent)]
 pub struct Tracked<'tracked, 'scope, 'data, T> {
@@ -78,8 +79,6 @@ impl<T> Drop for Tracked<'_, '_, '_, T> {
         }
     }
 }
-
-// TODO: Clone
 
 /// Mutable tracked data.
 #[repr(transparent)]

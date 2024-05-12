@@ -26,9 +26,9 @@
 //! depending on the target.
 //!
 //! `TargetException` is used when exceptions are caught but the function doesn't need to return
-//! Julia data on success. This is used by [`Array::grow_end`] which calls a function from the C
-//! API that can throw, but doesn't return anything if it returns successfully. Like
-//! `TargetResult` it's a `Result`, but can contain arbitrary data in its `Ok` variant.
+//! Julia data on success. This is used by functions that call a function that can throw, but
+//! don't return Julia data on success. Like `TargetResult` it's a `Result`, but can contain
+//! arbitrary data in its `Ok` variant.
 //!
 //! All managed types provide type aliases for `Target::Data` and `TargetResult`, their names
 //! are simply the name of the type itself and `Data` or `Result`. For example, `Value` provides
@@ -94,27 +94,31 @@
 //! [`Managed`]: crate::data::managed::Managed
 //! [`memory`]: crate::memory
 //! [`Call`]: crate::call::Call
-//! [`Array::grow_end`]: crate::data::managed::array::Array::grow_end
 //! [`Value`]: crate::data::managed::value::Value
 //! [`Value::new`]: crate::data::managed::value::Value::new
 //! [`ValueRef`]: crate::data::managed::value::ValueRef
 //! [`ValueData`]: crate::data::managed::value::ValueData
 //! [`ValueResult`]: crate::data::managed::value::ValueResult
 
-use std::{marker::PhantomData, ptr::NonNull};
+use std::{marker::PhantomData, pin::Pin};
 
 #[cfg(feature = "async")]
 use self::frame::AsyncGcFrame;
 use self::{
-    frame::{BorrowedFrame, GcFrame, LocalFrame, LocalGcFrame},
+    frame::{BorrowedFrame, GcFrame, LocalFrame, LocalGcFrame, UnsizedLocalGcFrame},
     output::{LocalOutput, Output},
     private::TargetPriv,
     reusable_slot::{LocalReusableSlot, ReusableSlot},
     unrooted::Unrooted,
 };
+use super::scope::LocalScope;
+#[cfg(feature = "multi-rt")]
+#[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8")))]
+use crate::runtime::handle::mt_handle::ActiveHandle;
 use crate::{
     data::managed::Ref,
-    prelude::{JlrsResult, Managed, ValueData},
+    prelude::{Managed, ValueData},
+    runtime::handle::{weak_handle::WeakHandle, with_stack::StackHandle},
 };
 
 pub mod frame;
@@ -136,57 +140,19 @@ pub trait Target<'target>: TargetPriv<'target> {
 
     /// Create a new local scope and call `func`.
     ///
-    /// The `LocalGcFrame` provided to `func` has capacity for `M` roots.
-    #[inline]
-    fn local_scope<T, F, const M: usize>(&self, func: F) -> JlrsResult<T>
-    where
-        for<'inner> F: FnOnce(LocalGcFrame<'inner, M>) -> JlrsResult<T>,
-    {
-        unsafe {
-            let mut local_frame = LocalFrame::new();
-
-            #[cfg(not(feature = "julia-1-6"))]
-            let pgcstack = NonNull::new_unchecked(jl_sys::jl_get_pgcstack());
-
-            #[cfg(feature = "julia-1-6")]
-            let pgcstack = {
-                let ptls = jl_sys::jl_get_ptls_states();
-                NonNull::new_unchecked(jl_sys::jlrs_pgcstack(ptls))
-            };
-
-            let pinned = local_frame.pin(pgcstack);
-
-            let res = func(LocalGcFrame::new(&pinned));
-
-            pinned.pop(pgcstack);
-            res
-        }
-    }
-
-    /// Create a new local scope and call `func`.
-    ///
     /// The `LocalGcFrame` provided to `func` has capacity for `M` roots, `self` is propagated to
     /// the closure.
     #[inline]
-    fn with_local_scope<T, F, const M: usize>(self, func: F) -> JlrsResult<T>
+    fn with_local_scope<T, F, const M: usize>(self, func: F) -> T
     where
-        for<'inner> F: FnOnce(Self, LocalGcFrame<'inner, M>) -> JlrsResult<T>,
+        for<'inner> F: FnOnce(Self, LocalGcFrame<'inner, M>) -> T,
     {
         unsafe {
             let mut local_frame = LocalFrame::new();
-            #[cfg(not(feature = "julia-1-6"))]
-            let pgcstack = NonNull::new_unchecked(jl_sys::jl_get_pgcstack());
 
-            #[cfg(feature = "julia-1-6")]
-            let pgcstack = {
-                let ptls = jl_sys::jl_get_ptls_states();
-                NonNull::new_unchecked(jl_sys::jlrs_pgcstack(ptls))
-            };
-            let pinned = local_frame.pin(pgcstack);
-
+            let pinned = local_frame.pin();
             let res = func(self, LocalGcFrame::new(&pinned));
-
-            pinned.pop(pgcstack);
+            pinned.pop();
             res
         }
     }
@@ -219,46 +185,53 @@ pub trait Target<'target>: TargetPriv<'target> {
     }
 }
 
+impl<'target, T, Tgt: Target<'target>> LocalScope<'target, T> for Tgt {}
+
 /// A `Target` bundled with a [`GcFrame`].
-pub struct ExtendedTarget<'target, 'current, 'borrow, T>
+pub struct ExtendedTarget<'target, 'current, 'borrow, Tgt>
 where
-    T: Target<'target>,
+    Tgt: Target<'target>,
 {
-    pub(crate) target: T,
+    pub(crate) target: Tgt,
     pub(crate) frame: &'borrow mut GcFrame<'current>,
     pub(crate) _target_marker: PhantomData<&'target ()>,
 }
 
-impl<'target, 'current, 'borrow, T> ExtendedTarget<'target, 'current, 'borrow, T>
+impl<'target, 'current, 'borrow, Tgt> ExtendedTarget<'target, 'current, 'borrow, Tgt>
 where
-    T: Target<'target>,
+    Tgt: Target<'target>,
 {
     /// Split the `ExtendedTarget` into its `Target` and a `BorrowedFrame`.
     #[inline]
-    pub fn split(self) -> (T, BorrowedFrame<'borrow, 'current, GcFrame<'current>>) {
+    pub fn split(self) -> (Tgt, BorrowedFrame<'borrow, 'current, GcFrame<'current>>) {
         (self.target, BorrowedFrame(self.frame, PhantomData))
     }
 }
 
 #[cfg(feature = "async")]
 /// A `Target` bundled with an [`AsyncGcFrame`].
-pub struct ExtendedAsyncTarget<'target, 'current, 'borrow, T>
+pub struct ExtendedAsyncTarget<'target, 'current, 'borrow, Tgt>
 where
-    T: Target<'target>,
+    Tgt: Target<'target>,
 {
-    pub(crate) target: T,
+    pub(crate) target: Tgt,
     pub(crate) frame: &'borrow mut AsyncGcFrame<'current>,
     pub(crate) _target_marker: PhantomData<&'target ()>,
 }
 
 #[cfg(feature = "async")]
-impl<'target, 'current, 'borrow, T> ExtendedAsyncTarget<'target, 'current, 'borrow, T>
+impl<'target, 'current, 'borrow, Tgt> ExtendedAsyncTarget<'target, 'current, 'borrow, Tgt>
 where
-    T: Target<'target>,
+    Tgt: Target<'target>,
 {
     /// Split the `ExtendedTarget` into its `Target` and a `BorrowedFrame`.
     #[inline]
-    pub fn split(self) -> (T, BorrowedFrame<'borrow, 'current, AsyncGcFrame<'current>>) {
+    pub fn split(
+        self,
+    ) -> (
+        Tgt,
+        BorrowedFrame<'borrow, 'current, AsyncGcFrame<'current>>,
+    ) {
         (self.target, BorrowedFrame(self.frame, PhantomData))
     }
 }
@@ -267,9 +240,13 @@ impl<'target> Target<'target> for GcFrame<'target> {}
 
 impl<'target, const N: usize> Target<'target> for LocalGcFrame<'target, N> {}
 
+impl<'target> Target<'target> for UnsizedLocalGcFrame<'target> {}
+
 impl<'target> Target<'target> for &mut GcFrame<'target> {}
 
 impl<'target, const N: usize> Target<'target> for &mut LocalGcFrame<'target, N> {}
+
+impl<'target> Target<'target> for &mut UnsizedLocalGcFrame<'target> {}
 
 #[cfg(feature = "async")]
 impl<'target> Target<'target> for AsyncGcFrame<'target> {}
@@ -278,6 +255,12 @@ impl<'target> Target<'target> for AsyncGcFrame<'target> {}
 impl<'target> Target<'target> for &mut AsyncGcFrame<'target> {}
 
 impl<'target> Target<'target> for Unrooted<'target> {}
+
+#[cfg(feature = "multi-rt")]
+#[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8")))]
+impl<'target> Target<'target> for ActiveHandle<'target> {}
+impl<'target> Target<'target> for Pin<&'target mut WeakHandle> {}
+impl<'target> Target<'target> for StackHandle<'target> {}
 
 impl<'target> Target<'target> for Output<'target> {}
 
@@ -289,11 +272,13 @@ impl<'target> Target<'target> for &'target mut LocalOutput<'_> {}
 
 impl<'target> Target<'target> for ReusableSlot<'target> {}
 
+impl<'target> Target<'target> for LocalReusableSlot<'target> {}
+
 impl<'target> Target<'target> for &mut LocalReusableSlot<'target> {}
 
 impl<'target> Target<'target> for &mut ReusableSlot<'target> {}
 
-impl<'target, 'data, T> Target<'target> for &T where T: Target<'target> {}
+impl<'target, 'data, Tgt> Target<'target> for &Tgt where Tgt: Target<'target> {}
 
 /// Defines the return types of a target, `Data`, `Exception`, and `Result`.
 pub trait TargetType<'target>: Sized {
@@ -309,21 +294,56 @@ pub type TargetResult<'scope, 'data, T, Tgt> =
 
 pub type TargetException<'scope, 'data, T, Tgt> = Result<T, ValueData<'scope, 'data, Tgt>>;
 
+/// Extension trait for rooting targets.
+pub trait RootingTarget<'target>: TargetType<'target> + Target<'target> {
+    /// Convert data rooted with this target to an instance of the concrete type.
+    fn into_concrete_type<'data, M: Managed<'target, 'data>>(t: Self::Data<'data, M>) -> M {
+        // Safety: for rooting targets M == Self::Data<'data, M>
+        unsafe { std::mem::transmute_copy(&t) }
+    }
+
+    /// Convert concrete data rooted with this target to an instance of the generic `Data` type.
+    fn into_generic_type<'data, M: Managed<'target, 'data>>(t: M) -> Self::Data<'data, M> {
+        // Safety: for rooting targets M == Self::Data<'data, M>
+        unsafe { std::mem::transmute_copy(&t) }
+    }
+}
+
 impl<'target> TargetType<'target> for &mut GcFrame<'target> {
     type Data<'data, T: Managed<'target, 'data>> = T;
 }
+
+impl<'target> RootingTarget<'target> for &mut GcFrame<'target> {}
 
 impl<'target, const N: usize> TargetType<'target> for &mut LocalGcFrame<'target, N> {
     type Data<'data, T: Managed<'target, 'data>> = T;
 }
 
+impl<'target, const N: usize> RootingTarget<'target> for &mut LocalGcFrame<'target, N> {}
+
+impl<'target> TargetType<'target> for &mut UnsizedLocalGcFrame<'target> {
+    type Data<'data, T: Managed<'target, 'data>> = T;
+}
+
+impl<'target> RootingTarget<'target> for &mut UnsizedLocalGcFrame<'target> {}
+
 impl<'target> TargetType<'target> for GcFrame<'target> {
     type Data<'data, T: Managed<'target, 'data>> = T;
 }
 
+impl<'target> RootingTarget<'target> for GcFrame<'target> {}
+
 impl<'target, const N: usize> TargetType<'target> for LocalGcFrame<'target, N> {
     type Data<'data, T: Managed<'target, 'data>> = T;
 }
+
+impl<'target, const N: usize> RootingTarget<'target> for LocalGcFrame<'target, N> {}
+
+impl<'target> TargetType<'target> for UnsizedLocalGcFrame<'target> {
+    type Data<'data, T: Managed<'target, 'data>> = T;
+}
+
+impl<'target> RootingTarget<'target> for UnsizedLocalGcFrame<'target> {}
 
 #[cfg(feature = "async")]
 impl<'target> TargetType<'target> for &mut AsyncGcFrame<'target> {
@@ -335,29 +355,47 @@ impl<'target> TargetType<'target> for AsyncGcFrame<'target> {
     type Data<'data, T: Managed<'target, 'data>> = T;
 }
 
+#[cfg(feature = "async")]
+impl<'target> RootingTarget<'target> for &mut AsyncGcFrame<'target> {}
+
+#[cfg(feature = "async")]
+impl<'target> RootingTarget<'target> for AsyncGcFrame<'target> {}
+
 impl<'target> TargetType<'target> for Output<'target> {
     type Data<'data, T: Managed<'target, 'data>> = T;
 }
+
+impl<'target> RootingTarget<'target> for Output<'target> {}
 
 impl<'target> TargetType<'target> for LocalOutput<'target> {
     type Data<'data, T: Managed<'target, 'data>> = T;
 }
 
+impl<'target> RootingTarget<'target> for LocalOutput<'target> {}
+
 impl<'target> TargetType<'target> for &'target mut Output<'_> {
     type Data<'data, T: Managed<'target, 'data>> = T;
 }
+
+impl<'target> RootingTarget<'target> for &'target mut Output<'_> {}
 
 impl<'target> TargetType<'target> for &'target mut LocalOutput<'_> {
     type Data<'data, T: Managed<'target, 'data>> = T;
 }
 
+impl<'target> RootingTarget<'target> for &'target mut LocalOutput<'_> {}
+
 impl<'target> TargetType<'target> for ReusableSlot<'target> {
     type Data<'data, T: Managed<'target, 'data>> = T;
 }
 
+impl<'target> RootingTarget<'target> for ReusableSlot<'target> {}
+
 impl<'target> TargetType<'target> for LocalReusableSlot<'target> {
     type Data<'data, T: Managed<'target, 'data>> = T;
 }
+
+impl<'target> RootingTarget<'target> for LocalReusableSlot<'target> {}
 
 impl<'target> TargetType<'target> for &mut ReusableSlot<'target> {
     type Data<'data, T: Managed<'target, 'data>> = Ref<'target, 'data, T>;
@@ -371,24 +409,41 @@ impl<'target> TargetType<'target> for Unrooted<'target> {
     type Data<'data, T: Managed<'target, 'data>> = Ref<'target, 'data, T>;
 }
 
+#[cfg(feature = "multi-rt")]
+#[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8")))]
+impl<'target> TargetType<'target> for ActiveHandle<'target> {
+    type Data<'data, T: Managed<'target, 'data>> = Ref<'target, 'data, T>;
+}
+
+impl<'target> TargetType<'target> for Pin<&'target mut WeakHandle> {
+    type Data<'data, T: Managed<'target, 'data>> = Ref<'target, 'data, T>;
+}
+
+impl<'target> TargetType<'target> for StackHandle<'target> {
+    type Data<'data, T: Managed<'target, 'data>> = Ref<'target, 'data, T>;
+}
+
 impl<'target, U: TargetType<'target>> TargetType<'target> for &U {
     type Data<'data, T: Managed<'target, 'data>> = Ref<'target, 'data, T>;
 }
 
 pub(crate) mod private {
-    use std::ptr::NonNull;
+    use std::{pin::Pin, ptr::NonNull};
 
     use jl_sys::jl_value_t;
 
     #[cfg(feature = "async")]
     use super::AsyncGcFrame;
     use super::{
-        frame::LocalGcFrame,
+        frame::{LocalGcFrame, UnsizedLocalGcFrame},
         output::LocalOutput,
         reusable_slot::{LocalReusableSlot, ReusableSlot},
         unrooted::Unrooted,
         GcFrame, Output, TargetException, TargetResult, TargetType,
     };
+    #[cfg(feature = "multi-rt")]
+    #[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8")))]
+    use crate::runtime::handle::mt_handle::ActiveHandle;
     use crate::{
         data::managed::{
             private::ManagedPriv,
@@ -396,43 +451,8 @@ pub(crate) mod private {
             Managed, Ref,
         },
         private::Private,
+        runtime::handle::{weak_handle::WeakHandle, with_stack::StackHandle},
     };
-
-    pub trait TargetBase<'target>: Sized {}
-
-    impl<'target> TargetBase<'target> for &mut GcFrame<'target> {}
-
-    impl<'target, const N: usize> TargetBase<'target> for &mut LocalGcFrame<'target, N> {}
-
-    impl<'target> TargetBase<'target> for GcFrame<'target> {}
-
-    impl<'target, const N: usize> TargetBase<'target> for LocalGcFrame<'target, N> {}
-
-    #[cfg(feature = "async")]
-    impl<'target> TargetBase<'target> for &mut AsyncGcFrame<'target> {}
-
-    #[cfg(feature = "async")]
-    impl<'target> TargetBase<'target> for AsyncGcFrame<'target> {}
-
-    impl<'target> TargetBase<'target> for Output<'target> {}
-
-    impl<'target> TargetBase<'target> for LocalOutput<'target> {}
-
-    impl<'target> TargetBase<'target> for &'target mut Output<'_> {}
-
-    impl<'target> TargetBase<'target> for &'target mut LocalOutput<'_> {}
-
-    impl<'target> TargetBase<'target> for ReusableSlot<'target> {}
-
-    impl<'target> TargetBase<'target> for LocalReusableSlot<'target> {}
-
-    impl<'target> TargetBase<'target> for &mut ReusableSlot<'target> {}
-
-    impl<'target> TargetBase<'target> for &mut LocalReusableSlot<'target> {}
-
-    impl<'target> TargetBase<'target> for Unrooted<'target> {}
-
-    impl<'target, T: TargetBase<'target>> TargetBase<'target> for &T {}
 
     pub trait TargetPriv<'target>: TargetType<'target> {
         // Safety: the pointer must point to valid data.
@@ -563,6 +583,44 @@ pub(crate) mod private {
         }
     }
 
+    impl<'target> TargetPriv<'target> for &mut UnsizedLocalGcFrame<'target> {
+        // Safety: the pointer must point to valid data.
+        #[inline]
+        unsafe fn data_from_ptr<'data, T: Managed<'target, 'data>>(
+            self,
+            value: NonNull<T::Wraps>,
+            _: Private,
+        ) -> Self::Data<'data, T> {
+            self.root(value)
+        }
+
+        // Safety: the pointer must point to valid data.
+        #[inline]
+        unsafe fn result_from_ptr<'data, T: Managed<'target, 'data>>(
+            self,
+            result: Result<NonNull<T::Wraps>, NonNull<jl_value_t>>,
+            _: Private,
+        ) -> TargetResult<'target, 'data, T, Self> {
+            match result {
+                Ok(t) => Ok(self.root(t)),
+                Err(e) => Err(self.root(e)),
+            }
+        }
+
+        // Safety: the pointer must point to valid data.
+        #[inline]
+        unsafe fn exception_from_ptr<'data, T>(
+            self,
+            result: Result<T, NonNull<jl_value_t>>,
+            _: Private,
+        ) -> TargetException<'target, 'data, T, Self> {
+            match result {
+                Ok(t) => Ok(t),
+                Err(e) => Err(self.root(e)),
+            }
+        }
+    }
+
     impl<'target> TargetPriv<'target> for GcFrame<'target> {
         // Safety: the pointer must point to valid data.
         #[inline]
@@ -602,6 +660,44 @@ pub(crate) mod private {
     }
 
     impl<'target, const N: usize> TargetPriv<'target> for LocalGcFrame<'target, N> {
+        // Safety: the pointer must point to valid data.
+        #[inline]
+        unsafe fn data_from_ptr<'data, T: Managed<'target, 'data>>(
+            mut self,
+            value: NonNull<T::Wraps>,
+            _: Private,
+        ) -> Self::Data<'data, T> {
+            self.root(value)
+        }
+
+        // Safety: the pointer must point to valid data.
+        #[inline]
+        unsafe fn result_from_ptr<'data, T: Managed<'target, 'data>>(
+            mut self,
+            result: Result<NonNull<T::Wraps>, NonNull<jl_value_t>>,
+            _: Private,
+        ) -> TargetResult<'target, 'data, T, Self> {
+            match result {
+                Ok(t) => Ok(self.root(t)),
+                Err(e) => Err(self.root(e)),
+            }
+        }
+
+        // Safety: the pointer must point to valid data.
+        #[inline]
+        unsafe fn exception_from_ptr<'data, T>(
+            mut self,
+            result: Result<T, NonNull<jl_value_t>>,
+            _: Private,
+        ) -> TargetException<'target, 'data, T, Self> {
+            match result {
+                Ok(t) => Ok(t),
+                Err(e) => Err(self.root(e)),
+            }
+        }
+    }
+
+    impl<'target> TargetPriv<'target> for UnsizedLocalGcFrame<'target> {
         // Safety: the pointer must point to valid data.
         #[inline]
         unsafe fn data_from_ptr<'data, T: Managed<'target, 'data>>(
@@ -1022,6 +1118,122 @@ pub(crate) mod private {
     }
 
     impl<'target> TargetPriv<'target> for Unrooted<'target> {
+        // Safety: the pointer must point to valid data.
+        #[inline]
+        unsafe fn data_from_ptr<'data, T: Managed<'target, 'data>>(
+            self,
+            value: NonNull<T::Wraps>,
+            _: Private,
+        ) -> Self::Data<'data, T> {
+            Ref::wrap(value)
+        }
+
+        // Safety: the pointer must point to valid data.
+        #[inline]
+        unsafe fn result_from_ptr<'data, T: Managed<'target, 'data>>(
+            self,
+            result: Result<NonNull<T::Wraps>, NonNull<jl_value_t>>,
+            _: Private,
+        ) -> TargetResult<'target, 'data, T, Self> {
+            match result {
+                Ok(t) => Ok(Ref::wrap(t)),
+                Err(e) => Err(Ref::wrap(e)),
+            }
+        }
+
+        // Safety: the pointer must point to valid data.
+        #[inline]
+        unsafe fn exception_from_ptr<'data, T>(
+            self,
+            result: Result<T, NonNull<jl_value_t>>,
+            _: Private,
+        ) -> TargetException<'target, 'data, T, Self> {
+            match result {
+                Ok(t) => Ok(t),
+                Err(e) => Err(Ref::wrap(e)),
+            }
+        }
+    }
+
+    #[cfg(feature = "multi-rt")]
+    #[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8")))]
+    impl<'target> TargetPriv<'target> for ActiveHandle<'target> {
+        // Safety: the pointer must point to valid data.
+        #[inline]
+        unsafe fn data_from_ptr<'data, T: Managed<'target, 'data>>(
+            self,
+            value: NonNull<T::Wraps>,
+            _: Private,
+        ) -> Self::Data<'data, T> {
+            Ref::wrap(value)
+        }
+
+        // Safety: the pointer must point to valid data.
+        #[inline]
+        unsafe fn result_from_ptr<'data, T: Managed<'target, 'data>>(
+            self,
+            result: Result<NonNull<T::Wraps>, NonNull<jl_value_t>>,
+            _: Private,
+        ) -> TargetResult<'target, 'data, T, Self> {
+            match result {
+                Ok(t) => Ok(Ref::wrap(t)),
+                Err(e) => Err(Ref::wrap(e)),
+            }
+        }
+
+        // Safety: the pointer must point to valid data.
+        #[inline]
+        unsafe fn exception_from_ptr<'data, T>(
+            self,
+            result: Result<T, NonNull<jl_value_t>>,
+            _: Private,
+        ) -> TargetException<'target, 'data, T, Self> {
+            match result {
+                Ok(t) => Ok(t),
+                Err(e) => Err(Ref::wrap(e)),
+            }
+        }
+    }
+
+    impl<'target> TargetPriv<'target> for Pin<&'target mut WeakHandle> {
+        // Safety: the pointer must point to valid data.
+        #[inline]
+        unsafe fn data_from_ptr<'data, T: Managed<'target, 'data>>(
+            self,
+            value: NonNull<T::Wraps>,
+            _: Private,
+        ) -> Self::Data<'data, T> {
+            Ref::wrap(value)
+        }
+
+        // Safety: the pointer must point to valid data.
+        #[inline]
+        unsafe fn result_from_ptr<'data, T: Managed<'target, 'data>>(
+            self,
+            result: Result<NonNull<T::Wraps>, NonNull<jl_value_t>>,
+            _: Private,
+        ) -> TargetResult<'target, 'data, T, Self> {
+            match result {
+                Ok(t) => Ok(Ref::wrap(t)),
+                Err(e) => Err(Ref::wrap(e)),
+            }
+        }
+
+        // Safety: the pointer must point to valid data.
+        #[inline]
+        unsafe fn exception_from_ptr<'data, T>(
+            self,
+            result: Result<T, NonNull<jl_value_t>>,
+            _: Private,
+        ) -> TargetException<'target, 'data, T, Self> {
+            match result {
+                Ok(t) => Ok(t),
+                Err(e) => Err(Ref::wrap(e)),
+            }
+        }
+    }
+
+    impl<'target> TargetPriv<'target> for StackHandle<'target> {
         // Safety: the pointer must point to valid data.
         #[inline]
         unsafe fn data_from_ptr<'data, T: Managed<'target, 'data>>(

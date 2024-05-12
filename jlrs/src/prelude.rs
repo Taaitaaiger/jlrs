@@ -4,35 +4,26 @@
 pub use async_trait::async_trait;
 #[cfg(feature = "ccall")]
 pub use jlrs_macros::julia_module;
-pub use jlrs_macros::julia_version;
+pub use jlrs_macros::{encode_as_constant_bytes, julia_version};
 #[cfg(feature = "jlrs-derive")]
 pub use jlrs_macros::{
     CCallArg, CCallReturn, ConstructType, HasLayout, IntoJulia, IsBits, Typecheck, Unbox,
     ValidField, ValidLayout,
 };
 
-#[cfg(feature = "ccall")]
-pub use crate::ccall::CCall;
-#[cfg(any(feature = "sync-rt", feature = "ccall"))]
+#[cfg(any(feature = "local-rt", feature = "async-rt", feature = "ccall"))]
 pub use crate::memory::stack_frame::StackFrame;
-#[cfg(feature = "pyplot")]
-pub use crate::pyplot::{AccessPlotsModule, PyPlot};
-#[cfg(feature = "async-std-rt")]
-pub use crate::runtime::async_rt::async_std_rt::*;
+#[cfg(any(feature = "async-rt", feature = "local-rt"))]
+pub use crate::runtime::builder::Builder;
 #[cfg(feature = "tokio-rt")]
-pub use crate::runtime::async_rt::tokio_rt::*;
-#[cfg(any(feature = "async-rt", feature = "sync-rt"))]
-pub use crate::runtime::builder::RuntimeBuilder;
-#[cfg(feature = "sync-rt")]
+pub use crate::runtime::executor::tokio_exec::*;
+#[cfg(feature = "ccall")]
+pub use crate::runtime::handle::ccall::CCall;
+#[cfg(feature = "local-rt")]
 pub use crate::runtime::sync_rt::{Julia, PendingJulia};
-#[cfg(feature = "async-rt")]
-pub use crate::runtime::{async_rt::AsyncJulia, builder::AsyncRuntimeBuilder};
 #[cfg(feature = "async")]
 pub use crate::{
-    async_util::{
-        affinity::{Affinity, DispatchAny, DispatchMain, DispatchWorker},
-        task::{yield_task, AsyncTask, PersistentTask},
-    },
+    async_util::task::{AsyncTask, PersistentTask},
     call::CallAsync,
     memory::target::frame::AsyncGcFrame,
 };
@@ -42,13 +33,35 @@ pub use crate::{
     data::{
         layout::{bool::Bool, char::Char, nothing::Nothing, tuple::*},
         managed::{
-            array::Array, array::ArrayRef, array::TypedArray, array::TypedArrayRef,
-            datatype::DataType, datatype::DataTypeRef, module::Module, module::ModuleRef,
-            string::JuliaString, string::StringRef, symbol::Symbol, value::Value, value::ValueData,
-            value::ValueRef, value::ValueResult, /* Ref, */ Managed, ManagedRef,
+            array::{
+                data::accessor::{Accessor, AccessorMut, AccessorMut1D},
+                Array, ArrayData, ArrayRef, ArrayResult, ConstructTypedArray, Matrix, MatrixData,
+                MatrixRef, MatrixResult, RankedArray, RankedArrayData, RankedArrayRef,
+                RankedArrayResult, TypedArray, TypedArrayData, TypedArrayRef, TypedArrayResult,
+                TypedMatrix, TypedMatrixData, TypedMatrixRef, TypedMatrixResult, TypedRankedArray,
+                TypedRankedArrayData, TypedRankedArrayRef, TypedRankedArrayResult, TypedVector,
+                TypedVectorData, TypedVectorRef, TypedVectorResult, Vector, VectorAny,
+                VectorAnyData, VectorAnyRef, VectorAnyResult, VectorData, VectorRef, VectorResult,
+            },
+            datatype::{DataType, DataTypeData, DataTypeRef, DataTypeResult},
+            module::{Module, ModuleData, ModuleRef, ModuleResult},
+            string::{JuliaString, StringData, StringRef, StringResult},
+            symbol::Symbol,
+            value::Value,
+            value::ValueData,
+            value::ValueRef,
+            value::ValueResult,
+            /* Ref, */ Managed, ManagedRef,
         },
     },
+    define_fast_array_key, define_fast_key,
     error::JlrsResult,
-    memory::target::{Target, TargetType},
+    memory::{
+        scope::{LocalScope, Scope},
+        target::{Target, TargetType},
+    },
     named_tuple,
+    runtime::handle::with_stack::WithStack,
 };
+#[cfg(feature = "async-rt")]
+pub use crate::{runtime::builder::AsyncBuilder, runtime::handle::async_handle::AsyncHandle};

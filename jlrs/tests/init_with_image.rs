@@ -1,6 +1,6 @@
-#![cfg(feature = "sync-rt")]
+#![cfg(feature = "local-rt")]
 mod tests {
-    use jlrs::runtime::builder::RuntimeBuilder;
+    use jlrs::runtime::builder::Builder;
 
     #[test]
     fn init_with_image() {
@@ -14,9 +14,11 @@ mod tests {
             let image_path = format!("{}/lib/julia/sys.dylib", julia_dir);
 
             unsafe {
-                assert!(RuntimeBuilder::new()
+                assert!(Builder::new()
                     .image(bindir, image_path)
-                    .start()
+                    .ok()
+                    .unwrap()
+                    .start_local()
                     .is_ok())
             }
         } else {

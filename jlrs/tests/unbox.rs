@@ -1,6 +1,6 @@
 mod util;
 
-#[cfg(feature = "sync-rt")]
+#[cfg(feature = "local-rt")]
 mod tests {
     use std::{ffi::c_void, ptr::null_mut};
 
@@ -19,6 +19,7 @@ mod tests {
                     let mut jlrs = j.borrow_mut();
 
                     jlrs.instance(&mut frame)
+                        .returning::<JlrsResult<_>>()
                         .scope(|frame| unsafe {
                             let val: $type = $val;
                             assert_eq!(

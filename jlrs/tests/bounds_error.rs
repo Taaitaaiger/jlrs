@@ -1,5 +1,5 @@
 mod util;
-#[cfg(feature = "sync-rt")]
+#[cfg(feature = "local-rt")]
 mod tests {
     use jlrs::prelude::*;
 
@@ -16,13 +16,14 @@ mod tests {
                     frame.scope(|mut frame| unsafe {
                         let idx = Value::new(&mut frame, 4usize);
                         let data = vec![1.0f64, 2., 3.];
-                        let array = Array::from_vec(&mut frame, data, 3)?.into_jlrs_result()?;
+                        let array =
+                            TypedArray::<f64>::from_vec(&mut frame, data, 3)?.into_jlrs_result()?;
                         let func = Module::base(&frame)
                             .function(&frame, "getindex")?
                             .as_managed();
                         let out = func.call2(&mut frame, array.as_value(), idx).unwrap_err();
 
-                        assert_eq!(out.datatype_name().unwrap(), "BoundsError");
+                        assert_eq!(out.datatype_name(), "BoundsError");
 
                         let field_names = out.field_names();
                         let f0: String = field_names[0].as_string().unwrap();

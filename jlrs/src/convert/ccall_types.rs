@@ -19,12 +19,14 @@
 //!
 //! [`julia_module`]: ::jlrs_macros::julia_module
 
+#[cfg(feature = "ccall")]
 use crate::{
-    data::{
-        managed::{module::JlrsCore, value::ValueRet},
-        types::construct_type::ConstructType,
-    },
-    prelude::{JlrsResult, JuliaString, Managed, Nothing},
+    data::managed::module::JlrsCore,
+    prelude::{JuliaString, Managed},
+};
+use crate::{
+    data::{managed::value::ValueRet, types::construct_type::ConstructType},
+    prelude::{JlrsResult, Nothing},
 };
 
 /// Trait implemented by types that can be used as argument types of Rust functions exposed by the
@@ -79,13 +81,7 @@ macro_rules! impl_ccall_arg {
 
             #[inline]
             unsafe fn return_or_throw(self) -> Self::ReturnAs {
-                #[cfg(feature = "ccall")]
                 return self;
-
-                #[cfg(not(feature = "ccall"))]
-                unimplemented!(
-                    "CCallReturn::return_or_throw can only be called if the `ccall` feature is enabled"
-                )
             }
         }
     };
@@ -115,7 +111,7 @@ unsafe impl<T: CCallReturn> CCallReturn for Result<T, ValueRet> {
         {
             match self {
                 Ok(t) => t,
-                Err(e) => crate::ccall::CCall::throw_exception(e),
+                Err(e) => crate::runtime::handle::ccall::CCall::throw_exception(e),
             }
         }
 
@@ -149,13 +145,16 @@ unsafe impl<T: CCallReturn> CCallReturn for JlrsResult<T> {
             match self {
                 Ok(t) => t,
                 Err(e) => {
-                    let e = crate::ccall::CCall::local_scope::<_, _, 1>(|mut frame| {
-                        let msg = JuliaString::new(&mut frame, format!("{}", e)).as_value();
-                        let err = JlrsCore::jlrs_error(&frame).instantiate_unchecked(&frame, [msg]);
-                        Ok(err.leak())
-                    })
+                    let e = crate::runtime::handle::ccall::CCall::local_scope::<_, _, 1>(
+                        |mut frame| {
+                            let msg = JuliaString::new(&mut frame, format!("{}", e)).as_value();
+                            let err =
+                                JlrsCore::jlrs_error(&frame).instantiate_unchecked(&frame, [msg]);
+                            Ok(err.leak())
+                        },
+                    )
                     .unwrap();
-                    crate::ccall::CCall::throw_exception(e)
+                    crate::runtime::handle::ccall::CCall::throw_exception(e)
                 }
             }
         }

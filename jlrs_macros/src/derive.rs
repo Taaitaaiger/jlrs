@@ -1,4 +1,5 @@
 use proc_macro::TokenStream;
+use proc_macro2::TokenStream as TS2;
 use quote::{format_ident, quote};
 use syn::{self, punctuated::Punctuated, token::Comma, Token};
 
@@ -252,9 +253,9 @@ pub fn impl_into_julia(ast: &syn::DeriveInput) -> TokenStream {
     into_julia_impl.into()
 }
 
-pub fn impl_into_julia_fn(attrs: &JlrsTypeAttrs) -> Option<syn::Item> {
+pub fn impl_into_julia_fn(attrs: &JlrsTypeAttrs) -> Option<TS2> {
     if attrs.zst {
-        Some(syn::parse_quote! {
+        Some(quote! {
             #[inline]
             fn into_julia<'target, T>(self, target: T) -> ::jlrs::data::managed::value::ValueData<'target, 'static, T>
             where
@@ -412,9 +413,15 @@ pub fn impl_construct_type(ast: &syn::DeriveInput) -> TokenStream {
             }
         }
     };
+
+    let n_names = ast.generics.type_params().count();
     let n_generics = ast.generics.params.len();
 
-    let (cacheable, construct_expr): (Option<syn::Stmt>, syn::Expr) = if n_generics == 0 {
+    let (cacheable, construct_expr, construct_with_context_expr): (
+        Option<syn::Stmt>,
+        syn::Expr,
+        syn::Expr,
+    ) = if n_names == 0 {
         let cacheable = syn::parse_quote! {
             const CACHEABLE: bool = false;
         };
@@ -423,32 +430,65 @@ pub fn impl_construct_type(ast: &syn::DeriveInput) -> TokenStream {
             base_type.root(target)
         };
 
-        (Some(cacheable), construct_expr)
+        let construct_with_context_expr = syn::parse_quote! {
+            base_type.root(target)
+        };
+
+        (Some(cacheable), construct_expr, construct_with_context_expr)
     } else {
+        // FIXME
         let param_names = ast.generics.type_params().map(|p| &p.ident);
+        let n_names = ast.generics.type_params().count();
 
         let n_slots = n_generics + 2;
-        let nth_generic = 0..n_generics;
+        let nth_generic = 0..n_names;
 
         let construct_expr = syn::parse_quote! {
             target.with_local_scope::<_, _, #n_slots>(|target, mut frame| {
-                let mut types: [Option<::jlrs::data::managed::value::Value>; #n_generics] = [None; #n_generics];
+
+                if #n_names == 0 {
+                    return base_type.root(target);
+                }
+
+                let mut types: [Option<::jlrs::data::managed::value::Value>; #n_names] = [None; #n_names];
                 #(
                     types[#nth_generic] = Some(<#param_names as ::jlrs::data::types::construct_type::ConstructType>::construct_type(&mut frame));
                 )*
                 unsafe {
-                    let types = std::mem::transmute::<&[Option<::jlrs::data::managed::value::Value>; #n_generics], &[::jlrs::data::managed::value::Value; #n_generics]>(&types);
+                    let types = std::mem::transmute::<&[Option<::jlrs::data::managed::value::Value>; #n_names], &[::jlrs::data::managed::value::Value; #n_names]>(&types);
+
                     let applied = base_type
-                        .apply_type(&mut frame, types).into_jlrs_result()?;
-                    Ok(::jlrs::data::managed::union_all::UnionAll::rewrap(
+                        .apply_type(&mut frame, types)
+                        .unwrap();
+
+                    ::jlrs::data::managed::union_all::UnionAll::rewrap(
                         target,
                         applied.cast_unchecked::<::jlrs::data::managed::datatype::DataType>(),
-                    ))
+                    )
                 }
-            }).unwrap()
+            })
         };
 
-        (None, construct_expr)
+        let nth_generic = 0..n_names;
+        let param_names = ast.generics.type_params().map(|p| &p.ident);
+        let construct_with_context_expr = syn::parse_quote! {
+            target.with_local_scope::<_, _, #n_slots>(|target, mut frame| {
+                if #n_names == 0 {
+                    return base_type.root(target);
+                }
+
+                let mut types: [Option<::jlrs::data::managed::value::Value>; #n_names] = [None; #n_names];
+                #(
+                    types[#nth_generic] = Some(<#param_names as ::jlrs::data::types::construct_type::ConstructType>::construct_type_with_env(&mut frame, env));
+                )*
+                unsafe {
+                    let types = std::mem::transmute::<&[Option<::jlrs::data::managed::value::Value>; #n_names], &[::jlrs::data::managed::value::Value; #n_names]>(&types);
+                    base_type.apply_type_unchecked(target, types)
+                }
+            })
+        };
+
+        (None, construct_expr, construct_with_context_expr)
     };
 
     let construct_type_impl = quote! {
@@ -465,6 +505,17 @@ pub fn impl_construct_type(ast: &syn::DeriveInput) -> TokenStream {
             {
                 let base_type = Self::base_type(&target).unwrap();
                 #construct_expr
+            }
+
+            fn construct_type_with_env_uncached<'target, Tgt>(
+                target: Tgt,
+                env: &::jlrs::data::types::construct_type::TypeVarEnv,
+            ) -> ::jlrs::data::managed::value::ValueData<'target, 'static, Tgt>
+            where
+                Tgt: ::jlrs::memory::target::Target<'target>,
+            {
+                let base_type = Self::base_type(&target).unwrap();
+                #construct_with_context_expr
             }
 
             #[inline]
@@ -642,7 +693,7 @@ pub fn impl_valid_layout(ast: &syn::DeriveInput) -> TokenStream {
     let mut attrs = JlrsTypeAttrs::parse(ast);
     let jl_type = attrs.julia_type
         .take()
-        .expect("IntoJulia can only be derived if the corresponding Julia type is set with #[julia_type = \"Main.MyModule.Submodule.StructType\"]");
+        .expect("ValidLayout can only be derived if the corresponding Julia type is set with #[julia_type = \"Main.MyModule.Submodule.StructType\"]");
 
     let rs_flag_fields = classified_fields.rs_flag_fields.iter();
     let rs_align_fields = classified_fields.rs_align_fields.iter();
@@ -664,21 +715,19 @@ pub fn impl_valid_layout(ast: &syn::DeriveInput) -> TokenStream {
                             return false;
                         }
 
-                        let global = v.unrooted_target();
-                        let field_types = dt.field_types(global);
-                        let field_types_svec = field_types.as_managed();
-                        let field_types_data = field_types_svec.data();
-                        let field_types = field_types_data.as_slice();
+                        let field_types = dt.field_types();
+                        let field_types_data = field_types.data();
+                        let field_types = field_types_data.as_atomic_slice().assume_immutable_non_null();
 
                         #(
-                            if !<#rs_non_union_fields as ::jlrs::data::layout::valid_layout::ValidField>::valid_field(field_types[#jl_non_union_field_idxs].unwrap().as_managed()) {
+                            if !<#rs_non_union_fields as ::jlrs::data::layout::valid_layout::ValidField>::valid_field(field_types[#jl_non_union_field_idxs]) {
                                 return false;
                             }
                         )*
 
                         #(
                             {
-                                let field_type = field_types[#jl_union_field_idxs].unwrap().as_managed();
+                                let field_type = field_types[#jl_union_field_idxs];
                                 if field_type.is::<::jlrs::data::managed::union::Union>() {
                                     let u = field_type.cast_unchecked::<::jlrs::data::managed::union::Union>();
                                     if !::jlrs::data::layout::union::correct_layout_for::<#rs_align_fields, #rs_union_fields, #rs_flag_fields>(u) {
@@ -720,7 +769,7 @@ pub fn impl_valid_layout(ast: &syn::DeriveInput) -> TokenStream {
 pub fn impl_valid_field(ast: &syn::DeriveInput) -> TokenStream {
     let name = &ast.ident;
     if !is_repr_c(ast) {
-        panic!("ValidLayout can only be derived for types with the attribute #[repr(C)].");
+        panic!("ValidField can only be derived for types with the attribute #[repr(C)].");
     }
 
     let generics = &ast.generics;
@@ -765,7 +814,7 @@ pub fn impl_valid_field(ast: &syn::DeriveInput) -> TokenStream {
 pub fn impl_ccall_arg(ast: &syn::DeriveInput) -> TokenStream {
     let name = &ast.ident;
     if !is_repr_c(ast) {
-        panic!("ValidLayout can only be derived for types with the attribute #[repr(C)].");
+        panic!("CCallArg can only be derived for types with the attribute #[repr(C)].");
     }
 
     let generics = &ast.generics;
@@ -808,7 +857,7 @@ pub fn impl_ccall_arg(ast: &syn::DeriveInput) -> TokenStream {
 pub fn impl_ccall_return(ast: &syn::DeriveInput) -> TokenStream {
     let name = &ast.ident;
     if !is_repr_c(ast) {
-        panic!("ValidLayout can only be derived for types with the attribute #[repr(C)].");
+        panic!("CCallReturn can only be derived for types with the attribute #[repr(C)].");
     }
 
     let generics = &ast.generics;

@@ -10,7 +10,7 @@
 use std::ffi::c_void;
 
 use crate::{
-    data::managed::{module::JlrsCore, private::ManagedPriv, value::Value},
+    data::managed::{module::Module, private::ManagedPriv, value::Value},
     error::{JlrsError, JlrsResult},
     gc_safe::GcSafeOnceLock,
     memory::target::unrooted::Unrooted,
@@ -45,7 +45,7 @@ pub(crate) struct Ledger {
 pub(crate) unsafe extern "C" fn init_ledger() {
     LEDGER.get_or_init(|| {
         let unrooted = Unrooted::new();
-        let module = JlrsCore::module(&unrooted);
+        let module = Module::jlrs_core(&unrooted);
 
         let module = module.submodule(unrooted, "Ledger").unwrap().as_managed();
 

@@ -1,11 +1,12 @@
-//! jlrs is a crate that provides access to most of the Julia C API, it can be used to embed Julia
-//! in Rust applications and to use functionality it provides when writing `ccall`able
-//! functions in Rust. Currently this crate is only tested in combination with Julia 1.6 and 1.9,
-//! but also supports Julia 1.7, 1.8 and 1.10. Using the current stable version is highly
-//! recommended. The minimum supported Rust version is currently 1.65.
+//! jlrs is a crate that provides access to the Julia C API. It can be used to embed Julia in Rust
+//! applications and to write interop libraries to Rust crates that can be used by Julia.
 //!
-//! The documentation assumes you're already familiar with the Julia and Rust programming
-//! languages.
+//! Julia versions 1.6 up to and including 1.11 are supported, but only the LTS and stable versions
+//! are actively tested. Using the current stable version of Julia is highly recommended. The
+//! minimum supported Rust version is currently 1.78.
+//!
+//!
+//! # Overview
 //!
 //! An incomplete list of features that are currently supported by jlrs:
 //!
@@ -13,36 +14,32 @@
 //!  - Call Julia functions, including functions that take keyword arguments.
 //!  - Handle exceptions or convert them to an error message, optionally with color.
 //!  - Include and call your own Julia code.
-//!  - Use a custom system image.
+//!  - Use custom system images.
 //!  - Create values that Julia can use, and convert them back to Rust, from Rust.
-//!  - Access the type information and fields of values. The contents of inline and bits-union
-//!    fields can be accessed directly.
+//!  - Access the type information and fields of such values. Inline and bits-union fields can be
+//!    accessed directly.
 //!  - Create and use n-dimensional arrays. The `jlrs-ndarray` feature can be enabled for
 //!    integration with ndarray.
 //!  - Map Julia structs to Rust structs, the Rust implementation can be generated with the
 //!    JlrsCore package.
 //!  - Structs that can be mapped to Rust include those with type parameters and bits unions.
-//!  - Use Julia from multiple threads with an async runtime, these runtimes support scheduling
-//!    Julia `Task`s and `await`ing them without blocking the runtime thread.
-//!  - Export Rust types, methods and functions to Julia with the `julia_module` macro; libraries
-//!    that use this macro can be compiled with BinaryBuilder and distributed as JLLs.
-//!
-//!
-//! NB: Active development happens on the `dev` branch, the `master` branch points to the most
-//! recently released version.
+//!  - Use Julia from multiple threads either directly or via Julia-aware thread pools.
+//!  - Export Rust types, methods and functions to Julia with the `julia_module` macro.
+//!  - Libraries that use `julia_module` can be compiled with BinaryBuilder and distributed as
+//!    JLLs.
 //!
 //!
 //! # Prerequisites
 //!
 //! Julia must be installed before jlrs can be used, jlrs is compatible with Julia 1.6 up to and
-//! including Julia 1.10. The JlrsCore package must also have been installed, if this is not the
-//! case it will automatically be added when jlrs is initialized by default. jlrs has not been
-//! tested with juliaup yet on Linux and macOS.
+//! including Julia 1.11. If the JlrsCore package has not been installed, it will automatically be
+//! installed when jlrs is initialized by default. jlrs has not been tested with juliaup yet on
+//! Linux and macOS.
 //!
 //! ## Linux
 //!
 //! The recommended way to install Julia is to download the binaries from the official website,
-//! which is distributed in an archive containing a directory called `julia-x.y.z`. This directory
+//! which is distributed as an archive containing a directory called `julia-x.y.z`. This directory
 //! contains several other directories, including a `bin` directory containing the `julia`
 //! executable.
 //!
@@ -56,9 +53,11 @@
 //!
 //! In order to be able to load `libjulia.so` this file must be on the library search path. If
 //! this is not the case you must add `/path/to/julia-x.y.z/lib` to the `LD_LIBRARY_PATH`
-//! environment variable. When the `uv` feature is enabled, `/path/to/julia-x.y.z/lib/julia` must
-//! also be added to `LD_LIBRARY_PATH`. The latter path should not be added to the default path
-//! because this can break tools installed on your system.
+//! environment variable.
+//!
+//! ## macOS
+//!
+//! Follow the instructions for Linux, but replace `LD_LIBRARY_PATH` with `DYLD_LIBRARY_PATH`.
 //!
 //! ## Windows
 //!
@@ -74,10 +73,6 @@
 //! `JULIA_DIR` environment variable. This doesn't work correctly with juliaup, in this case
 //! the environment variable must be set.
 //!
-//! ## macOS
-//!
-//! Follow the instructions for Linux, but replace `LD_LIBRARY_PATH` with `DYLD_LIBRARY_PATH`.
-//!
 //!
 //! # Features
 //!
@@ -86,21 +81,21 @@
 //!
 //! ## Versions
 //!
-//! There are minor incompatibilities between different versions of Julia, to ensure the correct
-//! bindings are used for a particular version of Julia you must enable a version features to use
-//! jlrs. The following version features currently exist:
+//! The Julia C API is unstable and there are minor incompatibilities between different versions
+//! of Julia. To ensure the correct bindings are used for a particular version of Julia you must
+//! enable a version feature. The following version features currently exist:
 //!
 //!  - `julia-1-6`
 //!  - `julia-1-7`
 //!  - `julia-1-8`
 //!  - `julia-1-9`
 //!  - `julia-1-10`
+//!  - `julia-1-11`
 //!
-//! Exactly one version feature must be enabled. If no version is enabled, or multiple are, jl-sys
-//! will fail to compile.
+//! Exactly one version feature must be enabled. Otherwise, jlrs will fail to compile.
 //!
-//! If you want your crate to be compatible with multiple versions of Julia, you should reexport
-//! these version features:
+//! If you want your crate to be compatible with multiple versions of Julia, you should "reexport"
+//! these version features as follows:
 //!
 //! ```toml
 //! [features]
@@ -109,46 +104,48 @@
 //! julia-1-8 = ["jlrs/julia-1-8"]
 //! julia-1-9 = ["jlrs/julia-1-9"]
 //! julia-1-10 = ["jlrs/julia-1-10"]
+//! julia-1-11 = ["jlrs/julia-1-11"]
 //! ```
-//!
-//! In this case you must provide this feature when you build or run your crate:
-//! `cargo (build,run) --feature julia-1-8`.
 //!
 //! ## Runtimes
 //!
-//! A runtime lets you embed Julia in a Rust application, the following features enable a runtime:
+//! A runtime lets initialize Julia from Rust application, the following features enable a
+//! runtime:
 //!
-//! - `sync-rt`
+//!  - `local-rt`
+//!  
+//!    Enables the local runtime. The local runtime provides single-threaded, blocking access to
+//!    Julia.
+//!  
+//!  - `async-rt`
+//!  
+//!    Enables the async runtime. The async runtime runs on a separate thread and can be used from
+//!    multiple threads.
+//!  
+//!  - `tokio-rt`
+//!  
+//!    The async runtime requires an executor. This feature provides a tokio-based executor.
+//!  
+//!  - `multi-rt`
+//!  
+//!    Enables the multithreaded runtime. The multithreaded runtime lets you call Julia from
+//!    arbitrary threads. It can be combined with the `async-rt` feature to create Julia-aware
+//!    thread pools. This feature requires Julia 1.9 or higher.
+//!  
 //!
-//!   Enables the sync runtime, [`Julia`]. The sync runtime provides single-threaded, blocking
-//!   access to the Julia C API.
+//! <div class="warning"><strong>WARNING</strong>: Runtime features must only be enabled by applications that embed Julia.
+//! Libraries must never enable a runtime feature.</div>
 //!
-//! - `async-rt`
-//!
-//!   Enables the async runtime, [`AsyncJulia`]. The async runtime runs on a separate thread and
-//!   can be used from multiple threads. Since Julia 1.9 it's possible to start the async runtime
-//!   with multiple worker threads.
-//!
-//! - `tokio-rt` and `async-std-rt`
-//!
-//!   These features provide a backing runtime for the async runtime. The first uses tokio, the
-//!   second async-std. The `async-rt` feature is automatically enabled when one of these features
-//!   is enabled.
-//!
-//! If you're writing a library, either one that will be called from Julia or one that will be
-//! used by a Rust application that embeds Julia, no runtime is required.
+//! <div class="warning"><strong>WARNING</strong>: When a runtime feature is enabled on Linux, set
+//! <code>RUSTFLAGS="-Clink-args=-rdynamic"</code> if you want fast code.</div>
 //!
 //! ## Utilities
 //!
-//! In addition to these runtimes, the following utility features are available:
-//!
-//! - `prelude`
-//!
-//!   Provides a prelude module, [`jlrs::prelude`]. This feature is enabled by default.
+//! All other features are called utility features. The following are available:
 //!
 //! - `async`
 //!
-//!   Enable the features of the async runtime which don't depend on the backing runtime. This
+//!   Enable the features of the async runtime which don't depend on the executor. This
 //!   can be used in libraries which provide implementations of tasks that the async runtime can
 //!   handle.
 //!
@@ -167,32 +164,34 @@
 //!
 //!   Adds support for working with Julia's `Float16` type from Rust using half's `f16` type.
 //!
+//! - `complex`
+//!
+//!   Adds support for working with Julia's `Complex` type from Rust using num's `Complex` type.
+//!
 //! - `ccall`
 //!
 //!   Julia's `ccall` interface can be used to call functions written in Rust from Julia. No
 //!   runtime can be used in this case because Julia has already been initialized, when this
 //!   feature is enabled the `CCall` struct is available which offers the same functionality as
-//!   the sync runtime without initializing Julia. The [`julia_module`] macro is provided to
+//!   the local runtime without initializing Julia. The `julia_module` macro is provided to
 //!   easily export functions, types, and data in combination with the macros from the Wrap
 //!   module in the JlrsCore package.
 //!
-//! - `uv`
+//! - `lto`
 //!
-//!   This feature enables the method `CCall::uv_async_send`, which can be used to wake a Julia
-//!   `AsyncCondition` from Rust. The `ccall` feature is automically enabled when this feature
-//!   is used.
+//!   jlrs depends on a support library written in C, if this feature is enabled this support
+//!   library is built with support for cross-language LTO which can provide a significant
+//!   performance boost.
 //!
-//! - `pyplot`
+//!   This feature has only been tested on Linux and requires building the support library using a
+//!   version of `clang` with the same major version as `rustc`'s LLVM version; e.g. rust 1.78.0
+//!   uses LLVM 18, so it requires `clang-18`. You can check what version you need by executing
+//!   `rustc -vV`.
 //!
-//!   This feature lets you plot data using the Pyplot package and Gtk 3 from Rust.
-//!
-//! - `internal-types`
-//!
-//!   Provide extra managed types for types that are mostly used internally by Julia.
-//!
-//! - `extra-fields`
-//!
-//!   Provide extra field accessor methods for managed types.
+//!   You must set the `RUSTFLAGS` environment variable if this feature is enabled, and possibly the
+//!   `CC` environment variable. Setting `RUSTFLAGS` overrides the default flags that jlrs sets, so
+//!   you must set at least the following flags:
+//!   `RUSTFLAGS="-Clinker-plugin-lto -Clinker=clang-XX -Clink-arg=-fuse-ld=lld -Clink-args=-rdynamic"`.
 //!
 //! - `i686`
 //!
@@ -208,191 +207,363 @@
 //!
 //! - `no-link`
 //!
-//!   Don't link Julia, linking can be skipped when writing libraries that will be loaded by
-//!   Julia.
+//!   Don't link Julia.
 //!
 //! - `yggdrasil`
 //!
 //!   Flag that must be enabled when compiling with BinaryBuilder.
 //!
-//! You can enable all features except `debug`, `i686`, `windows`, `no-link` and `yggdrasil` by
-//! enabling the `full` feature. If you don't want to enable any runtimes either, you can use
-//! `full-no-rt`.
+//! You can enable all features except `debug`, `i686`, `windows`, `no-link`, `lto` and
+//! `yggdrasil` by enabling the `full` feature. If you don't want to enable any runtimes either,
+//! you can use `full-no-rt`.
 //!
 //!
-//! # Using this crate
+//! # Using jlrs
+//!
+//! How you should use this crate depends on whether you're embedding Julia in a Rust application,
+//! or writing a library you want to call from Julia. We're going to focus on embedding first.
+//! Some topics covered in the section about the local runtime section are relevant for users of
+//! the other runtimes, and library authors who want to call into Rust from Julia and into Julia
+//! again from Rust.
+//!
+//!
+//! ## Calling Julia from Rust
 //!
 //! If you want to embed Julia in a Rust application, you must enable a runtime and a version
 //! feature:
 //!
-//! `jlrs = {version = "0.19.0", features = ["sync-rt", "julia-1-8"]}`
+//! `jlrs = {version = "0.20.0", features = ["local-rt", "julia-1-11"]}`
 //!
-//! `jlrs = {version = "0.19.0", features = ["tokio-rt", "julia-1-8"]}`
+//! `jlrs = {version = "0.20.0", features = ["tokio-rt", "julia-1-11"]}`
 //!
-//! `jlrs = {version = "0.19.0", features = ["async-std-rt", "julia-1-8"]}`
+//! `jlrs = {version = "0.20.0", features = ["multi-rt", "julia-1-11"]}`
 //!
-//! When Julia is embedded in an application, it must be initialized before it can be used. The
-//! following snippet initializes the sync runtime:
+//! When Julia is embedded in an application, it must be initialized before it can be used. A
+//! [`Builder`] is available to configure the runtime before starting it. This lets you set
+//! options like the number of threads Julia can start or instruct Julia to use a custom system
+//! image.
+//!
+//! There are three runtimes: the local, async and multithreaded runtime. Let's take a look at them
+//! in that same order.
+//!
+//!
+//! ### Local runtime
+//!
+//! The local runtime initializes Julia on the current thread and lets you call into Julia from
+//! that one thread.
+//!
+//! Starting this runtime is quite straightforward, you only need to create a `Builder` and call
+//! [`Builder::start_local`]. This initializes Julia on the current thread and returns a
+//! [`LocalHandle`] that lets you call into Julia. The runtime shuts down when this handle is
+//! dropped.
+//!
+//! The handle by itself doesn't let you do much directly. In order to create Julia data and call
+//! Julia functions, a scope must be created first. These scopes ensure Julia data can only be
+//! used while it's guaranteed to be safe from being freed by Julia's garbage collector. jlrs has
+//! dynamically-sized scopes and statically-sized local scopes. The easiest way to familiarize
+//! ourselves with these scopes is with a simple example where we allocate some Julia data.
+//!
+//! Dynamically-sized scope:
 //!
 //! ```
 //! use jlrs::prelude::*;
 //!
 //! # fn main() {
-//! // Initializing Julia is unsafe because this can load arbitrary
-//! // Julia code, and because it can race with other crates unrelated
-//! // to jlrs. It returns an error if Julia has already been
-//! // initialized.
-//! let mut julia = unsafe { RuntimeBuilder::new().start().unwrap() };
+//! let mut julia = Builder::new().start_local().unwrap();
 //!
-//! // A StackFrame must be provided to ensure Julia's GC can be made aware
-//! // of references to Julia data that exist in Rust code.
-//! let mut frame = StackFrame::new();
-//! let _instance = julia.instance(&mut frame);
+//! // To create to dynamically-sized scope we need to create a stack first.
+//! //
+//! // NB: This is a relatively expensive operation, if you need to create a stack you should do
+//! // so early and reuse it as much as possible.
+//! julia.with_stack(|mut stack| {
+//!     stack.scope(|mut frame| {
+//!         // We use `frame` every time we create Julia data. This roots the data in the
+//!         // frame, which means the garbage collector is guaranteed to leave this data alone
+//!         // at least until we leave this scope. Even if the frame is dropped, the data is
+//!         // guaranteed to be protected until the scope ends.
+//!         //
+//!         // This value inherits `frame`'s lifetime, which prevents it from being returned
+//!         // from this closure.
+//!         let _v = Value::new(&mut frame, 1usize);
+//!     })
+//! })
 //! # }
 //! ```
 //!
-//! To use the async runtime you must upgrade the [`RuntimeBuilder`] to an
-//! [`AsyncRuntimeBuilder`] by providing a backing runtime. Implementations for tokio
-//! and async-std are available if these features have been enabled. When starting the async
-//! runtime, you must declare the maximum number of concurrent tasks as a const generic.
-//!
-//! For example, an async runtime backed by tokio and an unbounded channel, that supports 3
-//! concurrent task can be initialized as follows if the `tokio-rt` feature is enabled:
+//! Statically-sized local scope:
 //!
 //! ```
 //! use jlrs::prelude::*;
 //!
 //! # fn main() {
-//! // Initializing Julia is unsafe for the same reasons as the sync runtime.
-//! let (_julia, _task_handle) = unsafe {
-//!     RuntimeBuilder::new()
-//!         .async_runtime::<Tokio>()
-//!         .start::<3>()
-//!         .unwrap()
-//! };
+//! let mut julia = Builder::new().start_local().unwrap();
+//!
+//! // Local scopes can be created without creating a stack, but you need to provide the exact
+//! // number of slots you need.
+//! julia.local_scope::<_, 1>(|mut frame| {
+//!     // We root one value in this frame, so the required capacity of this local scope is 1.
+//!     let _v = Value::new(&mut frame, 1usize);
+//!
+//!     // Because there is only one slot available, uncommenting the next line would cause a
+//!     // panic unless we changed `local_scope::<1>` to `local_scope::<2>`.
+//!     // let _v2 = Value::new(&mut frame, 2usize);
+//! })
 //! # }
 //! ```
 //!
-//! The async runtime can also be spawned as a blocking task on an existing executor:
+//! In general you should prefer using local scopes over dynamic scopes. For more information
+//! about scopes, frames, and other important topics involving memory management, see the
+//! [`memory`] module.
+//!
+//! In the previous two examples we saw the function [`Value::new`], which converts Rust to Julia
+//! data. In particular, calling `Value::new(&mut frame, 1usize)` returned a Julia `UInt` with the
+//! value 1. Any type that implements [`IntoJulia`] can be converted to Julia data with this
+//! method. Similarly, any type that implements [`Unbox`] can be converted from Julia to Rust.
 //!
 //! ```
 //! use jlrs::prelude::*;
 //!
-//! #[tokio::main]
-//! async fn main() {
-//!     // Initializing Julia is unsafe for the same reasons as the sync runtime.
-//!     let (_julia, _task_handle) = unsafe {
-//!         RuntimeBuilder::new()
-//!             .async_runtime::<Tokio>()
-//!             .start_async::<3>()
-//!             .unwrap()
-//!     };
+//! # fn main() {
+//! let mut julia = Builder::new().start_local().unwrap();
+//!
+//! julia.local_scope::<_, 1>(|mut frame| {
+//!     // We root one value in this frame, so the required capacity of this local scope is 1.
+//!     let v = Value::new(&mut frame, 1.0f32);
+//!
+//!     // `Value::unbox` checks if the conversion is valid before unboxing the value.
+//!     let unboxed = v.unbox::<f32>().expect("not a Float32");
+//!     assert_eq!(unboxed, 1.0f32);
+//! })
+//! # }
+//! ```
+//!
+//! We don't just want to unbox the exact same data we've just allocated, obviously. We want to
+//! call functions written in Julia with that data. This boils down to accessing the function in
+//! the right module and calling it.
+//!
+//! ```
+//! use jlrs::prelude::*;
+//!
+//! # fn main() {
+//! let mut julia = Builder::new().start_local().unwrap();
+//!
+//! // This scope contains a fallible operation. Whenever the return type is a `Result` and the
+//! // `?` operator is used, the closure typically has to be annotated with its return type.
+//! julia
+//!     .local_scope::<_, 4>(|mut frame| -> JlrsResult<()> {
+//!         let v1 = Value::new(&mut frame, 1.0f32); // 1
+//!         let v2 = Value::new(&mut frame, 2.0f32); // 2
+//!
+//!         // The Base module is globally rooted, so we can access it with `&frame` instead of
+//!         // `&mut frame`. Only uses of mutable references count towards the necessary capacity
+//!         // of the local scope.
+//!         let base = Module::base(&frame);
+//!
+//!         // The Base module contains the `+` function.
+//!         let func = base.global(&mut frame, "+")?; // 3
+//!
+//!         // `Value` implements the `Call` trait which lets us call it as a function. Any
+//!         // callable object can be called this way. Functions can throw exceptions, if it does
+//!         // it's caught and returned as the `Err` branch of a `Result`. Converting the result
+//!         // to a `JlrsResult` converts it to its error message and lets it be returned with the
+//!         // `?` operator.
+//!         //
+//!         // Calling Julia functions is unsafe. Some functions are inherently unsafe to call,
+//!         // their names typically start with `unsafe`. Other functions might involve
+//!         // multithreading and affect how you must access certain global variables. Adding two
+//!         // numbers is not an issue.
+//!         let v3 = unsafe {
+//!             func.call(&mut frame, [v1, v2]) // 4
+//!                 .into_jlrs_result()?
+//!         };
+//!
+//!         let unboxed = v3.unbox::<f32>().expect("not a Float32");
+//!         assert_eq!(unboxed, 3.0f32);
+//!
+//!         Ok(())
+//!     })
+//!     .unwrap()
+//! # }
+//! ```
+//!
+//! Julia functions are highly generic, calling functions with the `Call` trait calls the most
+//! appropriate function given the arguments. The `+` function for example accepts any number of
+//! arguments and returns their sum, so we can easily adjust the previous example to add more
+//! numbers together.
+//!
+//! ```
+//! use jlrs::prelude::*;
+//!
+//! # fn main() {
+//! let mut julia = Builder::new().start_local().unwrap();
+//!
+//! julia
+//!     .local_scope::<_, 5>(|mut frame| -> JlrsResult<()> {
+//!         let v1 = Value::new(&mut frame, 1.0f32); // 1
+//!         let v2 = Value::new(&mut frame, 2.0f32); // 2
+//!         let v3 = Value::new(&mut frame, 3.0f32); // 3
+//!
+//!         let v3 = unsafe {
+//!             Module::base(&frame)
+//!                 .global(&mut frame, "+")? // 4
+//!                 .call(&mut frame, [v1, v2, v3]) // 5
+//!                 .into_jlrs_result()?
+//!         };
+//!
+//!         let unboxed = v3.unbox::<f32>()?;
+//!         assert_eq!(unboxed, 6.0f32);
+//!
+//!         Ok(())
+//!     })
+//!     .unwrap()
+//! # }
+//! ```
+//!
+//! By default you can only access the `Main`, `Base` and `Core` module. If you want to use
+//! functions defined in standard libraries or installed packages, you must load them first.
+//!
+//! ```
+//! use jlrs::prelude::*;
+//!
+//! # fn main() {
+//! let mut julia = Builder::new().start_local().unwrap();
+//!
+//! unsafe {
+//!     julia
+//!         .using("LinearAlgebra")
+//!         .expect("LinearAlgebra package does not exist");
 //! }
+//!
+//! julia.local_scope::<_, 1>(|mut frame| {
+//!     let lin_alg = Module::package_root_module(&frame, "LinearAlgebra");
+//!     assert!(lin_alg.is_some());
+//!
+//!     let mul_mut_func = lin_alg.unwrap().global(&mut frame, "mul!");
+//!     assert!(mul_mut_func.is_ok());
+//! })
+//! # }
 //! ```
 //!
-//! If you're calling Rust from Julia everything has already been initialized. If the `ccall`
-//! feature is enabled [`CCall`] is available which provides the same functionality as the sync
-//! runtime.
 //!
-//! ## Calling Julia from Rust
+//! ### Multithreaded runtime
 //!
-//! This section will focus on some topics that are common between the sync and async runtimes.
+//! The multithreaded runtime initializes Julia on some background thread, and allows calling into
+//! Julia from arbitrary threads. This runtime is available since Julia 1.9.
 //!
-//! After initialization you have an instance of [`Julia`] or [`AsyncJulia`], both provide a
-//! method called `include` that lets you include files with custom Julia code. In order to
-//! create Julia data and call Julia functions, a scope must be created first.
+//! To start this runtime you need to create a `Builder` and call [`Builder::spawn_mt`]. It has
+//! its own handle type, [`MtHandle`], which can be cloned and sent to other threads. Unlike the
+//! local runtime's `LocalHandle`, it can't be used directly, you must call [`MtHandle::with`]
+//! first to ensure the thread is in a state where it can call into Julia.
 //!
-//! When the sync runtime is used this can be done by calling the method [`Julia::scope`]. This
-//! method takes a closure with a single argument, a [`GcFrame`] (frame). This frame can be used
-//! to access Julia data, and ensure it's not freed by the GC while it's accessible from Rust.
+//! Let's call into Julia from two separate threads to see it in action:
 //!
-//! The async runtime can't create a new scope directly, `AsyncJulia` is a handle to the async
-//! runtime which runs on another thread. Instead, the async runtime deals with tasks, each task
-//! runs in its own scope. The simplest kind of task is a blocking task, which can be executed by
-//! calling `AsyncJulia::blocking_task`. This method accepts any closure `Julia::scope` can
-//! handle with the additional requirement that it must be `Send` and `Sync`. It's called a
-//! blocking task because the thread that executes this task is blocked while executing it. The
-//! other kinds of tasks that the async runtime can handle will be introduced later.
+//! ```
+//! use std::thread;
 //!
-//! Inside the closure provided to `Julia::scope` or `AsyncJulia::blocking_task` it's possible to
-//! interact with Julia. Global Julia data can be accessed through its module system, the methods
-//! [`Module::main`], [`Module::base`], and [`Module::core`] can be used to access the `Main`,
-//! `Base`, and `Core` modules respectively. The contents of these modules can then be accessed by
-//! calling [`Module::function`] which returns a [`Function`], [`Module::global`] which returns a
-//! [`Value`], and [`Module::submodule`] which returns another [`Module`]. These types are
-//! examples of managed types, handles to data owned by Julia's GC. Most functionality in jlrs
-//! is provided through methods implemented by managed types.
+//! use jlrs::prelude::*;
 //!
-//! The most generic managed type is `Value`, all other managed types can always be converted to
-//! a `Value`. It provides several methods to allocate new Julia data. The simplest one is
-//! [`Value::eval_string`], which evaluates the contents of the string passed to it and returns
-//! the result as a `Value`. For example, you can evaluate `2` to convert it to  `Value`. In
-//! practice, this method should rarely be used. It can be used to evaluate simple function calls
-//! like `sqrt(2)`, but it must be parsed, compiled, and can't take any non-literal arguments. Its
-//! most important use-case is importing installed and standard library packages by evaluating an
-//! `import` or `using` statement.
+//! # fn main() {
+//! # #[cfg(feature = "multi-rt")]
+//! # #[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8")))]
+//! # {
+//! // When the multithreaded runtime is spawned, a new thread is spawned that initializes Julia.
+//! // This thread simply waits for shutdown to be requested when the final `mt_handle` is
+//! // dropped. An `MtHandle` and a `JoinHandle` to that runtime thread are returned.
+//! let (mut mt_handle, th_handle) = Builder::new().spawn_mt().unwrap();
 //!
-//! A more interesting method, [`Value::new`], can be used with data of any type that implements
-//! [`IntoJulia`]. This trait is implemented by primitive types like `i8` and `char`. Any type
-//! that implements [`IntoJulia`] also implements [`Unbox`] which is used to extract the contents
-//! of a `Value`. Managed types like [`Array`] don't implement [`IntoJulia`] or [`Unbox`], if they
-//! can be created from Rust they provide methods to do so.
+//! // We can send different instances of `MtHandle` to different threads. `MtHandle` is `Send`,
+//! // not `Sync` so we need to clone it in advance.
+//! let mut mt_handle2 = mt_handle.clone();
 //!
-//! As a simple example, let's convert two numbers to Julia values and add them:
+//! let t1 = thread::spawn(move || {
+//!     // By calling `MtHandle::with` we enable the thread to call into Julia. The handle you can
+//!     // use in that closure provides the same functionality as the local runtime's
+//!     // `LocalHandle`.
+//!     mt_handle.with(|handle| {
+//!         handle.local_scope::<_, 1>(|mut frame| unsafe {
+//!             let _v = Value::new(&mut frame, 1);
+//!         })
+//!     })
+//! });
+//!
+//! let t2 = thread::spawn(move || {
+//!     mt_handle2.with(|handle| {
+//!         handle.local_scope::<_, 1>(|mut frame| unsafe {
+//!             let _v = Value::new(&mut frame, 2);
+//!         })
+//!     })
+//! });
+//!
+//! t1.join().expect("thread 1 panicked");
+//! t2.join().expect("thread 2 panicked");
+//!
+//! // No more handles exist, so the runtime thread has shut down.
+//! th_handle.join().unwrap();
+//! # }
+//! # }
+//! ```
+//!
+//! It's important that you avoid blocking operations unrelated to Julia in a call to
+//! `MtHandle::with`. The reason is that this can prevent the garbage collector from running.
+//! Roughly speaking, whenever Julia data is allocated the garbage collector can signal it has to
+//! run. This blocks the thread that tried to allocate data, and every other thread will similarly
+//! block when they try to allocate data, until every thread is blocked. When all threads are
+//! blocked, the garbage collector collects garbage and unblocks the threads when it's done.
+//!
+//! The implication is that long-running operations which don't allocate Julia data can block the
+//! garbage collector, which can grind Julia to a halt. Outside calls to `MtHandle::with`, the
+//! thread is guaranteed to be in a state where it won't block the garbage collector from running.
+//!
+//!
+//! ### Async runtime
+//!  
+//! While the sync and multithreaded runtimes let you call into Julia directly from one or more
+//! threads, the async runtime runs on a background thread and uses an executor to allow
+//! running multiple tasks on that thread concurrently. Its handle type, `AsyncHandle`, can be
+//! shared across threads like the `MtHandle`, and lets you send tasks to the runtime thread.
+//!
+//! The async runtime supports three kinds of tasks: blocking, async, and persistent tasks.
+//! Blocking tasks run as a single unit and prevent other tasks from running until they've
+//! completed. Async tasks run as a separate task on the executor, they can use async operations
+//! and long-running Julia functions can be dispatched to a background thread. Persistent tasks
+//! are similar to async tasks, they run as separate tasks but additionally have internal state
+//! and can be called multiple times.
+//!
+//! Blocking task:
 //!
 //! ```
 //! use jlrs::prelude::*;
 //!
 //! # fn main() {
-//! // Initializing Julia is unsafe because it can race with another crate that does
-//! // the same.
-//! let mut julia = unsafe { RuntimeBuilder::new().start().unwrap() };
-//! let mut frame = StackFrame::new();
-//! let mut julia = julia.instance(&mut frame);
+//! let (julia, thread_handle) = Builder::new()
+//!     .async_runtime(Tokio::<3>::new(false))
+//!     .spawn()
+//!     .unwrap();
 //!
-//! let res = julia.scope(|mut frame| {
-//!     // Create the two arguments.
-//!     let i = Value::new(&mut frame, 2u64);
-//!     let j = Value::new(&mut frame, 1u32);
+//! // When a task cannot be dispatched to the runtime because the
+//! // channel is full, the dispatcher is returned in the `Err` branch.
+//! // `blocking_task` is the receiving end of a tokio oneshot channel.
+//! let blocking_task = julia
+//!     .blocking_task(|mut frame| -> JlrsResult<f32> {
+//!         Value::new(&mut frame, 1.0f32).unbox::<f32>()
+//!     })
+//!     .try_dispatch()
+//!     .expect("unable to dispatch task");
 //!
-//!     // The `+` function can be found in the base module.
-//!     let func = Module::base(&frame).function(&mut frame, "+")?;
+//! let res = blocking_task
+//!     .blocking_recv()
+//!     .expect("unable to receive result")
+//!     .expect("blocking task failed.");
 //!
-//!     // Call the function and unbox the result as a `u64`. The result of the function
-//!     // call is a nested `Result`; the outer error doesn't contain to any Julia
-//!     // data, while the inner error contains the exception if one is thrown. Here the
-//!     // exception is converted to the outer error type by calling `into_jlrs_result`, this new
-//!     // error contains the error message Julia would have shown.
-//!     unsafe { func.call2(&mut frame, i, j) }
-//!         .into_jlrs_result()?
-//!         .unbox::<u64>()
-//! }).unwrap();
+//! assert_eq!(res, 1.0);
 //!
-//! assert_eq!(res, 3);
+//! // The runtime thread exits when the last instance of `julia` is dropped.
+//! std::mem::drop(julia);
+//! thread_handle.join().unwrap();
 //! # }
 //! ```
 //!
-//! Evaluating raw code and calling Julia functions is always unsafe. Nothing prevents you from
-//! calling a function like `nasaldemons() = unsafe_load(Ptr{Float64}(0x05391A445))`. Similarly,
-//! mutating Julia data is unsafe because nothing prevents you from mutating data that shouldn't
-//! be mutated, e.g. a `DataType`. A full overview of the rules that you should keep in mind can
-//! be found in the [`safety`] module.
-//!
-//! ### Async and persistent tasks
-//!
-//! In addition to blocking tasks, the async runtime lets you execute async tasks which implement
-//! the [`AsyncTask`] trait, and persistent tasks which implement [`PersistentTask`]. Both of
-//! these traits are async traits.
-//!
-//! An async task is similar to a blocking task, except that you must implement the async `run`
-//! method instead of providing a closure. This method takes an [`AsyncGcFrame`]. This new frame
-//! type not only provides access to the same features as [`GcFrame`], it can also be used to call
-//! async methods provided by the [`CallAsync`] trait. These methods schedule a function call as a
-//! new Julia `Task` and can be `await`ed until this task has completed. The async runtime can
-//! switch to another task while the result is pending, allowing multiple tasks to run
-//! concurrently on a single thread.
-//!
-//! The previous example can be rewritten as an async task:
+//! Async task:
 //!
 //! ```
 //! use jlrs::prelude::*;
@@ -402,49 +573,59 @@
 //!     b: u32,
 //! }
 //!
-//! // Only the runtime thread can call the Julia C API, so the async
-//! // trait methods of `AsyncTask` must not return a future that
-//! // implements `Send` or `Sync`.
+//! // Async tasks must implement the `AsyncTask` trait. Only the runtime thread can call the
+//! // Julia C API, so the `run` method must not return a future that implements `Send` or `Sync`.
 //! #[async_trait(?Send)]
 //! impl AsyncTask for AdditionTask {
-//!     // The type of the result of this task if it succeeds.
-//!     type Output = u64;
-//!
-//!     // The affinity of the task. Setting it to `DispatchAny` allows the
-//!     // task to be dispatched to both the main thread and worker threads
-//!     // if they are available.
-//!     type Affinity = DispatchAny;
+//!     // The type of the result of this task.
+//!     type Output = JlrsResult<u64>;
 //!
 //!     // This async method replaces the closure from the previous examples,
-//!     // an `AsyncGcFrame` can be used the same way as a `GcFrame` but also
-//!     // can be used in combination with methods from the `CallAsync` trait.
-//!     async fn run<'frame>(
-//!         &mut self,
-//!         mut frame: AsyncGcFrame<'frame>,
-//!     ) -> JlrsResult<Self::Output> {
+//!     // an `AsyncGcFrame` can be used the same way as other frame types.
+//!     async fn run<'frame>(&mut self, mut frame: AsyncGcFrame<'frame>) -> Self::Output {
 //!         let a = Value::new(&mut frame, self.a);
 //!         let b = Value::new(&mut frame, self.b);
 //!
-//!         let func = Module::base(&frame).function(&mut frame, "+")?;
+//!         let func = Module::base(&frame).global(&mut frame, "+")?;
 //!
-//!         // CallAsync::call_async schedules the function call on another
-//!         // thread and returns a Future that resolves when the scheduled
-//!         // function has returned or thrown an error.
+//!         // CallAsync::call_async schedules the function call on another thread.
+//!         // The runtime can switch to other tasks while awaiting the result.
+//!         // Safety: adding two numbers is safe.
 //!         unsafe { func.call_async(&mut frame, [a, b]) }
 //!             .await
 //!             .into_jlrs_result()?
 //!             .unbox::<u64>()
 //!     }
 //! }
+//!
+//! # fn main() {
+//! let (julia, thread_handle) = Builder::new()
+//!     .async_runtime(Tokio::<3>::new(false))
+//!     .spawn()
+//!     .unwrap();
+//!
+//! // When a task cannot be dispatched to the runtime because the
+//! // channel is full, the dispatcher is returned in the `Err` branch.
+//! // `async_task` is the receiving end of a tokio oneshot channel.
+//! let async_task = julia
+//!     .task(AdditionTask { a: 1, b: 2 })
+//!     .try_dispatch()
+//!     .expect("unable to dispatch task");
+//!
+//! let res = async_task
+//!     .blocking_recv()
+//!     .expect("unable to receive result")
+//!     .expect("AdditionTask failed");
+//!
+//! assert_eq!(res, 3);
+//!
+//! // The runtime thread exits when the last instance of `julia` is dropped.
+//! std::mem::drop(julia);
+//! thread_handle.join().unwrap();
+//! # }
 //! ```
 //!
-//! While blocking and async tasks run once and return their result, a persistent task returns a
-//! handle to the task. This handle can be shared across threads and used to call its `run`
-//! method. In addition to a global and an async frame, this method can use the state and input
-//! data provided by the caller.
-//!
-//! As an example, let's accumulate some number of values in a Julia array and return the sum of
-//! its contents:
+//! Persistent task:
 //!
 //! ```
 //! use jlrs::prelude::*;
@@ -453,18 +634,16 @@
 //!     n_values: usize,
 //! }
 //!
+//! // The internal state of a persistent task can contain Julia data.
 //! struct AccumulatorTaskState<'state> {
 //!     array: TypedArray<'state, 'static, usize>,
 //!     offset: usize,
 //! }
 //!
-//! // Only the runtime thread can call the Julia C API, so the async trait
-//! // methods of `PersistentTask` must not return a future that implements
-//! // `Send` or `Sync`.
+//! // The same is true for implementations of `PersistentTask`.
 //! #[async_trait(?Send)]
 //! impl PersistentTask for AccumulatorTask {
-//!     // The type of the result of the task if it succeeds.
-//!     type Output = usize;
+//!     type Output = JlrsResult<usize>;
 //!
 //!     // The type of the task's internal state.
 //!     type State<'state> = AccumulatorTaskState<'state>;
@@ -472,14 +651,7 @@
 //!     // The type of the additional data that the task must be called with.
 //!     type Input = usize;
 //!
-//!     // The affinity of the task. Setting it to `DispatchAny` allows the
-//!     // task to be dispatched to both the main thread and worker threads
-//!     // if they are available.
-//!     type Affinity = DispatchAny;
-//!
-//!     // This method is called before the task can be called. Note that the
-//!     // frame is not dropped until the task has completed, so the task's
-//!     // internal state can contain Julia data rooted in this frame.
+//!     // This method is called before the task can be called.
 //!     async fn init<'frame>(
 //!         &mut self,
 //!         mut frame: AsyncGcFrame<'frame>,
@@ -493,32 +665,23 @@
 //!         Ok(AccumulatorTaskState { array, offset: 0 })
 //!     }
 //!
-//!     // Whenever the task is called through its handle this method
-//!     // is called. Unlike `init`, the frame that this method can use
-//!     // is dropped after `run` returns.
+//!     // Whenever the task is called, it's called with its state and the provided input.
 //!     async fn run<'frame, 'state: 'frame>(
 //!         &mut self,
 //!         mut frame: AsyncGcFrame<'frame>,
 //!         state: &mut Self::State<'state>,
 //!         input: Self::Input,
-//!     ) -> JlrsResult<Self::Output> {
-//!         {
-//!             // Array data can be directly accessed from Rust.
-//!             // The data is tracked first to ensure it's not
-//!             // already borrowed from Rust.
-//!             unsafe {
-//!                 let mut tracked = state.array.track_exclusive()?;
-//!                 let mut data = tracked.bits_data_mut()?;
-//!                 data[state.offset] = input;
-//!             };
+//!     ) -> Self::Output {
+//!         unsafe {
+//!             let mut data = state.array.bits_data_mut();
+//!             data[state.offset] = input;
+//!         };
 //!
-//!             state.offset += 1;
-//!             if (state.offset == self.n_values) {
-//!                 state.offset = 0;
-//!             }
+//!         state.offset += 1;
+//!         if (state.offset == self.n_values) {
+//!             state.offset = 0;
 //!         }
 //!
-//!         // Return the sum of the contents of `state.array`.
 //!         unsafe {
 //!             Module::base(&frame)
 //!                 .function(&mut frame, "sum")?
@@ -528,19 +691,104 @@
 //!         }
 //!     }
 //! }
+//!
+//! # fn main() {
+//! let (julia, thread_handle) = Builder::new()
+//!     .async_runtime(Tokio::<3>::new(false))
+//!     .spawn()
+//!     .unwrap();
+//!
+//! let persistent_task = julia
+//!     .persistent(AccumulatorTask { n_values: 2 })
+//!     .try_dispatch()
+//!     .expect("unable to dispatch task")
+//!     .blocking_recv()
+//!     .expect("unable to receive handle")
+//!     .expect("init failed");
+//!
+//! // A persistent task can be called with its input, the same dispatch mechanism
+//! // is used as above.
+//! let res = persistent_task
+//!     .call(1)
+//!     .try_dispatch()
+//!     .expect("unable to dispatch call")
+//!     .blocking_recv()
+//!     .expect("unable to receive handle")
+//!     .expect("call failed");
+//!
+//! assert_eq!(res, 1);
+//!
+//! let res = persistent_task
+//!     .call(2)
+//!     .try_dispatch()
+//!     .expect("unable to dispatch call")
+//!     .blocking_recv()
+//!     .expect("unable to receive handle")
+//!     .expect("call failed");
+//!
+//! assert_eq!(res, 3);
+//!
+//! // If the `AsyncHandle` is dropped before the task is, the runtime continues
+//! // running until the task has been dropped.
+//! std::mem::drop(julia);
+//! std::mem::drop(persistent_task);
+//! thread_handle.join().unwrap();
+//! # }
 //! ```
+//!
+//!
+//! ### Async, multithreaded runtime
+//!
+//! There are two non-exclusive ways the async runtime can be combined with the multithreaded
+//! runtime. You can start the runtime thread with an async executor, which grants you both an
+//! `AsyncHandle` to that thread and a `MtHandle`. This can be useful if you have code that must
+//! run on the main thread.
+//!
+//! The second option is thread pools. When both runtimes are enabled, `MtHandle` lets you
+//! construct pools of async worker threads that share a single task queue. Each pool can have an
+//! arbitrary number of workers, which are automatically restarted if they die. Like the async
+//! runtime, you interact with a pool through its `AsyncHandle`. The pool shuts down when the last
+//! handle is dropped.
+//!
+//! ```
+//! use jlrs::prelude::*;
+//!
+//! # fn main() {
+//! # #[cfg(feature = "multi-rt")]
+//! # #[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8")))]
+//! # {
+//! let (mt_handle, async_handle, thread_handle) = Builder::new()
+//!     .async_runtime(Tokio::<3>::new(false))
+//!     .spawn_mt()
+//!     .unwrap();
+//!
+//! let pool_handle = mt_handle
+//!     .pool_builder(Tokio::<1>::new(false))
+//!     .n_workers(2.try_into().unwrap())
+//!     .spawn();
+//!
+//! // All handles must be dropped .
+//! std::mem::drop(mt_handle);
+//! std::mem::drop(pool_handle);
+//! std::mem::drop(async_handle);
+//! thread_handle.join().unwrap();
+//! # }
+//! # }
+//! ```
+//!
 //!
 //! ## Calling Rust from Julia
 //!
-//! Julia's `ccall` interface can be used to call `extern "C"` functions defined in Rust.
-//! A function pointer can be cast to a void pointer and converted to a [`Value`]:
+//! Julia can call functions written in Rust thanks to its `ccall` interface, which lets you call
+//! arbitrary functions which use the C ABI. These functions can be defined in dynamic libraries or
+//! provided directly to Julia by converting a function pointer to a `Value`.
 //!
 //! ```
 //! use jlrs::prelude::*;
 //!
 //! // This function will be provided to Julia as a pointer, so its name can be mangled.
-//! unsafe extern "C" fn call_me(arg: bool) -> isize {
-//!     if arg {
+//! unsafe extern "C" fn call_me(arg: Bool) -> isize {
+//!     if arg.as_bool() {
 //!         1
 //!     } else {
 //!         -1
@@ -548,76 +796,76 @@
 //! }
 //!
 //! # fn main() {
-//! let mut frame = StackFrame::new();
-//! let mut julia = unsafe { RuntimeBuilder::new().start().unwrap() };
-//! let mut julia = julia.instance(&mut frame);
+//! # let mut julia = Builder::new().start_local().unwrap();
 //!
 //! julia
-//!     .scope(|mut frame| unsafe {
-//!         // Cast the function to a void pointer
-//!         let call_me_val = Value::new(&mut frame, call_me as *mut std::ffi::c_void);
+//!     .local_scope::<_, 3>(|mut frame| -> JlrsResult<_> {
+//!         unsafe {
+//!             // Cast the function to a void pointer
+//!             let call_me_val = Value::new(&mut frame, call_me as *mut std::ffi::c_void);
 //!
-//!         // Value::eval_string can be used to create new functions.
-//!         let func = Value::eval_string(
-//!             &mut frame,
-//!             "myfunc(callme::Ptr{Cvoid})::Int = ccall(callme, Int, (Bool,), true)",
-//!         )
-//!         .into_jlrs_result()?;
+//!             // Value::eval_string can be used to create new functions.
+//!             let func = Value::eval_string(
+//!                 &mut frame,
+//!                 "myfunc(callme::Ptr{Cvoid})::Int = ccall(callme, Int, (Bool,), true)",
+//!             )
+//!             .into_jlrs_result()?;
 //!
-//!         // Call the function and unbox the result.
-//!         let result = func
-//!             .call1(&mut frame, call_me_val)
-//!             .into_jlrs_result()?
-//!             .unbox::<isize>()?;
+//!             // Call the function and unbox the result.
+//!             let result = func
+//!                 .call1(&mut frame, call_me_val)
+//!                 .into_jlrs_result()?
+//!                 .unbox::<isize>()?;
 //!
-//!         assert_eq!(result, 1);
-//!
-//!         Ok(())
+//!             assert_eq!(result, 1);
+//!             Ok(())
+//!         }
 //!     })
 //!     .unwrap();
 //! # }
 //! ```
 //!
-//! You can also use functions defined in `cdylib` libraries. In order to create such
-//! a library you need to add
+//! To create a library that Julia can use, you must compile your crate as a `cdylib`. To achieve
+//! this you need to add
 //!
 //! ```toml
 //! [lib]
 //! crate-type = ["cdylib"]
 //! ```
 //!
-//! to your crate's `Cargo.toml`. It's also recommended to abort on panic:
+//! to your crate's `Cargo.toml`. You must also abort on panic:
 //!
 //! ```toml
 //! [profile.release]
 //! panic = "abort"
 //! ```
 //!
-//! You must not enable any runtime features.
+//! You must not enable any of jlrs's runtimes.
 //!
-//! The easiest way to export Rust functions like `call_me` from the previous example is by
-//! using the [`julia_module`] macro. The content of the macro is converted to an initialization
-//! function that can be called from Julia to generate the module.
+//! The most versatile way to export Rust functions like `call_me` from the previous example is by
+//! using the [`julia_module`] macro. This macro lets you export custom types and functions in a
+//! way that is friendly to precompilation.
 //!
-//! In Rust, the macro can be used like this:
+//! In Rust, this macro is used as follows:
 //!
 //! ```ignore
 //! use jlrs::prelude::*;
+//!
 //! fn call_me(arg: Bool) -> isize {
-//!   if arg.as_bool() {
-//!     1
-//!   } else {
-//!     0
-//!   }
+//!     if arg.as_bool() {
+//!         1
+//!     } else {
+//!         -1
+//!     }
 //! }
-//! 
+//!
 //! julia_module! {
 //!     become callme_init_fn;
 //!     fn call_me(arg: Bool) -> isize;
 //! }
 //! ```
 //!
-//! while on the Julia side things look like this:
+//! While on the Julia side things look like this:
 //!
 //! ```julia
 //! module CallMe
@@ -639,7 +887,7 @@
 //! @assert CallMe.call_me(false) == -1
 //! ```
 //!
-//! This macro has many more capabilities than just exporting extern "C" functions, for more
+//! This macro has many more capabilities than just exporting functions written in Rust. For more
 //! information see the [documentation]. A practical example that uses this macro is the
 //! [rustfft-jl] crate, which uses this macro to expose RustFFT to Julia. The recipe for
 //! BinaryBuilder can be found [here].
@@ -652,69 +900,26 @@
 //! # Testing
 //!
 //! The restriction that Julia can be initialized once must be taken into account when running
-//! tests that use `jlrs`. Because tests defined in a single crate are not guaranteed to be run
+//! tests that use jlrs. Because tests defined in a single crate are not guaranteed to be run
 //! from the same thread you must guarantee that each crate has only one test that initializes
 //! Julia. It's recommended you only use jlrs in integration tests because each top-level
 //! integration test file is treated as a separate crate.
 //!
 //! ```
-//! use jlrs::prelude::*;
+//! use jlrs::{prelude::*, runtime::handle::local_handle::LocalHandle};
 //!
-//! fn test_1(julia: &mut Julia) {
-//!     // use instance
+//! fn test_1(julia: &mut LocalHandle) {
+//!     // use handle
 //! }
-//! fn test_2(julia: &mut Julia) {
-//!     // use instance
+//! fn test_2(julia: &mut LocalHandle) {
+//!     // use handle
 //! }
 //!
 //! #[test]
 //! fn call_tests() {
-//!     let mut pending = unsafe { RuntimeBuilder::new().start().unwrap() };
-//!     let mut frame = StackFrame::new();
-//!     let mut julia = pending.instance(&mut frame);
-//!
+//!     let mut julia = unsafe { Builder::new().start_local().unwrap() };
 //!     test_1(&mut julia);
 //!     test_2(&mut julia);
-//! }
-//! ```
-//!
-//! Because `AsyncJulia` is thread-safe, it is possible to have multiple tests in a single crate
-//! when the async runtime is used:
-//!
-//! ```
-//! use std::{num::NonZeroUsize, sync::Arc};
-//!
-//! use jlrs::prelude::*;
-//! use once_cell::sync::OnceCell;
-//!
-//! fn init() -> Arc<AsyncJulia<Tokio>> {
-//!     unsafe {
-//!         Arc::new(
-//!             RuntimeBuilder::new()
-//!                 .async_runtime::<Tokio>()
-//!                 .n_threads(4)
-//!                 .channel_capacity(NonZeroUsize::new_unchecked(32))
-//!                 .start::<4>()
-//!                 .expect("Could not init Julia")
-//!                 .0,
-//!         )
-//!     }
-//! }
-//!
-//! pub static JULIA: OnceCell<Arc<AsyncJulia<Tokio>>> = OnceCell::new();
-//!
-//! #[test]
-//! fn test_1() {
-//!     let julia = JULIA.get_or_init(init);
-//!
-//!     // use instance
-//! }
-//!
-//! #[test]
-//! fn test_2() {
-//!     let julia = JULIA.get_or_init(init);
-//!
-//!     // use instance
 //! }
 //! ```
 //!
@@ -733,6 +938,10 @@
 //!
 //! These custom types can also be used when you call Rust from Julia with `ccall`.
 //!
+//! [`LocalHandle`]: crate::runtime::handle::local_handle::LocalHandle
+//! [`MtHandle`]: crate::runtime::handle::mt_handle::MtHandle
+//! [`MtHandle::with`]: crate::runtime::handle::mt_handle::MtHandle::with
+//! [`Builder::start_local`]: crate::runtime::builder::Builder::start_local
 //! [`Julia`]: crate::runtime::sync_rt::Julia
 //! [`Julia::scope`]: crate::runtime::sync_rt::Julia::scope
 //! [`Julia::scope_with_capacity`]: crate::runtime::sync_rt::Julia::scope_with_capacity
@@ -740,8 +949,7 @@
 //! [`AsyncJulia::init`]: crate::multitask::runtime::AsyncJulia::init
 //! [`AsyncJulia::init_async`]: crate::multitask::runtime::AsyncJulia::init_async
 //! [`Julia::init_with_image`]: crate::runtime::sync_rt::Julia::init_with_image
-//! [`CCall`]: crate::ccall::CCall
-//! [`CCall::uv_async_send`]: crate::ccall::CCall::uv_async_send
+//! [`CCall`]: crate::ccall::runtime::handle::CCall
 //! [`Unrooted`]: crate::memory::target::unrooted::Unrooted
 //! [`GcFrame`]: crate::memory::target::frame::GcFrame
 //! [`Module`]: crate::data::managed::module::Module
@@ -775,8 +983,8 @@
 //! [`CallAsync`]: crate::call::CallAsync
 //! [`DataType`]: crate::data::managed::datatype::DataType
 //! [`TypedArray`]: crate::data::managed::array::TypedArray
-//! [`RuntimeBuilder`]: crate::runtime::builder::RuntimeBuilder
-//! [`AsyncRuntimeBuilder`]: crate::runtime::builder::AsyncRuntimeBuilder
+//! [`Builder`]: crate::runtime::builder::Builder
+//! [`Builder::spawn_mt`]: crate::runtime::builder::Builder::spawn_mt
 //! [`jlrs::prelude`]: crate::prelude
 //! [`julia_module`]: jlrs_macros::julia_module
 //! [documentation]: jlrs_macros::julia_module
@@ -785,74 +993,50 @@
 
 #![forbid(rustdoc::broken_intra_doc_links)]
 
-use std::sync::atomic::AtomicBool;
+use std::sync::atomic::{AtomicBool, Ordering};
 
-use atomic::Ordering;
-#[cfg(feature = "sync-rt")]
+#[cfg(feature = "local-rt")]
 use once_cell::sync::OnceCell;
 use prelude::Managed;
 
 use crate::{
     data::{
-        managed::{module::init_global_cache, symbol::init_symbol_cache, value::Value},
+        managed::{
+            module::{init_global_cache, JlrsCore},
+            symbol::init_symbol_cache,
+            value::Value,
+        },
         types::{
             construct_type::init_constructed_type_cache, foreign_type::init_foreign_type_registry,
         },
     },
     memory::{
         context::{ledger::init_ledger, stack::Stack},
-        stack_frame::PinnedFrame,
         target::unrooted::Unrooted,
     },
 };
-
-#[cfg(feature = "pyplot")]
-macro_rules! init_fn {
-    ($name:ident, $include:ident, $file:expr) => {
-        pub(crate) static $include: &'static str = include_str!($file);
-        pub(crate) unsafe fn $name<'frame>(
-            frame: &mut $crate::memory::target::frame::GcFrame<'frame>,
-        ) -> () {
-            match $crate::data::managed::value::Value::eval_string(frame, $include) {
-                Ok(_) => (),
-                Err(e) => {
-                    panic!(
-                        "{}",
-                        $crate::data::managed::Managed::error_string_or(
-                            e,
-                            $crate::error::CANNOT_DISPLAY_VALUE
-                        )
-                    )
-                }
-            }
-        }
-    };
-}
 
 pub mod args;
 #[cfg(feature = "async")]
 pub mod async_util;
 pub mod call;
 pub mod catch;
-#[cfg(feature = "ccall")]
-pub mod ccall;
 pub mod convert;
 pub mod data;
 pub mod error;
 pub mod gc_safe;
 pub mod info;
 pub mod memory;
-#[cfg(feature = "prelude")]
 pub mod prelude;
 pub(crate) mod private;
-#[cfg(feature = "pyplot")]
-pub mod pyplot;
-#[cfg(any(feature = "sync-rt", feature = "async-rt"))]
 pub mod runtime;
 pub mod safety;
-#[doc(hidden)]
-#[cfg(feature = "sync-rt")]
 pub mod util;
+
+/// The version of the jlrs API this version of jlrs is compatible with.
+///
+/// If this version number doesn't match `JLRS_API_VERSION` in JlrsCore.jl, initialization fails.
+pub const JLRS_API_VERSION: isize = 3;
 
 /// Installation method for the JlrsCore package. If JlrsCore is already installed the installed version
 /// is used.
@@ -860,7 +1044,7 @@ pub mod util;
 pub enum InstallJlrsCore {
     /// Install the most recent version of JlrsCore
     Default,
-    /// Don't install the JlrsCore
+    /// Don't install JlrsCore
     No,
     /// Install the given version
     Version {
@@ -881,7 +1065,17 @@ pub enum InstallJlrsCore {
 }
 
 impl InstallJlrsCore {
-    pub(crate) unsafe fn use_or_install(&self, unrooted: Unrooted) {
+    #[cfg_attr(
+        not(any(
+            feature = "local-rt",
+            feature = "async-rt",
+            feature = "multi-rt",
+            feature = "ccall"
+        )),
+        allow(unused)
+    )]
+    pub(crate) unsafe fn use_or_install(&self) {
+        let unrooted = Unrooted::new();
         let res = match self {
             InstallJlrsCore::Default => {
                 Value::eval_string(
@@ -946,15 +1140,21 @@ impl InstallJlrsCore {
     }
 }
 
-// The chosen install method is stored in a OnceCell when the sync runtime is used to
+// The chosen install method is stored in a OnceCell when the local runtime is used to
 // avoid having to store it in `PendingJulia`.
-#[cfg(feature = "sync-rt")]
+#[cfg(feature = "local-rt")]
 pub(crate) static INSTALL_METHOD: OnceCell<InstallJlrsCore> = OnceCell::new();
 
-pub(crate) unsafe fn init_jlrs<const N: usize>(
-    frame: &mut PinnedFrame<N>,
-    install_jlrs_core: &InstallJlrsCore,
-) {
+#[cfg_attr(
+    not(any(
+        feature = "local-rt",
+        feature = "async-rt",
+        feature = "multi-rt",
+        feature = "ccall"
+    )),
+    allow(unused)
+)]
+pub(crate) unsafe fn init_jlrs(install_jlrs_core: &InstallJlrsCore) {
     static IS_INIT: AtomicBool = AtomicBool::new(false);
 
     if IS_INIT.swap(true, Ordering::Relaxed) {
@@ -966,11 +1166,13 @@ pub(crate) unsafe fn init_jlrs<const N: usize>(
     init_symbol_cache();
     init_global_cache();
 
+    install_jlrs_core.use_or_install();
     let unrooted = Unrooted::new();
-    install_jlrs_core.use_or_install(unrooted);
+    let api_version = JlrsCore::api_version(&unrooted);
+    if api_version != JLRS_API_VERSION {
+        panic!("Incompatible version of JlrsCore detected. Expected API version{JLRS_API_VERSION}, found {api_version}");
+    }
 
     init_ledger();
-
-    // Init foreign Stack type
-    Stack::init(frame);
+    Stack::init();
 }

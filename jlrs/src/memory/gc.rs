@@ -1,12 +1,10 @@
 //! Manage the garbage collector.
 
-#[julia_version(since = "1.10")]
-use jl_sys::jl_gc_set_max_memory;
-pub use jl_sys::{jl_gc_collect, jl_gc_collection_t_JL_GC_FULL};
+pub use jl_sys::GcCollection;
 use jl_sys::{
-    jl_gc_collection_t, jl_gc_enable, jl_gc_is_enabled, jl_gc_mark_queue_obj,
-    jl_gc_mark_queue_objarray, jl_gc_safepoint, jl_gc_wb, jlrs_gc_safe_enter, jlrs_gc_safe_leave,
-    jlrs_gc_unsafe_enter, jlrs_gc_unsafe_leave,
+    jl_gc_collect, jl_gc_collection_t, jl_gc_enable, jl_gc_is_enabled, jl_gc_mark_queue_obj,
+    jl_gc_mark_queue_objarray, jl_gc_safepoint, jlrs_gc_safe_enter, jlrs_gc_safe_leave,
+    jlrs_gc_unsafe_enter, jlrs_gc_unsafe_leave, jlrs_gc_wb, jlrs_ppgcstack,
 };
 use jlrs_macros::julia_version;
 
@@ -15,7 +13,7 @@ use super::{
     target::{unrooted::Unrooted, Target},
     PTls,
 };
-#[cfg(feature = "sync-rt")]
+#[cfg(feature = "local-rt")]
 use crate::runtime::sync_rt::Julia;
 #[julia_version(since = "1.7")]
 use crate::{call::Call, data::managed::module::Module};
@@ -26,14 +24,6 @@ use crate::{
     },
     private::Private,
 };
-
-/// The different collection modes.
-#[derive(Debug, Copy, Clone)]
-pub enum GcCollection {
-    Auto = 0,
-    Full = 1,
-    Incremental = 2,
-}
 
 /// Manage the GC.
 ///
@@ -96,6 +86,16 @@ pub trait Gc: private::GcPriv {
         // Safety: this function can only be called while Julia is active from a thread known to
         // Julia.
         unsafe { jl_gc_collect(mode as jl_gc_collection_t) }
+    }
+
+    /// Force `n` collections. This should only be used to investigate GC-related bugs.
+    #[inline]
+    fn gc_collect_n(&self, mode: GcCollection, n: usize) {
+        // Safety: this function can only be called while Julia is active from a thread known to
+        // Julia.
+        for _i in 0..n {
+            self.gc_collect(mode);
+        }
     }
 
     /// Insert a safepoint, a point where the garbage collector may run.
@@ -165,13 +165,6 @@ pub trait Gc: private::GcPriv {
         let ptls = get_tls();
         jlrs_gc_unsafe_leave(ptls, state)
     }
-
-    #[julia_version(since = "1.10")]
-    /// Set GC memory trigger in bytes for greedy memory collecting
-    #[inline]
-    fn gc_set_max_memory(max_mem: u64) {
-        unsafe { jl_gc_set_max_memory(max_mem) }
-    }
 }
 
 /// Mark `obj`, returns `true` if `obj` points to young data.
@@ -216,49 +209,8 @@ pub unsafe fn mark_queue_objarray(ptls: PTls, parent: ValueRef, objs: &[Option<V
 /// managed by the GC.
 #[inline]
 pub unsafe fn write_barrier<T>(data: &mut T, child: Value) {
-    jl_gc_wb(data as *mut _ as *mut _, child.unwrap(Private))
+    jlrs_gc_wb(data as *mut _ as *mut _, child.unwrap(Private).cast())
 }
-
-/*
-void jl_gc_queue_multiroot(const jl_value_t *parent, const jl_value_t *ptr) JL_NOTSAFEPOINT
-{
-    // first check if this is really necessary
-    // TODO: should we store this info in one of the extra gc bits?
-    jl_datatype_t *dt = (jl_datatype_t*)jl_typeof(ptr);
-    const jl_datatype_layout_t *ly = dt->layout;
-    uint32_t npointers = ly->npointers;
-    //if (npointers == 0) // this was checked by the caller
-    //    return;
-    jl_value_t *ptrf = ((jl_value_t**)ptr)[ly->first_ptr];
-    if (ptrf && (jl_astaggedvalue(ptrf)->bits.gc & 1) == 0) {
-        // this pointer was young, move the barrier back now
-        jl_gc_wb_back(parent);
-        return;
-    }
-    const uint8_t *ptrs8 = (const uint8_t *)jl_dt_layout_ptrs(ly);
-    const uint16_t *ptrs16 = (const uint16_t *)jl_dt_layout_ptrs(ly);
-    const uint32_t *ptrs32 = (const uint32_t*)jl_dt_layout_ptrs(ly);
-    for (size_t i = 1; i < npointers; i++) {
-        uint32_t fld;
-        if (ly->fielddesc_type == 0) {
-            fld = ptrs8[i];
-        }
-        else if (ly->fielddesc_type == 1) {
-            fld = ptrs16[i];
-        }
-        else {
-            assert(ly->fielddesc_type == 2);
-            fld = ptrs32[i];
-        }
-        jl_value_t *ptrf = ((jl_value_t**)ptr)[fld];
-        if (ptrf && (jl_astaggedvalue(ptrf)->bits.gc & 1) == 0) {
-            // this pointer was young, move the barrier back now
-            jl_gc_wb_back(parent);
-            return;
-        }
-    }
-}
-*/
 
 /// Put the current task in a GC-safe state, call `f`, and return to the previous GC state.
 ///
@@ -273,8 +225,22 @@ void jl_gc_queue_multiroot(const jl_value_t *parent, const jl_value_t *ptr) JL_N
 /// - `f` must not call into Julia in any way, except inside a function called with `gc_unsafe`.
 #[inline]
 pub unsafe fn gc_safe<F: FnOnce() -> T, T>(f: F) -> T {
-    let ptls = get_tls();
+    let pgc = jlrs_ppgcstack();
+    if pgc.is_null() {
+        return f();
+    }
 
+    let ptls = get_tls();
+    let state = jlrs_gc_safe_enter(ptls);
+    let res = f();
+    jlrs_gc_safe_leave(ptls, state);
+
+    res
+}
+
+#[inline]
+#[cfg(feature = "async")]
+pub(crate) unsafe fn gc_safe_with<F: FnOnce() -> T, T>(ptls: PTls, f: F) -> T {
     let state = jlrs_gc_safe_enter(ptls);
     let res = f();
     jlrs_gc_safe_leave(ptls, state);
@@ -293,6 +259,7 @@ pub unsafe fn gc_safe<F: FnOnce() -> T, T>(f: F) -> T {
 /// - This function must be called from a thread that can call into Julia.
 #[inline]
 pub unsafe fn gc_unsafe<F: for<'scope> FnOnce(Unrooted<'scope>) -> T, T>(f: F) -> T {
+    debug_assert!(!jlrs_ppgcstack().is_null());
     let ptls = get_tls();
 
     let unrooted = Unrooted::new();
@@ -303,16 +270,29 @@ pub unsafe fn gc_unsafe<F: for<'scope> FnOnce(Unrooted<'scope>) -> T, T>(f: F) -
     res
 }
 
-#[cfg(feature = "sync-rt")]
+#[cfg(feature = "async")]
+pub(crate) unsafe fn gc_unsafe_with<F: for<'scope> FnOnce(Unrooted<'scope>) -> T, T>(
+    ptls: PTls,
+    f: F,
+) -> T {
+    let state = jlrs_gc_unsafe_enter(ptls);
+    let unrooted = Unrooted::new();
+    let res = f(unrooted);
+    jlrs_gc_unsafe_leave(ptls, state);
+
+    res
+}
+
+#[cfg(feature = "local-rt")]
 impl Gc for Julia<'_> {}
-impl<'frame, T: Target<'frame>> Gc for T {}
+impl<'frame, Tgt: Target<'frame>> Gc for Tgt {}
 
 mod private {
     use crate::memory::target::Target;
-    #[cfg(feature = "sync-rt")]
+    #[cfg(feature = "local-rt")]
     use crate::runtime::sync_rt::Julia;
     pub trait GcPriv {}
-    impl<'frame, T: Target<'frame>> GcPriv for T {}
-    #[cfg(feature = "sync-rt")]
+    impl<'frame, Tgt: Target<'frame>> GcPriv for Tgt {}
+    #[cfg(feature = "local-rt")]
     impl GcPriv for Julia<'_> {}
 }

@@ -1,152 +1,258 @@
-//! Managed types for `Array`, create and access n-dimensional Julia arrays from Rust.
+//! N-dimensional arrays
 //!
-//! You will find two managed types in this module that can be used to work with Julia arrays from
-//! Rust. An [`Array`] is the Julia array itself, [`TypedArray`] is also available which can be
-//! used if the element type implements [`ValidField`].
+//! Julia has a generic array type, `Array{T, N}`. These arrays are column-major, N-dimensional
+//! arrays that can hold elements of type `T`.
 //!
-//! Several methods are available to create new arrays. [`Array::new`] lets you create a new array
-//! for any type that implements [`IntoJulia`], while [`Array::new_for`] can be used to create a
-//! new array for arbitrary types. These methods allocate a new array, it's also possible to use
-//! data from Rust directly if it implements `IntoJulia`. [`Array::from_vec`] and can be used to
-//! move the data from Rust to Julia, while [`Array::from_slice`] can be used to mutably borrow
-//! data from Rust as a Julia array.
+//! jlrs provides a flexible base type that wraps instances of this type, [`ArrayBase`]. This type
+//! has two generics: a [type constructor] `T`, and a constant `isize` rank `N`. You shouldn't use
+//! this type directly, but use the four available type aliases instead: [`Array`],
+//! [`TypedArray`], [`RankedArray`], and [`TypedRankedArray`]. If `Typed` is missing from the
+//! name, the element type `T` is set to [`Unknown`], if `Ranked` is missing the the rank `N` is
+//! set to `-1`.
 //!
-//! How the contents of the array must be accessed from Rust depends on the type of the elements.
-//! [`Array`] provides methods to (mutably) access their contents for all three possible
-//! layouts of the elements: inline, pointer, and bits union.
+//! There are several special aliases: [`Vector`], [`VectorAny`] and [`TypedVector`] (rank 1), and
+//! [`Matrix`] and [`TypedMatrix`] (rank 2).
 //!
-//! Accessing the contents of an array requires an n-dimensional index. The [`Dims`] trait is
-//! available for this purpose. This trait is implemented for tuples of four or fewer `usize`s;
-//! `[usize; N]` and `&[usize; N]` implement it for all `N`, `&[usize]` can be used if `N` is not
-//! a constant at compile time.
-
-use std::{
-    ffi::c_void,
-    fmt::{Debug, Formatter, Result as FmtResult},
-    marker::PhantomData,
-    mem,
-    mem::MaybeUninit,
-    ptr::{null_mut, NonNull},
-    slice,
-};
-
-use jl_sys::{
-    jl_apply_array_type, jl_array_data, jl_array_del_beg, jl_array_del_end, jl_array_dims_ptr,
-    jl_array_eltype, jl_array_grow_beg, jl_array_grow_end, jl_array_ndims, jl_array_t,
-    jl_gc_add_ptr_finalizer, jl_new_struct_uninit, jl_pchar_to_array, jl_reshape_array,
-};
-
-use self::{
-    data::accessor::{
-        ArrayAccessor, BitsArrayAccessorI, BitsArrayAccessorMut, Immutable,
-        IndeterminateArrayAccessor, IndeterminateArrayAccessorI, InlinePtrArrayAccessorI,
-        InlinePtrArrayAccessorMut, Mutable, PtrArrayAccessorI, PtrArrayAccessorMut,
-        UnionArrayAccessorI, UnionArrayAccessorMut,
-    },
-    dimensions::DimsExt,
-    tracked::{TrackedArray, TrackedArrayMut},
-};
-use super::{
-    union_all::UnionAll,
-    value::{typed::TypedValue, ValueRef},
-    Ref,
-};
-use crate::{
-    catch::catch_exceptions,
-    convert::{
-        ccall_types::{CCallArg, CCallReturn},
-        into_julia::IntoJulia,
-        unbox::Unbox,
-    },
-    data::{
-        layout::valid_layout::{ValidField, ValidLayout},
-        managed::{
-            array::{
-                data::copied::CopiedArray,
-                dimensions::{ArrayDimensions, Dims},
-            },
-            datatype::DataType,
-            private::ManagedPriv,
-            type_name::TypeName,
-            union::Union,
-            value::Value,
-            Managed, ManagedRef,
-        },
-        types::{
-            construct_type::{
-                ArrayTypeConstructor, ConstantIsize, ConstructType, Name, TypeVarConstructor,
-            },
-            typecheck::Typecheck,
-        },
-    },
-    error::{
-        AccessError, ArrayLayoutError, InstantiationError, JlrsResult, TypeError,
-        CANNOT_DISPLAY_TYPE,
-    },
-    memory::{
-        context::ledger::Ledger,
-        get_tls,
-        target::{unrooted::Unrooted, Target, TargetException, TargetResult},
-    },
-    prelude::ValueData,
-    private::Private,
-};
+//! ## Converting between array types
+//!
+//! The methods [`ArrayBase::set_rank`] and [`ArrayBase::set_type`] can be used to set the two
+//! generic parameters, [`ArrayBase::forget_rank`] and [`ArrayBase::forget_type`] lets you set
+//! them to `-1` and `Unknown` respectively.
+//!
+//! ## Constructing new arrays
+//!
+//! Many methods that construct new arrays exist, they can be divided into several groups:
+//!
+//! - `new`: Constructs a new array whose storage is managed by Julia.
+//!
+//! - `from_slice`: Constructs a new array whose storage is borrowed from Rust.
+//!
+//! - `from_vec`: Constructs a new array whose storage is moved from Rust.
+//!
+//! - `from_slice_cloned`: Constructs a new array whose storage is managed by Julia, the elements
+//!   are initialized by cloning a slice.
+//!
+//! - `from_slice_copied`: Constructs a new array whose storage is managed by Julia, the elements
+//!   are initialized by copying a slice.
+//!
+//! These methods exist as named for typed arrays, the element type is constructed from the
+//! provided type parameter. Untyped arrays have `*_for` methods like `new_for` that take the
+//! element type as an argument. All these methods have unsafe, unchecked variants like
+//! `new_for_unchecked`.
+//!
+//! One limitation of arrays that are backed by Rust data is that Julia is not able to reallocate
+//! this array. Functions that can reallocate, like `push!`, will throw an exception if they are
+//! called with such an array.
+//!
+//! In addition to these generic constructors there are two specialized constructors:
+//! [`TypedVector<u8>`] can be constructed with `from_bytes`, which behaves as `from_slice_copied`
+//! does. [`VectorAny`] can be constructed with `new_any`, which behaves as `new` does.
+//!
+//! ## Array data
+//!
+//! In order to access the content of an array an accessor must be created first. There are
+//! several kinds of accessors to account for the different ways the elements can be laid out in
+//! memory.
+//!
+//! Elements are either stored inline in the backing storage or as references. They are stored
+//! inline if they are immutable, concrete types. Unions of `isbits` types, i.e. immutable,
+//! concrete types which contain no references to other Julia data, are also stored inline. In
+//! this last case a type tag is stored for each element after the elements themselves. In all
+//!  other cases, the elements are stored as references, i.e. as `Option<ValueRef>`.
+//!
+//! For several reasons, some more technical than others, it's useful to distinguish between
+//! `isbits` and "non-bits" immutable types. Similarly, for elements that are stored as references
+//! it can be useful to distinguish between arbitrary `Value`s and more specific managed types.
+//! It's also perfectly valid to not make any assumptions about the layout and only work with
+//! `Value`s, allocating new Julia data whenever necessary.
+//!
+//! Putting all of this together, we end up with the following accessors: [`BitsAccessor`],
+//! [`InlineAccessor`], [`BitsUnionAccessor`], [`ValueAccessor`], [`ManagedAccessor`], and
+//! [`IndeterminateAccessor`]. There are also mutable variants of all of these accessors.
+//!
+//! Depending on the element type parameter `T` and the traits it implements, it can be possible
+//! to infer that a certain accessor must be used. If this is the case, a method to create
+//! that accessor without performing any checks will be available. An example is
+//! [`ArrayBase::bits_data`], which is only available if `T: IsBits + ConstructType`. If this
+//! information can't be inferred from `T`, `try_*` and `*_unchecked` variants are available.
+//!
+//! ## Tracking
+//!
+//! It's very easy to accidentally create multiple mutable accessors to the same array. In order
+//! to prevent this, you can track an array. You can either track an array exclusively or allow
+//! multiple shared references with [`ArrayBase::track_exclusive`] and
+//! [`ArrayBase::track_shared`] respectively. This dynamically enforces borrowing rules at
+//! runtime, but is limited. While it is thread-safe and even works across multiple packages, the
+//! tracking mechanism is unaware of how the data is used inside Julia. It won't protect you from
+//! accessing an array that is currently being mutated by some Julia task running in the
+//! background. Tracking is also relatively expensive; if you can guarantee you are the only user
+//! of an array, e.g. you've just allocated it, you should avoid tracking the array.
+//!
+//! [type constructor]: crate::data::types::construct_type::ConstructType
+//! [`Array::new_for`]: crate::data::managed::array::ArrayBase::new_for
+//! [`Array::from_slice_for`]: crate::data::managed::array::ArrayBase::from_slice_for
+//! [`Array::from_slice_cloned_for`]: crate::data::managed::array::ArrayBase::from_slice_cloned_for
+//! [`Array::from_vec_for`]: crate::data::managed::array::ArrayBase::from_vec_for
+//! [`TypedArray::new`]: crate::data::managed::array::ArrayBase::new
+//! [`TypedArray:from_slice`]: crate::data::managed::array::ArrayBase::from_slice
+//! [`TypedArray:from_slice_cloned`]: crate::data::managed::array::ArrayBase::from_slice_cloned
+//! [`TypedArray:from_vec`]: crate::data::managed::array::ArrayBase::from_vec
+//! [`RankedArray::new_for`]: crate::data::managed::array::ArrayBase::new_for
+//! [`RankedArray::from_slice_for`]: crate::data::managed::array::ArrayBase::from_slice_for
+//! [`RankedArray::from_slice_cloned_for`]: crate::data::managed::array::ArrayBase::from_slice_cloned_for
+//! [`RankedArray::from_vec_for`]: crate::data::managed::array::ArrayBase::from_vec_for
+//! [`TypedArrayRanked::new`]: crate::data::managed::array::ArrayBase::new
+//! [`TypedArrayRanked::from_slice`]: crate::data::managed::array::ArrayBase::from_slice
+//! [`TypedArrayRanked::from_slice_cloned`]: crate::data::managed::array::ArrayBase::from_slice_cloned
+//! [`TypedArrayRanked::from_vec`]: crate::data::managed::array::ArrayBase::from_vec
+//! [`TypedVector::from_bytes`]: crate::data::managed::array::ArrayBase::from_bytes
+//! [isbits]: crate::data::layout::is_bits
+//! [managed type]: crate::data::managed
 
 pub mod data;
 pub mod dimensions;
 pub mod tracked;
 
-/// An n-dimensional Julia array.
-///
-/// Each element in the backing storage is either stored as a [`Value`] or inline. If the inline
-/// data is a bits union, the flag indicating the active variant is stored separately from the
-/// elements. You can check how the data is stored by calling [`Array::is_value_array`],
-/// [`Array::is_inline_array`], or [`Array::is_union_array`].
-///
-/// Arrays that contain integers or floats are examples of inline arrays. Their data is stored as
-/// an array that contains numbers of the appropriate type, for example an array of `Float32`s in
-/// Julia is backed by an an array of `f32`s. The data in these arrays can be accessed with
-/// [`Array::inline_data`] and [`Array::inline_data_mut`], and copied from Julia to Rust with
-/// [`Array::copy_inline_data`]. In order to call these methods the type of the elements must be
-/// provided, this type must implement [`ValidField`] to ensure the layouts in Rust and Julia are
-/// compatible.
-///
-/// If the data isn't inlined, e.g. because it's mutable, each element is stored as a [`Value`].
-/// This data can be accessed using [`Array::value_data`] and [`Array::value_data_mut`].
-#[derive(Copy, Clone)]
+use std::{
+    ffi::c_void,
+    fmt::{Debug, Formatter, Result as FmtResult},
+    marker::PhantomData,
+    mem::MaybeUninit,
+    ptr::NonNull,
+};
+
+use jl_sys::{
+    jl_alloc_vec_any, jl_apply_array_type, jl_array_eltype, jl_array_rank, jl_array_t,
+    jl_array_to_string, jl_gc_add_ptr_finalizer, jl_new_struct_uninit, jl_pchar_to_array,
+    jlrs_array_data, jlrs_array_data_owner, jlrs_array_dims_ptr, jlrs_array_has_pointers,
+    jlrs_array_how, jlrs_array_is_pointer_array, jlrs_array_is_union_array, jlrs_array_len,
+    jlrs_array_ndims,
+};
+
+use self::{
+    data::accessor::{
+        BitsAccessor, BitsAccessorMut, BitsUnionAccessor, BitsUnionAccessorMut,
+        IndeterminateAccessor, IndeterminateAccessorMut, InlineAccessor, InlineAccessorMut,
+        ManagedAccessor, ManagedAccessorMut, ValueAccessor, ValueAccessorMut,
+    },
+    dimensions::{ArrayDimensions, Dims, DimsExt, DimsRankAssert, DimsRankCheck, RankedDims},
+    tracked::{TrackedArrayBase, TrackedArrayBaseMut},
+};
+use super::{
+    string::{JuliaString, StringData},
+    union::Union,
+};
+use crate::{
+    catch::{catch_exceptions, unwrap_exc},
+    convert::{
+        ccall_types::{CCallArg, CCallReturn},
+        to_symbol::ToSymbol,
+    },
+    data::{
+        layout::{
+            is_bits::IsBits,
+            typed_layout::HasLayout,
+            valid_layout::{ValidField, ValidLayout},
+        },
+        managed::{
+            private::ManagedPriv, type_name::TypeName, type_var::TypeVar, union_all::UnionAll, Ref,
+        },
+        types::{
+            abstract_type::AnyType,
+            construct_type::{BitsUnionCtor, ConstructType},
+            typecheck::Typecheck,
+        },
+    },
+    error::{AccessError, ArrayLayoutError, InstantiationError, TypeError, CANNOT_DISPLAY_TYPE},
+    memory::{
+        get_tls,
+        target::{unrooted::Unrooted, TargetResult},
+    },
+    prelude::{DataType, JlrsResult, LocalScope, Managed, Target, TargetType, Value, ValueData},
+    private::Private,
+};
+
+// TODO: move to jl-sys
+/// How an array has been allocated
+#[repr(u8)]
+#[derive(PartialEq, Debug)]
+pub enum How {
+    InlineOrForeign = 0,
+    JuliaAllocated = 1,
+    MallocAllocated = 2,
+    PointerToOwner = 3,
+}
+
+/// Wrapper type for an array of rank `N` whose element type is `T`.
 #[repr(transparent)]
-pub struct Array<'scope, 'data>(
+pub struct ArrayBase<'scope, 'data, T, const N: isize>(
     NonNull<jl_array_t>,
     PhantomData<&'scope ()>,
     PhantomData<&'data mut ()>,
+    PhantomData<T>,
 );
 
-impl<'data> Array<'_, 'data> {
-    /// Allocate a new n-dimensional Julia array of dimensions `dims` for data of type `T`.
-    ///
-    /// This method can only be used in combination with types that implement `ConstructType`.
-    ///
-    /// If the array size is too large, Julia will throw an error. This error is caught and
-    /// returned.
-    pub fn new<'target, 'current, 'borrow, T, D, Tgt>(
-        target: Tgt,
-        dims: D,
-    ) -> ArrayResult<'target, 'static, Tgt>
+impl<T, const N: isize> Clone for ArrayBase<'_, '_, T, N> {
+    #[inline]
+    fn clone(&self) -> Self {
+        ArrayBase(self.0, PhantomData, PhantomData, PhantomData)
+    }
+}
+
+impl<T, const N: isize> Copy for ArrayBase<'_, '_, T, N> {}
+
+/// Constructor methods for typed arrays.
+pub trait ConstructTypedArray<T: ConstructType, const N: isize> {
+    /// Returns the array type for the element type `T` and the rank of the dimensions `dims`.
+    fn array_type<'target, D, Tgt>(target: Tgt, dims: &D) -> ValueData<'target, 'static, Tgt>
     where
-        T: ConstructType,
-        D: DimsExt,
         Tgt: Target<'target>,
+        D: DimsExt;
+
+    /// Allocate a new Julia array.
+    ///
+    /// The element type is `T`, the rank follows from the rank of `D`. If `N >= 0`, the rank of
+    /// `D` must be equal to `N`. If this equality doesn't hold your program will fail to compile.
+    /// If an exception is thrown when the array is allocated, it is caught and returned.
+    ///
+    /// Examples
+    ///
+    /// ```
+    /// # use jlrs::prelude::*;
+    /// # fn main() {
+    /// # let mut julia = Builder::new().start_local().unwrap();
+    /// julia.local_scope::<_, 2>(|mut frame| {
+    ///     // Allocate a 2x2 array of `u32`s with an implicit rank.
+    ///     let array = TypedArray::<u32>::new(&mut frame, [2, 2]);
+    ///     assert!(array.is_ok());
+    ///
+    ///     // Allocate a 4x2 array of `u32`s with an explicit rank.
+    ///     let array = TypedRankedArray::<u32, 2>::new(&mut frame, [2, 2]);
+    ///     assert!(array.is_ok());
+    ///
+    ///     // This fails to compile because the rank of the array doesn't match the rank of
+    ///     // the dimensions.
+    ///     // let array = TypedRankedArray::<u32, 3>::new(&mut frame, [2, 2]);
+    /// });
+    /// # }
+    /// ```
+    fn new<'target, D, Tgt>(target: Tgt, dims: D) -> ArrayBaseResult<'target, 'static, Tgt, T, N>
+    where
+        Tgt: Target<'target>,
+        D: DimsExt,
     {
+        let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
+        if DimsRankAssert::<D, N>::NEEDS_RUNTIME_RANK_CHECK {
+            assert_eq!(N as usize, dims.rank());
+        }
+
         unsafe {
             let callback = || {
-                let array_type = D::ArrayContructor::<T>::construct_type(&target).as_value();
-                let array = dims.alloc_array(&target, array_type);
-                array
+                let array_type = Self::array_type(&target, &dims).as_value();
+                dims.alloc_array(&target, array_type)
             };
 
-            let exc = |err: Value| err.unwrap_non_null(Private);
-
-            let v = match catch_exceptions(callback, exc) {
+            let v = match catch_exceptions(callback, unwrap_exc) {
                 Ok(arr) => Ok(arr.ptr()),
                 Err(e) => Err(e),
             };
@@ -155,106 +261,106 @@ impl<'data> Array<'_, 'data> {
         }
     }
 
-    /// Allocate a new n-dimensional Julia array of dimensions `dims` for data of type `T`.
+    /// Allocate a new Julia array without checking any invariants.
     ///
-    /// This method is equivalent to [`Array::new`] except that Julia exceptions are not caught.
+    /// Safety:
     ///
-    /// Safety: If the array size is too large, Julia will throw an error. This error is not
-    /// caught, which is UB from a `ccall`ed function.
-    pub unsafe fn new_unchecked<'target, 'current, 'borrow, T, D, Tgt>(
-        target: Tgt,
-        dims: D,
-    ) -> ArrayData<'target, 'static, Tgt>
-    where
-        T: ConstructType,
-        D: DimsExt,
-        Tgt: Target<'target>,
-    {
-        let array_type = D::ArrayContructor::<T>::construct_type(&target).as_value();
-        dims.alloc_array(target, array_type)
-    }
-
-    /// Allocate a new n-dimensional Julia array of dimensions `dims` for data of type `ty`.
-    ///
-    /// The elementy type, ty` must be a` Union`, `UnionAll` or `DataType`.
-    ///
-    /// If the array size is too large or if the type is invalid, Julia will throw an error. This
-    /// error is caught and returned.
-    pub fn new_for<'target, 'current, 'borrow, D, Tgt>(
-        target: Tgt,
-        dims: D,
-        ty: Value,
-    ) -> ArrayResult<'target, 'static, Tgt>
-    where
-        D: DimsExt,
-        Tgt: Target<'target>,
-    {
-        let elty_ptr = ty.unwrap(Private);
-        // Safety: The array type is rooted until the array has been constructed, all C API
-        // functions are called with valid data.
-        unsafe {
-            let callback = || {
-                let array_type = Value::wrap_non_null(
-                    NonNull::new_unchecked(jl_apply_array_type(elty_ptr, dims.rank())),
-                    Private,
-                );
-                dims.alloc_array(&target, array_type).ptr()
-            };
-
-            let exc = |err: Value| err.unwrap_non_null(Private);
-            let res = match catch_exceptions(callback, exc) {
-                Ok(array_ptr) => Ok(array_ptr),
-                Err(e) => Err(e),
-            };
-
-            target.result_from_ptr(res, Private)
-        }
-    }
-
-    /// Allocate a new n-dimensional Julia array of dimensions `dims` for data of type `T`.
-    ///
-    /// This method is equivalent to [`Array::new_for`] except that Julia exceptions are not
+    /// The element type is `T`, the rank follows from the rank of `D`. If `N >= 0`, the rank of
+    /// `D` must be equal to `N`. If an exception is thrown when the array is allocated, it is not
     /// caught.
-    ///
-    /// Safety: If the array size is too large or if the type is invalid, Julia will throw an
-    /// error. This error is not caught, which is UB from a `ccall`ed function.
-    pub unsafe fn new_for_unchecked<'target, 'current, 'borrow, D, Tgt>(
+    unsafe fn new_unchecked<'target, D, Tgt>(
         target: Tgt,
         dims: D,
-        ty: Value,
-    ) -> ArrayData<'target, 'static, Tgt>
+    ) -> ArrayBaseData<'target, 'static, Tgt, T, N>
     where
-        D: DimsExt,
         Tgt: Target<'target>,
+        D: DimsExt,
     {
-        let elty_ptr = ty.unwrap(Private);
-        let array_type = Value::wrap_non_null(
-            NonNull::new_unchecked(jl_apply_array_type(elty_ptr, dims.rank())),
-            Private,
-        );
+        let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
+        let array_type = Self::array_type(&target, &dims).as_value();
         let array = dims.alloc_array(&target, array_type);
-
-        array.root(target)
+        target.data_from_ptr(array.ptr(), Private)
     }
 
-    /// Create a new n-dimensional Julia array of dimensions `dims` that borrows data from Rust.
+    /// Allocate a new Julia array that borrows its data from Rust.
     ///
-    /// This method can only be used in combination with types that implement `IntoJulia`. Because
-    /// the data is borrowed from Rust, operations that can change the size of the array (e.g.
-    /// `push!`) will fail.
+    /// The element type is `T`, the rank follows from the rank of `D`. If `N >= 0`, the rank of
+    /// `D` must be equal to `N`. If this equality doesn't hold `ArrayLayoutError::RankMismatch`
+    /// is returned. If an exception is thrown when the array is allocated, it is caught and
+    /// returned. The size of the dimensions must be equal to the length of `data`, otherwise
+    /// `InstantiationError::ArraySizeMismatch` is returned.
     ///
-    /// If the array size is too large, Julia will throw an error. This error is caught and
-    /// returned.
-    pub fn from_slice<'target: 'current, 'current: 'borrow, 'borrow, T, D, Tgt>(
+    /// Note that the type of `data` is not `&mut [T]` but `&mut [U]`. The reason is that the
+    /// type constructor can have more type parameters than its layout. `U` must implement
+    /// `IsBits` and `ValidLayout`, and `T` must implement `HasLayout<Layout = U>` to guarantee
+    /// that `U` is a valid representation of instances of `T`.
+    ///
+    /// NB: Because Julia didn't allocate the backing storage, there are some array functions in
+    /// Julia that will throw an exception if you call them, e.g. `push!`. The reason is that the
+    /// backing storage might need to be reallocated which is not possible.
+    ///
+    /// Examples
+    ///
+    /// ```
+    /// # use jlrs::prelude::*;
+    /// # fn main() {
+    /// # let mut julia = Builder::new().start_local().unwrap();
+    /// julia.local_scope::<_, 3>(|mut frame| {
+    ///     let mut data = vec![1u32, 2u32, 3u32, 4u32];
+    ///
+    ///     {
+    ///         // Allocate a 2x2 array of `u32`s with an implicit rank.
+    ///         let slice = data.as_mut_slice();
+    ///         let array = TypedArray::<u32>::from_slice(&mut frame, slice, [2, 2]);
+    ///         assert!(array.is_ok());
+    ///         assert!(array.unwrap().is_ok());
+    ///     }
+    ///
+    ///     {
+    ///         // Allocate a 4x2 array of `u32`s with an explicit rank.
+    ///         let slice = data.as_mut_slice();
+    ///         let array = TypedRankedArray::<u32, 2>::from_slice(&mut frame, slice, [2, 2]);
+    ///         assert!(array.is_ok());
+    ///         assert!(array.unwrap().is_ok());
+    ///     }
+    ///
+    ///     {
+    ///         // This fails to compile because the rank of the array doesn't match the rank
+    ///         // of the dimensions.
+    ///         // let slice = data.as_mut_slice();
+    ///         // let array = TypedRankedArray::<u32, 3>::from_slice(&mut frame, slice, [2, 2]);
+    ///     }
+    ///
+    ///     {
+    ///         // This fails because the size of the dimensions doesn't match the length of
+    ///         // the data.
+    ///         let slice = data.as_mut_slice();
+    ///         let array = TypedArray::<u32>::from_slice(&mut frame, slice, [2, 1]);
+    ///         assert!(array.is_err());
+    ///     }
+    /// });
+    /// # }
+    /// ```
+    fn from_slice<'target, 'data, U, D, Tgt>(
         target: Tgt,
-        data: &'data mut [T],
+        data: &'data mut [U],
         dims: D,
-    ) -> JlrsResult<ArrayResult<'target, 'data, Tgt>>
+    ) -> JlrsResult<ArrayBaseResult<'target, 'data, Tgt, T, N>>
     where
-        T: IntoJulia + ConstructType,
-        D: DimsExt,
         Tgt: Target<'target>,
+        D: DimsExt,
+        T: HasLayout<'static, 'static, Layout = U>,
+        U: ValidLayout + ValidField + IsBits,
     {
+        let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
+        if DimsRankAssert::<D, N>::NEEDS_RUNTIME_RANK_CHECK {
+            let expected = N as usize;
+            let found = dims.rank();
+            if expected != found {
+                Err(InstantiationError::ArrayRankMismatch { expected, found })?;
+            }
+        }
+
         if dims.size() != data.len() {
             Err(InstantiationError::ArraySizeMismatch {
                 vec_size: data.len(),
@@ -262,74 +368,123 @@ impl<'data> Array<'_, 'data> {
             })?;
         }
 
-        // Safety: The array type is rooted until the array has been constructed, all C API
-        // functions are called with valid data. The data-lifetime ensures the data can't be
-        // used from Rust after the borrow ends.
         unsafe {
             let callback = || {
-                let array_type = D::ArrayContructor::<T>::construct_type(&target).as_value();
-                dims.alloc_array_with_data(&target, array_type, data.as_mut_ptr().cast())
-                    .ptr()
+                let array_type = Self::array_type(&target, &dims).as_value();
+                dims.alloc_array_with_data(&target, array_type, data.as_ptr() as _)
             };
 
-            let exc = |err: Value| err.unwrap_non_null(Private);
-            let res = match catch_exceptions(callback, exc) {
-                Ok(array_ptr) => Ok(array_ptr),
+            let v = match catch_exceptions(callback, unwrap_exc) {
+                Ok(arr) => Ok(arr.ptr()),
                 Err(e) => Err(e),
             };
 
-            Ok(target.result_from_ptr(res, Private))
+            Ok(target.result_from_ptr(v, Private))
         }
     }
 
-    /// Create a new n-dimensional Julia array of dimensions `dims` that borrows data from Rust.
+    /// Allocate a new Julia array that borrows its data from Rust without checking any
+    /// invariants.
     ///
-    /// This method can only be used in combination with types that implement `IntoJulia`. Because
-    /// the data is borrowed from Rust, operations that can change the size of the array (e.g.
-    /// `push!`) will fail.
+    /// Safety:
     ///
-    /// Safety: If the array size is too large, Julia will throw an error. This error is not
-    /// caught, which is UB from a `ccall`ed function.
-    pub unsafe fn from_slice_unchecked<'target, 'current, 'borrow, T, D, Tgt>(
+    /// The element type is `T`, the rank follows from the rank of `D`. If `N >= 0`, the rank of
+    /// `D` must be equal to `N`. If an exception is thrown when the array is allocated, it is not
+    /// caught. The size of the dimensions must be equal to the length of `data`.
+    unsafe fn from_slice_unchecked<'target, 'data, U, D, Tgt>(
         target: Tgt,
-        data: &'data mut [T],
+        data: &'data mut [U],
         dims: D,
-    ) -> JlrsResult<ArrayData<'target, 'data, Tgt>>
+    ) -> ArrayBaseData<'target, 'data, Tgt, T, N>
     where
-        T: IntoJulia + ConstructType,
-        D: DimsExt,
         Tgt: Target<'target>,
+        D: DimsExt,
+        T: HasLayout<'static, 'static, Layout = U>,
+        U: ValidLayout + ValidField + IsBits,
     {
-        if dims.size() != data.len() {
-            Err(InstantiationError::ArraySizeMismatch {
-                vec_size: data.len(),
-                dim_size: dims.size(),
-            })?;
-        }
-
-        let array_type = D::ArrayContructor::<T>::construct_type(&target).as_value();
-        Ok(dims.alloc_array_with_data(target, array_type, data.as_mut_ptr().cast()))
+        let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
+        let array_type = Self::array_type(&target, &dims).as_value();
+        let array = dims.alloc_array_with_data(&target, array_type, data.as_ptr() as _);
+        target.data_from_ptr(array.ptr(), Private)
     }
 
-    /// Create a new n-dimensional Julia array of dimensions `dims` that takes ownership of Rust
-    /// data.
+    /// Allocate a new Julia array that takes owenership of a Rust `Vec`.
     ///
-    /// This method can only be used in combination with types that implement `IntoJulia`. Because
-    /// the data is allocated by Rust, operations that can change the size of the array (e.g.
-    /// `push!`) will fail.
+    /// The element type is `T`, the rank follows from the rank of `D`. If `N >= 0`, the rank of
+    /// `D` must be equal to `N`. If this equality doesn't hold `ArrayLayoutError::RankMismatch`
+    /// is returned. If an exception is thrown when the array is allocated, it is caught and
+    /// returned. The size of the dimensions must be equal to the length of `data`, otherwise
+    /// `InstantiationError::ArraySizeMismatch` is returned.
     ///
-    /// If the array size is too large, Julia will throw an error. This error is caught and
-    /// returned.
-    pub fn from_vec<'target, 'current, 'borrow, T, D, Tgt>(
+    /// Note that the type of `data` is not `Vec<T>` but `Vec<U>`. The reason is that the
+    /// type constructor can have more type parameters than its layout. `U` must implement
+    /// `IsBits` and `ValidLayout`, and `T` must implement `HasLayout<Layout = U>` to guarantee
+    /// that `U` is a valid representation of instances of `T`.
+    ///
+    /// NB: Because Julia didn't allocate the backing storage, there are some array functions in
+    /// Julia that will throw an exception if you call them, e.g. `push!`. The reason is that the
+    /// backing storage might need to be reallocated which is not possible.
+    ///
+    /// Examples
+    ///
+    /// ```
+    /// # use jlrs::prelude::*;
+    /// # fn main() {
+    /// # let mut julia = Builder::new().start_local().unwrap();
+    /// julia.local_scope::<_, 3>(|mut frame| {
+    ///     {
+    ///         // Allocate a 2x2 array of `u32`s with an implicit rank.
+    ///         let data = vec![1u32, 2u32, 3u32, 4u32];
+    ///         let array = TypedArray::<u32>::from_vec(&mut frame, data, [2, 2]);
+    ///         assert!(array.is_ok());
+    ///         assert!(array.unwrap().is_ok());
+    ///     }
+    ///
+    ///     {
+    ///         // Allocate a 4x2 array of `u32`s with an explicit rank.
+    ///         let data = vec![1u32, 2u32, 3u32, 4u32];
+    ///         let array = TypedRankedArray::<u32, 2>::from_vec(&mut frame, data, [2, 2]);
+    ///         assert!(array.is_ok());
+    ///         assert!(array.unwrap().is_ok());
+    ///     }
+    ///
+    ///     {
+    ///         // This fails to compile because the rank of the array doesn't match the rank
+    ///         // of the dimensions.
+    ///         // let data = vec![1u32, 2u32, 3u32, 4u32];
+    ///         // let array = TypedRankedArray::<u32, 3>::from_vec(&mut frame, data, [2, 2]);
+    ///     }
+    ///
+    ///     {
+    ///         // This fails because the size of the dimensions doesn't match the length of
+    ///         // the data.
+    ///         let data = vec![1u32, 2u32, 3u32, 4u32];
+    ///         let array = TypedArray::<u32>::from_vec(&mut frame, data, [2, 1]);
+    ///         assert!(array.is_err());
+    ///     }
+    /// });
+    /// # }
+    /// ```
+    fn from_vec<'target, U, D, Tgt>(
         target: Tgt,
-        data: Vec<T>,
+        data: Vec<U>,
         dims: D,
-    ) -> JlrsResult<ArrayResult<'target, 'static, Tgt>>
+    ) -> JlrsResult<ArrayBaseResult<'target, 'static, Tgt, T, N>>
     where
-        T: IntoJulia + ConstructType,
-        D: DimsExt,
         Tgt: Target<'target>,
+        D: DimsExt,
+        T: HasLayout<'static, 'static, Layout = U>,
+        U: ValidLayout + ValidField + IsBits,
     {
+        let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
+        if DimsRankAssert::<D, N>::NEEDS_RUNTIME_RANK_CHECK {
+            let expected = N as usize;
+            let found = dims.rank();
+            if expected != found {
+                Err(InstantiationError::ArrayRankMismatch { expected, found })?;
+            }
+        }
+
         if dims.size() != data.len() {
             Err(InstantiationError::ArraySizeMismatch {
                 vec_size: data.len(),
@@ -339,54 +494,518 @@ impl<'data> Array<'_, 'data> {
 
         let data = Box::leak(data.into_boxed_slice());
 
-        // Safety: The array type is rooted until the array has been constructed, all C API
-        // functions are called with valid data. The data-lifetime ensures the data can't be
-        // used from Rust after the borrow ends.
         unsafe {
             let callback = || {
-                let array_type = D::ArrayContructor::<T>::construct_type(&target).as_value();
-                let array = dims
-                    .alloc_array_with_data(&target, array_type, data.as_mut_ptr().cast())
-                    .ptr();
+                let array_type = Self::array_type(&target, &dims).as_value();
+                let array = dims.alloc_array_with_data(&target, array_type, data.as_mut_ptr() as _);
 
                 jl_gc_add_ptr_finalizer(
                     get_tls(),
-                    array.as_ptr().cast(),
-                    droparray::<T> as *mut c_void,
+                    array.ptr().as_ptr().cast(),
+                    droparray::<U> as *mut c_void,
                 );
 
                 array
             };
 
-            let exc = |err: Value| err.unwrap_non_null(Private);
-            let res = match catch_exceptions(callback, exc) {
-                Ok(array_ptr) => Ok(array_ptr),
+            let v = match catch_exceptions(callback, unwrap_exc) {
+                Ok(arr) => Ok(arr.ptr()),
                 Err(e) => Err(e),
             };
 
-            Ok(target.result_from_ptr(res, Private))
+            Ok(target.result_from_ptr(v, Private))
         }
     }
 
-    /// Create a new n-dimensional Julia array of dimensions `dims` that takes ownership of Rust
-    /// data.
+    /// Allocate a new Julia array that takes owenership of a Rust `Vec` without checking any
+    /// invariants.
     ///
-    /// This method can only be used in combination with types that implement `IntoJulia`. Because
-    /// the data is allocated by Rust, operations that can change the size of the array (e.g.
-    /// `push!`) will fail.
+    /// Safety:
     ///
-    /// Safety: If the array size is too large, Julia will throw an error. This error is not
-    /// caught, which is UB from a `ccall`ed function.
-    pub unsafe fn from_vec_unchecked<'target, 'current, 'borrow, T, D, Tgt>(
+    /// The element type is `T`, the rank follows from the rank of `D`. If `N >= 0`, the rank of
+    /// `D` must be equal to `N`. If an exception is thrown when the array is allocated, it is not
+    /// caught. The size of the dimensions must be equal to the length of `data`.
+    unsafe fn from_vec_unchecked<'target, U, D, Tgt>(
         target: Tgt,
-        data: Vec<T>,
+        data: Vec<U>,
         dims: D,
-    ) -> JlrsResult<ArrayData<'target, 'static, Tgt>>
+    ) -> ArrayBaseData<'target, 'static, Tgt, T, N>
     where
-        T: IntoJulia + ConstructType,
-        D: DimsExt,
         Tgt: Target<'target>,
+        D: DimsExt,
+        T: HasLayout<'static, 'static, Layout = U>,
+        U: ValidLayout + ValidField + IsBits,
     {
+        let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
+        let data = Box::leak(data.into_boxed_slice());
+
+        let array_type = Self::array_type(&target, &dims).as_value();
+        let array = dims.alloc_array_with_data(&target, array_type, data.as_mut_ptr() as _);
+
+        jl_gc_add_ptr_finalizer(
+            get_tls(),
+            array.ptr().as_ptr().cast(),
+            droparray::<U> as *mut c_void,
+        );
+
+        target.data_from_ptr(array.ptr(), Private)
+    }
+
+    /// Allocate a new Julia array that clones its data from Rust.
+    ///
+    /// The element type is `T`, the rank follows from the rank of `D`. If `N >= 0`, the rank of
+    /// `D` must be equal to `N`. If this equality doesn't hold `ArrayLayoutError::RankMismatch`
+    /// is returned. If an exception is thrown when the array is allocated, it is caught and
+    /// returned. The size of the dimensions must be equal to the length of `data`, otherwise
+    /// `InstantiationError::ArraySizeMismatch` is returned.
+    ///
+    /// Note that the type of `data` is not `AsRef<[T]>` but `AsRef<[U]>`. The reason is that the
+    /// type constructor can have more type parameters than its layout. `U` must implement
+    /// `IsBits` and `ValidLayout`, and `T` must implement `HasLamut_yout<Layout = U>` to guarantee
+    /// that `U` is a valid representation of instances of `T`.
+    ///
+    /// Examples
+    ///
+    /// ```
+    /// # use jlrs::prelude::*;
+    /// # fn main() {
+    /// # let mut julia = Builder::new().start_local().unwrap();
+    /// julia.local_scope::<_, 3>(|mut frame| {
+    ///     let data = vec![1u32, 2u32, 3u32, 4u32];
+    ///
+    ///     {
+    ///         // Allocate a 2x2 array of `u32`s with an implicit rank.
+    ///         let slice = data.as_slice();
+    ///         let array = TypedArray::<u32>::from_slice_cloned(&mut frame, slice, [2, 2]);
+    ///         assert!(array.is_ok());
+    ///         assert!(array.unwrap().is_ok());
+    ///     }
+    ///
+    ///     {
+    ///         // Allocate a 4x2 array of `u32`s with an explicit rank.
+    ///         let slice = data.as_slice();
+    ///         let array = TypedRankedArray::<u32, 2>::from_slice_cloned(&mut frame, slice, [2, 2]);
+    ///         assert!(array.is_ok());
+    ///         assert!(array.unwrap().is_ok());
+    ///     }
+    ///
+    ///     {
+    ///         // This fails to compile because the rank of the array doesn't match the rank
+    ///         // of the dimensions.
+    ///         // let slice = data.as_slice();
+    ///         // let array = TypedRankedArray::<u32, 3>::from_slice_cloned(&mut frame, slice, [2, 2]);
+    ///     }
+    ///
+    ///     {
+    ///         // This fails because the size of the dimensions doesn't match the length of
+    ///         // the data.
+    ///         let slice = data.as_slice();
+    ///         let array = TypedArray::<u32>::from_slice_cloned(&mut frame, slice, [2, 1]);
+    ///         assert!(array.is_err());
+    ///     }
+    /// });
+    /// # }
+    /// ```
+    fn from_slice_cloned<'target, V, U, D, Tgt>(
+        target: Tgt,
+        data: V,
+        dims: D,
+    ) -> JlrsResult<ArrayBaseResult<'target, 'static, Tgt, T, N>>
+    where
+        Tgt: Target<'target>,
+        D: DimsExt,
+        T: HasLayout<'static, 'static, Layout = U>,
+        U: ValidLayout + ValidField + IsBits + Clone,
+        V: AsRef<[U]>,
+    {
+        let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
+        if DimsRankAssert::<D, N>::NEEDS_RUNTIME_RANK_CHECK {
+            let expected = N as usize;
+            let found = dims.rank();
+            if expected != found {
+                Err(InstantiationError::ArrayRankMismatch { expected, found })?;
+            }
+        }
+
+        let data = data.as_ref();
+        let len = data.len();
+        let dim_size = dims.size();
+        if len != dim_size {
+            Err(InstantiationError::ArraySizeMismatch {
+                vec_size: len,
+                dim_size: dim_size,
+            })?;
+        }
+
+        unsafe {
+            let arr = match Self::new(&target, dims) {
+                Ok(arr) => arr,
+                Err(e) => return Ok(Err(e.as_value().root(target))),
+            };
+
+            let array_data = jlrs_array_data(arr.as_managed().unwrap(Private));
+            let array_data_slice = std::slice::from_raw_parts_mut(array_data as _, len);
+            array_data_slice.clone_from_slice(data);
+
+            Ok(Ok(arr.root(target)))
+        }
+    }
+
+    /// Allocate a new Julia array that clones its data from Rust without checking any invariants.
+    ///
+    /// The element type is `T`, the rank follows from the rank of `D`. If `N >= 0`, the rank of
+    /// `D` must be equal to `N`. If an exception is thrown when the array is allocated, it is not
+    /// caught. The size of the dimensions must be equal to the length of `data`.
+    ///
+    /// Note that the type of `data` is not `AsRef<[T]>` but `AsRef<[U]>`. The reason is that the
+    /// type constructor can have more type parameters than its layout. `U` must implement
+    /// `IsBits` and `ValidLayout`, and `T` must implement `HasLamut_yout<Layout = U>` to guarantee
+    /// that `U` is a valid representation of instances of `T`.
+    unsafe fn from_slice_cloned_unchecked<'target, V, U, D, Tgt>(
+        target: Tgt,
+        data: V,
+        dims: D,
+    ) -> ArrayBaseData<'target, 'static, Tgt, T, N>
+    where
+        Tgt: Target<'target>,
+        D: DimsExt,
+        T: HasLayout<'static, 'static, Layout = U>,
+        U: ValidLayout + ValidField + IsBits + Clone,
+        V: AsRef<[U]>,
+    {
+        let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
+        let data = data.as_ref();
+        let len = data.len();
+
+        let arr = Self::new_unchecked(&target, dims);
+        let array_data = jlrs_array_data(arr.as_managed().unwrap(Private));
+        let array_data_slice = std::slice::from_raw_parts_mut(array_data as _, len);
+        array_data_slice.clone_from_slice(data);
+
+        arr.root(target)
+    }
+
+    /// Allocate a new Julia array that copies its data from Rust.
+    ///
+    /// The element type is `T`, the rank follows from the rank of `D`. If `N >= 0`, the rank of
+    /// `D` must be equal to `N`. If this equality doesn't hold `ArrayLayoutError::RankMismatch`
+    /// is returned. If an exception is thrown when the array is allocated, it is caught and
+    /// returned. The size of the dimensions must be equal to the length of `data`, otherwise
+    /// `InstantiationError::ArraySizeMismatch` is returned.
+    ///
+    /// Note that the type of `data` is not `AsRef<[T]>` but `AsRef<[U]>`. The reason is that the
+    /// type constructor can have more type parameters than its layout. `U` must implement
+    /// `IsBits` and `ValidLayout`, and `T` must implement `HasLamut_yout<Layout = U>` to guarantee
+    /// that `U` is a valid representation of instances of `T`.
+    ///
+    /// Examples
+    ///
+    /// ```
+    /// # use jlrs::prelude::*;
+    /// # fn main() {
+    /// # let mut julia = Builder::new().start_local().unwrap();
+    /// julia.local_scope::<_, 3>(|mut frame| {
+    ///     let data = vec![1u32, 2u32, 3u32, 4u32];
+    ///
+    ///     {
+    ///         // Allocate a 2x2 array of `u32`s with an implicit rank.
+    ///         let slice = data.as_slice();
+    ///         let array = TypedArray::<u32>::from_slice_copied(&mut frame, slice, [2, 2]);
+    ///         assert!(array.is_ok());
+    ///         assert!(array.unwrap().is_ok());
+    ///     }
+    ///
+    ///     {
+    ///         // Allocate a 4x2 array of `u32`s with an explicit rank.
+    ///         let slice = data.as_slice();
+    ///         let array = TypedRankedArray::<u32, 2>::from_slice_copied(&mut frame, slice, [2, 2]);
+    ///         assert!(array.is_ok());
+    ///         assert!(array.unwrap().is_ok());
+    ///     }
+    ///
+    ///     {
+    ///         // This fails to compile because the rank of the array doesn't match the rank
+    ///         // of the dimensions.
+    ///         // let slice = data.as_slice();
+    ///         // let array = TypedRankedArray::<u32, 3>::from_slice_copied(&mut frame, slice, [2, 2]);
+    ///     }
+    ///
+    ///     {
+    ///         // This fails because the size of the dimensions doesn't match the length of
+    ///         // the data.
+    ///         let slice = data.as_slice();
+    ///         let array = TypedArray::<u32>::from_slice_copied(&mut frame, slice, [2, 1]);
+    ///         assert!(array.is_err());
+    ///     }
+    /// });
+    /// # }
+    /// ```
+    fn from_slice_copied<'target, V, U, D, Tgt>(
+        target: Tgt,
+        data: V,
+        dims: D,
+    ) -> JlrsResult<ArrayBaseResult<'target, 'static, Tgt, T, N>>
+    where
+        Tgt: Target<'target>,
+        D: DimsExt,
+        T: HasLayout<'static, 'static, Layout = U>,
+        U: ValidLayout + ValidField + IsBits + Copy,
+        V: AsRef<[U]>,
+    {
+        let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
+        if DimsRankAssert::<D, N>::NEEDS_RUNTIME_RANK_CHECK {
+            let expected = N as usize;
+            let found = dims.rank();
+            if expected != found {
+                Err(InstantiationError::ArrayRankMismatch { expected, found })?;
+            }
+        }
+
+        let data = data.as_ref();
+        let len = data.len();
+        let dim_size = dims.size();
+        if len != dim_size {
+            Err(InstantiationError::ArraySizeMismatch {
+                vec_size: len,
+                dim_size: dim_size,
+            })?;
+        }
+
+        unsafe {
+            let arr = match Self::new(&target, dims) {
+                Ok(arr) => arr,
+                Err(e) => return Ok(Err(e.as_value().root(target))),
+            };
+
+            let array_data = jlrs_array_data(arr.as_managed().unwrap(Private));
+            let array_data_slice = std::slice::from_raw_parts_mut(array_data as _, len);
+            array_data_slice.copy_from_slice(data);
+
+            Ok(Ok(arr.root(target)))
+        }
+    }
+
+    /// Allocate a new Julia array that clones its data from Rust without checking any invariants.
+    ///
+    /// The element type is `T`, the rank follows from the rank of `D`. If `N >= 0`, the rank of
+    /// `D` must be equal to `N`. If an exception is thrown when the array is allocated, it is not
+    /// caught. The size of the dimensions must be equal to the length of `data`.
+    ///
+    /// Note that the type of `data` is not `AsRef<[T]>` but `AsRef<[U]>`. The reason is that the
+    /// type constructor can have more type parameters than its layout. `U` must implement
+    /// `IsBits` and `ValidLayout`, and `T` must implement `HasLamut_yout<Layout = U>` to guarantee
+    /// that `U` is a valid representation of instances of `T`.
+    unsafe fn from_slice_copied_unchecked<'target, V, U, D, Tgt>(
+        target: Tgt,
+        data: V,
+        dims: D,
+    ) -> ArrayBaseData<'target, 'static, Tgt, T, N>
+    where
+        Tgt: Target<'target>,
+        D: DimsExt,
+        T: HasLayout<'static, 'static, Layout = U>,
+        U: ValidLayout + ValidField + IsBits + Copy,
+        V: AsRef<[U]>,
+    {
+        let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
+        let data = data.as_ref();
+        let len = data.len();
+
+        let arr = Self::new_unchecked(&target, dims);
+        let array_data = jlrs_array_data(arr.as_managed().unwrap(Private));
+        let array_data_slice = std::slice::from_raw_parts_mut(array_data as _, len);
+        array_data_slice.copy_from_slice(data);
+
+        arr.root(target)
+    }
+}
+
+impl<T: ConstructType, const N: isize> ConstructTypedArray<T, N> for ArrayBase<'_, '_, T, N> {
+    fn array_type<'target, D, Tgt>(target: Tgt, dims: &D) -> ValueData<'target, 'static, Tgt>
+    where
+        Tgt: Target<'target>,
+        D: DimsExt,
+    {
+        dims.array_type::<T, _>(target)
+    }
+}
+
+impl<const N: isize> ArrayBase<'_, '_, Unknown, N> {
+    /// Allocate a new Julia array for elements of some provided type.
+    ///
+    /// The element type is `ty`, the rank follows from the rank of `D`. If `N >= 0`, the rank of
+    /// `D` must be equal to `N`. If this equality doesn't hold `ArrayLayoutError::RankMismatch`
+    /// is returned. If an exception is thrown when the array is allocated, it is caught and
+    /// returned.
+    ///
+    /// Examples
+    ///
+    /// ```
+    /// # use jlrs::prelude::*;
+    /// # fn main() {
+    /// # let mut julia = Builder::new().start_local().unwrap();
+    /// julia.local_scope::<_, 2>(|mut frame| {
+    ///     let ty = DataType::uint32_type(&frame).as_value();
+    ///
+    ///     // Allocate a 2x2 array of `u32`s with an implicit rank.
+    ///     let array = Array::new_for(&mut frame, ty, [2, 2]);
+    ///     assert!(array.is_ok());
+    ///
+    ///     // Allocate a 4x2 array of `u32`s with an explicit rank.
+    ///     let array = RankedArray::<2>::new_for(&mut frame, ty, [2, 2]);
+    ///     assert!(array.is_ok());
+    ///
+    ///     // This fails to compile because the rank of the array doesn't match the rank of
+    ///     // the dimensions.
+    ///     // let array = RankedArray::<3>::new_for(&mut frame, ty, [2, 2]);
+    /// });
+    /// # }
+    /// ```
+    pub fn new_for<'target, D, Tgt>(
+        target: Tgt,
+        ty: Value,
+        dims: D,
+    ) -> ArrayBaseResult<'target, 'static, Tgt, Unknown, N>
+    where
+        Tgt: Target<'target>,
+        D: DimsExt,
+    {
+        let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
+        if DimsRankAssert::<D, N>::NEEDS_RUNTIME_RANK_CHECK {
+            assert_eq!(N as usize, dims.rank());
+        }
+
+        unsafe {
+            let callback = || {
+                // array_type should be a concrete type.
+                let array_type = jl_apply_array_type(ty.unwrap(Private), D::RANK as _);
+                let array_type = Value::wrap_non_null(NonNull::new_unchecked(array_type), Private);
+                let array = dims.alloc_array(&target, array_type);
+                array
+            };
+
+            let v = match catch_exceptions(callback, unwrap_exc) {
+                Ok(arr) => Ok(arr.ptr()),
+                Err(e) => Err(e),
+            };
+
+            target.result_from_ptr(v, Private)
+        }
+    }
+
+    /// Allocate a new Julia array for elements of some provided type without checking any
+    /// invariants.
+    ///
+    /// Safety:
+    ///
+    /// The element type is `ty`, the rank follows from the rank of `D`. If `N >= 0`, the rank of
+    /// `D` must be equal to `N`. If an exception is thrown when the array is allocated, it is not
+    /// caught.
+    pub unsafe fn new_for_unchecked<'target, D, Tgt>(
+        target: Tgt,
+        ty: Value,
+        dims: D,
+    ) -> ArrayBaseData<'target, 'static, Tgt, Unknown, N>
+    where
+        Tgt: Target<'target>,
+        D: DimsExt,
+    {
+        let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
+        // array_type should be a concrete type.
+        let array_type = jl_apply_array_type(ty.unwrap(Private), D::RANK as _);
+        let array_type = Value::wrap_non_null(NonNull::new_unchecked(array_type), Private);
+        let array = dims.alloc_array(&target, array_type);
+
+        target.data_from_ptr(array.ptr(), Private)
+    }
+
+    /// Allocate a new Julia array that borrows its data from Rust with some provided element
+    /// type.
+    ///
+    /// The element type is `ty`, the rank follows from the rank of `D`. If `N >= 0`, the rank of
+    /// `D` must be equal to `N`. If this equality doesn't hold `ArrayLayoutError::RankMismatch`
+    /// is returned. If an exception is thrown when the array is allocated, it is caught and
+    /// returned. The size of the dimensions must be equal to the length of `data`, otherwise
+    /// `InstantiationError::ArraySizeMismatch` is returned.
+    ///
+    /// The layout of `U` must be a valid layout for `ty`, if this is not true
+    /// `AccessError::InvalidLayout` is returned.
+    ///
+    /// NB: Because Julia didn't allocate the backing storage, there are some array functions in
+    /// Julia that will throw an exception if you call them, e.g. `push!`. The reason is that the
+    /// backing storage might need to be reallocated which is not possible.
+    ///
+    /// Examples
+    ///
+    /// ```
+    /// # use jlrs::prelude::*;
+    /// # fn main() {
+    /// # let mut julia = Builder::new().start_local().unwrap();
+    /// julia.local_scope::<_, 3>(|mut frame| {
+    ///     let mut data = vec![1u32, 2u32, 3u32, 4u32];
+    ///     let ty = DataType::uint32_type(&frame).as_value();
+    ///
+    ///     {
+    ///         // Allocate a 2x2 array of `u32`s with an implicit rank.
+    ///         let slice = data.as_mut_slice();
+    ///         let array = Array::from_slice_for(&mut frame, ty, slice, [2, 2]);
+    ///         assert!(array.is_ok());
+    ///         assert!(array.unwrap().is_ok());
+    ///     }
+    ///
+    ///     {
+    ///         // Allocate a 4x2 array of `u32`s with an explicit rank.
+    ///         let slice = data.as_mut_slice();
+    ///         let array = RankedArray::<2>::from_slice_for(&mut frame, ty, slice, [2, 2]);
+    ///         assert!(array.is_ok());
+    ///         assert!(array.unwrap().is_ok());
+    ///     }
+    ///
+    ///     {
+    ///         // This fails to compile because the rank of the array doesn't match the rank
+    ///         // of the dimensions.
+    ///         // let slice = data.as_mut_slice();
+    ///         // let array = RankedArray::<3>::from_slice_for(&mut frame, ty, slice, [2, 2]);
+    ///     }
+    ///
+    ///     {
+    ///         // This fails because the size of the dimensions doesn't match the length of
+    ///         // the data.
+    ///         let slice = data.as_mut_slice();
+    ///         let array = Array::from_slice_for(&mut frame, ty, slice, [2, 1]);
+    ///         assert!(array.is_err());
+    ///     }
+    ///
+    ///     {
+    ///         // This fails because the layout of the data is incompatible with `ty`.
+    ///         let ty = DataType::uint64_type(&frame).as_value();
+    ///         let slice = data.as_mut_slice();
+    ///         let array = Array::from_slice_for(&mut frame, ty, slice, [2, 2]);
+    ///         assert!(array.is_err());
+    ///     }
+    /// });
+    /// # }
+    /// ```
+    pub fn from_slice_for<'target, 'data, U, D, Tgt>(
+        target: Tgt,
+        ty: Value,
+        data: &'data mut [U],
+        dims: D,
+    ) -> JlrsResult<ArrayBaseResult<'target, 'data, Tgt, Unknown, N>>
+    where
+        Tgt: Target<'target>,
+        D: DimsExt,
+        U: ValidLayout + ValidField + IsBits,
+    {
+        let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
+        if DimsRankAssert::<D, N>::NEEDS_RUNTIME_RANK_CHECK {
+            let expected = N as usize;
+            let found = dims.rank();
+            if expected != found {
+                Err(InstantiationError::ArrayRankMismatch { expected, found })?;
+            }
+        }
+
         if dims.size() != data.len() {
             Err(InstantiationError::ArraySizeMismatch {
                 vec_size: data.len(),
@@ -394,56 +1013,700 @@ impl<'data> Array<'_, 'data> {
             })?;
         }
 
-        let data = Box::leak(data.into_boxed_slice());
-        let array_type = D::ArrayContructor::<T>::construct_type(&target).as_value();
-        let array = dims
-            .alloc_array_with_data(&target, array_type, data.as_mut_ptr().cast())
-            .ptr();
+        if !U::valid_layout(ty) {
+            let value_type = ty.display_string_or(CANNOT_DISPLAY_TYPE).into();
+            Err(AccessError::InvalidLayout { value_type })?;
+        }
 
-        jl_gc_add_ptr_finalizer(
-            get_tls(),
-            array.as_ptr().cast(),
-            droparray::<T> as *mut c_void,
-        );
-        Ok(target.data_from_ptr(array, Private))
-    }
-
-    /// Convert a string to a Julia array.
-    #[inline]
-    pub fn from_string<'target, A, Tgt>(target: Tgt, data: A) -> ArrayData<'target, 'static, Tgt>
-    where
-        A: AsRef<str>,
-        Tgt: Target<'target>,
-    {
-        let string = data.as_ref();
-        let nbytes = string.bytes().len();
-        let ptr = string.as_ptr();
-        // Safety: a string can be converted to an array of bytes.
         unsafe {
-            let arr = jl_pchar_to_array(ptr.cast(), nbytes);
-            target.data_from_ptr(NonNull::new_unchecked(arr), Private)
+            let callback = || {
+                // array_type should be a concrete type.
+                let array_type = jl_apply_array_type(ty.unwrap(Private), D::RANK as _);
+                let array_type = Value::wrap_non_null(NonNull::new_unchecked(array_type), Private);
+                let array = dims.alloc_array_with_data(&target, array_type, data.as_ptr() as _);
+                array
+            };
+
+            let v = match catch_exceptions(callback, unwrap_exc) {
+                Ok(arr) => Ok(arr.ptr()),
+                Err(e) => Err(e),
+            };
+
+            Ok(target.result_from_ptr(v, Private))
         }
     }
 
-    #[inline]
-    pub(crate) fn data_ptr(self) -> *mut c_void {
-        // Safety: the pointer points to valid data.
-        unsafe { self.unwrap_non_null(Private).as_ref().data }
+    /// Allocate a new Julia array that borrows its data from Rust with some provided element
+    /// type without checking any invariants.
+    ///
+    /// Safety:
+    ///
+    /// The element type is `ty`, the rank follows from the rank of `D`. If `N >= 0`, the rank of
+    /// `D` must be equal to `N`.If an exception is thrown when the array is allocated, it is not
+    /// caught. The size of the dimensions must be equal to the length of `data`. The layout of
+    /// `U` must be a valid layout for `ty`.
+    pub unsafe fn from_slice_for_unchecked<'target, 'data, U, D, Tgt>(
+        target: Tgt,
+        ty: Value,
+        data: &'data mut [U],
+        dims: D,
+    ) -> ArrayBaseData<'target, 'data, Tgt, Unknown, N>
+    where
+        Tgt: Target<'target>,
+        D: DimsExt,
+        U: ValidLayout + ValidField + IsBits,
+    {
+        let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
+
+        // array_type should be a concrete type.
+        let array_type = jl_apply_array_type(ty.unwrap(Private), D::RANK as _);
+        let array_type = Value::wrap_non_null(NonNull::new_unchecked(array_type), Private);
+        let array = dims.alloc_array_with_data(&target, array_type, data.as_ptr() as _);
+        target.data_from_ptr(array.ptr(), Private)
+    }
+
+    /// Allocate a new Julia array that takes ownership of a Rust `Vec` with some provided element
+    /// type.
+    ///
+    /// The element type is `ty`, the rank follows from the rank of `D`. If `N >= 0`, the rank of
+    /// `D` must be equal to `N`. If this equality doesn't hold `ArrayLayoutError::RankMismatch`
+    /// is returned. If an exception is thrown when the array is allocated, it is caught and
+    /// returned. The size of the dimensions must be equal to the length of `data`, otherwise
+    /// `InstantiationError::ArraySizeMismatch` is returned.
+    ///
+    /// The layout of `U` must be a valid layout for `ty`, if this is not true
+    /// `AccessError::InvalidLayout` is returned.
+    ///
+    /// NB: Because Julia didn't allocate the backing storage, there are some array functions in
+    /// Julia that will throw an exception if you call them, e.g. `push!`. The reason is that the
+    /// backing storage might need to be reallocated which is not possible.
+    ///
+    /// Examples
+    ///
+    /// ```
+    /// # use jlrs::prelude::*;
+    /// # fn main() {
+    /// # let mut julia = Builder::new().start_local().unwrap();
+    /// julia.local_scope::<_, 4>(|mut frame| {
+    ///     let ty = DataType::uint32_type(&frame).as_value();
+    ///
+    ///     {
+    ///         // Allocate a 2x2 array of `u32`s with an implicit rank.
+    ///         let data = vec![1u32, 2u32, 3u32, 4u32];
+    ///         let array = Array::from_vec_for(&mut frame, ty, data, [2, 2]);
+    ///         assert!(array.is_ok());
+    ///         assert!(array.unwrap().is_ok());
+    ///     }
+    ///
+    ///     {
+    ///         // Allocate a 4x2 array of `u32`s with an explicit rank.
+    ///         let data = vec![1u32, 2u32, 3u32, 4u32];
+    ///         let array = RankedArray::<2>::from_vec_for(&mut frame, ty, data, [2, 2]);
+    ///         assert!(array.is_ok());
+    ///         assert!(array.unwrap().is_ok());
+    ///     }
+    ///
+    ///     {
+    ///         // This fails to compile because the rank of the array doesn't match the rank
+    ///         // of the dimensions.
+    ///         // let data = vec![1u32, 2u32, 3u32, 4u32];
+    ///         // let array = RankedArray::<3>::from_vec_for(&mut frame, ty, data, [2, 2]);
+    ///     }
+    ///
+    ///     {
+    ///         // This fails because the size of the dimensions doesn't match the length of
+    ///         // the data.
+    ///         let mut data = vec![1u32, 2u32, 3u32, 4u32];
+    ///         let array = Array::from_vec_for(&mut frame, ty, data, [2, 1]);
+    ///         assert!(array.is_err());
+    ///     }
+    ///
+    ///     {
+    ///         // This fails because the layout of the data is incompatible with `ty`.
+    ///         let data = vec![1u32, 2u32, 3u32, 4u32];
+    ///         let ty = DataType::uint64_type(&frame).as_value();
+    ///         let array = Array::from_vec_for(&mut frame, ty, data, [2, 2]);
+    ///         assert!(array.is_err());
+    ///     }
+    /// });
+    /// # }
+    /// ```
+    pub fn from_vec_for<'target, U, D, Tgt>(
+        target: Tgt,
+        ty: Value,
+        data: Vec<U>,
+        dims: D,
+    ) -> JlrsResult<ArrayBaseResult<'target, 'static, Tgt, Unknown, N>>
+    where
+        Tgt: Target<'target>,
+        D: DimsExt,
+        U: ValidLayout + ValidField + IsBits,
+    {
+        let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
+        if DimsRankAssert::<D, N>::NEEDS_RUNTIME_RANK_CHECK {
+            let expected = N as usize;
+            let found = dims.rank();
+            if expected != found {
+                Err(InstantiationError::ArrayRankMismatch { expected, found })?;
+            }
+        }
+
+        if dims.size() != data.len() {
+            Err(InstantiationError::ArraySizeMismatch {
+                vec_size: data.len(),
+                dim_size: dims.size(),
+            })?;
+        }
+
+        if !U::valid_layout(ty) {
+            let value_type = ty.display_string_or(CANNOT_DISPLAY_TYPE).into();
+            Err(AccessError::InvalidLayout { value_type })?;
+        }
+
+        let data = Box::leak(data.into_boxed_slice());
+
+        unsafe {
+            let callback = || {
+                // array_type should be a concrete type.
+                let array_type = jl_apply_array_type(ty.unwrap(Private), D::RANK as _);
+                let array_type = Value::wrap_non_null(NonNull::new_unchecked(array_type), Private);
+                let array = dims.alloc_array_with_data(&target, array_type, data.as_mut_ptr() as _);
+
+                jl_gc_add_ptr_finalizer(
+                    get_tls(),
+                    array.ptr().as_ptr().cast(),
+                    droparray::<U> as *mut c_void,
+                );
+
+                array
+            };
+
+            let v = match catch_exceptions(callback, unwrap_exc) {
+                Ok(arr) => Ok(arr.ptr()),
+                Err(e) => Err(e),
+            };
+
+            Ok(target.result_from_ptr(v, Private))
+        }
+    }
+
+    /// Allocate a new Julia array that takes ownership of a Rust `Vec` with some provided element
+    /// type without checking any invariants.
+    ///
+    /// Safety:
+    ///
+    /// The element type is `ty`, the rank follows from the rank of `D`. If `N >= 0`, the rank of
+    /// `D` must be equal to `N`. If an exception is thrown when the array is allocated, it is not
+    /// caught. The size of the dimensions must be equal to the length of `data`. The layout of
+    /// `U` must be a valid layout for `ty`.
+    pub unsafe fn from_vec_for_unchecked<'target, U, D, Tgt>(
+        target: Tgt,
+        ty: Value,
+        data: Vec<U>,
+        dims: D,
+    ) -> ArrayBaseData<'target, 'static, Tgt, Unknown, N>
+    where
+        Tgt: Target<'target>,
+        D: DimsExt,
+        U: ValidLayout + ValidField + IsBits,
+    {
+        let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
+        let data = Box::leak(data.into_boxed_slice());
+
+        // array_type should be a concrete type.
+        let array_type = jl_apply_array_type(ty.unwrap(Private), D::RANK as _);
+        let array_type = Value::wrap_non_null(NonNull::new_unchecked(array_type), Private);
+        let array = dims.alloc_array_with_data(&target, array_type, data.as_mut_ptr() as _);
+
+        jl_gc_add_ptr_finalizer(
+            get_tls(),
+            array.ptr().as_ptr().cast(),
+            droparray::<U> as *mut c_void,
+        );
+
+        target.data_from_ptr(array.ptr(), Private)
+    }
+
+    /// Allocate a new Julia array with some provided element type that clones its data from Rust.
+    ///
+    /// The element type is `ty`, the rank follows from the rank of `D`. If `N >= 0`, the rank of
+    /// `D` must be equal to `N`. If this equality doesn't hold `ArrayLayoutError::RankMismatch`
+    /// is returned. If an exception is thrown when the array is allocated, it is caught and
+    /// returned. The size of the dimensions must be equal to the length of `data`, otherwise
+    /// `InstantiationError::ArraySizeMismatch` is returned.
+    ///
+    /// Note that the type of `data` is not `AsRef<[T]>` but `AsRef<[U]>`. The reason is that the
+    /// type constructor can have more type parameters than its layout. `U` must implement
+    /// `IsBits` and `ValidLayout`, and `T` must implement `HasLamut_yout<Layout = U>` to guarantee
+    /// that `U` is a valid representation of instances of `T`.
+    ///
+    /// Examples
+    ///
+    /// ```
+    /// # use jlrs::prelude::*;
+    /// # fn main() {
+    /// # let mut julia = Builder::new().start_local().unwrap();
+    /// julia.local_scope::<_, 4>(|mut frame| {
+    ///     let data = vec![1u32, 2u32, 3u32, 4u32];
+    ///     let ty = DataType::uint32_type(&frame).as_value();
+    ///
+    ///     {
+    ///         // Allocate a 2x2 array of `u32`s with an implicit rank.
+    ///         let slice = data.as_slice();
+    ///         let array = Array::from_slice_cloned_for(&mut frame, ty, slice, [2, 2]);
+    ///         assert!(array.is_ok());
+    ///         assert!(array.unwrap().is_ok());
+    ///     }
+    ///
+    ///     {
+    ///         // Allocate a 4x2 array of `u32`s with an explicit rank.
+    ///         let slice = data.as_slice();
+    ///         let array = RankedArray::<2>::from_slice_cloned_for(&mut frame, ty, slice, [2, 2]);
+    ///         assert!(array.is_ok());
+    ///         assert!(array.unwrap().is_ok());
+    ///     }
+    ///
+    ///     {
+    ///         // This fails to compile because the rank of the array doesn't match the rank
+    ///         // of the dimensions.
+    ///         // let slice = data.as_slice();
+    ///         // let array = RankedArray::<3>::from_slice_cloned_for(&mut frame, ty, slice, [2, 2]);
+    ///     }
+    ///
+    ///     {
+    ///         // This fails because the size of the dimensions doesn't match the length of
+    ///         // the data.
+    ///         let slice = data.as_slice();
+    ///         let array = Array::from_slice_cloned_for(&mut frame, ty, slice, [2, 1]);
+    ///         assert!(array.is_err());
+    ///     }
+    ///
+    ///     {
+    ///         // This fails because the layout of the data is incompatible with `ty`.
+    ///         let slice = data.as_slice();
+    ///         let ty = DataType::uint64_type(&frame).as_value();
+    ///         let array = Array::from_slice_cloned_for(&mut frame, ty, slice, [2, 1]);
+    ///         assert!(array.is_err());
+    ///     }
+    /// });
+    /// # }
+    /// ```
+    pub fn from_slice_cloned_for<'target, V, U, D, Tgt>(
+        target: Tgt,
+        ty: Value,
+        data: V,
+        dims: D,
+    ) -> JlrsResult<ArrayBaseResult<'target, 'static, Tgt, Unknown, N>>
+    where
+        Tgt: Target<'target>,
+        D: DimsExt,
+        U: ValidLayout + ValidField + IsBits + Clone,
+        V: AsRef<[U]>,
+    {
+        let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
+        if DimsRankAssert::<D, N>::NEEDS_RUNTIME_RANK_CHECK {
+            let expected = N as usize;
+            let found = dims.rank();
+            if expected != found {
+                Err(InstantiationError::ArrayRankMismatch { expected, found })?;
+            }
+        }
+
+        let data = data.as_ref();
+        let len = data.len();
+        let dim_size = dims.size();
+        if len != dim_size {
+            Err(InstantiationError::ArraySizeMismatch {
+                vec_size: len,
+                dim_size: dim_size,
+            })?;
+        }
+
+        if !U::valid_layout(ty) {
+            let value_type = ty.display_string_or(CANNOT_DISPLAY_TYPE).into();
+            Err(AccessError::InvalidLayout { value_type })?;
+        }
+
+        unsafe {
+            match Self::new_for(&target, ty, dims) {
+                Ok(arr) => {
+                    let array_data = jlrs_array_data(arr.as_managed().unwrap(Private));
+                    let array_data_slice = std::slice::from_raw_parts_mut(array_data as _, len);
+                    array_data_slice.clone_from_slice(data);
+
+                    Ok(Ok(arr.root(target)))
+                }
+                Err(err) => Ok(Err(err.as_value().root(target))),
+            }
+        }
+    }
+
+    /// Allocate a new Julia array that clones its data from Rust without checking any invariants.
+    ///
+    /// The element type is `T`, the rank follows from the rank of `D`. If `N >= 0`, the rank of
+    /// `D` must be equal to `N`. If an exception is thrown when the array is allocated, it is not
+    /// caught. The size of the dimensions must be equal to the length of `data`.
+    ///
+    /// Note that the type of `data` is not `AsRef<[T]>` but `AsRef<[U]>`. The reason is that the
+    /// type constructor can have more type parameters than its layout. `U` must implement
+    /// `IsBits` and `ValidLayout`, and `T` must implement `HasLamut_yout<Layout = U>` to guarantee
+    /// that `U` is a valid representation of instances of `T`.
+    pub unsafe fn from_slice_cloned_for_unchecked<'target, V, U, D, Tgt>(
+        target: Tgt,
+        ty: Value,
+        data: V,
+        dims: D,
+    ) -> ArrayBaseData<'target, 'static, Tgt, Unknown, N>
+    where
+        Tgt: Target<'target>,
+        D: DimsExt,
+        U: ValidLayout + ValidField + IsBits + Clone,
+        V: AsRef<[U]>,
+    {
+        let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
+
+        let data = data.as_ref();
+        let len = data.len();
+
+        let arr = Self::new_for_unchecked(&target, ty, dims);
+        let array_data = jlrs_array_data(arr.as_managed().unwrap(Private));
+        let array_data_slice = std::slice::from_raw_parts_mut(array_data as _, len);
+        array_data_slice.clone_from_slice(data);
+
+        arr.root(target)
+    }
+
+    /// Allocate a new Julia array with some provided element type that copies its data from Rust.
+    ///
+    /// The element type is `ty`, the rank follows from the rank of `D`. If `N >= 0`, the rank of
+    /// `D` must be equal to `N`. If this equality doesn't hold `ArrayLayoutError::RankMismatch`
+    /// is returned. If an exception is thrown when the array is allocated, it is caught and
+    /// returned. The size of the dimensions must be equal to the length of `data`, otherwise
+    /// `InstantiationError::ArraySizeMismatch` is returned.
+    ///
+    /// Note that the type of `data` is not `AsRef<[T]>` but `AsRef<[U]>`. The reason is that the
+    /// type constructor can have more type parameters than its layout. `U` must implement
+    /// `IsBits` and `ValidLayout`, and `T` must implement `HasLamut_yout<Layout = U>` to guarantee
+    /// that `U` is a valid representation of instances of `T`.
+    ///
+    /// Examples
+    ///
+    /// ```
+    /// # use jlrs::prelude::*;
+    /// # fn main() {
+    /// # let mut julia = Builder::new().start_local().unwrap();
+    /// julia.local_scope::<_, 4>(|mut frame| {
+    ///     let data = vec![1u32, 2u32, 3u32, 4u32];
+    ///     let ty = DataType::uint32_type(&frame).as_value();
+    ///
+    ///     {
+    ///         // Allocate a 2x2 array of `u32`s with an implicit rank.
+    ///         let slice = data.as_slice();
+    ///         let array = Array::from_slice_copied_for(&mut frame, ty, slice, [2, 2]);
+    ///         assert!(array.is_ok());
+    ///         assert!(array.unwrap().is_ok());
+    ///     }
+    ///
+    ///     {
+    ///         // Allocate a 4x2 array of `u32`s with an explicit rank.
+    ///         let slice = data.as_slice();
+    ///         let array = RankedArray::<2>::from_slice_copied_for(&mut frame, ty, slice, [2, 2]);
+    ///         assert!(array.is_ok());
+    ///         assert!(array.unwrap().is_ok());
+    ///     }
+    ///
+    ///     {
+    ///         // This fails to compile because the rank of the array doesn't match the rank
+    ///         // of the dimensions.
+    ///         // let slice = data.as_slice();
+    ///         // let array = RankedArray::<3>::from_slice_copied_for(&mut frame, ty, slice, [2, 2]);
+    ///     }
+    ///
+    ///     {
+    ///         // This fails because the size of the dimensions doesn't match the length of
+    ///         // the data.
+    ///         let slice = data.as_slice();
+    ///         let array = Array::from_slice_copied_for(&mut frame, ty, slice, [2, 1]);
+    ///         assert!(array.is_err());
+    ///     }
+    ///
+    ///     {
+    ///         // This fails because the layout of the data is incompatible with `ty`.
+    ///         let slice = data.as_slice();
+    ///         let ty = DataType::uint64_type(&frame).as_value();
+    ///         let array = Array::from_slice_copied_for(&mut frame, ty, slice, [2, 1]);
+    ///         assert!(array.is_err());
+    ///     }
+    /// });
+    /// # }
+    /// ```
+    pub fn from_slice_copied_for<'target, V, U, D, Tgt>(
+        target: Tgt,
+        ty: Value,
+        data: V,
+        dims: D,
+    ) -> JlrsResult<ArrayBaseResult<'target, 'static, Tgt, Unknown, N>>
+    where
+        Tgt: Target<'target>,
+        D: DimsExt,
+        U: ValidLayout + ValidField + IsBits + Copy,
+        V: AsRef<[U]>,
+    {
+        let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
+        if DimsRankAssert::<D, N>::NEEDS_RUNTIME_RANK_CHECK {
+            let expected = N as usize;
+            let found = dims.rank();
+            if expected != found {
+                Err(InstantiationError::ArrayRankMismatch { expected, found })?;
+            }
+        }
+
+        let data = data.as_ref();
+        let len = data.len();
+        let dim_size = dims.size();
+        if len != dim_size {
+            Err(InstantiationError::ArraySizeMismatch {
+                vec_size: len,
+                dim_size: dim_size,
+            })?;
+        }
+
+        if !U::valid_layout(ty) {
+            let value_type = ty.display_string_or(CANNOT_DISPLAY_TYPE).into();
+            Err(AccessError::InvalidLayout { value_type })?;
+        }
+
+        unsafe {
+            match Self::new_for(&target, ty, dims) {
+                Ok(arr) => {
+                    let array_data = jlrs_array_data(arr.as_managed().unwrap(Private));
+                    let array_data_slice = std::slice::from_raw_parts_mut(array_data as _, len);
+                    array_data_slice.copy_from_slice(data);
+
+                    Ok(Ok(arr.root(target)))
+                }
+                Err(err) => Ok(Err(err.as_value().root(target))),
+            }
+        }
+    }
+
+    /// Allocate a new Julia array that clones its data from Rust without checking any invariants.
+    ///
+    /// The element type is `T`, the rank follows from the rank of `D`. If `N >= 0`, the rank of
+    /// `D` must be equal to `N`. If an exception is thrown when the array is allocated, it is not
+    /// caught. The size of the dimensions must be equal to the length of `data`.
+    ///
+    /// Note that the type of `data` is not `AsRef<[T]>` but `AsRef<[U]>`. The reason is that the
+    /// type constructor can have more type parameters than its layout. `U` must implement
+    /// `IsBits` and `ValidLayout`, and `T` must implement `HasLamut_yout<Layout = U>` to guarantee
+    /// that `U` is a valid representation of instances of `T`.
+    pub unsafe fn from_slice_copied_for_unchecked<'target, V, U, D, Tgt>(
+        target: Tgt,
+        ty: Value,
+        data: V,
+        dims: D,
+    ) -> ArrayBaseData<'target, 'static, Tgt, Unknown, N>
+    where
+        Tgt: Target<'target>,
+        D: DimsExt,
+        U: ValidLayout + ValidField + IsBits + Copy,
+        V: AsRef<[U]>,
+    {
+        let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
+
+        let data = data.as_ref();
+        let len = data.len();
+
+        let arr = Self::new_for_unchecked(&target, ty, dims);
+        let array_data = jlrs_array_data(arr.as_managed().unwrap(Private));
+        let array_data_slice = std::slice::from_raw_parts_mut(array_data as _, len);
+        array_data_slice.copy_from_slice(data);
+
+        arr.root(target)
     }
 }
 
-impl<'scope, 'data> Array<'scope, 'data> {
-    /// Returns the array's dimensions.
-    // TODO safety
-    #[inline]
-    pub unsafe fn dimensions(self) -> ArrayDimensions<'scope> {
-        ArrayDimensions::new(self)
+impl TypedVector<'_, '_, u8> {
+    /// Convert a slice of bytes to a `TypedVector<u8>`.
+    ///
+    /// The bytes are copied from Rust to Julia. If an exception is thrown, it is caught and
+    /// returned.
+    pub fn from_bytes<'target, B, Tgt>(
+        target: Tgt,
+        bytes: B,
+    ) -> ArrayBaseResult<'target, 'static, Tgt, u8, 1>
+    where
+        Tgt: Target<'target>,
+        B: AsRef<[u8]>,
+    {
+        unsafe {
+            let callback = || {
+                let bytes = bytes.as_ref();
+                jl_pchar_to_array(bytes.as_ptr() as *const _ as _, bytes.len())
+            };
+
+            let v = match catch_exceptions(callback, unwrap_exc) {
+                Ok(arr) => Ok(NonNull::new_unchecked(arr)),
+                Err(e) => Err(e),
+            };
+
+            target.result_from_ptr(v, Private)
+        }
     }
 
-    /// Returns the type of this array's elements.
-    #[inline]
+    /// Convert a slice of bytes to a `TypedVector<u8>` without catching exceptions.
+    ///
+    /// The bytes are copied from Rust to Julia.
+    ///
+    /// Safety:
+    ///
+    /// If an exception is thrown, it is not caught.
+    pub unsafe fn from_bytes_unchecked<'target, B, Tgt>(
+        target: Tgt,
+        bytes: B,
+    ) -> ArrayBaseData<'target, 'static, Tgt, u8, 1>
+    where
+        Tgt: Target<'target>,
+        B: AsRef<[u8]>,
+    {
+        let bytes = bytes.as_ref();
+        let array = jl_pchar_to_array(bytes.as_ptr() as *const _ as _, bytes.len());
+        target.data_from_ptr(NonNull::new_unchecked(array), Private)
+    }
+
+    /// Convert this array to a [`JuliaString`].
+    pub fn to_jl_string<'target, Tgt>(self, target: Tgt) -> StringData<'target, Tgt>
+    where
+        Tgt: Target<'target>,
+    {
+        unsafe {
+            let s = jl_array_to_string(self.unwrap(Private));
+            let s = JuliaString::wrap_non_null(NonNull::new_unchecked(s.cast()), Private);
+            s.root(target)
+        }
+    }
+}
+
+impl<'scope, 'data> VectorAny<'_, '_> {
+    /// Allocate a new Julia array, the element type is the `Any` type and rank is 1.
+    ///
+    /// Examples
+    ///
+    /// ```
+    /// # use jlrs::prelude::*;
+    /// # fn main() {
+    /// # let mut julia = Builder::new().start_local().unwrap();
+    /// julia.local_scope::<_, 2>(|mut frame| {
+    ///     let array = VectorAny::new_any(&mut frame, 2);
+    ///     assert!(array.is_ok());
+    ///
+    ///     let array = VectorAny::new_any(&mut frame, usize::MAX);
+    ///     assert!(array.is_err());
+    /// });
+    /// # }
+    /// ```
+    pub fn new_any<'target, Tgt>(target: Tgt, size: usize) -> VectorAnyResult<'target, 'static, Tgt>
+    where
+        Tgt: Target<'target>,
+    {
+        unsafe {
+            let callback = || jl_alloc_vec_any(size);
+
+            let v = match catch_exceptions(callback, unwrap_exc) {
+                Ok(arr) => Ok(NonNull::new_unchecked(arr)),
+                Err(e) => Err(e),
+            };
+            target.result_from_ptr(v, Private)
+        }
+    }
+
+    /// Allocate a new Julia array, the element type is the `Any` type and rank is 1 without
+    /// checking any invariants.
+    ///
+    /// Safety: if an exception is thrown, it's not caught.
+    pub unsafe fn new_any_unchecked<'target, Tgt>(
+        target: Tgt,
+        size: usize,
+    ) -> VectorAnyData<'target, 'static, Tgt>
+    where
+        Tgt: Target<'target>,
+    {
+        let arr = jl_alloc_vec_any(size);
+        target.data_from_ptr(NonNull::new_unchecked(arr), Private)
+    }
+}
+
+impl<T, const N: isize> ArrayBase<'_, '_, T, N> {
+    /// Returns the rank of this array.
+    pub fn rank(self) -> i32 {
+        unsafe { jl_array_rank(self.unwrap(Private).cast()) }
+    }
+
+    // Returns `true` if `N != -1`.
+    pub const fn has_rank(self) -> bool {
+        N != -1
+    }
+
+    // Returns `true` if `N != -1`.
+    pub const fn has_rank_s() -> bool {
+        N != -1
+    }
+}
+
+impl<const N: isize> ArrayBase<'_, '_, Unknown, N> {
+    // Returns `false` because the the element type is `Unknown`.
+    pub const fn has_constrained_type(self) -> bool {
+        false
+    }
+
+    // Returns `false` because the the element type is `Unknown`.
+    pub const fn has_constrained_type_s() -> bool {
+        false
+    }
+}
+
+impl<T: ConstructType, const N: isize> ArrayBase<'_, '_, T, N> {
+    // Returns `true` because the the element type implements `ConstructType`.
+    pub const fn has_constrained_type(self) -> bool {
+        true
+    }
+
+    // Returns `true` because the the element type implements `ConstructType`.
+    pub const fn has_constrained_type_s() -> bool {
+        true
+    }
+}
+
+// Fields and flags
+impl<'scope, 'data, T, const N: isize> ArrayBase<'scope, 'data, T, N> {
+    /// Returns the element size in bytes.
+    pub fn element_size(self) -> usize {
+        unsafe {
+            let t = self.as_value().datatype().parameter_unchecked(0);
+
+            if t.is::<DataType>() {
+                t.cast_unchecked::<DataType>()
+                    .size()
+                    .map(|sz| sz as usize)
+                    .unwrap_or(std::mem::size_of::<Value>())
+            } else if t.is::<Union>() {
+                let u = t.cast_unchecked::<Union>();
+
+                let mut sz = 0;
+                let mut align = 0;
+                if u.isbits_size_align(&mut sz, &mut align) {
+                    return sz;
+                }
+
+                std::mem::size_of::<Value>()
+            } else {
+                std::mem::size_of::<Value>()
+            }
+        }
+    }
+
+    /// Returns the element type.
     pub fn element_type(self) -> Value<'scope, 'static> {
-        // Safety: C API function is called valid arguments.
         unsafe {
             Value::wrap_non_null(
                 NonNull::new_unchecked(jl_array_eltype(self.unwrap(Private).cast()).cast()),
@@ -452,1641 +1715,1087 @@ impl<'scope, 'data> Array<'scope, 'data> {
         }
     }
 
-    /// Returns the size of this array's elements.
-    #[inline]
-    pub fn element_size(self) -> usize {
-        // Safety: the pointer points to valid data.
-        unsafe { self.unwrap_non_null(Private).as_ref().elsize as usize }
+    /// Returns `true` if `L` is a valid layout for the element type.
+    pub fn contains<L: ValidField>(self) -> bool {
+        L::valid_field(self.element_type())
     }
 
-    /// Returns `true` if the layout of the elements is compatible with `T`.
-    #[inline]
-    pub fn contains<T: ValidField>(self) -> bool {
-        // Safety: C API function is called valid arguments.
-        T::valid_field(self.element_type())
+    /// Returns the length of this array.
+    pub fn length(self) -> usize {
+        unsafe { jlrs_array_len(self.unwrap(Private)) }
     }
 
-    /// Returns `true` if the layout of the elements is compatible with `T` and these elements are
-    /// stored inline.
-    #[inline]
-    pub fn contains_inline<T: ValidField>(self) -> bool {
-        self.contains::<T>() && self.is_inline_array()
-    }
-
-    /// Returns `true` if the elements of the array are stored inline.
-    #[inline]
-    pub fn is_inline_array(self) -> bool {
-        // Safety: the pointer points to valid data.
-        unsafe { self.unwrap_non_null(Private).as_ref().flags.ptrarray() == 0 }
-    }
-
-    /// Returns `true` if the elements of the array are stored inline and the element type is a
-    /// union type.
-    #[inline]
-    pub fn is_union_array(self) -> bool {
-        self.is_inline_array() && self.element_type().is::<Union>()
-    }
-
-    /// Returns true if the elements of the array are stored inline and at least one of the fields
-    /// of the inlined type is a pointer.
-    #[inline]
-    pub fn has_inlined_pointers(self) -> bool {
-        // Safety: the pointer points to valid data.
-        unsafe {
-            let flags = self.unwrap_non_null(Private).as_ref().flags;
-            self.is_inline_array() && flags.hasptr() != 0
+    /// Returns how the array has been allocated.
+    pub fn how(self) -> How {
+        let how = unsafe { jlrs_array_how(self.unwrap(Private)) };
+        match how {
+            0 => How::InlineOrForeign,
+            1 => How::JuliaAllocated,
+            2 => How::MallocAllocated,
+            3 => How::PointerToOwner,
+            _ => unreachable!(),
         }
     }
 
-    /// Returns `true` if elements of this array are zero-initialized.
-    #[inline]
-    pub fn zero_init(self) -> bool {
-        // Safety: the pointer points to valid data.
-        unsafe {
-            let flags = self.unwrap_non_null(Private).as_ref().flags;
-            if flags.ptrarray() == 1 || flags.hasptr() == 1 {
-                return true;
-            }
+    /// Returns the number of dimensions (i.e. the rank) of this array.
+    pub fn n_dims(self) -> usize {
+        unsafe { jlrs_array_ndims(self.unwrap(Private)) }
+    }
 
-            let elty = self.element_type();
-            if let Ok(dt) = elty.cast::<DataType>() {
-                return dt.zero_init();
-            } else {
-                false
-            }
+    /// Returns the const parameter, `N`.
+    pub const fn generic_rank(self) -> isize {
+        N
+    }
+
+    /// Returns `true` if the elements are stored as pointers, i.e. `Option<ValueRef>`.
+    pub fn ptr_array(self) -> bool {
+        unsafe { jlrs_array_is_pointer_array(self.unwrap(Private)) != 0 }
+    }
+
+    /// Returns `true` if the elements are stored inline and contain references to managed data.
+    pub fn has_ptr(self) -> bool {
+        unsafe { jlrs_array_has_pointers(self.unwrap(Private)) != 0 }
+    }
+
+    pub fn union_array(self) -> bool {
+        unsafe { jlrs_array_is_union_array(self.unwrap(Private)) != 0 }
+    }
+
+    /// Returns the dimensions of this array.
+    pub fn dimensions<'borrow>(&'borrow self) -> ArrayDimensions<'borrow, N> {
+        unsafe {
+            let ptr = jlrs_array_dims_ptr(self.unwrap(Private));
+            let n = self.n_dims() as usize;
+            let dims = std::slice::from_raw_parts(ptr.cast(), n);
+            ArrayDimensions::new(dims)
         }
     }
 
-    /// Returns true if the elements of the array are stored as [`Value`]s.
-    #[inline]
-    pub fn is_value_array(self) -> bool {
-        !self.is_inline_array()
+    /// Returns a pointer to this array's data.
+    pub unsafe fn data_ptr(self) -> *mut c_void {
+        jlrs_array_data(self.unwrap(Private))
     }
 
-    /// Convert this untyped array to a [`TypedArray`].
-    pub fn try_as_typed<T>(self) -> JlrsResult<TypedArray<'scope, 'data, T>>
-    where
-        T: ValidField,
-    {
-        if self.contains::<T>() {
-            let ptr = self.unwrap_non_null(Private);
-            // Safety: the type is correct
-            unsafe { Ok(TypedArray::wrap_non_null(ptr, Private)) }
+    /// Returns the owner of the array data.
+    pub fn owner(self) -> Option<Value<'scope, 'data>> {
+        if self.how() == How::PointerToOwner {
+            unsafe {
+                return Some(Value::wrap_non_null(
+                    NonNull::new_unchecked(jlrs_array_data_owner(self.unwrap(Private))),
+                    Private,
+                ));
+            }
+        }
+        None
+    }
+
+    /// Returns true if the elements are zero-initialized.
+    pub fn zero_init(&self) -> bool {
+        let ty = self.element_type();
+        if ty.is::<DataType>() {
+            unsafe {
+                let ty = ty.cast_unchecked::<DataType>();
+                ty.zero_init()
+            }
         } else {
-            let value_type = self.element_type().display_string_or(CANNOT_DISPLAY_TYPE);
-            Err(AccessError::InvalidLayout { value_type })?
+            true
         }
     }
+}
 
-    /// Convert this array to a [`TypedValue`].
-    pub fn as_typed_value<'target, T: ConstructType, Tgt: Target<'target>, const N: isize>(
-        self,
-        target: &Tgt,
-    ) -> JlrsResult<TypedValue<'scope, 'data, ArrayType<T, N>>> {
-        unsafe {
-            let ty = T::construct_type(target).as_value();
+// Tracking
+impl<'scope, 'data, T, const N: isize> ArrayBase<'scope, 'data, T, N> {
+    /// Track this array, allowing shared access.
+    pub fn track_shared(self) -> JlrsResult<TrackedArrayBase<'scope, 'data, T, N>> {
+        TrackedArrayBase::track_shared(self)
+    }
+
+    /// Track this array, enforcing exclusive access.
+    pub fn track_exclusive(self) -> JlrsResult<TrackedArrayBaseMut<'scope, 'data, T, N>> {
+        TrackedArrayBaseMut::track_exclusive(self)
+    }
+}
+
+// Layout checks
+impl<'scope, 'data, T, const N: isize> ArrayBase<'scope, 'data, T, N> {
+    /// Returns `true` if the elements are stored inline and the element type is an isbits type.
+    pub fn has_bits_layout(self) -> bool {
+        self.has_inline_layout() && !self.has_ptr()
+    }
+
+    /// Returns `true` if the elements are stored inline.
+    pub fn has_inline_layout(self) -> bool {
+        !self.ptr_array() && !self.union_array()
+    }
+
+    /// Returns `true` if the elements are stored inline and the elements contain references to
+    /// other Julia data.
+    pub fn has_inline_with_refs_layout(self) -> bool {
+        !self.ptr_array() && !self.has_union_layout() && self.has_ptr()
+    }
+
+    /// Returns `true` if the elements are stored inline and the element type is a union.
+    pub fn has_union_layout(self) -> bool {
+        self.union_array()
+    }
+
+    /// Returns `true` if the elements are stored as references to Julia data.
+    pub fn has_value_layout(self) -> bool {
+        self.ptr_array()
+    }
+
+    /// Returns `true` if the elements are stored as references to managed data.
+    pub fn has_managed_layout<M: Managed<'scope, 'data> + Typecheck>(self) -> bool {
+        if self.ptr_array() {
             let elty = self.element_type();
-            if ty != elty {
-                // err
-                Err(TypeError::IncompatibleType {
-                    element_type: elty.display_string_or("<Cannot display type>"),
-                    value_type: ty.display_string_or("<Cannot display type>"),
-                })?;
-            }
-
-            let rank = self.dimensions().rank();
-            if rank != N as _ {
-                Err(ArrayLayoutError::RankMismatch {
-                    found: rank as isize,
-                    provided: N,
-                })?;
-            }
-
-            Ok(TypedValue::<ArrayType<T, N>>::from_value_unchecked(
-                self.as_value(),
-            ))
-        }
-    }
-
-    /// Convert this array to a [`TypedValue`] without checking if the layout is compatible.
-    #[inline]
-    pub unsafe fn as_typed_value_unchecked<T: ConstructType, const N: isize>(
-        self,
-    ) -> TypedValue<'scope, 'data, ArrayType<T, N>> {
-        TypedValue::<ArrayType<T, N>>::from_value_unchecked(self.as_value())
-    }
-
-    /// Convert this array to a [`RankedArray`].
-    pub fn try_as_ranked<const N: isize>(self) -> JlrsResult<RankedArray<'scope, 'data, N>> {
-        unsafe {
-            if self.dimensions().rank() == N as usize {
-                Ok(RankedArray(self.0, PhantomData, PhantomData))
+            if elty.is::<DataType>() {
+                unsafe { elty.cast_unchecked::<DataType>().is::<M>() }
             } else {
-                let value_type = self.element_type().display_string_or(CANNOT_DISPLAY_TYPE);
-                Err(AccessError::InvalidLayout { value_type })?
+                elty.is::<M>()
             }
+        } else {
+            false
         }
     }
+}
 
-    /// Convert this array to a [`TypedRankedArray`].
-    pub fn try_as_typed_ranked<U: ValidField, const N: isize>(
-        self,
-    ) -> JlrsResult<TypedRankedArray<'scope, 'data, U, N>> {
-        unsafe {
-            if self.dimensions().rank() == N as usize && self.contains::<U>() {
-                Ok(TypedRankedArray(
-                    self.0,
-                    PhantomData,
-                    PhantomData,
-                    PhantomData,
-                ))
-            } else {
-                let value_type = self.element_type().display_string_or(CANNOT_DISPLAY_TYPE);
-                Err(AccessError::InvalidLayout { value_type })?
-            }
-        }
-    }
-
-    /// Convert this untyped array to a [`TypedArray`] without checking if this conversion is
-    /// valid.
+// Accessors
+impl<'scope, 'data, T, const N: isize> ArrayBase<'scope, 'data, T, N> {
+    /// Create an accessor for `isbits` data.
     ///
-    /// Safety: `T` must be a valid representation of the data stored in the array.
-    #[inline]
-    pub unsafe fn as_typed_unchecked<T>(self) -> TypedArray<'scope, 'data, T>
+    /// Thanks to the restrictions on `T` the data is guaranteed to be stored inline as an array
+    /// of `T`s.
+    ///
+    /// Safety:
+    ///
+    /// No mutable accessors to this data must exist.
+    pub unsafe fn bits_data<'borrow>(&'borrow self) -> BitsAccessor<'borrow, 'scope, 'data, T, T, N>
     where
-        T: ValidField,
+        T: ConstructType + ValidField + IsBits,
     {
-        TypedArray::wrap_non_null(self.unwrap_non_null(Private), Private)
+        // No need for checks, guaranteed to have isbits layout
+        BitsAccessor::new(self)
     }
 
-    /// Track this array.
+    /// Create an accessor for `isbits` data with layout `L`.
     ///
-    /// While an array is tracked, it can't be exclusively tracked.
-    #[inline]
-    pub fn track_shared<'borrow>(
+    /// Thanks to the restrictions on `T` and `L` the elements are guaranteed to be stored inline
+    /// as an array of `L`s.
+    ///
+    /// Safety:
+    ///
+    /// No mutable accessors to this data must exist.
+    pub unsafe fn bits_data_with_layout<'borrow, L>(
         &'borrow self,
-    ) -> JlrsResult<TrackedArray<'borrow, 'scope, 'data, Self>> {
-        Ledger::try_borrow_shared(self.as_value())?;
-        unsafe { Ok(TrackedArray::new(self)) }
-    }
-
-    /// Exclusively track this array.
-    ///
-    /// While an array is exclusively tracked, it can't be tracked otherwise.
-    #[inline]
-    pub unsafe fn track_exclusive<'borrow>(
-        &'borrow mut self,
-    ) -> JlrsResult<TrackedArrayMut<'borrow, 'scope, 'data, Self>> {
-        Ledger::try_borrow_exclusive(self.as_value())?;
-        unsafe { Ok(TrackedArrayMut::new(self)) }
-    }
-
-    /// Copy the data of an inline array to Rust.
-    ///
-    /// Returns `ArrayLayoutError::NotInline` if the data is not stored inline or `AccessError::InvalidLayout`
-    /// if the type of the elements is incorrect.
-    pub unsafe fn copy_inline_data<T>(&self) -> JlrsResult<CopiedArray<T>>
+    ) -> BitsAccessor<'borrow, 'scope, 'data, T, L, N>
     where
-        T: 'static + ValidField + Unbox,
+        T: ConstructType + HasLayout<'static, 'static, Layout = L>,
+        L: IsBits + ValidField,
     {
-        self.ensure_bits_containing::<T>()?;
-
-        let dimensions = self.dimensions().into_dimensions();
-        let sz = dimensions.size();
-        let mut data = Vec::with_capacity(sz);
-
-        // Safety: layouts are compatible and is guaranteed to be a bits type due to the
-        // 'static constraint on T.
-        let jl_data = jl_array_data(self.unwrap(Private).cast()).cast();
-        let ptr = data.as_mut_ptr();
-        std::ptr::copy_nonoverlapping(jl_data, ptr, sz);
-        data.set_len(sz);
-
-        Ok(CopiedArray::new(data.into_boxed_slice(), dimensions))
+        // No need for checks, guaranteed to have isbits layout and L is the layout of T
+        BitsAccessor::new(self)
     }
 
-    // TODO docs
-    // TODO safety for all
-
-    /// Immutably access the contents of this array. The elements must have an `isbits` type.
+    /// Try to create an accessor for `isbits` data with layout `L`.
     ///
-    /// Returns `ArrayLayoutError::NotInline` if the data is not stored inline, `ArrayLayoutError::NotBits`
-    /// if the type is not an `isbits` type, or `AccessError::InvalidLayout` if `T` is not a valid
-    /// layout for the array elements.
+    /// If the array doesn't have an isbits layout `ArrayLayoutError::NotBits` is returned. If `L`
+    /// is not a valid field layout for the element type `TypeError::InvalidLayout` is returned.
     ///
-    /// Safety: it's not checked if the content of this array are already borrowed by Rust code.
-    #[inline]
-    pub unsafe fn bits_data<'borrow, T>(
+    /// Safety:
+    ///
+    /// No mutable accessors to this data must exist.
+    pub unsafe fn try_bits_data<'borrow, L>(
         &'borrow self,
-    ) -> JlrsResult<BitsArrayAccessorI<'borrow, 'scope, 'data, T>>
+    ) -> JlrsResult<BitsAccessor<'borrow, 'scope, 'data, T, L, N>>
     where
-        T: ValidField,
+        L: IsBits + ValidField,
     {
-        self.ensure_bits_containing::<T>()?;
-
-        // Safety: layouts are compatible, access is immutable.
-        let accessor = ArrayAccessor::new(self);
-        Ok(accessor)
-    }
-
-    /// Mutably access the contents of this array. The elements must have an `isbits` type.
-    ///
-    /// Returns `ArrayLayoutError::NotInline` if the data is not stored inline, `ArrayLayoutError::NotBits`
-    /// if the type is not an `isbits` type, or `AccessError::InvalidLayout` if `T` is not a valid
-    /// layout for the array elements.
-    ///
-    /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
-    /// this value is allowed.
-    #[inline]
-    pub unsafe fn bits_data_mut<'borrow, T>(
-        &'borrow mut self,
-    ) -> JlrsResult<BitsArrayAccessorMut<'borrow, 'scope, 'data, T>>
-    where
-        T: ValidField,
-    {
-        self.ensure_bits_containing::<T>()?;
-
-        let accessor = ArrayAccessor::new(self);
-        Ok(accessor)
-    }
-
-    /// Immutably the contents of this array. The elements must be stored inline.
-    ///
-    /// You can borrow data from multiple arrays at the same time.
-    ///
-    /// Returns `ArrayLayoutError::NotInline` if the data is not stored inline or
-    /// `AccessError::InvalidLayout` if `T` is not a valid layout for the array elements.
-    #[inline]
-    pub unsafe fn inline_data<'borrow, T>(
-        &'borrow self,
-    ) -> JlrsResult<InlinePtrArrayAccessorI<'borrow, 'scope, 'data, T>>
-    where
-        T: ValidField,
-    {
-        self.ensure_inline_containing::<T>()?;
-
-        let accessor = ArrayAccessor::new(self);
-        Ok(accessor)
-    }
-
-    /// Mutably access the contents of this array. The elements must be stored inline.
-    ///
-    /// This method can be used to gain mutable access to the contents of a single array.
-    ///
-    /// Returns `ArrayLayoutError::NotInline` if the data is not stored inline or
-    /// `AccessError::InvalidLayout` if `T` is not a valid layout for the array elements.
-    ///
-    /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
-    /// this value is allowed.
-    #[inline]
-    pub unsafe fn inline_data_mut<'borrow, T>(
-        &'borrow mut self,
-    ) -> JlrsResult<InlinePtrArrayAccessorMut<'borrow, 'scope, 'data, T>>
-    where
-        T: ValidField,
-    {
-        self.ensure_inline_containing::<T>()?;
-
-        let accessor = ArrayAccessor::new(self);
-        Ok(accessor)
-    }
-
-    /// Immutably the contents of this array. The elements must not be stored inline.
-    ///
-    /// You can borrow data from multiple arrays at the same time.
-    ///
-    /// Returns `ArrayLayoutError::NotPointer` if the data is stored inline or `AccessError::InvalidLayout` if `T`
-    /// is not a valid layout for the array elements.
-    #[inline]
-    pub unsafe fn managed_data<'borrow, T>(
-        &'borrow self,
-    ) -> JlrsResult<PtrArrayAccessorI<'borrow, 'scope, 'data, T>>
-    where
-        T: ManagedRef<'scope, 'data>,
-        Option<T>: ValidField,
-    {
-        self.ensure_ptr_containing::<T>()?;
-
-        let accessor = ArrayAccessor::new(self);
-        Ok(accessor)
-    }
-
-    /// Mutably access the contents of this array. The elements must not be stored inline.
-    ///
-    /// This method can be used to gain mutable access to the contents of a single array.
-    ///
-    /// Returns `ArrayLayoutError::NotPointer` if the data is stored inline or `AccessError::InvalidLayout` if `T`
-    /// is not a valid layout for the array elements.
-    ///
-    /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
-    /// this value is allowed.
-    #[inline]
-    pub unsafe fn managed_data_mut<'borrow, T>(
-        &'borrow mut self,
-    ) -> JlrsResult<PtrArrayAccessorMut<'borrow, 'scope, 'data, T>>
-    where
-        T: ManagedRef<'scope, 'data>,
-        Option<T>: ValidField,
-    {
-        self.ensure_ptr_containing::<T>()?;
-
-        let accessor = ArrayAccessor::new(self);
-        Ok(accessor)
-    }
-
-    /// Immutably the contents of this array. The elements must not be stored inline.
-    ///
-    /// You can borrow data from multiple arrays at the same time.
-    ///
-    /// Returns `ArrayLayoutError::NotPointer` if the data is stored inline.
-    #[inline]
-    pub unsafe fn value_data<'borrow>(
-        &'borrow self,
-    ) -> JlrsResult<PtrArrayAccessorI<'borrow, 'scope, 'data, ValueRef<'scope, 'data>>> {
-        self.ensure_ptr_containing::<ValueRef>()?;
-
-        let accessor = ArrayAccessor::new(self);
-        Ok(accessor)
-    }
-
-    /// Mutably access the contents of this array. The elements must not be stored inline.
-    ///
-    /// This method can be used to gain mutable access to the contents of a single array.
-    ///
-    /// Returns `ArrayLayoutError::NotPointer` if the data is stored inline.
-    ///
-    /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
-    /// this value is allowed.
-    #[inline]
-    pub unsafe fn value_data_mut<'borrow>(
-        &'borrow mut self,
-    ) -> JlrsResult<PtrArrayAccessorMut<'borrow, 'scope, 'data, ValueRef<'scope, 'data>>> {
-        self.ensure_ptr_containing::<ValueRef>()?;
-
-        let accessor = ArrayAccessor::new(self);
-        Ok(accessor)
-    }
-
-    /// Immutably access the contents of this array. The element type must be a bits union type.
-    ///
-    /// You can borrow data from multiple arrays at the same time.
-    ///
-    /// Returns `ArrayLayoutError::NotUnion` if the data is not stored as a bits union.
-    #[inline]
-    pub unsafe fn union_data<'borrow>(
-        &'borrow self,
-    ) -> JlrsResult<UnionArrayAccessorI<'borrow, 'scope, 'data>> {
-        self.ensure_union()?;
-
-        let accessor = ArrayAccessor::new(self);
-        Ok(accessor)
-    }
-
-    /// Mutably access the contents of this array. The element type must be a bits union.
-    ///
-    /// This method can be used to gain mutable access to the contents of a single array.
-    ///
-    /// Returns `ArrayLayoutError::NotUnion` if the data is not stored as a bits union.
-    ///
-    /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
-    /// this value is allowed.
-    #[inline]
-    pub unsafe fn union_data_mut<'borrow>(
-        &'borrow mut self,
-    ) -> JlrsResult<UnionArrayAccessorMut<'borrow, 'scope, 'data>> {
-        self.ensure_union()?;
-
-        let accessor = ArrayAccessor::new(self);
-        Ok(accessor)
-    }
-
-    /// Immutably access the contents of this array.
-    ///
-    /// You can borrow data from multiple arrays at the same time.
-    #[inline]
-    pub unsafe fn indeterminate_data<'borrow>(
-        &'borrow self,
-    ) -> IndeterminateArrayAccessorI<'borrow, 'scope, 'data> {
-        ArrayAccessor::new(self)
-    }
-
-    /// Mutably access the contents of this array.
-    ///
-    /// This method can be used to gain mutable access to the contents of a single array.
-    ///
-    /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
-    /// this value is allowed.
-    #[inline]
-    pub unsafe fn indeterminate_data_mut<'borrow>(
-        &'borrow mut self,
-    ) -> IndeterminateArrayAccessor<'borrow, 'scope, 'data, Mutable<'borrow, u8>> {
-        ArrayAccessor::new(self)
-    }
-
-    #[inline]
-    pub unsafe fn into_slice_unchecked<T>(self) -> &'scope [T] {
-        let len = self.dimensions().size();
-        let data = self.data_ptr().cast::<T>();
-        std::slice::from_raw_parts(data, len)
-    }
-
-    #[inline]
-    pub unsafe fn as_slice_unchecked<'borrow, T>(&'borrow self) -> &'borrow [T] {
-        let len = self.dimensions().size();
-        let data = self.data_ptr().cast::<T>();
-        std::slice::from_raw_parts(data, len)
-    }
-
-    #[inline]
-    pub unsafe fn into_mut_slice_unchecked<T>(self) -> &'scope mut [T] {
-        let len = self.dimensions().size();
-        let data = self.data_ptr().cast::<T>();
-        std::slice::from_raw_parts_mut(data, len)
-    }
-
-    #[inline]
-    pub unsafe fn as_mut_slice_unchecked<'borrow, T>(&'borrow mut self) -> &'borrow mut [T] {
-        let len = self.dimensions().size();
-        let data = self.data_ptr().cast::<T>();
-        std::slice::from_raw_parts_mut(data, len)
-    }
-
-    /// Reshape the array, a new array is returned that has dimensions `dims`. The new array and
-    /// `self` share their data.
-    ///
-    /// This method returns an exception if the old and new array have a different number of
-    /// elements.
-    pub unsafe fn reshape<'target, 'current, 'borrow, D, Tgt>(
-        &self,
-        target: Tgt,
-        dims: D,
-    ) -> ArrayResult<'target, 'data, Tgt>
-    where
-        D: DimsExt,
-        Tgt: Target<'target>,
-    {
-        target
-            .with_local_scope::<_, _, 1>(|target, mut frame| {
-                let elty_ptr = self.element_type().unwrap(Private);
-
-                // Safety: The array type is rooted until the array has been constructed, all C API
-                // functions are called with valid data. If an exception is thrown it's caught.
-                let callback = || {
-                    let array_type = jl_apply_array_type(elty_ptr, dims.rank());
-
-                    let tuple = sized_dim_tuple(&mut frame, &dims);
-
-                    jl_reshape_array(array_type, self.unwrap(Private), tuple.unwrap(Private))
-                };
-
-                let exc = |err: Value| err.unwrap_non_null(Private);
-                let res = match catch_exceptions(callback, exc) {
-                    Ok(array_ptr) => Ok(NonNull::new_unchecked(array_ptr)),
-                    Err(e) => Err(e),
-                };
-
-                Ok(target.result_from_ptr(res, Private))
-            })
-            .unwrap()
-    }
-
-    /// Reshape the array, a new array is returned that has dimensions `dims`. The new array and
-    /// `self` share their data.
-    ///
-    /// Safety: If the dimensions are incompatible with the array size, Julia will throw an error.
-    /// This error is not caught, which is UB from a `ccall`ed function.
-    pub unsafe fn reshape_unchecked<'target, 'current, 'borrow, D, Tgt>(
-        &self,
-        target: Tgt,
-        dims: D,
-    ) -> ArrayData<'target, 'data, Tgt>
-    where
-        D: DimsExt,
-        Tgt: Target<'target>,
-    {
-        target
-            .with_local_scope::<_, _, 1>(|target, mut frame| {
-                let elty_ptr = self.element_type().unwrap(Private);
-                let array_type = jl_apply_array_type(elty_ptr.cast(), dims.rank());
-                let tuple = sized_dim_tuple(&mut frame, &dims);
-
-                let res = jl_reshape_array(array_type, self.unwrap(Private), tuple.unwrap(Private));
-                Ok(target.data_from_ptr(NonNull::new_unchecked(res), Private))
-            })
-            .unwrap()
-    }
-
-    fn ensure_bits_containing<T>(self) -> JlrsResult<()>
-    where
-        T: ValidField,
-    {
-        if !self.is_inline_array() {
-            Err(ArrayLayoutError::NotInline {
-                element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
-            })?;
-        }
-
-        // Safety: Inline array must have a DataType as element type
-        if unsafe {
-            self.element_type()
-                .cast_unchecked::<DataType>()
-                .has_pointer_fields()?
-        } {
+        if !self.has_bits_layout() {
             Err(ArrayLayoutError::NotBits {
                 element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
             })?;
         }
 
-        if !self.contains::<T>() {
-            Err(AccessError::InvalidLayout {
+        let ty = self.element_type();
+        if !L::valid_field(ty) {
+            Err(TypeError::InvalidLayout {
                 value_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
             })?;
         }
 
-        Ok(())
+        Ok(BitsAccessor::new(self))
     }
 
-    fn ensure_inline_containing<T>(self) -> JlrsResult<()>
-    where
-        T: ValidField,
-    {
-        if !self.is_inline_array() {
-            Err(ArrayLayoutError::NotInline {
-                element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
-            })?;
-        }
-
-        if !self.contains::<T>() {
-            Err(AccessError::InvalidLayout {
-                value_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
-            })?;
-        }
-
-        Ok(())
-    }
-
-    fn ensure_ptr_containing<'fr, 'da, T>(self) -> JlrsResult<()>
-    where
-        T: ManagedRef<'fr, 'da>,
-        Option<T>: ValidField,
-    {
-        if !self.is_value_array() {
-            Err(ArrayLayoutError::NotPointer {
-                element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
-            })?;
-        }
-
-        if !self.contains::<Option<T>>() {
-            Err(AccessError::InvalidLayout {
-                value_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
-            })?;
-        }
-
-        Ok(())
-    }
-
-    fn ensure_union(self) -> JlrsResult<()> {
-        if !self.is_union_array() {
-            let element_type = self.element_type().display_string_or(CANNOT_DISPLAY_TYPE);
-            Err(ArrayLayoutError::NotUnion { element_type })?
-        }
-
-        Ok(())
-    }
-}
-
-impl<'scope> Array<'scope, 'static> {
-    /*
-        TODO
-        jl_array_ptr_1d_push
-        jl_array_ptr_1d_append
-    */
-
-    /// Insert `inc` elements at the end of the array.
+    /// Create an accessor for `isbits` data with layout `L` without checking any invariants.
     ///
-    /// The array must be 1D and not contain data borrowed or moved from Rust, otherwise an exception
-    /// is returned.
-    pub unsafe fn grow_end<'target, S>(
-        &mut self,
-        target: S,
-        inc: usize,
-    ) -> TargetException<'target, 'static, (), S>
-    where
-        S: Target<'target>,
-    {
-        // Safety: the C API function is called with valid data. If an exception is thrown it's caught.
-
-        let callback = || jl_array_grow_end(self.unwrap(Private), inc);
-
-        let exc = |err: Value| err.unwrap_non_null(Private);
-
-        let res = match catch_exceptions(callback, exc) {
-            Ok(_) => Ok(()),
-            Err(e) => Err(e),
-        };
-
-        target.exception_from_ptr(res, Private)
-    }
-
-    /// Insert `inc` elements at the end of the array.
+    /// Safety:
     ///
-    /// Safety: the array must be 1D and not contain data borrowed or moved from Rust, otherwise
-    /// Julia throws an exception. This error is not exception, which is UB from a `ccall`ed
-    /// function.
-    #[inline]
-    pub unsafe fn grow_end_unchecked(&mut self, inc: usize) {
-        jl_array_grow_end(self.unwrap(Private), inc);
-    }
-
-    /// Remove `dec` elements from the end of the array.
-    ///
-    /// The array must be 1D, not contain data borrowed or moved from Rust, otherwise an exception
-    /// is returned.
-    pub unsafe fn del_end<'target, S>(
-        &mut self,
-        target: S,
-        dec: usize,
-    ) -> TargetException<'target, 'static, (), S>
-    where
-        S: Target<'target>,
-    {
-        // Safety: the C API function is called with valid data. If an exception is thrown it's caught.
-        let callback = || jl_array_del_end(self.unwrap(Private), dec);
-
-        let exc = |err: Value| err.unwrap_non_null(Private);
-
-        let res = match catch_exceptions(callback, exc) {
-            Ok(_) => Ok(()),
-            Err(e) => Err(e),
-        };
-
-        target.exception_from_ptr(res, Private)
-    }
-
-    /// Remove `dec` elements from the end of the array.
-    ///
-    /// Safety: the array must be 1D and not contain data borrowed or moved from Rust, otherwise
-    /// Julia throws an exception. This error is not exception, which is UB from a `ccall`ed
-    /// function.
-    #[inline]
-    pub unsafe fn del_end_unchecked(&mut self, dec: usize) {
-        jl_array_del_end(self.unwrap(Private), dec);
-    }
-
-    /// Insert `inc` elements at the beginning of the array.
-    ///
-    /// The array must be 1D, not contain data borrowed or moved from Rust, otherwise an exception
-    /// is returned.
-    pub unsafe fn grow_begin<'target, S>(
-        &mut self,
-        target: S,
-        inc: usize,
-    ) -> TargetException<'target, 'static, (), S>
-    where
-        S: Target<'target>,
-    {
-        // Safety: the C API function is called with valid data. If an exception is thrown it's caught.
-        let callback = || jl_array_grow_beg(self.unwrap(Private), inc);
-        let exc = |err: Value| err.unwrap_non_null(Private);
-
-        let res = match catch_exceptions(callback, exc) {
-            Ok(_) => Ok(()),
-            Err(e) => Err(e),
-        };
-
-        target.exception_from_ptr(res, Private)
-    }
-
-    /// Insert `inc` elements at the beginning of the array.
-    ///
-    /// Safety: the array must be 1D and not contain data borrowed or moved from Rust, otherwise
-    /// Julia throws an exception. This error is not exception, which is UB from a `ccall`ed
-    /// function.
-    #[inline]
-    pub unsafe fn grow_begin_unchecked(&mut self, inc: usize) {
-        jl_array_grow_beg(self.unwrap(Private), inc);
-    }
-
-    /// Remove `dec` elements from the beginning of the array.
-    ///
-    /// The array must be 1D, not contain data borrowed or moved from Rust, otherwise an exception
-    /// is returned.
-    pub unsafe fn del_begin<'target, S>(
-        &mut self,
-        target: S,
-        dec: usize,
-    ) -> TargetException<'target, 'static, (), S>
-    where
-        S: Target<'target>,
-    {
-        // Safety: the C API function is called with valid data. If an exception is thrown it's caught.
-        let callback = || jl_array_del_beg(self.unwrap(Private), dec);
-        let exc = |err: Value| err.unwrap_non_null(Private);
-
-        let res = match catch_exceptions(callback, exc) {
-            Ok(_) => Ok(()),
-            Err(e) => Err(e),
-        };
-
-        target.exception_from_ptr(res, Private)
-    }
-
-    /// Remove `dec` elements from the beginning of the array.
-    ///
-    /// Safety: the array must be 1D and not contain data borrowed or moved from Rust, otherwise
-    /// Julia throws an exception. This error is not exception, which is UB from a `ccall`ed
-    /// function.
-    #[inline]
-    pub unsafe fn del_begin_unchecked(&mut self, dec: usize) {
-        jl_array_del_beg(self.unwrap(Private), dec);
-    }
-}
-
-unsafe impl<'scope, 'data> Typecheck for Array<'scope, 'data> {
-    #[inline]
-    fn typecheck(t: DataType) -> bool {
-        // Safety: Array is a UnionAll. so check if the typenames match
-        unsafe { t.type_name() == TypeName::of_array(&Unrooted::new()) }
-    }
-}
-
-impl_debug!(Array<'_, '_>);
-
-impl<'scope, 'data> ManagedPriv<'scope, 'data> for Array<'scope, 'data> {
-    type Wraps = jl_array_t;
-    type TypeConstructorPriv<'target, 'da> = Array<'target, 'da>;
-    const NAME: &'static str = "Array";
-
-    // Safety: `inner` must not have been freed yet, the result must never be
-    // used after the GC might have freed it.
-    #[inline]
-    unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self {
-        Self(inner, PhantomData, PhantomData)
-    }
-
-    #[inline]
-    fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps> {
-        self.0
-    }
-}
-
-impl_ccall_arg_managed!(Array, 2);
-
-/// Exactly the same as [`Array`], except it has an explicit element type `T`.
-#[repr(transparent)]
-pub struct TypedArray<'scope, 'data, T>(
-    NonNull<jl_array_t>,
-    PhantomData<&'scope ()>,
-    PhantomData<&'data ()>,
-    PhantomData<T>,
-);
-
-impl<'scope, 'data, T> TypedArray<'scope, 'data, T> {
-    /// Returns the array's dimensions.
-    #[inline]
-    pub unsafe fn dimensions(self) -> ArrayDimensions<'scope> {
-        self.as_array().dimensions()
-    }
-
-    /// Returns the type of this array's elements.
-    #[inline]
-    pub fn element_type(self) -> Value<'scope, 'static> {
-        self.as_array().element_type()
-    }
-
-    /// Returns the size of this array's elements.
-    #[inline]
-    pub fn element_size(self) -> usize {
-        self.as_array().element_size()
-    }
-
-    /// Convert `self` to `Array`.
-    #[inline]
-    pub fn as_array(self) -> Array<'scope, 'data> {
-        unsafe { Array::wrap_non_null(self.0, Private) }
-    }
-}
-
-impl<'scope, 'data, U: ValidField> TypedArray<'scope, 'data, U> {
-    /// Track this array.
-    ///
-    /// While an array is tracked, it can't be exclusively tracked.
-    #[inline]
-    pub fn track_shared<'borrow>(
+    /// No mutable accessors to this data must exist. The element type must be an isbits type, and
+    /// `L` must be a valid field layout of the element type.
+    pub unsafe fn bits_data_unchecked<'borrow, L>(
         &'borrow self,
-    ) -> JlrsResult<TrackedArray<'borrow, 'scope, 'data, Self>> {
-        Ledger::try_borrow_shared(self.as_value())?;
-        unsafe { Ok(TrackedArray::new(self)) }
-    }
-
-    /// Exclusively track this array.
-    ///
-    /// While an array is exclusively tracked, it can't be tracked otherwise.
-    #[inline]
-    pub unsafe fn track_exclusive<'borrow>(
-        &'borrow mut self,
-    ) -> JlrsResult<TrackedArrayMut<'borrow, 'scope, 'data, Self>> {
-        Ledger::try_borrow_exclusive(self.as_value())?;
-        unsafe { Ok(TrackedArrayMut::new(self)) }
-    }
-}
-
-impl<'scope, 'data, T: ConstructType> TypedArray<'scope, 'data, T> {
-    /// Convert this array to a [`TypedValue`].
-    pub fn as_typed_value<const N: isize>(
-        self,
-    ) -> JlrsResult<TypedValue<'scope, 'data, ArrayType<T, N>>> {
-        unsafe {
-            let ptr = self.0;
-            let rank = self.dimensions().rank();
-            if rank != N as _ {
-                Err(ArrayLayoutError::RankMismatch {
-                    found: rank as isize,
-                    provided: N,
-                })?;
-            }
-
-            Ok(TypedValue::<ArrayType<T, N>>::from_value_unchecked(
-                Value::wrap_non_null(ptr.cast(), Private),
-            ))
-        }
-    }
-
-    /// Convert this array to a [`TypedValue`] without checking if the layout is compatible.
-    #[inline]
-    pub unsafe fn as_typed_value_unchecked<const N: isize>(
-        self,
-    ) -> TypedValue<'scope, 'data, ArrayType<T, N>> {
-        TypedValue::<ArrayType<T, N>>::from_value_unchecked(Value::wrap_non_null(
-            self.0.cast(),
-            Private,
-        ))
-    }
-}
-
-impl<'scope, 'data, T> Clone for TypedArray<'scope, 'data, T>
-where
-    T: ValidField,
-{
-    #[inline]
-    fn clone(&self) -> Self {
-        unsafe { TypedArray::wrap_non_null(self.unwrap_non_null(Private), Private) }
-    }
-}
-
-impl<'scope, 'data, T> Copy for TypedArray<'scope, 'data, T> where T: ValidField {}
-
-impl<'data, T> TypedArray<'_, 'data, T>
-where
-    T: ValidField + IntoJulia + ConstructType,
-{
-    /// Allocate a new n-dimensional Julia array of dimensions `dims` for data of type `T`.
-    ///
-    /// This method can only be used in combination with types that implement `IntoJulia`. If you
-    /// want to create an array for a type that doesn't implement this trait you must use
-    /// [`Array::new_for`].
-    ///
-    /// If the array size is too large, Julia will throw an error. This error is caught and
-    /// returned.
-    #[inline]
-    pub fn new<'target, 'current, 'borrow, D, Tgt>(
-        target: Tgt,
-        dims: D,
-    ) -> TypedArrayResult<'target, 'static, Tgt, T>
+    ) -> BitsAccessor<'borrow, 'scope, 'data, T, L, N>
     where
-        D: DimsExt,
-        Tgt: Target<'target>,
+        L: IsBits + ValidField,
     {
-        unsafe {
-            let res = match Array::new::<T, _, _>(&target, dims) {
-                Ok(arr) => Ok(arr
-                    .as_managed()
-                    .as_typed_unchecked::<T>()
-                    .unwrap_non_null(Private)),
-                Err(e) => Err(e.as_managed().unwrap_non_null(Private)),
-            };
-
-            target.result_from_ptr(res, Private)
-        }
+        BitsAccessor::new(self)
     }
 
-    /// Allocate a new n-dimensional Julia array of dimensions `dims` for data of type `T`.
+    /// Create a mutable accessor for `isbits` data.
     ///
-    /// This method is equivalent to [`Array::new`] except that Julia exceptions are not caught.
+    /// Thanks to the restrictions on `T` the data is guaranteed to be stored inline as an array
+    /// of `T`s.
     ///
-    /// Safety: If the array size is too large, Julia will throw an error. This error is not
-    /// caught, which is UB from a `ccall`ed function.
-    #[inline]
-    pub unsafe fn new_unchecked<'target, 'current, 'borrow, D, Tgt>(
-        target: Tgt,
-        dims: D,
-    ) -> TypedArrayData<'target, 'data, Tgt, T>
-    where
-        D: DimsExt,
-        Tgt: Target<'target>,
-    {
-        let res = Array::new_unchecked::<T, _, _>(&target, dims)
-            .as_managed()
-            .as_typed_unchecked::<T>();
-
-        target.data_from_ptr(res.unwrap_non_null(Private), Private)
-    }
-
-    /// Create a new n-dimensional Julia array of dimensions `dims` that borrows data from Rust.
+    /// Safety:
     ///
-    /// This method can only be used in combination with types that implement `IntoJulia`. Because
-    /// the data is borrowed from Rust, operations that can change the size of the array (e.g.
-    /// `push!`) will fail.
-    ///
-    /// If the array size is too large, Julia will throw an error. This error is caught and
-    /// returned.
-    #[inline]
-    pub fn from_slice<'target: 'current, 'current: 'borrow, 'borrow, D, Tgt>(
-        target: Tgt,
-        data: &'data mut [T],
-        dims: D,
-    ) -> JlrsResult<TypedArrayResult<'target, 'data, Tgt, T>>
-    where
-        T: IntoJulia,
-        D: DimsExt,
-        Tgt: Target<'target>,
-    {
-        unsafe {
-            let res = match Array::from_slice::<T, _, _>(&target, data, dims)? {
-                Ok(arr) => Ok(arr
-                    .as_managed()
-                    .as_typed_unchecked::<T>()
-                    .unwrap_non_null(Private)),
-                Err(e) => Err(e.as_managed().unwrap_non_null(Private)),
-            };
-
-            Ok(target.result_from_ptr(res, Private))
-        }
-    }
-
-    /// Create a new n-dimensional Julia array of dimensions `dims` that borrows data from Rust.
-    ///
-    /// This method can only be used in combination with types that implement `IntoJulia`. Because
-    /// the data is borrowed from Rust, operations that can change the size of the array (e.g.
-    /// `push!`) will fail.
-    ///
-    /// Safety: If the array size is too large, Julia will throw an error. This error is not
-    /// caught, which is UB from a `ccall`ed function.
-    #[inline]
-    pub unsafe fn from_slice_unchecked<'target, 'current, 'borrow, D, Tgt>(
-        target: Tgt,
-        data: &'data mut [T],
-        dims: D,
-    ) -> JlrsResult<TypedArrayData<'target, 'data, Tgt, T>>
-    where
-        T: IntoJulia,
-        D: DimsExt,
-        Tgt: Target<'target>,
-    {
-        let res = Array::from_slice_unchecked::<T, _, _>(&target, data, dims)?
-            .as_managed()
-            .as_typed_unchecked::<T>();
-
-        Ok(target.data_from_ptr(res.unwrap_non_null(Private), Private))
-    }
-
-    /// Create a new n-dimensional Julia array of dimensions `dims` that takes ownership of Rust
-    /// data.
-    ///
-    /// This method can only be used in combination with types that implement `IntoJulia`. Because
-    /// the data is allocated by Rust, operations that can change the size of the array (e.g.
-    /// `push!`) will fail.
-    ///
-    /// If the array size is too large, Julia will throw an error. This error is caught and
-    /// returned.
-    #[inline]
-    pub fn from_vec<'target, 'current, 'borrow, D, Tgt>(
-        target: Tgt,
-        data: Vec<T>,
-        dims: D,
-    ) -> JlrsResult<TypedArrayResult<'target, 'static, Tgt, T>>
-    where
-        T: IntoJulia,
-        D: DimsExt,
-        Tgt: Target<'target>,
-    {
-        unsafe {
-            let res = match Array::from_vec::<T, _, _>(&target, data, dims)? {
-                Ok(arr) => Ok(arr
-                    .as_managed()
-                    .as_typed_unchecked::<T>()
-                    .unwrap_non_null(Private)),
-                Err(e) => Err(e.as_managed().unwrap_non_null(Private)),
-            };
-
-            Ok(target.result_from_ptr(res, Private))
-        }
-    }
-
-    /// Create a new n-dimensional Julia array of dimensions `dims` that takes ownership of Rust
-    /// data.
-    ///
-    /// This method can only be used in combination with types that implement `IntoJulia`. Because
-    /// the data is allocated by Rust, operations that can change the size of the array (e.g.
-    /// `push!`) will fail.
-    ///
-    /// Safety: If the array size is too large, Julia will throw an error. This error is not
-    /// caught, which is UB from a `ccall`ed function.
-    #[inline]
-    pub unsafe fn from_vec_unchecked<'target, 'current, 'borrow, D, Tgt>(
-        target: Tgt,
-        data: Vec<T>,
-        dims: D,
-    ) -> JlrsResult<TypedArrayData<'target, 'static, Tgt, T>>
-    where
-        T: IntoJulia,
-        D: DimsExt,
-        Tgt: Target<'target>,
-    {
-        let res = Array::from_vec_unchecked::<T, _, _>(&target, data, dims)?
-            .as_managed()
-            .as_typed_unchecked::<T>();
-
-        Ok(target.data_from_ptr(res.unwrap_non_null(Private), Private))
-    }
-}
-
-impl<'data, T> TypedArray<'_, 'data, T>
-where
-    T: ValidField,
-{
-    /// Allocate a new n-dimensional Julia array of dimensions `dims` for data of type `ty`.
-    ///
-    /// The elementy type, ty` must be a `Union`, `UnionAll` or `DataType`.
-    ///
-    /// If the array size is too large or if the type is invalid, Julia will throw an error. This
-    /// error is caught and returned.
-    pub fn new_for<'target, 'current, 'borrow, D, Tgt>(
-        target: Tgt,
-        dims: D,
-        ty: Value,
-    ) -> JlrsResult<TypedArrayResult<'target, 'static, Tgt, T>>
-    where
-        D: DimsExt,
-        Tgt: Target<'target>,
-    {
-        if !T::valid_field(ty) {
-            let value_type = ty.display_string_or(CANNOT_DISPLAY_TYPE).into();
-            Err(AccessError::InvalidLayout { value_type })?;
-        }
-
-        unsafe {
-            let res = match Array::new_for(&target, dims, ty) {
-                Ok(arr) => Ok(arr
-                    .as_managed()
-                    .as_typed_unchecked::<T>()
-                    .unwrap_non_null(Private)),
-                Err(e) => Err(e.as_managed().unwrap_non_null(Private)),
-            };
-
-            Ok(target.result_from_ptr(res, Private))
-        }
-    }
-
-    /// Allocate a new n-dimensional Julia array of dimensions `dims` for data of type `T`.
-    ///
-    /// This method is equivalent to [`Array::new_for`] except that Julia exceptions are not
-    /// caught.
-    ///
-    /// Safety: If the array size is too large or if the type is invalid, Julia will throw an
-    /// error. This error is not caught, which is UB from a `ccall`ed function.
-    pub unsafe fn new_for_unchecked<'target, 'current, 'borrow, D, Tgt>(
-        target: Tgt,
-        dims: D,
-        ty: Value,
-    ) -> JlrsResult<TypedArrayData<'target, 'static, Tgt, T>>
-    where
-        D: DimsExt,
-        Tgt: Target<'target>,
-    {
-        if !T::valid_field(ty) {
-            let value_type = ty.display_string_or(CANNOT_DISPLAY_TYPE).into();
-            Err(AccessError::InvalidLayout { value_type })?;
-        }
-
-        let res = Array::new_for_unchecked(&target, dims, ty)
-            .as_managed()
-            .as_typed_unchecked::<T>();
-
-        Ok(target.data_from_ptr(res.unwrap_non_null(Private), Private))
-    }
-}
-
-impl<'data> TypedArray<'_, 'data, u8> {
-    /// Convert a string to a Julia array.
-    #[inline]
-    pub fn from_string<'target, A, T>(target: T, data: A) -> TypedArrayData<'target, 'static, T, u8>
-    where
-        A: AsRef<str>,
-        T: Target<'target>,
-    {
-        let string = data.as_ref();
-        let nbytes = string.bytes().len();
-        let ptr = string.as_ptr();
-
-        // Safety: a string can be converted to an array of bytes.
-        unsafe {
-            let arr = jl_pchar_to_array(ptr.cast(), nbytes);
-            target.data_from_ptr(NonNull::new_unchecked(arr), Private)
-        }
-    }
-}
-
-impl<'scope, 'data, T> TypedArray<'scope, 'data, T>
-where
-    T: ValidField,
-{
-    /// Returns `true` if the elements of the array are stored inline.
-    #[inline]
-    pub fn is_inline_array(self) -> bool {
-        self.as_array().is_inline_array()
-    }
-
-    /// Returns true if the elements of the array are stored inline and at least one of the fields
-    /// of the inlined type is a pointer.
-    #[inline]
-    pub fn has_inlined_pointers(self) -> bool {
-        self.as_array().has_inlined_pointers()
-    }
-
-    /// Returns `true` if elements of this array are zero-initialized.
-    #[inline]
-    pub fn zero_init(self) -> bool {
-        self.as_array().zero_init()
-    }
-
-    /// Returns true if the elements of the array are stored as [`Value`]s.
-    #[inline]
-    pub fn is_value_array(self) -> bool {
-        !self.is_inline_array()
-    }
-
-    fn ensure_bits(self) -> JlrsResult<()> {
-        if !self.is_inline_array() {
-            Err(ArrayLayoutError::NotInline {
-                element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
-            })?;
-        }
-
-        // Safety: Inline array must have a DataType as element type
-        if unsafe {
-            self.element_type()
-                .cast_unchecked::<DataType>()
-                .has_pointer_fields()?
-        } {
-            Err(ArrayLayoutError::NotBits {
-                element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
-            })?;
-        }
-
-        Ok(())
-    }
-
-    fn ensure_inline(self) -> JlrsResult<()> {
-        if !self.is_inline_array() {
-            Err(ArrayLayoutError::NotInline {
-                element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
-            })?;
-        }
-
-        Ok(())
-    }
-
-    /// Immutably the contents of this array. The elements must have an `isbits` type.
-    ///
-    /// You can borrow data from multiple arrays at the same time.
-    ///
-    /// Returns `ArrayLayoutError::NotInline` if the data is not stored inline, `ArrayLayoutError::NotBits`
-    /// if the type is not an `isbits` type, or `AccessError::InvalidLayout` if `T` is not a valid
-    /// layout for the array elements.
-    #[inline]
-    pub unsafe fn bits_data<'borrow>(
-        &'borrow self,
-    ) -> JlrsResult<BitsArrayAccessorI<'borrow, 'scope, 'data, T>> {
-        self.ensure_bits()?;
-
-        // Safety: layouts are compatible, access is immutable.
-        let accessor = ArrayAccessor::new(self.as_array_ref());
-        Ok(accessor)
-    }
-
-    /// Mutably access the contents of this array. The elements must have an `isbits` type.
-    ///
-    /// This method can be used to gain mutable access to the contents of a single array.
-    ///
-    /// Returns `ArrayLayoutError::NotInline` if the data is not stored inline, `ArrayLayoutError::NotBits`
-    /// if the type is not an `isbits` type, or `AccessError::InvalidLayout` if `T` is not a valid
-    /// layout for the array elements.
-    ///
-    /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
-    /// this value is allowed.
-    #[inline]
+    /// No other accessors to this data must exist.
     pub unsafe fn bits_data_mut<'borrow>(
         &'borrow mut self,
-    ) -> JlrsResult<BitsArrayAccessorMut<'borrow, 'scope, 'data, T>> {
-        self.ensure_bits()?;
-
-        // Safety: layouts are compatible, access is immutable.
-        let accessor = ArrayAccessor::new(self.as_array_ref());
-        Ok(accessor)
-    }
-
-    /// Immutably the contents of this array. The elements must be stored inline.
-    ///
-    /// You can borrow data from multiple arrays at the same time.
-    ///
-    /// Returns `ArrayLayoutError::NotInline` if the data is not stored inline or
-    /// `AccessError::InvalidLayout` if `T` is not a valid layout for the array elements.
-    #[inline]
-    pub unsafe fn inline_data<'borrow>(
-        &'borrow self,
-    ) -> JlrsResult<InlinePtrArrayAccessorI<'borrow, 'scope, 'data, T>>
+    ) -> BitsAccessorMut<'borrow, 'scope, 'data, T, T, N>
     where
-        T: ValidField,
+        T: ConstructType + ValidField + IsBits,
     {
-        self.ensure_inline()?;
-
-        // Safety: layouts are compatible, access is immutable.
-        let accessor = ArrayAccessor::new(self.as_array_ref());
-        Ok(accessor)
+        // No need for checks, guaranteed to have isbits layout
+        BitsAccessorMut::new(self)
     }
 
-    /// Mutably access the contents of this array. The elements must be stored inline.
+    /// Create a mutable accessor for `isbits` data with layout `L`.
     ///
-    /// This method can be used to gain mutable access to the contents of a single array.
+    /// Thanks to the restrictions on `T` and `L` the elements are guaranteed to be stored inline
+    /// as an array of `L`s.
     ///
-    /// Returns `ArrayLayoutError::NotInline` if the data is not stored inline or
-    /// `AccessError::InvalidLayout` if `T` is not a valid layout for the array elements.
+    /// Safety:
     ///
-    /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
-    /// this value is allowed.
-    #[inline]
-    pub unsafe fn inline_data_mut<'borrow>(
+    /// No other accessors to this data must exist.
+    pub unsafe fn bits_data_mut_with_layout<'borrow, L>(
         &'borrow mut self,
-    ) -> JlrsResult<InlinePtrArrayAccessorMut<'borrow, 'scope, 'data, T>>
+    ) -> BitsAccessorMut<'borrow, 'scope, 'data, T, L, N>
     where
-        T: ValidField,
+        T: ConstructType + HasLayout<'static, 'static, Layout = L>,
+        L: IsBits + ValidField,
     {
-        self.ensure_inline()?;
-
-        // Safety: layouts are compatible, access is immutable.
-        let accessor = ArrayAccessor::new(self.as_array_ref());
-        Ok(accessor)
+        // No need for checks, guaranteed to have isbits layout and L is the layout of T
+        BitsAccessorMut::new(self)
     }
 
-    /// Convert this array to a [`RankedArray`].
-    pub fn try_as_ranked<const N: isize>(self) -> JlrsResult<RankedArray<'scope, 'data, N>> {
-        unsafe {
-            if self.dimensions().rank() == N as usize {
-                Ok(RankedArray(self.0, PhantomData, PhantomData))
-            } else {
-                let value_type = self.element_type().display_string_or(CANNOT_DISPLAY_TYPE);
-                Err(AccessError::InvalidLayout { value_type })?
-            }
-        }
-    }
-
-    /// Convert this array to a [`TypedRankedArray`].
-    pub fn try_as_typed_ranked<U: ValidField, const N: isize>(
-        self,
-    ) -> JlrsResult<TypedRankedArray<'scope, 'data, U, N>> {
-        unsafe {
-            if self.dimensions().rank() == N as usize {
-                Ok(TypedRankedArray(
-                    self.0,
-                    PhantomData,
-                    PhantomData,
-                    PhantomData,
-                ))
-            } else {
-                let value_type = self.element_type().display_string_or(CANNOT_DISPLAY_TYPE);
-                Err(AccessError::InvalidLayout { value_type })?
-            }
-        }
-    }
-
-    /// Convert `self` to `Array`.
-    #[inline]
-    pub fn as_array_ref(&self) -> &Array<'scope, 'data> {
-        unsafe { std::mem::transmute(self) }
-    }
-
-    /// Reshape the array, a new array is returned that has dimensions `dims`. The new array and
-    /// `self` share their data.
+    /// Try to create a mutable accessor for `isbits` data with layout `L`.
     ///
-    /// This method returns an exception if the old and new array have a different number of
-    /// elements.
-    #[inline]
-    pub unsafe fn reshape<'target, 'current, 'borrow, D, Tgt>(
-        &self,
-        target: Tgt,
-        dims: D,
-    ) -> TypedArrayResult<'target, 'data, Tgt, T>
-    where
-        D: DimsExt,
-        Tgt: Target<'target>,
-    {
-        let res = match self.as_array().reshape(&target, dims) {
-            Ok(arr) => Ok(arr
-                .as_managed()
-                .as_typed_unchecked::<T>()
-                .unwrap_non_null(Private)),
-            Err(e) => Err(e.as_managed().unwrap_non_null(Private)),
-        };
-
-        target.result_from_ptr(res, Private)
-    }
-
-    /// Reshape the array, a new array is returned that has dimensions `dims`. The new array and
-    /// `self` share their data.
+    /// If the array doesn't have an isbits layout `ArrayLayoutError::NotBits` is returned. If `L`
+    /// is not a valid field layout for the element type `TypeError::InvalidLayout` is returned.
     ///
-    /// Safety: If the dimensions are incompatible with the array size, Julia will throw an error.
-    /// This error is not caught, which is UB from a `ccall`ed function.
-    #[inline]
-    pub unsafe fn reshape_unchecked<'target, 'current, 'borrow, D, Tgt>(
-        self,
-        target: Tgt,
-        dims: D,
-    ) -> TypedArrayData<'target, 'data, Tgt, T>
-    where
-        D: DimsExt,
-        Tgt: Target<'target>,
-    {
-        let res = self
-            .as_array()
-            .reshape_unchecked(&target, dims)
-            .as_managed()
-            .as_typed_unchecked::<T>()
-            .unwrap_non_null(Private);
-
-        target.data_from_ptr(res, Private)
-    }
-
-    /// Immutably access the contents of this array.
+    /// Safety:
     ///
-    /// You can borrow data from multiple arrays at the same time.
-    #[inline]
-    pub unsafe fn indeterminate_data<'borrow>(
-        &'borrow self,
-    ) -> IndeterminateArrayAccessor<'borrow, 'scope, 'data, Immutable<'borrow, u8>> {
-        // Safety: layouts are compatible, access is immutable.
-        ArrayAccessor::new(self.as_array_ref())
-    }
-
-    /// Mutably access the contents of this array.
-    ///
-    /// This method can be used to gain mutable access to the contents of a single array.
-    ///
-    /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
-    /// this value is allowed.
-    #[inline]
-    pub unsafe fn indeterminate_data_mut<'borrow>(
+    /// No other accessors to this data must exist.
+    pub unsafe fn try_bits_data_mut<'borrow, L>(
         &'borrow mut self,
-    ) -> IndeterminateArrayAccessor<'borrow, 'scope, 'data, Mutable<'borrow, u8>> {
-        // Safety: layouts are compatible, access is immutable.
-        ArrayAccessor::new(self.as_array_ref())
-    }
-}
-
-impl<'scope, 'data, T> TypedArray<'scope, 'data, Option<T>>
-where
-    T: ManagedRef<'scope, 'data>,
-    Option<T>: ValidField,
-{
-    fn ensure_ptr(self) -> JlrsResult<()> {
-        if !self.as_array().is_value_array() {
-            Err(ArrayLayoutError::NotPointer {
+    ) -> JlrsResult<BitsAccessorMut<'borrow, 'scope, 'data, T, L, N>>
+    where
+        L: IsBits + ValidField,
+    {
+        if !self.has_bits_layout() {
+            Err(ArrayLayoutError::NotBits {
                 element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
             })?;
         }
 
-        Ok(())
+        let ty = self.element_type();
+        if !L::valid_field(ty) {
+            Err(TypeError::InvalidLayout {
+                value_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
+            })?;
+        }
+
+        Ok(BitsAccessorMut::new(self))
     }
 
-    /// Immutably the contents of this array. The elements must not be stored inline.
+    /// Create a mutable accessor for `isbits` data with layout `L` without checking any
+    /// invariants.
     ///
-    /// You can borrow data from multiple arrays at the same time.
+    /// Safety:
     ///
-    /// Returns `ArrayLayoutError::NotPointer` if the data is stored inline or `AccessError::InvalidLayout` if `T`
-    /// is not a valid layout for the array elements.
-    #[inline]
+    /// No other accessors to this data must exist. The element type must be an isbits type, and
+    /// `L` must be a valid field layout of the element type.
+    pub unsafe fn bits_data_mut_unchecked<'borrow, L>(
+        &'borrow mut self,
+    ) -> BitsAccessorMut<'borrow, 'scope, 'data, T, L, N>
+    where
+        L: IsBits + ValidField,
+    {
+        BitsAccessorMut::new(self)
+    }
+
+    /// Create an accessor for inline data.
+    ///
+    /// Thanks to the restrictions on `T` the data is guaranteed to be stored inline as an array
+    /// of `T`s.
+    ///
+    /// Safety:
+    ///
+    /// No mutable accessors to this data must exist.
+    pub unsafe fn inline_data<'borrow>(
+        &'borrow self,
+    ) -> InlineAccessor<'borrow, 'scope, 'data, T, T, N>
+    where
+        T: ConstructType + ValidField,
+    {
+        // No need for checks, guaranteed to have inline layout
+        InlineAccessor::new(self)
+    }
+
+    /// Create an accessor for inline data with layout `L`.
+    ///
+    /// Thanks to the restrictions on `T` and `L` the elements are guaranteed to be stored inline
+    /// as an array of `L`s.
+    ///
+    /// Safety:
+    ///
+    /// No mutable accessors to this data must exist.
+    pub unsafe fn inline_data_with_layout<'borrow, L>(
+        &'borrow self,
+    ) -> InlineAccessor<'borrow, 'scope, 'data, T, L, N>
+    where
+        T: ConstructType + HasLayout<'scope, 'data, Layout = L>,
+        L: ValidField,
+    {
+        // No need for checks, guaranteed to have inline layout and L is the layout of T
+        InlineAccessor::new(self)
+    }
+
+    /// Try to create an accessor for inline data with layout `L`.
+    ///
+    /// If the array doesn't have an inline layout `ArrayLayoutError::NotInline` is returned. If
+    /// `L` is not a valid field layout for the element type `TypeError::InvalidLayout` is
+    /// returned.
+    ///
+    /// Safety:
+    ///
+    /// No mutable accessors to this data must exist.
+    pub unsafe fn try_inline_data<'borrow, L>(
+        &'borrow self,
+    ) -> JlrsResult<InlineAccessor<'borrow, 'scope, 'data, T, L, N>>
+    where
+        L: ValidField,
+    {
+        if !self.has_inline_layout() {
+            Err(ArrayLayoutError::NotInline {
+                element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
+            })?;
+        }
+
+        let ty = self.element_type();
+        if !L::valid_field(ty) {
+            Err(TypeError::InvalidLayout {
+                value_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
+            })?;
+        }
+
+        Ok(InlineAccessor::new(self))
+    }
+
+    /// Create an accessor for inline data with layout `L` without checking any invariants.
+    ///
+    /// Safety:
+    ///
+    /// No mutable accessors to this data must exist. The elements must be stored inline, and `L`
+    /// must be a valid field layout of the element type.
+    pub unsafe fn inline_data_unchecked<'borrow, L>(
+        &'borrow self,
+    ) -> InlineAccessor<'borrow, 'scope, 'data, T, L, N>
+    where
+        L: ValidField,
+    {
+        InlineAccessor::new(self)
+    }
+
+    /// Create a mutable accessor for inline data.
+    ///
+    /// Thanks to the restrictions on `T` the data is guaranteed to be stored inline as an array
+    /// of `T`s.
+    ///
+    /// Safety:
+    ///
+    /// No other accessors to this data must exist.
+    pub unsafe fn inline_data_mut<'borrow>(
+        &'borrow mut self,
+    ) -> InlineAccessorMut<'borrow, 'scope, 'data, T, T, N>
+    where
+        T: ConstructType + ValidField,
+    {
+        // No need for checks, guaranteed to have inline layout
+        InlineAccessorMut::new(self)
+    }
+
+    /// Create a mutable accessor for inline data with layout `L`.
+    ///
+    /// Thanks to the restrictions on `T` and `L` the elements are guaranteed to be stored inline
+    /// as an array of `L`s.
+    ///
+    /// Safety:
+    ///
+    /// No other accessors to this data must exist.
+    pub unsafe fn inline_data_mut_with_layout<'borrow, L>(
+        &'borrow mut self,
+    ) -> InlineAccessorMut<'borrow, 'scope, 'data, T, L, N>
+    where
+        T: ConstructType + HasLayout<'scope, 'data, Layout = L>,
+        L: ValidField,
+    {
+        // No need for checks, guaranteed to have inline layout and L is the layout of T
+        InlineAccessorMut::new(self)
+    }
+
+    /// Try to create a mutable accessor for inline data with layout `L`.
+    ///
+    /// If the array doesn't have an inline layout `ArrayLayoutError::NotInline` is returned. If
+    /// `L` is not a valid field layout for the element type `TypeError::InvalidLayout` is
+    /// returned.
+    ///
+    /// Safety:
+    ///
+    /// No other accessors to this data must exist.
+    pub unsafe fn try_inline_data_mut<'borrow, L>(
+        &'borrow mut self,
+    ) -> JlrsResult<InlineAccessorMut<'borrow, 'scope, 'data, T, L, N>>
+    where
+        L: ValidField,
+    {
+        if !self.has_inline_layout() {
+            Err(ArrayLayoutError::NotInline {
+                element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
+            })?;
+        }
+
+        let ty = self.element_type();
+        if !L::valid_field(ty) {
+            Err(TypeError::InvalidLayout {
+                value_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
+            })?;
+        }
+
+        Ok(InlineAccessorMut::new(self))
+    }
+
+    /// Create a mutable  accessor for inline data with layout `L` without checking any
+    /// invariants.
+    ///
+    /// Safety:
+    ///
+    /// No other accessors to this data must exist. The elements must be stored inline, and `L`
+    /// must be a valid field layout of the element type.
+    pub unsafe fn inline_data_mut_unchecked<'borrow, L>(
+        &'borrow mut self,
+    ) -> InlineAccessorMut<'borrow, 'scope, 'data, T, L, N>
+    where
+        L: ValidField,
+    {
+        InlineAccessorMut::new(self)
+    }
+
+    /// Create an accessor for unions of isbits types.
+    ///
+    /// This function panics if the array doesn't have a union layout.
+    ///
+    /// Safety:
+    ///
+    /// No mutable accessors to this data must exist.
+    pub unsafe fn union_data<'borrow>(
+        &'borrow self,
+    ) -> BitsUnionAccessor<'borrow, 'scope, 'data, T, N>
+    where
+        T: BitsUnionCtor,
+    {
+        assert!(
+            self.has_union_layout(),
+            "Array does not have a union layout"
+        );
+        BitsUnionAccessor::new(self)
+    }
+
+    /// Try to create an accessor for unions of isbits types.
+    ///
+    /// If the element type is not a union of isbits types `ArrayLayoutError::NotUnion` is
+    /// returned.
+    ///
+    /// Safety:
+    ///
+    /// No mutable accessors to this data must exist.
+    pub unsafe fn try_union_data<'borrow>(
+        &'borrow self,
+    ) -> JlrsResult<BitsUnionAccessor<'borrow, 'scope, 'data, T, N>> {
+        if !self.has_union_layout() {
+            Err(ArrayLayoutError::NotUnion {
+                element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
+            })?;
+        }
+
+        Ok(BitsUnionAccessor::new(self))
+    }
+
+    /// Create an accessor for unions of isbits types without checking any invariants.
+    ///
+    /// Safety:
+    ///
+    /// No mutable accessors to this data must exist. The element type must be a union of isbits
+    /// types.
+    pub unsafe fn union_data_unchecked<'borrow>(
+        &'borrow self,
+    ) -> BitsUnionAccessor<'borrow, 'scope, 'data, T, N> {
+        BitsUnionAccessor::new(self)
+    }
+
+    /// Create a mutable accessor for unions of isbits types.
+    ///
+    /// This function panics if the array doesn't have a union layout.
+    ///
+    /// Safety:
+    ///
+    /// No other accessors to this data must exist.
+    pub unsafe fn union_data_mut<'borrow>(
+        &'borrow mut self,
+    ) -> BitsUnionAccessorMut<'borrow, 'scope, 'data, T, N>
+    where
+        T: BitsUnionCtor,
+    {
+        assert!(
+            self.has_union_layout(),
+            "Array does not have a union layout"
+        );
+        BitsUnionAccessorMut::new(self)
+    }
+
+    /// Try to create a mutable accessor for unions of isbits types.
+    ///
+    /// If the element type is not a union of isbits types `ArrayLayoutError::NotUnion` is
+    /// returned.
+    ///
+    /// Safety:
+    ///
+    /// No other accessors to this data must exist.
+    pub unsafe fn try_union_data_mut<'borrow>(
+        &'borrow mut self,
+    ) -> JlrsResult<BitsUnionAccessorMut<'borrow, 'scope, 'data, T, N>> {
+        if !self.has_union_layout() {
+            Err(ArrayLayoutError::NotUnion {
+                element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
+            })?;
+        }
+
+        Ok(BitsUnionAccessorMut::new(self))
+    }
+
+    /// Create a mutable accessor for unions of isbits types without checking any invariants.
+    ///
+    /// Safety:
+    ///
+    /// No other accessors to this data must exist. The element type must be a union of isbits
+    /// types.
+    pub unsafe fn union_data_mut_unchecked<'borrow>(
+        &'borrow mut self,
+    ) -> BitsUnionAccessorMut<'borrow, 'scope, 'data, T, N> {
+        BitsUnionAccessorMut::new(self)
+    }
+
+    /// Create an accessor for managed data.
+    ///
+    /// Thanks to the restrictions on `T` the data is guaranteed to be as an array of
+    /// `Option<Ref<T>>`s.
+    ///
+    /// Safety:
+    ///
+    /// No mutable accessors to this data must exist.
     pub unsafe fn managed_data<'borrow>(
         &'borrow self,
-    ) -> JlrsResult<PtrArrayAccessorI<'borrow, 'scope, 'data, T>> {
-        self.ensure_ptr()?;
-
-        // Safety: layouts are compatible, access is immutable.
-        let accessor = ArrayAccessor::new(self.as_array_ref());
-        Ok(accessor)
+    ) -> ManagedAccessor<'borrow, 'scope, 'data, T, T, N>
+    where
+        T: Managed<'scope, 'data> + ConstructType,
+    {
+        // No need for checks, guaranteed to have correct layout
+        ManagedAccessor::new(self)
     }
 
-    /// Mutably access the contents of this array. The elements must not be stored inline.
+    /// Try to create an accessor for managed data of type `L`.
     ///
-    /// This method can be used to gain mutable access to the contents of a single array.
+    /// If the element type is incompatible with `L` `ArrayLayoutError::NotManaged` is returned.
     ///
-    /// Returns `ArrayLayoutError::NotPointer` if the data is stored inline or `AccessError::InvalidLayout` if `T`
-    /// is not a valid layout for the array elements.
+    /// Safety:
     ///
-    /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
-    /// this value is allowed.
-    #[inline]
+    /// No mutable accessors to this data must exist.
+    pub unsafe fn try_managed_data<'borrow, L>(
+        &'borrow self,
+    ) -> JlrsResult<ManagedAccessor<'borrow, 'scope, 'data, T, L, N>>
+    where
+        L: Managed<'scope, 'data> + Typecheck,
+    {
+        if !self.has_managed_layout::<L>() {
+            Err(ArrayLayoutError::NotManaged {
+                element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
+                name: L::NAME.into(),
+            })?;
+        }
+
+        Ok(ManagedAccessor::new(self))
+    }
+
+    /// Create an accessor for managed data of type `L` without checking any invariants.
+    ///
+    /// Safety:
+    ///
+    /// No mutable accessors to this data must exist. The element type must be compatible with
+    /// `L`.
+    pub unsafe fn managed_data_unchecked<'borrow, L>(
+        &'borrow self,
+    ) -> ManagedAccessor<'borrow, 'scope, 'data, T, L, N>
+    where
+        L: Managed<'scope, 'data>,
+    {
+        ManagedAccessor::new(self)
+    }
+
+    /// Create a mutable accessor for managed data.
+    ///
+    /// Thanks to the restrictions on `T` the data is guaranteed to be as an array of
+    /// `Option<Ref<T>>`s.
+    ///
+    /// Safety:
+    ///
+    /// No other accessors to this data must exist.
     pub unsafe fn managed_data_mut<'borrow>(
         &'borrow mut self,
-    ) -> JlrsResult<PtrArrayAccessorMut<'borrow, 'scope, 'data, T>> {
-        self.ensure_ptr()?;
-
-        // Safety: layouts are compatible, access is immutable.
-        let accessor = ArrayAccessor::new(self.as_array_ref());
-        Ok(accessor)
+    ) -> ManagedAccessorMut<'borrow, 'scope, 'data, T, T, N>
+    where
+        T: Managed<'scope, 'data> + ConstructType,
+    {
+        // No need for checks, guaranteed to have correct layout
+        ManagedAccessorMut::new(self)
     }
 
-    /// Immutably the contents of this array. The elements must not be stored inline.
+    /// Try to create a mutable accessor for managed data of type `L`.
     ///
-    /// You can borrow data from multiple arrays at the same time.
+    /// If the element type is incompatible with `L` `ArrayLayoutError::NotManaged` is returned.
     ///
-    /// Returns `ArrayLayoutError::NotPointer` if the data is stored inline.
-    #[inline]
-    pub unsafe fn value_data<'borrow>(
+    /// Safety:
+    ///
+    /// No other accessors to this data must exist.
+    pub unsafe fn try_managed_data_mut<'borrow, L>(
+        &'borrow mut self,
+    ) -> JlrsResult<ManagedAccessorMut<'borrow, 'scope, 'data, T, L, N>>
+    where
+        L: Managed<'scope, 'data> + Typecheck,
+    {
+        if !self.has_managed_layout::<L>() {
+            Err(ArrayLayoutError::NotManaged {
+                element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
+                name: L::NAME.into(),
+            })?;
+        }
+
+        Ok(ManagedAccessorMut::new(self))
+    }
+
+    /// Create a mutable accessor for managed data of type `L` without checking any invariants.
+    ///
+    /// Safety:
+    ///
+    /// No other accessors to this data must exist. The element type must be compatible with
+    /// `L`.
+    pub unsafe fn managed_data_mut_unchecked<'borrow, L>(
+        &'borrow mut self,
+    ) -> ManagedAccessorMut<'borrow, 'scope, 'data, T, L, N>
+    where
+        L: Managed<'scope, 'data>,
+    {
+        ManagedAccessorMut::new(self)
+    }
+
+    /// Create an accessor for value data.
+    ///
+    /// Thanks to the restrictions on `T` the data is guaranteed to be as an array of
+    /// `Option<Ref<Value>>`s.
+    ///
+    /// Safety:
+    ///
+    /// No mutable accessors to this data must exist.
+    pub unsafe fn value_data<'borrow>(&'borrow self) -> ValueAccessor<'borrow, 'scope, 'data, T, N>
+    where
+        T: Managed<'scope, 'data> + ConstructType,
+    {
+        // No need for checks, guaranteed to have inline layout
+        ValueAccessor::new(self)
+    }
+
+    /// Try to create an accessor for value data.
+    ///
+    /// If the elements are stored inline `ArrayLayoutError::NotPointer` is returned.
+    ///
+    /// Safety:
+    ///
+    /// No mutable accessors to this data must exist.
+    pub unsafe fn try_value_data<'borrow>(
         &'borrow self,
-    ) -> JlrsResult<PtrArrayAccessorI<'borrow, 'scope, 'data, ValueRef<'scope, 'data>>> {
-        self.ensure_ptr()?;
+    ) -> JlrsResult<ValueAccessor<'borrow, 'scope, 'data, T, N>> {
+        if !self.has_value_layout() {
+            Err(ArrayLayoutError::NotPointer {
+                element_type: self.element_type().error_string_or(CANNOT_DISPLAY_TYPE),
+            })?;
+        }
 
-        // Safety: layouts are compatible, access is immutable.
-        let accessor = ArrayAccessor::new(self.as_array_ref());
-        Ok(accessor)
+        Ok(ValueAccessor::new(self))
     }
 
-    /// Mutably access the contents of this array. The elements must not be stored inline.
+    /// Create an accessor for managed data of type `L` without checking any invariants.
     ///
-    /// This method can be used to gain mutable access to the contents of a single array.
+    /// Safety:
     ///
-    /// Returns `ArrayLayoutError::NotPointer` if the data is stored inline.
+    /// No mutable accessors to this data must exist. The elements must not be stored inline.
+    pub unsafe fn value_data_unchecked<'borrow>(
+        &'borrow self,
+    ) -> ValueAccessor<'borrow, 'scope, 'data, T, N> {
+        ValueAccessor::new(self)
+    }
+
+    /// Create a mutable accessor for value data.
     ///
-    /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
-    /// this value is allowed.
-    #[inline]
+    /// Thanks to the restrictions on `T` the data is guaranteed to be as an array of
+    /// `Option<Ref<Value>>`s.
+    ///
+    /// Safety:
+    ///
+    /// No other accessors to this data must exist.
     pub unsafe fn value_data_mut<'borrow>(
         &'borrow mut self,
-    ) -> JlrsResult<PtrArrayAccessorMut<'borrow, 'scope, 'data, ValueRef<'scope, 'data>>> {
-        self.ensure_ptr()?;
+    ) -> ValueAccessorMut<'borrow, 'scope, 'data, T, N>
+    where
+        T: Managed<'scope, 'data> + ConstructType,
+    {
+        // No need for checks, guaranteed to have inline layout
+        ValueAccessorMut::new(self)
+    }
 
-        // Safety: layouts are compatible, access is immutable.
-        let accessor = ArrayAccessor::new(self.as_array_ref());
-        Ok(accessor)
+    /// Try to create a mutable accessor for value data.
+    ///
+    /// If the elements are stored inline `ArrayLayoutError::NotPointer` is returned.
+    ///
+    /// Safety:
+    ///
+    /// No other accessors to this data must exist.
+    pub unsafe fn try_value_data_mut<'borrow>(
+        &'borrow mut self,
+    ) -> JlrsResult<ValueAccessorMut<'borrow, 'scope, 'data, T, N>> {
+        if !self.has_value_layout() {
+            Err(ArrayLayoutError::NotPointer {
+                element_type: self.element_type().error_string_or(CANNOT_DISPLAY_TYPE),
+            })?;
+        }
+
+        Ok(ValueAccessorMut::new(self))
+    }
+
+    /// Create a mutable accessor for managed data of type `L` without checking any invariants.
+    ///
+    /// Safety:
+    ///
+    /// No other accessors to this data must exist. The elements must not be stored inline.
+    pub unsafe fn value_data_mut_unchecked<'borrow>(
+        &'borrow mut self,
+    ) -> ValueAccessorMut<'borrow, 'scope, 'data, T, N> {
+        ValueAccessorMut::new(self)
+    }
+
+    /// Create an accessor for indeterminate data.
+    ///
+    /// Safety:
+    ///
+    /// No mutable accessors to this data must exist.
+    pub unsafe fn indeterminate_data<'borrow>(
+        &'borrow self,
+    ) -> IndeterminateAccessor<'borrow, 'scope, 'data, T, N> {
+        IndeterminateAccessor::new(self)
+    }
+
+    /// Create a mutable accessor for indeterminate data.
+    ///
+    /// Safety:
+    ///
+    /// No other accessors to this data must exist.
+    pub unsafe fn indeterminate_data_mut<'borrow>(
+        &'borrow mut self,
+    ) -> IndeterminateAccessorMut<'borrow, 'scope, 'data, T, N> {
+        IndeterminateAccessorMut::new(self)
     }
 }
 
-impl<'scope, 'data, T> TypedArray<'scope, 'data, T>
-where
-    T: 'static + ValidField,
-{
-    /// Copy the data of an inline array to Rust.
+// Conversions
+impl<'scope, 'data, T> ArrayBase<'scope, 'data, T, -1> {
+    /// Sets the rank of this array to `N` if `N` is equal to the rank of `self` at runtime.  
+    pub fn set_rank<const N: isize>(self) -> JlrsResult<ArrayBase<'scope, 'data, T, N>> {
+        if self.n_dims() as isize != N {
+            Err(ArrayLayoutError::RankMismatch {
+                found: self.n_dims() as _,
+                provided: N,
+            })?;
+        }
+
+        unsafe { Ok(self.set_rank_unchecked()) }
+    }
+
+    /// Sets the rank of this array to `N`.
     ///
-    /// Returns `ArrayLayoutError::NotInline` if the data is not stored inline or `AccessError::InvalidLayout`
-    /// if the type of the elements is incorrect.
-    pub unsafe fn copy_inline_data(&self) -> JlrsResult<CopiedArray<T>> {
-        self.ensure_bits()?;
-
-        // Safety: layouts are compatible and is guaranteed to be a bits type due to the
-        // 'static constraint on T.
-        let jl_data = jl_array_data(self.unwrap(Private).cast()).cast();
-        let dimensions = self.dimensions().into_dimensions();
-
-        let sz = dimensions.size();
-        let mut data = Vec::with_capacity(sz);
-        let ptr = data.as_mut_ptr();
-        std::ptr::copy_nonoverlapping(jl_data, ptr, sz);
-        data.set_len(sz);
-
-        Ok(CopiedArray::new(data.into_boxed_slice(), dimensions))
+    /// Safety:
+    ///
+    /// The rank at runtime must be equal to `N`.
+    #[inline]
+    pub unsafe fn set_rank_unchecked<const N: isize>(self) -> ArrayBase<'scope, 'data, T, N> {
+        ArrayBase(
+            self.unwrap_non_null(Private),
+            PhantomData,
+            PhantomData,
+            PhantomData,
+        )
     }
 }
 
-impl<'scope, T> TypedArray<'scope, 'static, T>
-where
-    T: ValidField,
-{
-    /// Insert `inc` elements at the end of the array.
-    ///
-    /// The array must be 1D and not contain data borrowed or moved from Rust, otherwise an exception
-    /// is returned.
-    #[inline]
-    pub unsafe fn grow_end<'target, S>(
-        &mut self,
-        target: S,
-        inc: usize,
-    ) -> TargetException<'target, 'static, (), S>
-    where
-        S: Target<'target>,
-    {
-        self.as_array().grow_end(target, inc)
-    }
-
-    /// Insert `inc` elements at the end of the array.
-    ///
-    /// Safety: the array must be 1D and not contain data borrowed or moved from Rust, otherwise
-    /// Julia throws an exception. This error is not exception, which is UB from a `ccall`ed
-    /// function.
-    #[inline]
-    pub unsafe fn grow_end_unchecked(&mut self, inc: usize) {
-        self.as_array().grow_end_unchecked(inc)
-    }
-
-    /// Remove `dec` elements from the end of the array.
-    ///
-    /// The array must be 1D, not contain data borrowed or moved from Rust, otherwise an exception
-    /// is returned.
-    #[inline]
-    pub unsafe fn del_end<'target, S>(
-        &mut self,
-        target: S,
-        dec: usize,
-    ) -> TargetException<'target, 'static, (), S>
-    where
-        S: Target<'target>,
-    {
-        self.as_array().del_end(target, dec)
-    }
-    /// Remove `dec` elements from the end of the array.
-    ///
-    /// Safety: the array must be 1D and not contain data borrowed or moved from Rust, otherwise
-    /// Julia throws an exception. This error is not exception, which is UB from a `ccall`ed
-    /// function.
-    #[inline]
-    pub unsafe fn del_end_unchecked(&mut self, dec: usize) {
-        self.as_array().del_end_unchecked(dec)
-    }
-
-    /// Insert `inc` elements at the beginning of the array.
-    ///
-    /// The array must be 1D, not contain data borrowed or moved from Rust, otherwise an exception
-    /// is returned.
-    #[inline]
-    pub unsafe fn grow_begin<'target, S>(
-        &mut self,
-        target: S,
-        inc: usize,
-    ) -> TargetException<'target, 'static, (), S>
-    where
-        S: Target<'target>,
-    {
-        self.as_array().grow_begin(target, inc)
-    }
-
-    /// Insert `inc` elements at the beginning of the array.
-    ///
-    /// Safety: the array must be 1D and not contain data borrowed or moved from Rust, otherwise
-    /// Julia throws an exception. This error is not exception, which is UB from a `ccall`ed
-    /// function.
-    #[inline]
-    pub unsafe fn grow_begin_unchecked(&mut self, inc: usize) {
-        self.as_array().grow_begin_unchecked(inc)
-    }
-
-    /// Remove `dec` elements from the beginning of the array.
-    ///
-    /// The array must be 1D, not contain data borrowed or moved from Rust, otherwise an exception
-    /// is returned.
-    #[inline]
-    pub unsafe fn del_begin<'target, S>(
-        &mut self,
-        target: S,
-        dec: usize,
-    ) -> TargetException<'target, 'static, (), S>
-    where
-        S: Target<'target>,
-    {
-        self.as_array().del_begin(target, dec)
-    }
-
-    /// Remove `dec` elements from the beginning of the array.
-    ///
-    /// Safety: the array must be 1D and not contain data borrowed or moved from Rust, otherwise
-    /// Julia throws an exception. This error is not exception, which is UB from a `ccall`ed
-    /// function.
-    #[inline]
-    pub unsafe fn del_begin_unchecked(&mut self, dec: usize) {
-        self.as_array().del_begin_unchecked(dec)
-    }
-}
-
-unsafe impl<'scope, 'data, T: ValidField> Typecheck for TypedArray<'scope, 'data, T> {
-    #[inline]
-    fn typecheck(t: DataType) -> bool {
-        // Safety: borrow is only temporary
+impl<'scope, 'data, const N: isize> ArrayBase<'scope, 'data, Unknown, N> {
+    /// Sets the element type of this array to `T` if the cosntructed type of `T` is equal to the
+    /// element type of `self` at runtime.  
+    pub fn set_type<T: ConstructType>(self) -> JlrsResult<ArrayBase<'scope, 'data, T, N>> {
         unsafe {
-            t.is::<Array>()
-                && T::valid_field(t.parameters().data().as_slice()[0].unwrap().as_value())
+            let unrooted = Unrooted::new();
+
+            let constructed = T::construct_type(unrooted).as_value();
+            let elem_ty = self.element_type();
+            if constructed != elem_ty {
+                Err(TypeError::IncompatibleType {
+                    element_type: constructed.display_string_or(CANNOT_DISPLAY_TYPE),
+                    value_type: elem_ty.display_string_or(CANNOT_DISPLAY_TYPE),
+                })?;
+            }
+
+            Ok(self.set_type_unchecked())
+        }
+    }
+
+    /// Sets the element type of this array to `T`.
+    ///
+    /// Safety:
+    ///
+    /// The element at runtime must be equal to the constructed type of `T`.
+    #[inline]
+    pub unsafe fn set_type_unchecked<T: ConstructType>(self) -> ArrayBase<'scope, 'data, T, N> {
+        ArrayBase(
+            self.unwrap_non_null(Private),
+            PhantomData,
+            PhantomData,
+            PhantomData,
+        )
+    }
+}
+
+impl<'scope, 'data, T, const N: isize> ArrayBase<'scope, 'data, T, N> {
+    /// Forget the rank of this array.
+    pub fn forget_rank(self) -> ArrayBase<'scope, 'data, T, -1> {
+        ArrayBase(
+            self.unwrap_non_null(Private),
+            PhantomData,
+            PhantomData,
+            PhantomData,
+        )
+    }
+
+    /// Forget the element type of this array.
+    pub fn forget_type(self) -> ArrayBase<'scope, 'data, Unknown, N> {
+        ArrayBase(
+            self.unwrap_non_null(Private),
+            PhantomData,
+            PhantomData,
+            PhantomData,
+        )
+    }
+
+    /// Asserts that the rank is correct.
+    pub fn assert_rank(self) {
+        if N == -1 {
+            return;
+        }
+
+        let rank = self.rank();
+        assert!(rank as isize == N);
+    }
+}
+
+impl<'scope, 'data, T: ConstructType, const N: isize> ArrayBase<'scope, 'data, T, N> {
+    /// Asserts that the element type of `self` is equal to the type constructed by `T`.
+    ///
+    /// Panics if the element type of `self`is not equal to the type constructed by `T`.
+    pub fn assert_type(self) {
+        unsafe {
+            let unrooted = Unrooted::new();
+            unrooted.local_scope::<_, 1>(|mut frame| {
+                let ty = T::construct_type(&mut frame);
+                assert_eq!(ty, self.element_type());
+            });
         }
     }
 }
 
-impl<T: ValidField> Debug for TypedArray<'_, '_, T> {
+/// Marker type used to indicate the element type of an array is unknown.
+pub enum Unknown {}
+
+/// `Array` or `ArrayRef`, depending on the target type `T`.
+pub type ArrayBaseData<'target, 'data, Tgt, T, const N: isize> =
+    <Tgt as TargetType<'target>>::Data<'data, ArrayBase<'target, 'data, T, N>>;
+
+/// `JuliaResult<Array>` or `JuliaResultRef<ArrayRef>`, depending on the target type `T`.
+pub type ArrayBaseResult<'target, 'data, Tgt, T, const N: isize> =
+    TargetResult<'target, 'data, ArrayBase<'target, 'data, T, N>, Tgt>;
+
+/// An array with an unknown element type and unknown rank.
+pub type Array<'scope, 'data> = ArrayBase<'scope, 'data, Unknown, -1>;
+pub type ArrayRef<'scope, 'data> = Ref<'scope, 'data, Array<'scope, 'data>>;
+pub type ArrayRet = ArrayRef<'static, 'static>;
+pub type ArrayData<'target, 'data, Tgt> =
+    <Tgt as TargetType<'target>>::Data<'data, Array<'target, 'data>>;
+pub type ArrayResult<'target, 'data, Tgt> =
+    TargetResult<'target, 'data, Array<'target, 'data>, Tgt>;
+
+/// An array with an unknown element type of rank 1.
+pub type Vector<'scope, 'data> = ArrayBase<'scope, 'data, Unknown, 1>;
+pub type VectorRef<'scope, 'data> = Ref<'scope, 'data, Vector<'scope, 'data>>;
+pub type VectorRet = VectorRef<'static, 'static>;
+pub type VectorData<'target, 'data, Tgt> =
+    <Tgt as TargetType<'target>>::Data<'data, Vector<'target, 'data>>;
+pub type VectorResult<'target, 'data, Tgt> =
+    TargetResult<'target, 'data, Vector<'target, 'data>, Tgt>;
+
+/// An array with an unknown element type of rank 1.
+pub type VectorAny<'scope, 'data> = ArrayBase<'scope, 'data, Value<'scope, 'data>, 1>;
+pub type VectorAnyRef<'scope, 'data> = Ref<'scope, 'data, VectorAny<'scope, 'data>>;
+pub type VectorAnyRet = VectorAnyRef<'static, 'static>;
+pub type VectorAnyData<'target, 'data, Tgt> =
+    <Tgt as TargetType<'target>>::Data<'data, VectorAny<'target, 'data>>;
+pub type VectorAnyResult<'target, 'data, Tgt> =
+    TargetResult<'target, 'data, VectorAny<'target, 'data>, Tgt>;
+
+/// An array with an unknown element type of rank 2.
+pub type Matrix<'scope, 'data> = ArrayBase<'scope, 'data, Unknown, 2>;
+pub type MatrixRef<'scope, 'data> = Ref<'scope, 'data, Matrix<'scope, 'data>>;
+pub type MatrixRet = MatrixRef<'static, 'static>;
+pub type MatrixData<'target, 'data, Tgt> =
+    <Tgt as TargetType<'target>>::Data<'data, Matrix<'target, 'data>>;
+pub type MatrixResult<'target, 'data, Tgt> =
+    TargetResult<'target, 'data, Matrix<'target, 'data>, Tgt>;
+
+/// An array with a known element type and unknown rank.
+pub type TypedArray<'scope, 'data, T> = ArrayBase<'scope, 'data, T, -1>;
+pub type TypedArrayRef<'scope, 'data, T> = Ref<'scope, 'data, TypedArray<'scope, 'data, T>>;
+pub type TypedArrayRet<T> = TypedArrayRef<'static, 'static, T>;
+pub type TypedArrayData<'target, 'data, Tgt, T> =
+    <Tgt as TargetType<'target>>::Data<'data, TypedArray<'target, 'data, T>>;
+pub type TypedArrayResult<'target, 'data, Tgt, T> =
+    TargetResult<'target, 'data, TypedArray<'target, 'data, T>, Tgt>;
+
+/// An array with a known element type of rank 1.
+pub type TypedVector<'scope, 'data, T> = ArrayBase<'scope, 'data, T, 1>;
+pub type TypedVectorRef<'scope, 'data, T> = Ref<'scope, 'data, TypedVector<'scope, 'data, T>>;
+pub type TypedVectorRet<T> = TypedVectorRef<'static, 'static, T>;
+pub type TypedVectorData<'target, 'data, Tgt, T> =
+    <Tgt as TargetType<'target>>::Data<'data, TypedVector<'target, 'data, T>>;
+pub type TypedVectorResult<'target, 'data, Tgt, T> =
+    TargetResult<'target, 'data, TypedVector<'target, 'data, T>, Tgt>;
+
+/// An array with a known element type of rank 2.
+pub type TypedMatrix<'scope, 'data, T> = ArrayBase<'scope, 'data, T, 2>;
+pub type TypedMatrixRef<'scope, 'data, T> = Ref<'scope, 'data, TypedMatrix<'scope, 'data, T>>;
+pub type TypedMatrixRet<T> = TypedMatrixRef<'static, 'static, T>;
+pub type TypedMatrixData<'target, 'data, Tgt, T> =
+    <Tgt as TargetType<'target>>::Data<'data, TypedMatrix<'target, 'data, T>>;
+pub type TypedMatrixResult<'target, 'data, Tgt, T> =
+    TargetResult<'target, 'data, TypedMatrix<'target, 'data, T>, Tgt>;
+
+/// An array with an unknown element type and known rank.
+pub type RankedArray<'scope, 'data, const N: isize> = ArrayBase<'scope, 'data, Unknown, N>;
+pub type RankedArrayRef<'scope, 'data, const N: isize> =
+    Ref<'scope, 'data, RankedArray<'scope, 'data, N>>;
+pub type RankedArrayRet<const N: isize> = RankedArrayRef<'static, 'static, N>;
+pub type RankedArrayData<'target, 'data, Tgt, const N: isize> =
+    <Tgt as TargetType<'target>>::Data<'data, RankedArray<'target, 'data, N>>;
+pub type RankedArrayResult<'target, 'data, Tgt, const N: isize> =
+    TargetResult<'target, 'data, RankedArray<'target, 'data, N>, Tgt>;
+
+/// An array with a known element type and known rank.
+pub type TypedRankedArray<'scope, 'data, T, const N: isize> = ArrayBase<'scope, 'data, T, N>;
+pub type TypedRankedArrayRef<'scope, 'data, T, const N: isize> =
+    Ref<'scope, 'data, TypedRankedArray<'scope, 'data, T, N>>;
+pub type TypedRankedArrayRet<T, const N: isize> = TypedRankedArrayRef<'static, 'static, T, N>;
+pub type TypedRankedArrayData<'target, 'data, Tgt, T, const N: isize> =
+    <Tgt as TargetType<'target>>::Data<'data, TypedRankedArray<'target, 'data, T, N>>;
+pub type TypedRankedArrayResult<'target, 'data, Tgt, T, const N: isize> =
+    TargetResult<'target, 'data, TypedRankedArray<'target, 'data, T, N>, Tgt>;
+
+unsafe impl<'scope, 'data, const N: isize> Typecheck for ArrayBase<'scope, 'data, Unknown, N> {
+    fn typecheck(ty: DataType) -> bool {
+        let unrooted = ty.unrooted_target();
+
+        // Datatype must be an array type
+        if ty.type_name().unwrap(Private) != TypeName::of_array(&unrooted).unwrap(Private) {
+            return false;
+        }
+
+        if N >= 0 {
+            // Casting to RankedArray, check if the rank is correct
+            unsafe {
+                let param = ty.parameter_unchecked(1);
+
+                if !param.is::<isize>() || param.unbox_unchecked::<isize>() != N {
+                    return false;
+                }
+            }
+        }
+
+        true
+    }
+}
+
+unsafe impl<'scope, 'data, T: ConstructType, const N: isize> Typecheck
+    for ArrayBase<'scope, 'data, T, N>
+{
+    fn typecheck(ty: DataType) -> bool {
+        let unrooted = ty.unrooted_target();
+
+        // Datatype must be an array type
+        if ty.type_name().unwrap(Private) != TypeName::of_array(&unrooted).unwrap(Private) {
+            return false;
+        }
+
+        if N >= 0 {
+            // Casting to RankedArray, check if the rank is correct
+            unsafe {
+                let param = ty.parameter_unchecked(1);
+
+                if !param.is::<isize>() || param.unbox_unchecked::<isize>() != N {
+                    return false;
+                }
+            }
+        }
+
+        unrooted.local_scope::<_, 1>(|mut frame| {
+            // Safety: elem_ty is reachable from ty
+            let elem_ty = unsafe { ty.parameter_unchecked(0) };
+            let constructed_ty = T::construct_type(&mut frame);
+            if elem_ty.is::<TypeVar>() && constructed_ty.is::<TypeVar>() {
+                unsafe {
+                    let et = elem_ty.cast_unchecked::<TypeVar>();
+                    let ct = constructed_ty.cast_unchecked::<TypeVar>();
+                    return et.name() == ct.name()
+                        && et.lower_bound(&frame).as_value() == ct.lower_bound(&frame).as_value()
+                        && et.upper_bound(&frame).as_value() == ct.upper_bound(&frame).as_value();
+                }
+            }
+            elem_ty == constructed_ty
+        })
+    }
+}
+
+impl<T, const N: isize> Debug for ArrayBase<'_, '_, T, N> {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         match self.display_string() {
             Ok(s) => write!(f, "{}", s),
@@ -2095,33 +2804,292 @@ impl<T: ValidField> Debug for TypedArray<'_, '_, T> {
     }
 }
 
-impl<'scope, 'data, T: ValidField> ManagedPriv<'scope, 'data> for TypedArray<'scope, 'data, T> {
+impl<'scope, 'data, T, const N: isize> ManagedPriv<'scope, 'data>
+    for ArrayBase<'scope, 'data, T, N>
+{
     type Wraps = jl_array_t;
-    type TypeConstructorPriv<'target, 'da> = TypedArray<'target, 'da, T>;
+
+    type WithLifetimes<'target, 'da> = ArrayBase<'target, 'da, T, N>;
+
     const NAME: &'static str = "Array";
 
-    // Safety: `inner` must not have been freed yet, the result must never be
-    // used after the GC might have freed it. T must be correct
-    #[inline]
-    unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self {
-        Self(inner, PhantomData, PhantomData, PhantomData)
+    unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: crate::private::Private) -> Self {
+        ArrayBase(inner, PhantomData, PhantomData, PhantomData)
     }
 
-    #[inline]
-    fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps> {
+    fn unwrap_non_null(self, _: crate::private::Private) -> NonNull<Self::Wraps> {
         self.0
     }
 }
 
-#[repr(transparent)]
-#[derive(Copy, Clone)]
-pub(self) struct AssumeThreadsafe<T>(T);
+unsafe impl<const N: isize> ValidField for Option<RankedArrayRef<'_, '_, N>> {
+    #[inline]
+    fn valid_field(v: Value) -> bool {
+        if v.is::<DataType>() {
+            let dt = unsafe { v.cast_unchecked::<DataType>() };
+            let is_array = dt.is::<Array>();
 
-unsafe impl<T> Send for AssumeThreadsafe<T> {}
-unsafe impl<T> Sync for AssumeThreadsafe<T> {}
+            if !is_array {
+                return false;
+            }
+
+            let parameters = dt.parameters();
+            let parameters = parameters.data();
+            if N != -1 {
+                unsafe {
+                    let unrooted = Unrooted::new();
+                    let rank_param = parameters.get(unrooted, 1).unwrap_unchecked().as_value();
+                    if !rank_param.is::<isize>() || rank_param.unbox_unchecked::<isize>() != N {
+                        return false;
+                    }
+                }
+            }
+
+            true
+        } else if v.is::<UnionAll>() {
+            let ua = unsafe { v.cast_unchecked::<UnionAll>() };
+            let dt = ua.base_type();
+
+            if !dt.is::<Array>() {
+                return false;
+            }
+            let parameters = dt.parameters();
+            let parameters = parameters.data();
+            if N != -1 {
+                unsafe {
+                    let unrooted = Unrooted::new();
+                    let rank_param = parameters.get(unrooted, 1).unwrap_unchecked().as_value();
+                    if !rank_param.is::<isize>() || rank_param.unbox_unchecked::<isize>() != N {
+                        return false;
+                    }
+                }
+            }
+
+            true
+        } else {
+            false
+        }
+    }
+}
+
+unsafe impl<T: ConstructType, const N: isize> ValidField
+    for Option<TypedRankedArrayRef<'_, '_, T, N>>
+{
+    #[inline]
+    fn valid_field(v: Value) -> bool {
+        if v.is::<DataType>() {
+            let dt = unsafe { v.cast_unchecked::<DataType>() };
+            if !dt.is::<Array>() {
+                return false;
+            }
+
+            let parameters = dt.parameters();
+            let parameters = parameters.data();
+            if N != -1 {
+                unsafe {
+                    let unrooted = Unrooted::new();
+                    let rank_param = parameters.get(unrooted, 1).unwrap_unchecked().as_value();
+                    if !rank_param.is::<isize>() || rank_param.unbox_unchecked::<isize>() != N {
+                        return false;
+                    }
+                }
+            }
+
+            unsafe {
+                let unrooted = Unrooted::new();
+                unrooted.local_scope::<_, 1>(|mut frame| {
+                    let ty = T::construct_type(&mut frame);
+                    let elem_ty = parameters.get(unrooted, 0).unwrap_unchecked().as_value();
+                    ty == elem_ty
+                })
+            }
+        } else {
+            false
+        }
+    }
+}
+
+unsafe impl<'scope, 'data, T: ConstructType, const N: isize> ConstructType
+    for TypedRankedArray<'scope, 'data, T, N>
+{
+    type Static = TypedRankedArray<'static, 'static, T::Static, N>;
+
+    fn construct_type_uncached<'target, Tgt>(
+        target: Tgt,
+    ) -> crate::prelude::ValueData<'target, 'static, Tgt>
+    where
+        Tgt: Target<'target>,
+    {
+        let ty = UnionAll::array_type(&target);
+
+        if N == -1 {
+            target.with_local_scope::<_, _, 3>(|target, mut frame| unsafe {
+                let elty = T::construct_type(&mut frame);
+                let tn_n = TypeVar::new_unchecked(&mut frame, "N", None, None);
+                let applied = ty.apply_types_unchecked(&mut frame, [elty, tn_n.as_value()]);
+
+                UnionAll::rewrap(target, applied.cast_unchecked::<DataType>())
+            })
+        } else {
+            target.with_local_scope::<_, _, 3>(|target, mut frame| unsafe {
+                let elty = T::construct_type(&mut frame);
+                let n = Value::new(&mut frame, N);
+                let applied = ty.apply_types_unchecked(&mut frame, [elty, n]);
+
+                UnionAll::rewrap(target, applied.cast_unchecked::<DataType>())
+            })
+        }
+    }
+
+    fn base_type<'target, Tgt>(target: &Tgt) -> Option<Value<'target, 'static>>
+    where
+        Tgt: Target<'target>,
+    {
+        Some(UnionAll::array_type(target).as_value())
+    }
+
+    fn construct_type_with_env_uncached<'target, Tgt>(
+        target: Tgt,
+        env: &crate::data::types::construct_type::TypeVarEnv,
+    ) -> ValueData<'target, 'static, Tgt>
+    where
+        Tgt: Target<'target>,
+    {
+        let ty = UnionAll::array_type(&target);
+
+        if N == -1 {
+            let n_sym = "N".to_symbol(&target);
+            let n_param = env.get(n_sym).expect("TypeVar N is not in env");
+
+            target.with_local_scope::<_, _, 1>(|target, mut frame| unsafe {
+                let t = T::construct_type_with_env(&mut frame, env);
+                ty.apply_types_unchecked(target, [t, n_param.as_value()])
+            })
+        } else {
+            target.with_local_scope::<_, _, 2>(|target, mut frame| unsafe {
+                let t = T::construct_type_with_env(&mut frame, env);
+                let n = Value::new(&mut frame, N);
+                ty.apply_types_unchecked(target, [t, n])
+            })
+        }
+    }
+}
+
+unsafe impl<'scope, 'data, const N: isize> ConstructType for RankedArray<'scope, 'data, N> {
+    type Static = RankedArray<'static, 'static, N>;
+
+    fn construct_type_uncached<'target, Tgt>(
+        target: Tgt,
+    ) -> crate::prelude::ValueData<'target, 'static, Tgt>
+    where
+        Tgt: Target<'target>,
+    {
+        let ty = UnionAll::array_type(&target);
+
+        if N == -1 {
+            ty.as_value().root(target)
+        } else {
+            target.with_local_scope::<_, _, 3>(|target, mut frame| unsafe {
+                let tn_t = TypeVar::new_unchecked(&mut frame, "T", None, None);
+                let n = Value::new(&mut frame, N);
+                let applied = ty.apply_types_unchecked(&mut frame, [tn_t.as_value(), n]);
+
+                UnionAll::rewrap(target, applied.cast_unchecked::<DataType>())
+            })
+        }
+    }
+
+    fn base_type<'target, Tgt>(target: &Tgt) -> Option<Value<'target, 'static>>
+    where
+        Tgt: Target<'target>,
+    {
+        Some(UnionAll::array_type(target).as_value())
+    }
+
+    fn construct_type_with_env_uncached<'target, Tgt>(
+        target: Tgt,
+        env: &crate::data::types::construct_type::TypeVarEnv,
+    ) -> ValueData<'target, 'static, Tgt>
+    where
+        Tgt: Target<'target>,
+    {
+        let ty = UnionAll::array_type(&target);
+        let t_sym = "T".to_symbol(&target);
+        let t_param = env.get(t_sym).expect("TypeVar T is not in env");
+
+        if N == -1 {
+            let n_sym = "N".to_symbol(&target);
+            let n_param = env.get(n_sym).expect("TypeVar N is not in env");
+
+            unsafe { ty.apply_types_unchecked(target, [t_param.as_value(), n_param.as_value()]) }
+        } else {
+            target.with_local_scope::<_, _, 1>(|target, mut frame| unsafe {
+                let n = Value::new(&mut frame, N);
+                let applied = ty.apply_types_unchecked(target, [t_param.as_value(), n]);
+                applied
+            })
+        }
+    }
+}
+
+unsafe impl<'scope, 'data, const N: isize> CCallArg for RankedArray<'scope, 'data, N> {
+    type CCallArgType = AnyType;
+    type FunctionArgType = Self;
+}
+
+unsafe impl<const N: isize> CCallReturn for RankedArrayRet<N> {
+    type CCallReturnType = AnyType;
+    type FunctionReturnType = RankedArray<'static, 'static, N>;
+    type ReturnAs = Self;
+
+    #[inline]
+    unsafe fn return_or_throw(self) -> Self::ReturnAs {
+        self
+    }
+}
+unsafe impl<'scope, 'data, T: ConstructType, const N: isize> CCallArg
+    for TypedRankedArray<'scope, 'data, T, N>
+{
+    type CCallArgType = Self;
+    type FunctionArgType = Self;
+}
+
+unsafe impl<T: ConstructType, const N: isize> CCallReturn for TypedRankedArrayRet<T, N> {
+    type CCallReturnType = TypedRankedArray<'static, 'static, T, N>;
+    type FunctionReturnType = TypedRankedArray<'static, 'static, T, N>;
+    type ReturnAs = Self;
+
+    #[inline]
+    unsafe fn return_or_throw(self) -> Self::ReturnAs {
+        self
+    }
+}
 
 #[inline]
-pub(self) fn sized_dim_tuple<'target, D, Tgt>(
+pub(crate) fn sized_dim_tuple<'target, D, Tgt>(
+    target: Tgt,
+    dims: &D,
+) -> ValueData<'target, 'static, Tgt>
+where
+    D: RankedDims,
+    Tgt: Target<'target>,
+{
+    unsafe {
+        let dims_type = dims.dimension_object(&target).as_managed();
+        let tuple = jl_new_struct_uninit(dims_type.unwrap(Private));
+
+        {
+            let slice =
+                std::slice::from_raw_parts_mut(tuple as *mut MaybeUninit<usize>, D::RANK as _);
+            dims.fill_tuple(slice, Private);
+        }
+
+        Value::wrap_non_null(NonNull::new_unchecked(tuple), Private).root(target)
+    }
+}
+
+#[inline]
+pub(crate) fn unsized_dim_tuple<'target, D, Tgt>(
     target: Tgt,
     dims: &D,
 ) -> ValueData<'target, 'static, Tgt>
@@ -2130,12 +3098,12 @@ where
     Tgt: Target<'target>,
 {
     unsafe {
-        let rank = dims.rank();
         let dims_type = dims.dimension_object(&target).as_managed();
         let tuple = jl_new_struct_uninit(dims_type.unwrap(Private));
 
         {
-            let slice = std::slice::from_raw_parts_mut(tuple as *mut MaybeUninit<usize>, rank);
+            let slice =
+                std::slice::from_raw_parts_mut(tuple as *mut MaybeUninit<usize>, dims.rank());
             dims.fill_tuple(slice, Private);
         }
 
@@ -2146,659 +3114,9 @@ where
 // Safety: must be used as a finalizer when moving array data from Rust to Julia
 // to ensure it's freed correctly.
 unsafe extern "C" fn droparray<T>(a: Array) {
-    // The data of a moved array is allocated by Rust, this function is called by
-    // a finalizer in order to ensure it's also freed by Rust.
-    let mut arr_nn_ptr = a.unwrap_non_null(Private);
-    let arr_ref = arr_nn_ptr.as_mut();
+    let sz = a.dimensions().size();
+    let data_ptr = a.data_ptr().cast::<T>();
 
-    if arr_ref.flags.how() != 2 {
-        return;
-    }
-
-    // Set data to null pointer
-    let data_ptr = arr_ref.data.cast::<T>();
-    arr_ref.data = null_mut();
-
-    // Set all dims to 0
-    let arr_ptr = arr_nn_ptr.as_ptr();
-    let dims_ptr = jl_array_dims_ptr(arr_ptr);
-    let n_dims = jl_array_ndims(arr_ptr);
-    for dim in slice::from_raw_parts_mut(dims_ptr, n_dims as _) {
-        *dim = 0;
-    }
-
-    // Drop the data
-    let data = Vec::from_raw_parts(data_ptr, arr_ref.length, arr_ref.length);
-    mem::drop(data);
+    let data = Vec::from_raw_parts(data_ptr, sz, sz);
+    std::mem::drop(data);
 }
-
-/// A reference to a [`Array`] that has not been explicitly rooted.
-pub type ArrayRef<'scope, 'data> = Ref<'scope, 'data, Array<'scope, 'data>>;
-
-/// An [`Array`] with static lifetimes.
-///
-/// This is a useful shorthand for signatures of `ccall`able functions that take a [`Array`].
-///
-/// See [`TypedArrayUnbound`] for more information.
-pub type ArrayUnbound = Array<'static, 'static>;
-
-impl ArrayUnbound {
-    /// Track this array.
-    ///
-    /// While an array is tracked, it can't be exclusively tracked.
-    #[inline]
-    pub fn track_shared_unbound(self) -> JlrsResult<TrackedArray<'static, 'static, 'static, Self>> {
-        Ledger::try_borrow_shared(self.as_value())?;
-        unsafe { Ok(TrackedArray::new_from_owned(self)) }
-    }
-
-    /// Exclusively track this array.
-    ///
-    /// While an array is exclusively tracked, it can't be tracked otherwise.
-    #[inline]
-    pub unsafe fn track_exclusive_unbound(
-        self,
-    ) -> JlrsResult<TrackedArrayMut<'static, 'static, 'static, Self>> {
-        Ledger::try_borrow_exclusive(self.as_value())?;
-        unsafe { Ok(TrackedArrayMut::new_from_owned(self)) }
-    }
-}
-
-/// A [`ArrayRef`] with static lifetimes. This is a useful shorthand for signatures of
-/// `ccall`able functions that return a [`Array`].
-pub type ArrayRet = Ref<'static, 'static, Array<'static, 'static>>;
-
-unsafe impl ConstructType for Array<'_, '_> {
-    #[inline]
-    fn construct_type_uncached<'target, Tgt>(
-        target: Tgt,
-    ) -> super::value::ValueData<'target, 'static, Tgt>
-    where
-        Tgt: Target<'target>,
-    {
-        UnionAll::array_type(&target).as_value().root(target)
-    }
-
-    #[inline]
-    fn base_type<'target, Tgt>(target: &Tgt) -> Option<Value<'target, 'static>>
-    where
-        Tgt: Target<'target>,
-    {
-        Some(UnionAll::array_type(&target).as_value())
-    }
-
-    type Static = Array<'static, 'static>;
-}
-
-unsafe impl ValidLayout for ArrayRef<'_, '_> {
-    #[inline]
-    fn valid_layout(v: Value) -> bool {
-        if v.is::<DataType>() {
-            let dt = unsafe { v.cast_unchecked::<DataType>() };
-            dt.is::<Array>()
-        } else if v.is::<UnionAll>() {
-            let ua = unsafe { v.cast_unchecked::<UnionAll>() };
-            ua.base_type().is::<Array>()
-        } else {
-            false
-        }
-    }
-
-    #[inline]
-    fn type_object<'target, Tgt: Target<'target>>(target: &Tgt) -> Value<'target, 'static> {
-        UnionAll::array_type(target).as_value()
-    }
-
-    const IS_REF: bool = true;
-}
-
-unsafe impl ValidField for Option<ArrayRef<'_, '_>> {
-    #[inline]
-    fn valid_field(v: Value) -> bool {
-        if v.is::<DataType>() {
-            let dt = unsafe { v.cast_unchecked::<DataType>() };
-            dt.is::<Array>()
-        } else if v.is::<UnionAll>() {
-            let ua = unsafe { v.cast_unchecked::<UnionAll>() };
-            ua.base_type().is::<Array>()
-        } else {
-            false
-        }
-    }
-}
-
-/// A reference to an [`TypedArray`] that has not been explicitly rooted.
-pub type TypedArrayRef<'scope, 'data, T> = Ref<'scope, 'data, TypedArray<'scope, 'data, T>>;
-
-/// A [`TypedArray`] with static lifetimes.
-///
-/// This is a useful shorthand for signatures of `ccall`able functions that take a [`TypedArray`]
-/// and operate on its contents in another thread. Example:
-///
-/// ```
-/// use jlrs::{ccall::AsyncCallback, data::managed::array::TypedArrayUnbound, prelude::*};
-///
-/// fn sum_dispatched(data: TypedArrayUnbound<f32>) -> JlrsResult<impl AsyncCallback<f32>> {
-///     let tracked = data.track_shared_unbound()?;
-///     Ok(move || Ok(tracked.as_slice().iter().sum()))
-/// }
-///
-/// julia_module! {
-///     become init_fn_name;
-///
-///     async fn sum_dispatched(
-///         data: TypedArrayUnbound<f32>
-///     ) -> JlrsResult<impl AsyncCallback<f32>>;
-/// }
-/// ```
-///
-/// In order for `tracked` to be moved to another thread, all lifetimes of `data` must be
-/// `'static`. The generated Julia function guarantees that the array won't be freed by the GC
-/// until the dispatched callback has completed.
-pub type TypedArrayUnbound<T> = TypedArray<'static, 'static, T>;
-
-impl<T: ValidField> TypedArrayUnbound<T> {
-    /// Track this array.
-    ///
-    /// While an array is tracked, it can't be exclusively tracked.
-    #[inline]
-    pub fn track_shared_unbound(self) -> JlrsResult<TrackedArray<'static, 'static, 'static, Self>> {
-        Ledger::try_borrow_shared(self.as_value())?;
-        unsafe { Ok(TrackedArray::new_from_owned(self)) }
-    }
-
-    /// Exclusively track this array.
-    ///
-    /// While an array is exclusively tracked, it can't be tracked otherwise.
-    #[inline]
-    pub unsafe fn track_exclusive_unbound(
-        self,
-    ) -> JlrsResult<TrackedArrayMut<'static, 'static, 'static, Self>> {
-        Ledger::try_borrow_exclusive(self.as_value())?;
-        unsafe { Ok(TrackedArrayMut::new_from_owned(self)) }
-    }
-}
-
-/// A [`TypedArrayRef`] with static lifetimes. This is a useful shorthand for signatures of
-/// `ccall`able functions that return a [`TypedArray`].
-pub type TypedArrayRet<T> = Ref<'static, 'static, TypedArray<'static, 'static, T>>;
-
-unsafe impl<T: ValidField> ValidLayout for TypedArrayRef<'_, '_, T> {
-    #[inline]
-    fn valid_layout(v: Value) -> bool {
-        if v.is::<DataType>() {
-            let dt = unsafe { v.cast_unchecked::<DataType>() };
-            dt.is::<TypedArray<T>>()
-        } else if v.is::<UnionAll>() {
-            let ua = unsafe { v.cast_unchecked::<UnionAll>() };
-            ua.base_type().is::<TypedArray<T>>()
-        } else {
-            false
-        }
-    }
-
-    #[inline]
-    fn type_object<'target, Tgt: Target<'target>>(target: &Tgt) -> Value<'target, 'static> {
-        UnionAll::array_type(target).as_value()
-    }
-
-    const IS_REF: bool = true;
-}
-
-unsafe impl<T: ValidField> ValidField for Option<TypedArrayRef<'_, '_, T>> {
-    #[inline]
-    fn valid_field(v: Value) -> bool {
-        if v.is::<DataType>() {
-            let dt = unsafe { v.cast_unchecked::<DataType>() };
-            dt.is::<TypedArray<T>>()
-        } else if v.is::<UnionAll>() {
-            let ua = unsafe { v.cast_unchecked::<UnionAll>() };
-            ua.base_type().is::<TypedArray<T>>()
-        } else {
-            false
-        }
-    }
-}
-
-use crate::memory::target::TargetType;
-
-/// `Array` or `ArrayRef`, depending on the target type `T`.
-pub type ArrayData<'target, 'data, T> =
-    <T as TargetType<'target>>::Data<'data, Array<'target, 'data>>;
-
-/// `JuliaResult<Array>` or `JuliaResultRef<ArrayRef>`, depending on the target type `T`.
-pub type ArrayResult<'target, 'data, T> = TargetResult<'target, 'data, Array<'target, 'data>, T>;
-
-/// `TypedArray<U>` or `TypedArrayRef<U>`, depending on the target type `T`.
-pub type TypedArrayData<'target, 'data, T, U> =
-    <T as TargetType<'target>>::Data<'data, TypedArray<'target, 'data, U>>;
-
-/// `JuliaResult<TypedArray<U>>` or `JuliaResultRef<TypedArrayRef<U>>`, depending on the target
-/// type `T`.
-pub type TypedArrayResult<'target, 'data, T, U> =
-    TargetResult<'target, 'data, TypedArray<'target, 'data, U>, T>;
-
-unsafe impl<'scope, 'data, T: ValidField + ConstructType> CCallArg
-    for TypedArray<'scope, 'data, T>
-{
-    type CCallArgType = Value<'scope, 'data>;
-    type FunctionArgType =
-        TypedValue<'scope, 'static, ArrayTypeConstructor<T, TypeVarConstructor<Name<'N'>>>>;
-}
-
-unsafe impl<T: ValidField + ConstructType> CCallReturn for TypedArrayRet<T> {
-    type CCallReturnType = Value<'static, 'static>;
-    type FunctionReturnType =
-        TypedValue<'static, 'static, ArrayTypeConstructor<T, TypeVarConstructor<Name<'N'>>>>;
-    type ReturnAs = Self;
-
-    #[inline]
-    unsafe fn return_or_throw(self) -> Self::ReturnAs {
-        self
-    }
-}
-
-/// An array with a definite rank.
-#[repr(transparent)]
-pub struct RankedArray<'scope, 'data, const N: isize>(
-    NonNull<jl_array_t>,
-    PhantomData<&'scope ()>,
-    PhantomData<&'data mut ()>,
-);
-
-impl<'scope, 'data, const N: isize> RankedArray<'scope, 'data, N> {
-    /// Convert `self` to `Array`.
-    #[inline]
-    pub fn as_array(self) -> Array<'scope, 'data> {
-        unsafe { Array::wrap_non_null(self.0, Private) }
-    }
-
-    /// Convert this array to a [`TypedValue`].
-    pub fn as_typed_value<'target, T: ConstructType, Tgt: Target<'target>>(
-        self,
-        target: &Tgt,
-    ) -> JlrsResult<TypedValue<'scope, 'data, ArrayType<T, N>>> {
-        target.local_scope::<_, _, 1>(|frame| {
-            let ty = T::construct_type(frame);
-            let arr = self.as_array();
-            let elty = arr.element_type();
-            if ty != elty {
-                // err
-                Err(TypeError::IncompatibleType {
-                    element_type: elty.display_string_or("<Cannot display type>"),
-                    value_type: ty.display_string_or("<Cannot display type>"),
-                })?;
-            }
-
-            unsafe {
-                Ok(TypedValue::<ArrayType<T, N>>::from_value_unchecked(
-                    self.as_value(),
-                ))
-            }
-        })
-    }
-
-    /// Convert this array to a [`TypedValue`] without checking if the layout is compatible.
-    #[inline]
-    pub unsafe fn as_typed_value_unchecked<T: ConstructType>(
-        self,
-    ) -> TypedValue<'scope, 'data, ArrayType<T, N>> {
-        TypedValue::<ArrayType<T, N>>::from_value_unchecked(self.as_value())
-    }
-}
-
-impl<const N: isize> Clone for RankedArray<'_, '_, N> {
-    #[inline]
-    fn clone(&self) -> Self {
-        RankedArray(self.0, PhantomData, PhantomData)
-    }
-}
-
-impl<const N: isize> Copy for RankedArray<'_, '_, N> {}
-
-impl<'scope, 'data, const N: isize> ManagedPriv<'scope, 'data> for RankedArray<'scope, 'data, N> {
-    type Wraps = jl_array_t;
-    type TypeConstructorPriv<'target, 'da> = RankedArray<'target, 'da, N>;
-    const NAME: &'static str = "Array";
-
-    // Safety: `inner` must not have been freed yet, the result must never be
-    // used after the GC might have freed it.
-    #[inline]
-    unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self {
-        Self(inner, PhantomData, PhantomData)
-    }
-
-    #[inline]
-    fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps> {
-        self.0
-    }
-}
-
-unsafe impl<const N: isize> Typecheck for RankedArray<'_, '_, N> {
-    #[inline]
-    fn typecheck(t: DataType) -> bool {
-        // Safety: Array is a UnionAll. so check if the typenames match
-        unsafe {
-            if !Array::typecheck(t) {
-                return false;
-            }
-
-            let unrooted = t.unrooted_target();
-            if let Some(param) = t.parameter(unrooted, 1) {
-                if let Ok(rank) = param.as_value().unbox::<isize>() {
-                    rank == N
-                } else {
-                    false
-                }
-            } else {
-                false
-            }
-        }
-    }
-}
-
-impl<const N: isize> Debug for RankedArray<'_, '_, N> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        match self.display_string() {
-            Ok(s) => write!(f, "{}", s),
-            Err(e) => write!(f, "<Cannot display value: {}>", e),
-        }
-    }
-}
-
-/// A reference to an [`RankedArray`] that has not been explicitly rooted.
-pub type RankedArrayRef<'scope, 'data, const N: isize> =
-    Ref<'scope, 'data, RankedArray<'scope, 'data, N>>;
-
-/// A [`RankedArrayRef`] with static lifetimes. This is a useful shorthand for signatures of
-/// `ccall`able functions that return a [`RankedArray`].
-pub type RankedArrayRet<const N: isize> = Ref<'static, 'static, RankedArray<'static, 'static, N>>;
-
-unsafe impl<const N: isize> ValidLayout for RankedArrayRef<'_, '_, N> {
-    #[inline]
-    fn valid_layout(v: Value) -> bool {
-        if v.is::<DataType>() {
-            let dt = unsafe { v.cast_unchecked::<DataType>() };
-            dt.is::<RankedArray<N>>()
-        } else if v.is::<UnionAll>() {
-            let ua = unsafe { v.cast_unchecked::<UnionAll>() };
-            ua.base_type().is::<RankedArray<N>>()
-        } else {
-            false
-        }
-    }
-
-    #[inline]
-    fn type_object<'target, Tgt: Target<'target>>(target: &Tgt) -> Value<'target, 'static> {
-        UnionAll::array_type(target).as_value()
-    }
-
-    const IS_REF: bool = true;
-}
-
-unsafe impl<const N: isize> ValidField for Option<RankedArrayRef<'_, '_, N>> {
-    #[inline]
-    fn valid_field(v: Value) -> bool {
-        if v.is::<DataType>() {
-            let dt = unsafe { v.cast_unchecked::<DataType>() };
-            dt.is::<RankedArray<N>>()
-        } else if v.is::<UnionAll>() {
-            let ua = unsafe { v.cast_unchecked::<UnionAll>() };
-            ua.base_type().is::<RankedArray<N>>()
-        } else {
-            false
-        }
-    }
-}
-
-unsafe impl<'scope, 'data, const N: isize> CCallArg for RankedArray<'scope, 'data, N> {
-    type CCallArgType = Value<'scope, 'data>;
-    type FunctionArgType = ArrayTypeConstructor<TypeVarConstructor<Name<'T'>>, ConstantIsize<N>>;
-}
-
-unsafe impl<'scope, 'data, const N: isize> CCallReturn for RankedArray<'scope, 'data, N> {
-    type CCallReturnType = Value<'static, 'static>;
-    type FunctionReturnType = ArrayTypeConstructor<TypeVarConstructor<Name<'T'>>, ConstantIsize<N>>;
-    type ReturnAs = Self;
-
-    #[inline]
-    unsafe fn return_or_throw(self) -> Self::ReturnAs {
-        self
-    }
-}
-
-/// An array with a set element type and a definite rank.
-#[repr(transparent)]
-pub struct TypedRankedArray<'scope, 'data, U, const N: isize>(
-    NonNull<jl_array_t>,
-    PhantomData<&'scope ()>,
-    PhantomData<&'data mut ()>,
-    PhantomData<U>,
-);
-
-impl<'scope, 'data, U: ConstructType, const N: isize> TypedRankedArray<'scope, 'data, U, N> {
-    #[inline]
-    pub fn as_typed(self) -> TypedArray<'scope, 'data, U> {
-        TypedArray(self.0, PhantomData, PhantomData, PhantomData)
-    }
-
-    /// Convert `self` to `Array`.
-    #[inline]
-    pub fn as_array(self) -> Array<'scope, 'data> {
-        unsafe { Array::wrap_non_null(self.0, Private) }
-    }
-
-    /// Convert this array to a [`TypedValue`].
-    pub fn as_typed_value<'target, Tgt: Target<'target>>(
-        self,
-        target: &Tgt,
-    ) -> JlrsResult<TypedValue<'scope, 'data, ArrayType<U, N>>> {
-        target.local_scope::<_, _, 1>(|frame| {
-            let ty = U::construct_type(frame);
-            let arr = self.as_array();
-            let elty = arr.element_type();
-            if ty != elty {
-                // err
-                Err(TypeError::IncompatibleType {
-                    element_type: elty.display_string_or("<Cannot display type>"),
-                    value_type: ty.display_string_or("<Cannot display type>"),
-                })?;
-            }
-
-            unsafe {
-                Ok(TypedValue::<ArrayType<U, N>>::from_value_unchecked(
-                    arr.as_value(),
-                ))
-            }
-        })
-    }
-
-    /// Convert this array to a [`TypedValue`] without checking if the layout is compatible.
-    #[inline]
-    pub unsafe fn as_typed_value_unchecked(self) -> TypedValue<'scope, 'data, ArrayType<U, N>> {
-        let arr = self.as_array();
-        TypedValue::<ArrayType<U, N>>::from_value_unchecked(arr.as_value())
-    }
-}
-
-impl<U, const N: isize> Clone for TypedRankedArray<'_, '_, U, N> {
-    #[inline]
-    fn clone(&self) -> Self {
-        TypedRankedArray(self.0, PhantomData, PhantomData, PhantomData)
-    }
-}
-
-impl<U, const N: isize> Copy for TypedRankedArray<'_, '_, U, N> {}
-
-unsafe impl<U: ConstructType + ValidField, const N: isize> ConstructType
-    for TypedRankedArray<'_, '_, U, N>
-{
-    type Static = ArrayTypeConstructor<U::Static, ConstantIsize<N>>;
-
-    // TODO
-    #[inline]
-    fn construct_type_uncached<'target, Tgt>(
-        target: Tgt,
-    ) -> super::value::ValueData<'target, 'static, Tgt>
-    where
-        Tgt: Target<'target>,
-    {
-        target
-            .with_local_scope::<_, _, 4>(|target, mut frame| {
-                let ua = UnionAll::array_type(&target);
-                unsafe {
-                    let inner = ua.body();
-                    let ty_var = ua.var();
-                    let elem_ty = U::construct_type(&mut frame);
-                    let rank = Value::new(&mut frame, N);
-                    let with_rank = inner.apply_type_unchecked(&mut frame, [rank]);
-
-                    let rewrap = UnionAll::new_unchecked(&mut frame, ty_var, with_rank);
-                    let ty = rewrap
-                        .apply_type_unchecked(&target, [elem_ty])
-                        .as_value()
-                        .root(target);
-                    Ok(ty)
-                }
-            })
-            .unwrap()
-    }
-
-    #[inline]
-    fn base_type<'target, Tgt>(target: &Tgt) -> Option<Value<'target, 'static>>
-    where
-        Tgt: Target<'target>,
-    {
-        Some(UnionAll::array_type(&target).as_value())
-    }
-}
-
-unsafe impl<U: ValidField, const N: isize> Typecheck for TypedRankedArray<'_, '_, U, N> {
-    #[inline]
-    fn typecheck(t: DataType) -> bool {
-        // Safety: Array is a UnionAll. so check if the typenames match
-        unsafe {
-            if !TypedArray::<U>::typecheck(t) {
-                return false;
-            }
-
-            let unrooted = t.unrooted_target();
-            if let Some(param) = t.parameter(unrooted, 1) {
-                if let Ok(rank) = param.as_value().unbox::<isize>() {
-                    rank == N
-                } else {
-                    false
-                }
-            } else {
-                false
-            }
-        }
-    }
-}
-
-impl<U: ValidField, const N: isize> Debug for TypedRankedArray<'_, '_, U, N> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        match self.display_string() {
-            Ok(s) => write!(f, "{}", s),
-            Err(e) => write!(f, "<Cannot display value: {}>", e),
-        }
-    }
-}
-
-impl<'scope, 'data, U: ValidField, const N: isize> ManagedPriv<'scope, 'data>
-    for TypedRankedArray<'scope, 'data, U, N>
-{
-    type Wraps = jl_array_t;
-    type TypeConstructorPriv<'target, 'da> = TypedRankedArray<'target, 'da, U, N>;
-    const NAME: &'static str = "Array";
-
-    // Safety: `inner` must not have been freed yet, the result must never be
-    // used after the GC might have freed it. T must be correct
-    #[inline]
-    unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self {
-        Self(inner, PhantomData, PhantomData, PhantomData)
-    }
-
-    #[inline]
-    fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps> {
-        self.0
-    }
-}
-
-/// A reference to an [`RankedArray`] that has not been explicitly rooted.
-pub type TypedRankedArrayRef<'scope, 'data, U, const N: isize> =
-    Ref<'scope, 'data, TypedRankedArray<'scope, 'data, U, N>>;
-
-/// A [`TypedRankedArrayRef`] with static lifetimes. This is a useful shorthand for signatures of
-/// `ccall`able functions that return a [`TypedRankedArray`].
-pub type TypedRankedArrayRet<U, const N: isize> =
-    Ref<'static, 'static, TypedRankedArray<'static, 'static, U, N>>;
-
-/// A [`TypedRankedArray`] with static lifetimes.
-///
-/// This is a useful shorthand for signatures of `ccall`able functions that take a [`Array`].
-///
-/// See [`TypedArrayUnbound`] for more information.
-pub type TypedRankedArrayUnbound<U, const N: isize> = TypedRankedArray<'static, 'static, U, N>;
-
-unsafe impl<U: ValidField, const N: isize> ValidLayout for TypedRankedArrayRef<'_, '_, U, N> {
-    #[inline]
-    fn valid_layout(v: Value) -> bool {
-        if v.is::<DataType>() {
-            let dt = unsafe { v.cast_unchecked::<DataType>() };
-            dt.is::<TypedRankedArray<U, N>>()
-        } else if v.is::<UnionAll>() {
-            let ua = unsafe { v.cast_unchecked::<UnionAll>() };
-            ua.base_type().is::<TypedRankedArray<U, N>>()
-        } else {
-            false
-        }
-    }
-
-    #[inline]
-    fn type_object<'target, Tgt: Target<'target>>(target: &Tgt) -> Value<'target, 'static> {
-        UnionAll::array_type(target).as_value()
-    }
-
-    const IS_REF: bool = true;
-}
-
-unsafe impl<U: ValidField, const N: isize> ValidField
-    for Option<TypedRankedArrayRef<'_, '_, U, N>>
-{
-    #[inline]
-    fn valid_field(v: Value) -> bool {
-        if let Ok(dt) = v.cast::<DataType>() {
-            dt.is::<Array>()
-        } else if let Ok(ua) = v.cast::<UnionAll>() {
-            ua.base_type().is::<TypedRankedArray<U, N>>()
-        } else {
-            false
-        }
-    }
-}
-
-unsafe impl<'scope, 'data, U: ValidField + ConstructType, const N: isize> CCallArg
-    for TypedRankedArray<'scope, 'data, U, N>
-{
-    type CCallArgType = TypedRankedArray<'scope, 'data, U, N>;
-    type FunctionArgType = TypedRankedArray<'scope, 'data, U, N>;
-}
-
-unsafe impl<'scope, 'data, U: ValidField + ConstructType, const N: isize> CCallReturn
-    for TypedRankedArrayRef<'scope, 'data, U, N>
-{
-    type CCallReturnType = Value<'static, 'static>;
-    type FunctionReturnType = TypedRankedArray<'scope, 'data, U, N>;
-    type ReturnAs = Self;
-
-    #[inline]
-    unsafe fn return_or_throw(self) -> Self::ReturnAs {
-        self
-    }
-}
-
-// TODO: conversions
-
-/// Alias for `ArrayTypeConstructor<T, ConstantIsize<N>>`.
-pub type ArrayType<T, const N: isize> = ArrayTypeConstructor<T, ConstantIsize<N>>;

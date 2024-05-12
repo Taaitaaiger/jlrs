@@ -1,7 +1,7 @@
 mod util;
 
 #[cfg(test)]
-#[cfg(all(feature = "sync-rt", feature = "f16"))]
+#[cfg(all(feature = "local-rt", feature = "f16"))]
 mod tests {
     use half::f16;
     use jlrs::prelude::*;
@@ -16,6 +16,7 @@ mod tests {
 
             julia
                 .instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| unsafe {
                     let one = Value::new(&mut frame, f16::ONE);
                     let func = Module::base(&frame).function(&mut frame, "-")?;

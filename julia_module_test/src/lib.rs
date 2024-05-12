@@ -1,47 +1,41 @@
 use std::ops::AddAssign;
 
 use jlrs::{
-    ccall::AsyncCallback,
     data::{
         managed::{
-            array::{ArrayRet, TypedArrayUnbound},
-            ccall_ref::CCallRef,
+            array::ArrayRet,
+            ccall_ref::{CCallRef, CCallRefRet},
             value::{
                 typed::{TypedValue, TypedValueRet},
                 ValueRet,
             },
         },
         types::{
-            abstract_types::{AnyType, Number},
+            abstract_type::{AbstractArray, AbstractFloat, AnyType, Number},
             construct_type::ConstructType,
             foreign_type::{ForeignType, OpaqueType, ParametricBase, ParametricVariant},
         },
     },
-    error::JlrsError,
     impl_type_parameters, impl_variant_parameters,
     memory::gc::{mark_queue_obj, write_barrier},
     prelude::*,
+    tvar, tvars,
 };
 
-#[inline]
 fn freestanding_func_trivial() {}
 
-#[inline]
 fn freestanding_func_noargs() -> usize {
     0
 }
 
-#[inline]
 fn freestanding_func_bitsarg(a: usize) -> usize {
     a + 1
 }
 
-#[inline]
 fn freestanding_func_ref_bitsarg(usize_ref: CCallRef<usize>) -> usize {
     usize_ref.as_ref().unwrap() + 1
 }
 
-#[inline]
 fn freestanding_func_arrayarg(a: Array) -> usize {
     let elty = a.element_type();
 
@@ -52,43 +46,52 @@ fn freestanding_func_arrayarg(a: Array) -> usize {
     }
 }
 
-#[inline]
 fn freestanding_func_ref_mutarg(module_ref: CCallRef<Module>) -> usize {
     let _module = module_ref.as_managed().unwrap();
-    //let target = module.unrooted_target();
-    //module.set_global_unchecked("MyGlobal", Value::nothing(&target));
     0
 }
 
-#[inline]
 fn freestanding_func_ref_any(value_ref: CCallRef<AnyType>) -> usize {
     let _dt = value_ref.as_value_ref().datatype();
-    //println!("freestanding_func_ref_any {:?}", value.datatype());
     0
 }
 
-#[inline]
 fn freestanding_func_ref_abstract(value_ref: CCallRef<Number>) -> usize {
     let _dt = value_ref.as_value().unwrap().datatype();
-    //println!("freestanding_func_ref_abstract {:?}", value.datatype());
     0
 }
 
-#[inline]
 unsafe fn freestanding_func_typevaluearg(a: TypedValue<usize>) -> usize {
     a.unbox_unchecked::<usize>()
 }
 
-#[inline]
 unsafe fn freestanding_func_ret_array(dt: DataType) -> ArrayRet {
     CCall::stackless_invoke(|unrooted| {
-        Array::new_for::<_, _>(unrooted, (2, 2), dt.as_value())
+        Array::new_for::<_, _>(unrooted, dt.as_value(), (2, 2))
             .unwrap()
             .leak()
     })
 }
 
-#[inline]
+unsafe fn freestanding_func_ccall_ref_ret() -> CCallRefRet<bool> {
+    CCall::stackless_invoke(|unrooted| {
+        let v = Value::true_v(&unrooted)
+            .as_typed::<bool, _>(&unrooted)
+            .unwrap()
+            .leak();
+        CCallRefRet::new(v)
+    })
+}
+
+unsafe fn freestanding_func_typed_value_ret() -> TypedValueRet<bool> {
+    CCall::stackless_invoke(|unrooted| {
+        Value::true_v(&unrooted)
+            .as_typed::<bool, _>(&unrooted)
+            .unwrap()
+            .leak()
+    })
+}
+
 fn freestanding_func_ret_rust_result(throw_err: Bool) -> JlrsResult<i32> {
     if throw_err.as_bool() {
         Err(jlrs::error::JlrsError::exception("Error"))?
@@ -105,24 +108,22 @@ struct OpaqueInt {
 unsafe impl OpaqueType for OpaqueInt {}
 
 impl OpaqueInt {
-    #[inline]
     fn new(value: i32) -> TypedValueRet<OpaqueInt> {
         unsafe {
-            CCall::stackless_invoke(|unrooted| TypedValue::new(unrooted, OpaqueInt { a: value }).leak())
+            CCall::stackless_invoke(|unrooted| {
+                TypedValue::new(unrooted, OpaqueInt { a: value }).leak()
+            })
         }
     }
 
-    #[inline]
     fn increment(&mut self) {
         self.a += 1;
     }
 
-    #[inline]
     fn get(&self) -> i32 {
         self.a
     }
 
-    #[inline]
     fn get_cloned(self) -> i32 {
         self.a
     }
@@ -137,7 +138,6 @@ impl<T> POpaque<T>
 where
     T: 'static + Send + ConstructType + AddAssign + Copy + jlrs::convert::into_julia::IntoJulia,
 {
-    #[inline]
     fn new(value: T) -> TypedValueRet<Self> {
         unsafe {
             CCall::invoke(|mut frame| {
@@ -147,26 +147,17 @@ where
         }
     }
 
-    #[inline]
     fn get(&self) -> T {
         self.value
     }
 
-    #[inline]
     fn get_cloned(self) -> T {
         self.value
     }
 
-    #[inline]
     fn set(&mut self, value: T) {
         self.value = value;
     }
-}
-
-#[derive(Clone)]
-pub struct POpaqueTwo<T, U> {
-    value: T,
-    value2: U,
 }
 
 unsafe impl<T> ParametricBase for POpaque<T>
@@ -181,15 +172,17 @@ unsafe impl<T: 'static + Send + ConstructType> ParametricVariant for POpaque<T> 
     impl_variant_parameters!(T);
 }
 
-pub struct ForeignThing {
-    a: ValueRef<'static, 'static>,
+#[derive(Clone)]
+pub struct POpaqueTwo<T, U> {
+    value: T,
+    value2: U,
 }
+
 impl<T, U> POpaqueTwo<T, U>
 where
     T: 'static + Send + ConstructType + AddAssign + Copy + jlrs::convert::into_julia::IntoJulia,
     U: 'static + Send + ConstructType + AddAssign + Copy + jlrs::convert::into_julia::IntoJulia,
 {
-    #[inline]
     fn new(value: T, value2: U) -> TypedValueRet<Self> {
         unsafe {
             CCall::stackless_invoke(|unrooted| {
@@ -199,12 +192,10 @@ where
         }
     }
 
-    #[inline]
     fn get_v1(&self) -> T {
         self.value
     }
 
-    #[inline]
     fn get_v2(&self) -> U {
         self.value2
     }
@@ -227,17 +218,19 @@ where
     impl_variant_parameters!(T, U);
 }
 
+pub struct ForeignThing {
+    a: ValueRef<'static, 'static>,
+}
+
 unsafe impl Send for ForeignThing {}
 
 unsafe impl ForeignType for ForeignThing {
-    #[inline]
     fn mark(ptls: jlrs::memory::PTls, data: &Self) -> usize {
         unsafe { mark_queue_obj(ptls, data.a) as usize }
     }
 }
 
 impl ForeignThing {
-    #[inline]
     fn new(value: Value) -> TypedValueRet<ForeignThing> {
         unsafe {
             CCall::stackless_invoke(|unrooted| {
@@ -252,12 +245,10 @@ impl ForeignThing {
         }
     }
 
-    #[inline]
     fn get(&self) -> ValueRet {
         unsafe { self.a.assume_owned().leak() }
     }
 
-    #[inline]
     fn set(&mut self, value: Value) {
         unsafe {
             self.a = value.assume_owned().leak();
@@ -269,45 +260,22 @@ impl ForeignThing {
 struct UnexportedType;
 
 impl UnexportedType {
-    #[inline]
     fn assoc_func() -> isize {
         1
     }
 }
 
-#[inline]
-fn async_callback(arr: TypedArrayUnbound<isize>) -> JlrsResult<impl AsyncCallback<isize>> {
-    let arr = arr.track_shared_unbound()?;
-    Ok(move || Ok(arr.as_slice().iter().sum()))
-}
+type GenericEnv = tvars!(
+    tvar!('T'; AbstractFloat),
+    tvar!('N'),
+    tvar!('A'; AbstractArray<tvar!('T'), tvar!('N')>)
+);
+fn takes_generics_from_env(_array: TypedValue<tvar!('A')>, _data: TypedValue<tvar!('T')>) {}
 
-#[inline]
-fn async_callback_init_err() -> JlrsResult<impl AsyncCallback<isize>> {
-    Err(JlrsError::exception("Err"))?;
-    Ok(move || Ok(0))
-}
-
-#[inline]
-fn async_callback_callback_err() -> JlrsResult<impl AsyncCallback<isize>> {
-    Ok(move || Err(JlrsError::exception("Err"))?)
-}
-
-#[inline]
-fn generic_async_callback<T>(t: T) -> JlrsResult<impl AsyncCallback<T>>
-where
-    T: jlrs::convert::into_julia::IntoJulia
-        + Send
-        + jlrs::data::types::construct_type::ConstructType,
-{
-    Ok(move || Ok(t))
-}
-
-#[inline]
 fn has_generic<T>(t: T) -> T {
     t
 }
 
-#[inline]
 fn has_two_generics<T, U>(t: T, _u: U) -> T {
     t
 }
@@ -330,6 +298,9 @@ julia_module! {
     fn freestanding_func_typevaluearg(a: TypedValue<usize>) -> usize;
     fn freestanding_func_ret_array(dt: DataType) -> ArrayRet;
     fn freestanding_func_ret_rust_result(throw_err: Bool) -> JlrsResult<i32>;
+    fn freestanding_func_ccall_ref_ret() -> CCallRefRet<bool>;
+    fn freestanding_func_typed_value_ret() -> TypedValueRet<bool>;
+    fn takes_generics_from_env(array: TypedValue<tvar!('A')>, data: TypedValue<tvar!('T')>) use GenericEnv;
 
     struct OpaqueInt;
     in OpaqueInt fn new(value: i32) -> TypedValueRet<OpaqueInt> as OpaqueInt;
@@ -354,13 +325,6 @@ julia_module! {
 
     in UnexportedType fn assoc_func() -> isize;
 
-    #[doc = "    async_callback(array::Array{Int})::Int"]
-    #[doc = ""]
-    #[doc = "...docs for async_callback"]
-    async fn async_callback(arr: TypedArrayUnbound<isize>) -> JlrsResult<impl AsyncCallback<isize>>;
-    async fn async_callback_init_err() -> JlrsResult<impl AsyncCallback<isize>>;
-    async fn async_callback_callback_err() -> JlrsResult<impl AsyncCallback<isize>>;
-
     for T in [f64, f32, f64] {
         fn has_generic(t: T) -> T;
 
@@ -370,11 +334,6 @@ julia_module! {
         in POpaque<T> fn get(&self) -> T as popaque_get;
         in POpaque<T> fn get_cloned(self) -> T as popaque_get_cloned;
         in POpaque<T> fn set(&mut self, value: T) as popaque_set;
-
-        #[doc = "    generic_async_callback{T}(t::T)::T"]
-        #[doc = ""]
-        #[doc = "...docs for generic_async_callback"]
-        async fn generic_async_callback<T>(t: T) -> JlrsResult<impl AsyncCallback<T>>;
 
         for U in [T, i32] {
             struct POpaqueTwo<T, U>;
@@ -393,5 +352,5 @@ julia_module! {
     static STATIC_U8: u8;
 
     type POpaque64 = POpaque<f64>;
-    in POpaque<f64> fn new(value: f64) -> TypedValueRet<POpaque<f64>> as POpaque64
+    in POpaque<f64> fn new(value: f64) -> TypedValueRet<POpaque<f64>> as POpaque64;
 }

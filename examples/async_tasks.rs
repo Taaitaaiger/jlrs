@@ -1,6 +1,6 @@
-use std::{num::NonZeroUsize, path::PathBuf};
+use std::path::PathBuf;
 
-use jlrs::prelude::*;
+use jlrs::{async_util::task::Register, prelude::*};
 
 // This struct contains the data our task will need. This struct must be `Send`, `Sync`, and
 // contain no borrowed data.
@@ -9,31 +9,14 @@ struct MyTask {
     iters: isize,
 }
 
-// `MyTask` is a task we want to be executed, so we need to implement `AsyncTask`. This requires
-// `async_trait` because traits with async methods are not yet available in Rust. Because the
-// task itself is executed on a single thread, it is marked with `?Send`.
 #[async_trait(?Send)]
 impl AsyncTask for MyTask {
     // Different tasks can return different results. If successful, this task returns an `f64`.
-    type Output = f64;
-    type Affinity = DispatchAny;
-
-    // Include the custom code MyTask needs.
-    async fn register<'frame>(mut frame: AsyncGcFrame<'frame>) -> JlrsResult<()> {
-        unsafe {
-            let path = PathBuf::from("MyModule.jl");
-            if path.exists() {
-                Value::include(&mut frame, "MyModule.jl")?.into_jlrs_result()?;
-            } else {
-                Value::include(&mut frame, "examples/MyModule.jl")?.into_jlrs_result()?;
-            }
-        }
-        Ok(())
-    }
+    type Output = JlrsResult<f64>;
 
     // This is the async variation of the closure you provide `Julia::scope` when using the sync
     // runtime.
-    async fn run<'frame>(&mut self, mut frame: AsyncGcFrame<'frame>) -> JlrsResult<Self::Output> {
+    async fn run<'frame>(&mut self, mut frame: AsyncGcFrame<'frame>) -> Self::Output {
         // Convert the two arguments to values Julia can work with.
         let dims = Value::new(&mut frame, self.dims);
         let iters = Value::new(&mut frame, self.iters);
@@ -58,63 +41,65 @@ impl AsyncTask for MyTask {
     }
 }
 
-fn main() {
-    // The first thing we need to do is initialize the async runtime. In this example tokio is
-    // used as backing runtime.
-    //
-    // Afterwards we have an instance of `AsyncJulia` that can be used to interact with the
-    // runtime, and a handle to the thread where the runtime is running.
-    let (julia, handle) = unsafe {
-        RuntimeBuilder::new()
-            .async_runtime::<Tokio>()
-            .channel_capacity(NonZeroUsize::new(2).unwrap())
-            .start::<1>()
-            .expect("Could not init Julia")
-    };
-
-    {
-        // Include the custom code MyTask needs by registering it.
-        let (sender, receiver) = crossbeam_channel::bounded(1);
-        julia
-            .register_task::<MyTask, _>(sender)
-            .try_dispatch_any()
-            .unwrap();
-        receiver.recv().unwrap().unwrap();
+#[async_trait(?Send)]
+impl Register for MyTask {
+    // Include the custom code MyTask needs.
+    async fn register<'frame>(mut frame: AsyncGcFrame<'frame>) -> JlrsResult<()> {
+        unsafe {
+            let path = PathBuf::from("MyModule.jl");
+            if path.exists() {
+                Value::include(&mut frame, "MyModule.jl")?.into_jlrs_result()?;
+            } else {
+                Value::include(&mut frame, "examples/MyModule.jl")?.into_jlrs_result()?;
+            }
+        }
+        Ok(())
     }
+}
+
+fn main() {
+    // The first thing we need to do is initialize the async runtime.
+    let (julia, handle) = Builder::new()
+        .async_runtime(Tokio::<1>::new(false))
+        .channel_capacity(2)
+        .spawn()
+        .expect("Could not init Julia");
+
+    // Include the custom code MyTask needs by registering it.
+    julia
+        .register_task::<MyTask>()
+        .try_dispatch()
+        .unwrap()
+        .blocking_recv()
+        .unwrap()
+        .unwrap();
 
     // Send two tasks to the runtime.
-    let receiver1 = {
-        let task = MyTask {
+    let task1 = julia
+        .task(MyTask {
             dims: 4,
             iters: 1_000_000,
-        };
-        let (sender, receiver) = crossbeam_channel::bounded(1);
-        julia.task(task, sender).try_dispatch_any().unwrap();
-        receiver
-    };
+        })
+        .try_dispatch()
+        .unwrap();
 
-    let receiver2 = {
-        let task = MyTask {
+    let task2 = julia
+        .task(MyTask {
             dims: 6,
             iters: 1_000_000,
-        };
-        let (sender, receiver) = crossbeam_channel::bounded(1);
-        julia.task(task, sender).try_dispatch_any().unwrap();
-        receiver
-    };
+        })
+        .try_dispatch()
+        .unwrap();
 
     // Receive the results of the tasks.
-    let x = receiver1.recv().unwrap().unwrap();
+    let x = task1.blocking_recv().unwrap().unwrap();
     println!("Result of first task: {}", x);
 
-    let y = receiver2.recv().unwrap().unwrap();
+    let y = task2.blocking_recv().unwrap().unwrap();
     println!("Result of second task: {}", y);
 
     // Dropping `julia` causes the runtime to shut down Julia and itself. Join the handle to wait
     // for everything to shut down cleanly.
     std::mem::drop(julia);
-    handle
-        .join()
-        .expect("Cannot join")
-        .expect("The runtime thread panicked");
+    handle.join().expect("runtime thread panicked");
 }

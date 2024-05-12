@@ -1,24 +1,32 @@
 //! Use Julia without support for multitasking.
 //!
-//! This module is only available if the `sync-rt` feature is enabled, it provides the sync
-//! runtime which initializes Julia on the current thread.
+//! This module is only available if the `local-rt` feature is enabled, it provides the sync
+//! runtime which initializes Julia on the current thread. It has been deprecated in favor
+//! of [`LocalHandle`].
+//!
+//! [`LocalHandle`]: crate::runtime::handle::local_handle::LocalHandle
 
-use std::{ffi::c_void, marker::PhantomData, path::Path, sync::atomic::Ordering};
+use std::{
+    ffi::{c_void, CString},
+    marker::PhantomData,
+    path::Path,
+};
 
-use jl_sys::{jl_atexit_hook, jl_init, jl_init_with_image, jl_is_initialized};
+use jl_sys::{jl_atexit_hook, jl_is_initialized, jlrs_init, jlrs_init_with_image};
 
 use crate::{
     call::Call,
     convert::into_jlrs_result::IntoJlrsResult,
-    data::managed::{module::{Module, JlrsCore}, string::JuliaString, value::Value, Managed},
+    data::managed::{module::Module, string::JuliaString, value::Value, Managed},
     error::{IOError, JlrsResult, RuntimeError},
     init_jlrs,
     memory::{
         context::stack::Stack,
+        scope::{LocalScope, Scope},
         stack_frame::{PinnedFrame, StackFrame},
-        target::frame::GcFrame,
+        target::{frame::GcFrame, unrooted::Unrooted},
     },
-    runtime::{builder::RuntimeBuilder, INIT},
+    runtime::{builder::Builder, state::can_init},
     INSTALL_METHOD,
 };
 
@@ -30,45 +38,6 @@ pub struct PendingJulia {
 }
 
 impl PendingJulia {
-    pub(crate) unsafe fn init(builder: RuntimeBuilder) -> JlrsResult<Self> {
-        if jl_is_initialized() != 0 || INIT.swap(true, Ordering::Relaxed) {
-            Err(RuntimeError::AlreadyInitialized)?;
-        }
-
-        if let Some((julia_bindir, image_path)) = builder.image {
-            let julia_bindir_str = julia_bindir.to_string_lossy().to_string();
-            let image_path_str = image_path.to_string_lossy().to_string();
-
-            if !julia_bindir.exists() {
-                return Err(IOError::NotFound {
-                    path: julia_bindir_str,
-                })?;
-            }
-
-            if !image_path.exists() {
-                return Err(IOError::NotFound {
-                    path: image_path_str,
-                })?;
-            }
-
-            let bindir = std::ffi::CString::new(julia_bindir_str).unwrap();
-            let im_rel_path = std::ffi::CString::new(image_path_str).unwrap();
-
-            jl_init_with_image(bindir.as_ptr(), im_rel_path.as_ptr());
-        } else {
-            jl_init();
-        }
-
-        assert!(jl_is_initialized() != 0);
-
-        let install_method = builder.install_jlrs_core.clone();
-        INSTALL_METHOD.get_or_init(|| install_method);
-
-        Ok(PendingJulia {
-            _not_send_sync: PhantomData,
-        })
-    }
-
     /// Activate the pending instance.
     ///
     /// The provided `StackFrame` should be allocated on the stack.
@@ -78,7 +47,7 @@ impl PendingJulia {
             let mut pinned = frame.pin();
 
             let install_method = INSTALL_METHOD.get().unwrap();
-            init_jlrs(&mut pinned, install_method);
+            init_jlrs(install_method);
 
             let frame = pinned.stack_frame();
             let context = frame.sync_stack();
@@ -89,6 +58,33 @@ impl PendingJulia {
 
             wrapped
         }
+    }
+
+    pub(crate) unsafe fn init(builder: Builder) -> JlrsResult<Self> {
+        if !can_init() {
+            Err(RuntimeError::AlreadyInitialized)?;
+        }
+
+        if let Some((julia_bindir, image_path)) = builder.image {
+            let julia_bindir_str = julia_bindir.as_os_str().as_encoded_bytes();
+            let image_path_str = image_path.as_os_str().as_encoded_bytes();
+
+            let bindir = CString::new(julia_bindir_str).unwrap();
+            let im_rel_path = CString::new(image_path_str).unwrap();
+
+            jlrs_init_with_image(bindir.as_ptr(), im_rel_path.as_ptr());
+        } else {
+            jlrs_init();
+        }
+
+        assert!(jl_is_initialized() != 0);
+
+        let install_method = builder.install_jlrs_core.clone();
+        INSTALL_METHOD.get_or_init(|| install_method);
+
+        Ok(PendingJulia {
+            _not_send_sync: PhantomData,
+        })
     }
 }
 
@@ -106,26 +102,27 @@ pub struct Julia<'context> {
     stack: &'context Stack,
 }
 
-impl Julia<'_> {
+impl<'a> Julia<'a> {
     /// Enable or disable colored error messages originating from Julia. If this is enabled the
     /// error message in [`JlrsError::Exception`] can contain ANSI color codes. This feature is
     /// disabled by default.
     ///
     /// [`JlrsError::Exception`]: crate::error::JlrsError::Exception
     pub fn error_color(&mut self, enable: bool) -> JlrsResult<()> {
-        self.scope(|frame| unsafe {
+        unsafe {
+            let unrooted = Unrooted::new();
             let enable = if enable {
-                Value::true_v(&frame)
+                Value::true_v(&unrooted)
             } else {
-                Value::false_v(&frame)
+                Value::false_v(&unrooted)
             };
 
             // FIXME: make atomic
-            JlrsCore::module(&frame)
-                .global(&frame, "color")?
+            Module::jlrs_core(&unrooted)
+                .global(&unrooted, "color")?
                 .as_value()
-                .set_field_unchecked("x", enable)
-        })?;
+                .set_field_unchecked("x", enable)?;
+        };
 
         Ok(())
     }
@@ -169,38 +166,36 @@ impl Julia<'_> {
         })?
     }
 
-    /// This method is a main entrypoint to interact with Julia. It takes a closure with one
-    /// argument, a `GcFrame`, and can return arbitrary results.
+    /// Evaluate `using {module_name}`.
     ///
-    /// Example:
-    ///
-    /// ```
-    /// # use jlrs::prelude::*;
-    /// # use jlrs::util::test::JULIA;
-    /// # fn main() {
-    /// # JULIA.with(|j| {
-    /// # let mut julia = j.borrow_mut();
-    /// # let mut frame = StackFrame::new();
-    /// # let mut julia = julia.instance(&mut frame);
-    /// julia
-    ///     .scope(|mut frame| {
-    ///         let _i = Value::new(&mut frame, 1u64);
-    ///         Ok(())
-    ///     })
-    ///     .unwrap();
-    /// # });
-    /// # }
-    /// ```
-    pub fn scope<T, F>(&mut self, func: F) -> JlrsResult<T>
+    /// Safety: `module_name` must be a valid module or package name.
+    pub unsafe fn using<S: AsRef<str>>(&self, module_name: S) -> JlrsResult<()> {
+        return self.local_scope::<_, 1>(|mut frame| {
+            let cmd = format!("using {}", module_name.as_ref());
+            Value::eval_string(&mut frame, cmd)
+                .map(|_| ())
+                .into_jlrs_result()
+        });
+    }
+
+    pub fn returning<T>(&mut self) -> &mut impl Scope<'a, T> {
+        self
+    }
+}
+
+impl<'ctx, T> Scope<'ctx, T> for Julia<'ctx> {
+    fn scope<F>(&mut self, func: F) -> T
     where
-        for<'base> F: FnOnce(GcFrame<'base>) -> JlrsResult<T>,
+        for<'scope> F: FnOnce(GcFrame<'scope>) -> T,
     {
         unsafe {
-            let (owner, frame) = GcFrame::base(&self.stack);
+            let frame = GcFrame::base(&self.stack);
 
             let ret = func(frame);
-            std::mem::drop(owner);
+            self.stack.pop_roots(0);
             ret
         }
     }
 }
+
+impl<'ctx, T> LocalScope<'ctx, T> for Julia<'ctx> {}

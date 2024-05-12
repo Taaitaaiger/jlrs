@@ -1,6 +1,6 @@
 mod util;
 
-#[cfg(feature = "sync-rt")]
+#[cfg(feature = "local-rt")]
 mod tests {
     use jlrs::prelude::*;
 
@@ -11,6 +11,7 @@ mod tests {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
                     let output = frame.output();
 
@@ -18,7 +19,7 @@ mod tests {
                         .scope(|frame| {
                             let func =
                                 unsafe { Module::base(&frame).function(&frame, "+")?.as_managed() };
-                            Ok(func.root(output))
+                            JlrsResult::Ok(func.root(output))
                         })
                         .unwrap();
 
@@ -33,6 +34,7 @@ mod tests {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|frame| {
                     let func_ty = unsafe {
                         Module::base(&frame)

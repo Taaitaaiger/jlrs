@@ -1,734 +1,800 @@
-//! Track arrays to make directly accessing their content safer.
+/// Tracked references to Julia arrays
+///
+/// It's very easy to create multiple aliasing references to Julia array data if you use the
+/// access methods defined in the `array` module. To help avoid this problem, you can track
+/// arrays by calling [`ArrayBase::track_shared`] or [`ArrayBase::track_exclusive`].
+///
+/// If you strictly use tracking before accessing an array, it's not possible to create multiple
+/// aliasing references to this data in Rust. These last two words are important: access to this
+/// array in Julia is in no way affected, and you are still responsible for ensuring you don't
+/// access data that is in use in Julia.
+///
+/// [`ArrayBase::track_shared`]: crate::data::managed::array::ArrayBase::track_shared
+/// [`ArrayBase::track_exclusive`]: crate::data::managed::array::ArrayBase::track_exclusive
+use std::{ops::Deref, ptr::NonNull};
 
-use std::{
-    marker::PhantomData,
-    mem::{self, ManuallyDrop},
-    ops::Deref,
-};
+use jl_sys::jlrs_array_data_owner;
 
 use super::{
-    data::{
-        accessor::{
-            BitsArrayAccessorI, BitsArrayAccessorMut, IndeterminateArrayAccessorI,
-            IndeterminateArrayAccessorMut, InlinePtrArrayAccessorI, InlinePtrArrayAccessorMut,
-            PtrArrayAccessorI, PtrArrayAccessorMut, UnionArrayAccessorI, UnionArrayAccessorMut,
-        },
-        copied::CopiedArray,
+    data::accessor::{
+        BitsAccessor, BitsAccessorMut, BitsUnionAccessor, BitsUnionAccessorMut,
+        IndeterminateAccessor, IndeterminateAccessorMut, InlineAccessor, InlineAccessorMut,
+        ManagedAccessor, ManagedAccessorMut, ValueAccessor, ValueAccessorMut,
     },
-    dimensions::{ArrayDimensions, DimsExt},
-    Array, ArrayData, ArrayResult, TypedArray, TypedArrayData, TypedArrayResult,
+    ArrayBase, Unknown,
 };
 use crate::{
-    convert::unbox::Unbox,
     data::{
-        layout::valid_layout::ValidField,
-        managed::{value::ValueRef, Managed, ManagedRef},
+        layout::{is_bits::IsBits, typed_layout::HasLayout, valid_layout::ValidField},
+        managed::{array::How, private::ManagedPriv},
+        types::{
+            construct_type::{BitsUnionCtor, ConstructType},
+            typecheck::Typecheck,
+        },
     },
-    error::JlrsResult,
-    memory::{
-        context::ledger::Ledger,
-        target::{Target, TargetException},
-    },
+    error::{ArrayLayoutError, TypeError, CANNOT_DISPLAY_TYPE},
+    memory::context::ledger::Ledger,
+    prelude::{JlrsResult, Managed, Value},
+    private::Private,
 };
 
-/// An array that has been tracked immutably.
-pub struct TrackedArray<'tracked, 'scope, 'data, T: Managed<'scope, 'data>> {
-    data: T,
-    _scope: PhantomData<&'scope ()>,
-    _tracked: PhantomData<&'tracked ()>,
-    _data: PhantomData<&'data ()>,
+/// A tracked array that provides immutable access
+#[repr(transparent)]
+pub struct TrackedArrayBase<'scope, 'data, T, const N: isize> {
+    data: ArrayBase<'scope, 'data, T, N>,
 }
 
-unsafe impl<'tracked, 'scope, 'data, T: Managed<'scope, 'data>> Send
-    for TrackedArray<'tracked, 'scope, 'data, T>
-{
+// Accessors
+impl<'scope, 'data, T, const N: isize> TrackedArrayBase<'scope, 'data, T, N> {
+    /// Create an accessor for `isbits` data.
+    ///
+    /// Thanks to the restrictions on `T` the data is guaranteed to be stored inline as an array
+    /// of `T`s.
+    pub fn bits_data<'borrow>(&'borrow self) -> BitsAccessor<'borrow, 'scope, 'data, T, T, N>
+    where
+        T: ConstructType + ValidField + IsBits,
+    {
+        // No need for checks, guaranteed to have isbits layout
+        unsafe { BitsAccessor::new(&self.data) }
+    }
+
+    /// Create an accessor for `isbits` data with layout `L`.
+    ///
+    /// Thanks to the restrictions on `T` and `L` the elements are guaranteed to be stored inline
+    /// as an array of `L`s.
+    pub fn bits_data_with_layout<'borrow, L>(
+        &'borrow self,
+    ) -> BitsAccessor<'borrow, 'scope, 'data, T, L, N>
+    where
+        T: ConstructType + HasLayout<'static, 'static, Layout = L>,
+        L: IsBits + ValidField,
+    {
+        // No need for checks, guaranteed to have isbits layout and L is the layout of T
+        unsafe { BitsAccessor::new(&self.data) }
+    }
+
+    /// Try to create an accessor for `isbits` data with layout `L`.
+    ///
+    /// If the array doesn't have an isbits layout `ArrayLayoutError::NotBits` is returned. If `L`
+    /// is not a valid field layout for the element type `TypeError::InvalidLayout` is returned.
+    pub fn try_bits_data<'borrow, L>(
+        &'borrow self,
+    ) -> JlrsResult<BitsAccessor<'borrow, 'scope, 'data, T, L, N>>
+    where
+        L: IsBits + ValidField,
+    {
+        if !self.has_bits_layout() {
+            Err(ArrayLayoutError::NotBits {
+                element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
+            })?;
+        }
+
+        let ty = self.element_type();
+        if !L::valid_field(ty) {
+            Err(TypeError::InvalidLayout {
+                value_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
+            })?;
+        }
+
+        unsafe { Ok(BitsAccessor::new(&self.data)) }
+    }
+
+    /// Create an accessor for `isbits` data with layout `L` without checking any invariants.
+    ///
+    /// Safety:
+    ///
+    /// The element type must be an isbits type, and `L` must be a valid field layout of the
+    /// element type.
+    pub unsafe fn bits_data_unchecked<'borrow, L>(
+        &'borrow self,
+    ) -> BitsAccessor<'borrow, 'scope, 'data, T, L, N>
+    where
+        L: IsBits + ValidField,
+    {
+        BitsAccessor::new(&self.data)
+    }
+
+    /// Create an accessor for inline data.
+    ///
+    /// Thanks to the restrictions on `T` the data is guaranteed to be stored inline as an array
+    /// of `T`s.
+    pub fn inline_data<'borrow>(&'borrow self) -> InlineAccessor<'borrow, 'scope, 'data, T, T, N>
+    where
+        T: ConstructType + ValidField,
+    {
+        // No need for checks, guaranteed to have inline layout
+        unsafe { InlineAccessor::new(&self.data) }
+    }
+
+    /// Create an accessor for inline data with layout `L`.
+    ///
+    /// Thanks to the restrictions on `T` and `L` the elements are guaranteed to be stored inline
+    /// as an array of `L`s.
+    pub fn inline_data_with_layout<'borrow, L>(
+        &'borrow self,
+    ) -> InlineAccessor<'borrow, 'scope, 'data, T, L, N>
+    where
+        T: ConstructType + HasLayout<'scope, 'data, Layout = L>,
+        L: ValidField,
+    {
+        // No need for checks, guaranteed to have inline layout and L is the layout of T
+        unsafe { InlineAccessor::new(&self.data) }
+    }
+
+    /// Try to create an accessor for inline data with layout `L`.
+    ///
+    /// If the array doesn't have an inline layout `ArrayLayoutError::NotInline` is returned. If
+    /// `L` is not a valid field layout for the element type `TypeError::InvalidLayout` is
+    /// returned.
+    pub fn try_inline_data<'borrow, L>(
+        &'borrow self,
+    ) -> JlrsResult<InlineAccessor<'borrow, 'scope, 'data, T, L, N>>
+    where
+        L: ValidField,
+    {
+        if !self.has_inline_layout() {
+            Err(ArrayLayoutError::NotInline {
+                element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
+            })?;
+        }
+
+        let ty = self.element_type();
+        if !L::valid_field(ty) {
+            Err(TypeError::InvalidLayout {
+                value_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
+            })?;
+        }
+
+        unsafe { Ok(InlineAccessor::new(&self.data)) }
+    }
+
+    /// Create an accessor for inline data with layout `L` without checking any invariants.
+    ///
+    /// Safety:
+    ///
+    /// The elements must be stored inline, and `L` must be a valid field layout of the element
+    /// type.
+    pub unsafe fn inline_data_unchecked<'borrow, L>(
+        &'borrow self,
+    ) -> InlineAccessor<'borrow, 'scope, 'data, T, L, N>
+    where
+        L: ValidField,
+    {
+        InlineAccessor::new(&self.data)
+    }
+
+    /// Create an accessor for unions of isbits types.
+    ///
+    /// This function panics if the array doesn't have a union layout.
+    pub fn union_data<'borrow>(&'borrow self) -> BitsUnionAccessor<'borrow, 'scope, 'data, T, N>
+    where
+        T: BitsUnionCtor,
+    {
+        assert!(
+            self.has_union_layout(),
+            "Array does not have a union layout"
+        );
+
+        unsafe { BitsUnionAccessor::new(&self.data) }
+    }
+
+    /// Try to create an accessor for unions of isbits types.
+    ///
+    /// If the element type is not a union of isbits types `ArrayLayoutError::NotUnion` is
+    /// returned.
+    pub fn try_union_data<'borrow>(
+        &'borrow self,
+    ) -> JlrsResult<BitsUnionAccessor<'borrow, 'scope, 'data, T, N>> {
+        if !self.has_union_layout() {
+            Err(ArrayLayoutError::NotUnion {
+                element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
+            })?;
+        }
+
+        unsafe { Ok(BitsUnionAccessor::new(&self.data)) }
+    }
+
+    /// Create an accessor for unions of isbits types without checking any invariants.
+    ///
+    /// Safety:
+    ///
+    /// The element type must be a union of isbits types.
+    pub unsafe fn union_data_unchecked<'borrow>(
+        &'borrow self,
+    ) -> BitsUnionAccessor<'borrow, 'scope, 'data, T, N> {
+        BitsUnionAccessor::new(&self.data)
+    }
+    /// Create an accessor for managed data.
+    ///
+    /// Thanks to the restrictions on `T` the data is guaranteed to be as an array of
+    /// `Option<Ref<T>>`s.
+    pub fn managed_data<'borrow>(&'borrow self) -> ManagedAccessor<'borrow, 'scope, 'data, T, T, N>
+    where
+        T: Managed<'scope, 'data> + ConstructType,
+    {
+        // No need for checks, guaranteed to have correct layout
+        unsafe { ManagedAccessor::new(&self.data) }
+    }
+
+    /// Try to create an accessor for managed data of type `L`.
+    ///
+    /// If the element type is incompatible with `L` `ArrayLayoutError::NotManaged` is returned.
+    pub fn try_managed_data<'borrow, L>(
+        &'borrow self,
+    ) -> JlrsResult<ManagedAccessor<'borrow, 'scope, 'data, T, L, N>>
+    where
+        L: Managed<'scope, 'data> + Typecheck,
+    {
+        if !self.has_managed_layout::<L>() {
+            Err(ArrayLayoutError::NotManaged {
+                element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
+                name: L::NAME.into(),
+            })?;
+        }
+
+        unsafe { Ok(ManagedAccessor::new(&self.data)) }
+    }
+
+    /// Create an accessor for managed data of type `L` without checking any invariants.
+    ///
+    /// Safety:
+    ///
+    /// The element type must be compatible with `L`.
+    pub unsafe fn managed_data_unchecked<'borrow, L>(
+        &'borrow self,
+    ) -> ManagedAccessor<'borrow, 'scope, 'data, T, L, N>
+    where
+        L: Managed<'scope, 'data>,
+    {
+        ManagedAccessor::new(&self.data)
+    }
+
+    /// Create an accessor for value data.
+    ///
+    /// Thanks to the restrictions on `T` the data is guaranteed to be as an array of
+    /// `Option<Ref<Value>>`s.
+    pub fn value_data<'borrow>(&'borrow self) -> ValueAccessor<'borrow, 'scope, 'data, T, N>
+    where
+        T: Managed<'scope, 'data> + ConstructType,
+    {
+        // No need for checks, guaranteed to have inline layout
+        unsafe { ValueAccessor::new(&self.data) }
+    }
+
+    /// Try to create an accessor for value data.
+    ///
+    /// If the elements are stored inline `ArrayLayoutError::NotPointer` is returned.
+    pub fn try_value_data<'borrow>(
+        &'borrow self,
+    ) -> JlrsResult<ValueAccessor<'borrow, 'scope, 'data, T, N>> {
+        if !self.has_value_layout() {
+            Err(ArrayLayoutError::NotPointer {
+                element_type: self.element_type().error_string_or(CANNOT_DISPLAY_TYPE),
+            })?;
+        }
+
+        unsafe { Ok(ValueAccessor::new(&self.data)) }
+    }
+
+    /// Create an accessor for managed data of type `L` without checking any invariants.
+    ///
+    /// Safety:
+    ///
+    /// The elements must not be stored inline.
+    pub unsafe fn value_data_unchecked<'borrow>(
+        &'borrow self,
+    ) -> ValueAccessor<'borrow, 'scope, 'data, T, N> {
+        ValueAccessor::new(&self.data)
+    }
+
+    /// Create an accessor for indeterminate data.
+    pub fn indeterminate_data<'borrow>(
+        &'borrow self,
+    ) -> IndeterminateAccessor<'borrow, 'scope, 'data, T, N> {
+        unsafe { IndeterminateAccessor::new(&self.data) }
+    }
 }
 
-impl<'tracked, 'scope, 'data, T: Managed<'scope, 'data>> Clone
-    for TrackedArray<'tracked, 'scope, 'data, T>
-{
+impl<'scope, 'data, T, const N: isize> TrackedArrayBase<'scope, 'data, T, N> {
+    pub(crate) fn track_shared(array: ArrayBase<'scope, 'data, T, N>) -> JlrsResult<Self> {
+        unsafe {
+            let mut array_v = array.as_value();
+            if array.how() == How::PointerToOwner {
+                let owner = jlrs_array_data_owner(array.unwrap(Private));
+                array_v = Value::wrap_non_null(NonNull::new_unchecked(owner), Private);
+            }
+
+            let success = Ledger::try_borrow_shared(array_v)?;
+            assert!(success);
+
+            Ok(TrackedArrayBase { data: array })
+        }
+    }
+}
+
+impl<'scope, 'data, T, const N: isize> Clone for TrackedArrayBase<'scope, 'data, T, N> {
     fn clone(&self) -> Self {
         unsafe {
-            Ledger::borrow_shared_unchecked(self.data.as_value()).unwrap();
-            Self::new_from_owned(self.data)
+            let array = self.data;
+            let mut array_v = array.as_value();
+            if array.how() == How::PointerToOwner {
+                let owner = jlrs_array_data_owner(array.unwrap(Private));
+                array_v = Value::wrap_non_null(NonNull::new_unchecked(owner), Private);
+            }
+
+            Ledger::borrow_shared_unchecked(array_v).unwrap();
         }
+        Self { data: self.data }
     }
 }
 
-impl<'tracked, 'scope, 'data, T: Managed<'scope, 'data>> TrackedArray<'tracked, 'scope, 'data, T> {
-    pub(crate) unsafe fn new(data: &'tracked T) -> Self {
-        TrackedArray {
-            data: *data,
-            _scope: PhantomData,
-            _tracked: PhantomData,
-            _data: PhantomData,
-        }
-    }
+impl<'scope, 'data, T, const N: isize> Deref for TrackedArrayBase<'scope, 'data, T, N> {
+    type Target = ArrayBase<'scope, 'data, T, N>;
 
-    pub(crate) unsafe fn new_from_owned(data: T) -> Self {
-        TrackedArray {
-            data: data,
-            _scope: PhantomData,
-            _tracked: PhantomData,
-            _data: PhantomData,
-        }
+    fn deref(&self) -> &Self::Target {
+        &self.data
     }
 }
 
-impl<'tracked, 'scope, 'data> TrackedArray<'tracked, 'scope, 'data, Array<'scope, 'data>> {
-    /// Returns the dimensions of the tracked array.
-    pub fn dimensions<'borrow>(&'borrow self) -> ArrayDimensions<'borrow> {
-        unsafe { self.data.dimensions() }
-    }
-
-    /// Try to reborrow the array with the provided element type.
-    pub fn try_as_typed<T>(
-        self,
-    ) -> JlrsResult<TrackedArray<'tracked, 'scope, 'data, TypedArray<'scope, 'data, T>>>
-    where
-        T: ValidField,
-    {
-        let data = self.data.try_as_typed::<T>()?;
-        let ret = unsafe { Ok(TrackedArray::new_from_owned(data)) };
-        mem::forget(self);
-        ret
-    }
-
-    /// Reborrow the array with the provided element type without checking if this conversion is valid.
-    pub unsafe fn as_typed_unchecked<T>(
-        self,
-    ) -> TrackedArray<'tracked, 'scope, 'data, TypedArray<'scope, 'data, T>>
-    where
-        T: ValidField,
-    {
-        let data = self.data.as_typed_unchecked::<T>();
-        let ret = TrackedArray::new_from_owned(data);
-        mem::forget(self);
-        ret
-    }
-
-    /// Copy the content of this array.
-    pub fn copy_inline_data<T>(&self) -> JlrsResult<CopiedArray<T>>
-    where
-        T: 'static + ValidField + Unbox,
-    {
-        unsafe { self.data.copy_inline_data() }
-    }
-
-    /// Convert this array to a slice without checking if the layouts are compatible.
-    pub unsafe fn as_slice_unchecked<'borrow, T>(&'borrow self) -> &'borrow [T] {
-        self.data.as_slice_unchecked()
-    }
-
-    /// Create an accessor for the content of the array if the element type is an isbits type.
-    pub fn bits_data<'borrow, T>(
-        &'borrow self,
-    ) -> JlrsResult<BitsArrayAccessorI<'borrow, 'scope, 'data, T>>
-    where
-        T: ValidField + 'static,
-    {
-        unsafe { self.data.bits_data() }
-    }
-
-    /// Create an accessor for the content of the array if the element type is stored inline, but
-    /// can contain references to managed data.
-    pub fn inline_data<'borrow, T>(
-        &'borrow self,
-    ) -> JlrsResult<InlinePtrArrayAccessorI<'borrow, 'scope, 'data, T>>
-    where
-        T: ValidField,
-    {
-        unsafe { self.data.inline_data() }
-    }
-
-    /// Create an accessor for the content of the array if the element type is a managed type.
-    pub fn managed_data<'borrow, T>(
-        &'borrow self,
-    ) -> JlrsResult<PtrArrayAccessorI<'borrow, 'scope, 'data, T>>
-    where
-        T: ManagedRef<'scope, 'data>,
-        Option<T>: ValidField,
-    {
-        unsafe { self.data.managed_data() }
-    }
-
-    /// Create an accessor for the content of the array if the element type is a non-inlined type
-    /// (e.g. any mutable type).
-    pub fn value_data<'borrow>(
-        &'borrow self,
-    ) -> JlrsResult<PtrArrayAccessorI<'borrow, 'scope, 'data, ValueRef<'scope, 'data>>> {
-        unsafe { self.data.value_data() }
-    }
-
-    /// Create an accessor for the content of the array if the element type is a bits union, i.e.
-    /// a union of bits types.
-    pub fn union_data<'borrow>(
-        &'borrow self,
-    ) -> JlrsResult<UnionArrayAccessorI<'borrow, 'scope, 'data>> {
-        unsafe { self.data.union_data() }
-    }
-
-    /// Create an accessor for the content of the array that makes no assumptions about the
-    /// element type.
-    pub fn indeterminate_data<'borrow>(
-        &'borrow self,
-    ) -> IndeterminateArrayAccessorI<'borrow, 'scope, 'data> {
-        unsafe { self.data.indeterminate_data() }
-    }
-
-    /// Reshape the array.
-    ///
-    /// Returns a new array with the provided dimensions, the content of the array is shared with
-    /// the original array. The old and new dimensions must have an equal number of elements.
-    pub fn reshape<'target, 'current, 'borrow, D, Tgt>(
-        &self,
-        target: Tgt,
-        dims: D,
-    ) -> ArrayResult<'target, 'data, Tgt>
-    where
-        D: DimsExt,
-        Tgt: Target<'target>,
-    {
-        unsafe { self.data.reshape(target, dims) }
-    }
-
-    /// Reshape the array.
-    ///
-    /// Returns a new array with the provided dimensions, the content of the array is shared with
-    /// the original array. The old and new dimensions must have an equal number of elements.
-    ///
-    /// Safety: if an exception is thrown it isn't caught.
-    pub unsafe fn reshape_unchecked<'target, 'current, 'borrow, D, Tgt>(
-        &self,
-        target: Tgt,
-        dims: D,
-    ) -> ArrayData<'target, 'data, Tgt>
-    where
-        D: DimsExt,
-        Tgt: Target<'target>,
-    {
-        self.data.reshape_unchecked(target, dims)
-    }
-}
-
-impl<'tracked, 'scope, 'data, T> TrackedArray<'tracked, 'scope, 'data, TypedArray<'scope, 'data, T>>
-where
-    T: ValidField,
-{
-    /// Returns the dimensions of the tracked array.
-    pub fn dimensions<'borrow>(&'borrow self) -> ArrayDimensions<'borrow> {
-        unsafe { self.data.dimensions() }
-    }
-
-    /// Copy the content of this array.
-    pub fn copy_inline_data(&self) -> JlrsResult<CopiedArray<T>>
-    where
-        T: 'static,
-    {
-        unsafe { self.data.copy_inline_data() }
-    }
-
-    /// Convert this array to a slice.
-    pub fn as_slice<'borrow>(&'borrow self) -> &'borrow [T] {
-        unsafe {
-            let arr = std::mem::transmute::<&'borrow Self, &'borrow Array>(self);
-            arr.as_slice_unchecked()
-        }
-    }
-
-    /// Create an accessor for the content of the array if the element type is an isbits type.
-    pub fn bits_data<'borrow>(
-        &'borrow self,
-    ) -> JlrsResult<BitsArrayAccessorI<'borrow, 'scope, 'data, T>> {
-        unsafe { self.data.bits_data() }
-    }
-
-    /// Create an accessor for the content of the array if the element type is stored inline, but
-    /// can contain references to managed data.
-    pub fn inline_data<'borrow>(
-        &'borrow self,
-    ) -> JlrsResult<InlinePtrArrayAccessorI<'borrow, 'scope, 'data, T>> {
-        unsafe { self.data.inline_data() }
-    }
-
-    /// Create an accessor for the content of the array that makes no assumptions about the
-    /// element type.
-    pub fn indeterminate_data<'borrow>(
-        &'borrow self,
-    ) -> IndeterminateArrayAccessorI<'borrow, 'scope, 'data> {
-        unsafe { self.data.indeterminate_data() }
-    }
-
-    /// Reshape the array.
-    ///
-    /// Returns a new array with the provided dimensions, the content of the array is shared with
-    /// the original array. The old and new dimensions must have an equal number of elements.
-    pub fn reshape<'target, 'current, 'borrow, D, Tgt>(
-        &self,
-        target: Tgt,
-        dims: D,
-    ) -> TypedArrayResult<'target, 'data, Tgt, T>
-    where
-        D: DimsExt,
-        Tgt: Target<'target>,
-    {
-        unsafe { self.data.reshape(target, dims) }
-    }
-
-    /// Reshape the array.
-    ///
-    /// Returns a new array with the provided dimensions, the content of the array is shared with
-    /// the original array. The old and new dimensions must have an equal number of elements.
-    ///
-    /// Safety: if an exception is thrown it isn't caught.
-    pub unsafe fn reshape_unchecked<'target, 'current, 'borrow, D, Tgt>(
-        &self,
-        target: Tgt,
-        dims: D,
-    ) -> TypedArrayData<'target, 'data, Tgt, T>
-    where
-        D: DimsExt,
-        Tgt: Target<'target>,
-    {
-        self.data.reshape_unchecked(target, dims)
-    }
-}
-
-impl<'tracked, 'scope, 'data, T>
-    TrackedArray<'tracked, 'scope, 'data, TypedArray<'scope, 'data, Option<T>>>
-where
-    T: ManagedRef<'scope, 'data>,
-    Option<T>: ValidField,
-{
-    /// Create an accessor for the content of the array if the element type is a managed type.
-    pub fn managed_data<'borrow>(
-        &'borrow self,
-    ) -> JlrsResult<PtrArrayAccessorI<'borrow, 'scope, 'data, T>> {
-        unsafe { self.data.managed_data() }
-    }
-
-    /// Create an accessor for the content of the array if the element type is a non-inlined type
-    /// (e.g. any mutable type).
-    pub fn value_data<'borrow>(
-        &'borrow self,
-    ) -> JlrsResult<PtrArrayAccessorI<'borrow, 'scope, 'data, ValueRef<'scope, 'data>>> {
-        unsafe { self.data.value_data() }
-    }
-}
-
-impl<'scope, 'data, T: Managed<'scope, 'data>> Drop for TrackedArray<'_, 'scope, 'data, T> {
+impl<T, const N: isize> Drop for TrackedArrayBase<'_, '_, T, N> {
     fn drop(&mut self) {
         unsafe {
-            Ledger::unborrow_shared(self.data.as_value()).unwrap();
+            let array = self.data;
+            let mut array_v = array.as_value();
+            if array.how() == How::PointerToOwner {
+                let owner = jlrs_array_data_owner(array.unwrap(Private));
+                array_v = Value::wrap_non_null(NonNull::new_unchecked(owner), Private);
+            }
+
+            let _success = Ledger::unborrow_shared(array_v).expect("Failed to untrack shared");
         }
     }
 }
 
-pub struct TrackedArrayMut<'tracked, 'scope, 'data, T: Managed<'scope, 'data>> {
-    tracked: ManuallyDrop<TrackedArray<'tracked, 'scope, 'data, T>>,
+/// A tracked array that provides mutable access
+#[repr(transparent)]
+pub struct TrackedArrayBaseMut<'scope, 'data, T, const N: isize> {
+    data: ArrayBase<'scope, 'data, T, N>,
 }
 
-impl<'tracked, 'scope, 'data, T: Managed<'scope, 'data>>
-    TrackedArrayMut<'tracked, 'scope, 'data, T>
-{
-    pub(crate) unsafe fn new(data: &'tracked mut T) -> Self {
-        TrackedArrayMut {
-            tracked: ManuallyDrop::new(TrackedArray::new(data)),
-        }
-    }
-
-    pub(crate) unsafe fn new_from_owned(data: T) -> Self {
-        TrackedArrayMut {
-            tracked: ManuallyDrop::new(TrackedArray::new_from_owned(data)),
-        }
-    }
-}
-
-impl<'tracked, 'scope, 'data> TrackedArrayMut<'tracked, 'scope, 'data, Array<'scope, 'data>> {
-    /// Create a mutable accessor for the content of the array if the element type is an isbits
-    /// type.
+impl<'scope, 'data, T, const N: isize> TrackedArrayBaseMut<'scope, 'data, T, N> {
+    /// Create a mutable accessor for `isbits` data.
     ///
-    /// Safety: Mutating things that should absolutely not be mutated is not prevented.
-    pub unsafe fn bits_data_mut<'borrow, T>(
-        &'borrow mut self,
-    ) -> JlrsResult<BitsArrayAccessorMut<'borrow, 'scope, 'data, T>>
-    where
-        T: ValidField,
-    {
-        self.tracked.data.bits_data_mut()
-    }
-
-    /// Create a mutable accessor for the content of the array if the element type is stored
-    /// inline, but can contain references to managed data.
+    /// Thanks to the restrictions on `T` the data is guaranteed to be stored inline as an array
+    /// of `T`s.
     ///
-    /// Safety: Mutating things that should absolutely not be mutated is not prevented.
-    pub unsafe fn inline_data_mut<'borrow, T>(
-        &'borrow mut self,
-    ) -> JlrsResult<InlinePtrArrayAccessorMut<'borrow, 'scope, 'data, T>>
-    where
-        T: ValidField,
-    {
-        self.tracked.data.inline_data_mut()
-    }
-
-    /// Create a mutable accessor for the content of the array if the element type is a managed
-    /// type.
+    /// Safety:
     ///
-    /// Safety: Mutating things that should absolutely not be mutated is not prevented.
-    pub unsafe fn managed_data_mut<'borrow, T>(
-        &'borrow mut self,
-    ) -> JlrsResult<PtrArrayAccessorMut<'borrow, 'scope, 'data, T>>
-    where
-        T: ManagedRef<'scope, 'data>,
-        Option<T>: ValidField,
-    {
-        self.tracked.data.managed_data_mut()
-    }
-
-    /// Create a mutable accessor for the content of the array if the element type is a
-    /// non-inlined type (e.g. any mutable type).
-    ///
-    /// Safety: Mutating things that should absolutely not be mutated is not prevented.
-    pub unsafe fn value_data_mut<'borrow>(
-        &'borrow mut self,
-    ) -> JlrsResult<PtrArrayAccessorMut<'borrow, 'scope, 'data, ValueRef<'scope, 'data>>> {
-        self.tracked.data.value_data_mut()
-    }
-
-    /// Create a mutable accessor for the content of the array if the element type is a bits
-    /// union, i.e. a union of bits types.
-    ///
-    /// Safety: Mutating things that should absolutely not be mutated is not prevented.
-    pub unsafe fn union_data_mut<'borrow>(
-        &'borrow mut self,
-    ) -> JlrsResult<UnionArrayAccessorMut<'borrow, 'scope, 'data>> {
-        self.tracked.data.union_data_mut()
-    }
-
-    /// Create a mutable accessor for the content of the array that makes no assumptions about the
-    /// element type.
-    ///
-    /// Safety: Mutating things that should absolutely not be mutated is not prevented.
-    pub unsafe fn indeterminate_data_mut<'borrow>(
-        &'borrow mut self,
-    ) -> IndeterminateArrayAccessorMut<'borrow, 'scope, 'data> {
-        self.tracked.data.indeterminate_data_mut()
-    }
-
-    /// Convert this array to a mutable slice without checking if the layouts are compatible.
-    ///
-    /// Safety: Mutating things that should absolutely not be mutated is not prevented.
-    pub unsafe fn as_mut_slice_unchecked<'borrow, T>(&'borrow mut self) -> &'borrow mut [T]
-    where
-        T: 'static,
-    {
-        self.tracked.data.as_mut_slice_unchecked()
-    }
-}
-
-impl<'tracked, 'scope> TrackedArrayMut<'tracked, 'scope, 'static, Array<'scope, 'static>> {
-    /// Create a mutable accessor for the content of the array if the element type is a managed
-    /// type.
-    ///
-    /// Safety: Mutating things that should absolutely not be mutated is not prevented.
-    pub unsafe fn grow_end<'target, Tgt>(
-        &mut self,
-        target: Tgt,
-        inc: usize,
-    ) -> TargetException<'target, 'static, (), Tgt>
-    where
-        Tgt: Target<'target>,
-    {
-        self.tracked.data.grow_end(target, inc)
-    }
-
-    /// Add capacity for `inc` more elements at the end of the array. The array must be
-    /// one-dimensional. If the array isn't one-dimensional an exception is thrown.
-    ///
-    /// Safety: Mutating things that should absolutely not be mutated is not prevented. If an
-    /// exception is thrown, it isn't caught.
-    pub unsafe fn grow_end_unchecked(&mut self, inc: usize) {
-        self.tracked.data.grow_end_unchecked(inc);
-    }
-
-    /// Remove `dec` elements from the end of the array.  The array must be one-dimensional. If
-    /// the array isn't one-dimensional an exception is thrown.
-    ///
-    /// Safety: Mutating things that should absolutely not be mutated is not prevented.
-    pub unsafe fn del_end<'target, Tgt>(
-        &mut self,
-        target: Tgt,
-        dec: usize,
-    ) -> TargetException<'target, 'static, (), Tgt>
-    where
-        Tgt: Target<'target>,
-    {
-        self.tracked.data.del_end(target, dec)
-    }
-
-    /// Remove `dec` elements from the end of the array.  The array must be one-dimensional. If
-    /// the array isn't one-dimensional an exception is thrown.
-    ///
-    /// Safety: Mutating things that should absolutely not be mutated is not prevented. If an
-    /// exception is thrown, it isn't caught.
-    pub unsafe fn del_end_unchecked(&mut self, dec: usize) {
-        self.tracked.data.del_end_unchecked(dec);
-    }
-
-    /// Add capacity for `inc` more elements at the start of the array. The array must be
-    /// one-dimensional. If the array isn't one-dimensional an exception is thrown.
-    ///
-    /// Safety: Mutating things that should absolutely not be mutated is not prevented.
-    pub unsafe fn grow_begin<'target, Tgt>(
-        &mut self,
-        target: Tgt,
-        inc: usize,
-    ) -> TargetException<'target, 'static, (), Tgt>
-    where
-        Tgt: Target<'target>,
-    {
-        self.tracked.data.grow_begin(target, inc)
-    }
-
-    /// Add capacity for `inc` more elements at the start of the array. The array must be
-    /// one-dimensional. If the array isn't one-dimensional an exception is thrown.
-    ///
-    /// Safety: Mutating things that should absolutely not be mutated is not prevented. If an
-    /// exception is thrown, it isn't caught.
-    pub unsafe fn grow_begin_unchecked(&mut self, inc: usize) {
-        self.tracked.data.grow_begin_unchecked(inc);
-    }
-
-    /// Remove `dec` elements from the start of the array.  The array must be one-dimensional. If
-    /// the array isn't one-dimensional an exception is thrown.
-    ///
-    /// Safety: Mutating things that should absolutely not be mutated is not prevented.
-    pub unsafe fn del_begin<'target, Tgt>(
-        &mut self,
-        target: Tgt,
-        dec: usize,
-    ) -> TargetException<'target, 'static, (), Tgt>
-    where
-        Tgt: Target<'target>,
-    {
-        self.tracked.data.del_begin(target, dec)
-    }
-
-    /// Remove `dec` elements from the start of the array.  The array must be one-dimensional. If
-    /// the array isn't one-dimensional an exception is thrown.
-    ///
-    /// Safety: Mutating things that should absolutely not be mutated is not prevented. If an
-    /// exception is thrown, it isn't caught.
-    pub unsafe fn del_begin_unchecked(&mut self, dec: usize) {
-        self.tracked.data.del_begin_unchecked(dec);
-    }
-}
-
-impl<'tracked, 'scope, 'data, T>
-    TrackedArrayMut<'tracked, 'scope, 'data, TypedArray<'scope, 'data, T>>
-where
-    T: ValidField,
-{
-    /// Convert this array to a slice.
-    pub fn as_mut_slice<'borrow>(&'borrow mut self) -> &'borrow mut [T] {
-        unsafe {
-            let arr = std::mem::transmute::<&'borrow mut Self, &'borrow mut Array>(self);
-            arr.as_mut_slice_unchecked()
-        }
-    }
-
-    /// Create a mutable accessor for the content of the array if the element type is an isbits
-    /// type.
-    ///
-    /// Safety: Mutating things that should absolutely not be mutated is not prevented.
+    /// Mutating Julia data is generally unsafe. You must guarantee that you're allowed to mutate
+    /// its content, and that no running Julia code is accessing this data.
     pub unsafe fn bits_data_mut<'borrow>(
         &'borrow mut self,
-    ) -> JlrsResult<BitsArrayAccessorMut<'borrow, 'scope, 'data, T>> {
-        self.tracked.data.bits_data_mut()
+    ) -> BitsAccessorMut<'borrow, 'scope, 'data, T, T, N>
+    where
+        T: ConstructType + ValidField + IsBits,
+    {
+        // No need for checks, guaranteed to have isbits layout
+        BitsAccessorMut::new(&mut self.data)
     }
 
-    /// Create a mutable accessor for the content of the array if the element type is stored
-    /// inline, but can contain references to managed data.
+    /// Create a mutable accessor for `isbits` data with layout `L`.
     ///
-    /// Safety: Mutating things that should absolutely not be mutated is not prevented.
+    /// Thanks to the restrictions on `T` and `L` the elements are guaranteed to be stored inline
+    /// as an array of `L`s.
+    ///
+    /// Safety:
+    ///
+    /// Mutating Julia data is generally unsafe. You must guarantee that you're allowed to mutate
+    /// its content, and that no running Julia code is accessing this data.
+    pub unsafe fn bits_data_mut_with_layout<'borrow, L>(
+        &'borrow mut self,
+    ) -> BitsAccessorMut<'borrow, 'scope, 'data, T, L, N>
+    where
+        T: HasLayout<'static, 'static, Layout = L>,
+        L: IsBits + ValidField,
+    {
+        // No need for checks, guaranteed to have isbits layout and L is the layout of T
+        BitsAccessorMut::new(&mut self.data)
+    }
+
+    /// Try to create a mutable accessor for `isbits` data with layout `L`.
+    ///
+    /// If the array doesn't have an isbits layout `ArrayLayoutError::NotBits` is returned. If `L`
+    /// is not a valid field layout for the element type `TypeError::InvalidLayout` is returned.
+    ///
+    /// Safety:
+    ///
+    /// Mutating Julia data is generally unsafe. You must guarantee that you're allowed to mutate
+    /// its content, and that no running Julia code is accessing this data.
+    pub unsafe fn try_bits_data_mut<'borrow, L>(
+        &'borrow mut self,
+    ) -> JlrsResult<BitsAccessorMut<'borrow, 'scope, 'data, T, L, N>>
+    where
+        L: IsBits + ValidField,
+    {
+        if !self.has_bits_layout() {
+            Err(ArrayLayoutError::NotBits {
+                element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
+            })?;
+        }
+
+        let ty = self.element_type();
+        if !L::valid_field(ty) {
+            Err(TypeError::InvalidLayout {
+                value_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
+            })?;
+        }
+
+        Ok(BitsAccessorMut::new(&mut self.data))
+    }
+
+    /// Create a mutable accessor for `isbits` data with layout `L` without checking any
+    /// invariants.
+    ///
+    /// Safety:
+    ///
+    /// Mutating Julia data is generally unsafe. You must guarantee that you're allowed to mutate
+    /// its content, and that no running Julia code is accessing this data. The element type must
+    /// be an isbits type, and `L` must be a valid field layout of the element type.
+    pub unsafe fn bits_data_mut_unchecked<'borrow, L>(
+        &'borrow mut self,
+    ) -> BitsAccessorMut<'borrow, 'scope, 'data, T, L, N>
+    where
+        L: IsBits + ValidField,
+    {
+        BitsAccessorMut::new(&mut self.data)
+    }
+
+    /// Create a mutable accessor for inline data.
+    ///
+    /// Thanks to the restrictions on `T` the data is guaranteed to be stored inline as an array
+    /// of `T`s.
+    ///
+    /// Safety:
+    ///
+    /// Mutating Julia data is generally unsafe. You must guarantee that you're allowed to mutate
+    /// its content, and that no running Julia code is accessing this data.
     pub unsafe fn inline_data_mut<'borrow>(
         &'borrow mut self,
-    ) -> JlrsResult<InlinePtrArrayAccessorMut<'borrow, 'scope, 'data, T>> {
-        self.tracked.data.inline_data_mut()
+    ) -> InlineAccessorMut<'borrow, 'scope, 'data, T, T, N>
+    where
+        T: ConstructType + ValidField,
+    {
+        // No need for checks, guaranteed to have inline layout
+        InlineAccessorMut::new(&mut self.data)
     }
 
-    /// Create a mutable accessor for the content of the array that makes no assumptions about the
-    /// element type.
+    /// Create a mutable accessor for inline data with layout `L`.
     ///
-    /// Safety: Mutating things that should absolutely not be mutated is not prevented.
-    pub unsafe fn indeterminate_data_mut<'borrow>(
+    /// Thanks to the restrictions on `T` and `L` the elements are guaranteed to be stored inline
+    /// as an array of `L`s.
+    ///
+    /// Safety:
+    ///
+    /// Mutating Julia data is generally unsafe. You must guarantee that you're allowed to mutate
+    /// its content, and that no running Julia code is accessing this data.
+    pub unsafe fn inline_data_mut_with_layout<'borrow, L>(
         &'borrow mut self,
-    ) -> IndeterminateArrayAccessorMut<'borrow, 'scope, 'data> {
-        self.tracked.data.indeterminate_data_mut()
+    ) -> InlineAccessorMut<'borrow, 'scope, 'data, T, L, N>
+    where
+        T: ConstructType + HasLayout<'scope, 'data, Layout = L>,
+        L: ValidField,
+    {
+        // No need for checks, guaranteed to have inline layout and L is the layout of T
+        InlineAccessorMut::new(&mut self.data)
     }
-}
 
-unsafe impl<'tracked, 'scope, 'data, T: Managed<'scope, 'data>> Send
-    for TrackedArrayMut<'tracked, 'scope, 'data, T>
-{
-}
-
-impl<'tracked, 'scope, 'data, T>
-    TrackedArrayMut<'tracked, 'scope, 'data, TypedArray<'scope, 'data, Option<T>>>
-where
-    T: ManagedRef<'scope, 'data>,
-    Option<T>: ValidField,
-{
-    /// Create a mutable accessor for the content of the array if the element type is a managed
-    /// type.
+    /// Try to create a mutable accessor for inline data with layout `L`.
     ///
-    /// Safety: Mutating things that should absolutely not be mutated is not prevented.
+    /// If the array doesn't have an inline layout `ArrayLayoutError::NotInline` is returned. If
+    /// `L` is not a valid field layout for the element type `TypeError::InvalidLayout` is
+    /// returned.
+    ///
+    /// Safety:
+    ///
+    /// Mutating Julia data is generally unsafe. You must guarantee that you're allowed to mutate
+    /// its content, and that no running Julia code is accessing this data.
+    pub unsafe fn try_inline_data_mut<'borrow, L>(
+        &'borrow mut self,
+    ) -> JlrsResult<InlineAccessorMut<'borrow, 'scope, 'data, T, L, N>>
+    where
+        L: ValidField,
+    {
+        if !self.has_inline_layout() {
+            Err(ArrayLayoutError::NotInline {
+                element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
+            })?;
+        }
+
+        let ty = self.element_type();
+        if !L::valid_field(ty) {
+            Err(TypeError::InvalidLayout {
+                value_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
+            })?;
+        }
+
+        Ok(InlineAccessorMut::new(&mut self.data))
+    }
+
+    /// Create a mutable  accessor for inline data with layout `L` without checking any
+    /// invariants.
+    ///
+    /// Safety:
+    ///
+    /// Mutating Julia data is generally unsafe. You must guarantee that you're allowed to mutate
+    /// its content, and that no running Julia code is accessing this data. The elements must be
+    /// stored inline, and `L` must be a valid field layout of the element type.
+    pub unsafe fn inline_data_mut_unchecked<'borrow, L>(
+        &'borrow mut self,
+    ) -> InlineAccessorMut<'borrow, 'scope, 'data, T, L, N>
+    where
+        L: ValidField,
+    {
+        InlineAccessorMut::new(&mut self.data)
+    }
+
+    /// Create a mutable accessor for unions of isbits types.
+    ///
+    /// This function panics if the array doesn't have a union layout.
+    ///
+    /// Safety:
+    ///
+    /// Mutating Julia data is generally unsafe. You must guarantee that you're allowed to mutate
+    /// its content, and that no running Julia code is accessing this data.
+    pub unsafe fn union_data_mut<'borrow>(
+        &'borrow mut self,
+    ) -> BitsUnionAccessorMut<'borrow, 'scope, 'data, T, N>
+    where
+        T: BitsUnionCtor,
+    {
+        assert!(
+            self.has_union_layout(),
+            "Array does not have a union layout"
+        );
+        BitsUnionAccessorMut::new(&mut self.data)
+    }
+
+    /// Try to create a mutable accessor for unions of isbits types.
+    ///
+    /// If the element type is not a union of isbits types `ArrayLayoutError::NotUnion` is
+    /// returned.
+    ///
+    /// Safety:
+    ///
+    /// Mutating Julia data is generally unsafe. You must guarantee that you're allowed to mutate
+    /// its content, and that no running Julia code is accessing this data.
+    pub unsafe fn try_union_data_mut<'borrow>(
+        &'borrow mut self,
+    ) -> JlrsResult<BitsUnionAccessorMut<'borrow, 'scope, 'data, T, N>> {
+        if !self.has_union_layout() {
+            Err(ArrayLayoutError::NotUnion {
+                element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
+            })?;
+        }
+
+        Ok(BitsUnionAccessorMut::new(&mut self.data))
+    }
+
+    /// Create a mutable accessor for unions of isbits types without checking any invariants.
+    ///
+    /// Safety:
+    ///
+    /// Mutating Julia data is generally unsafe. You must guarantee that you're allowed to mutate
+    /// its content, and that no running Julia code is accessing this data. The element type must
+    /// be a union of isbits types.
+    pub unsafe fn union_data_mut_unchecked<'borrow>(
+        &'borrow mut self,
+    ) -> BitsUnionAccessorMut<'borrow, 'scope, 'data, T, N> {
+        BitsUnionAccessorMut::new(&mut self.data)
+    }
+
+    /// Create a mutable accessor for managed data.
+    ///
+    /// Thanks to the restrictions on `T` the data is guaranteed to be as an array of
+    /// `Option<Ref<T>>`s.
+    ///
+    /// Safety:
+    ///
+    /// Mutating Julia data is generally unsafe. You must guarantee that you're allowed to mutate
+    /// its content, and that no running Julia code is accessing this data.
     pub unsafe fn managed_data_mut<'borrow>(
         &'borrow mut self,
-    ) -> JlrsResult<PtrArrayAccessorMut<'borrow, 'scope, 'data, T>> {
-        self.tracked.data.managed_data_mut()
+    ) -> ManagedAccessorMut<'borrow, 'scope, 'data, T, T, N>
+    where
+        T: Managed<'scope, 'data> + ConstructType,
+    {
+        // No need for checks, guaranteed to have correct layout
+        ManagedAccessorMut::new(&mut self.data)
     }
 
-    /// Create a mutable accessor for the content of the array if the element type is a
-    /// non-inlined type (e.g. any mutable type).
+    /// Try to create a mutable accessor for managed data of type `L`.
     ///
-    /// Safety: Mutating things that should absolutely not be mutated is not prevented.
+    /// If the element type is incompatible with `L` `ArrayLayoutError::NotManaged` is returned.
+    ///
+    /// Safety:
+    ///
+    /// Mutating Julia data is generally unsafe. You must guarantee that you're allowed to mutate
+    /// its content, and that no running Julia code is accessing this data.
+    pub unsafe fn try_managed_data_mut<'borrow, L>(
+        &'borrow mut self,
+    ) -> JlrsResult<ManagedAccessorMut<'borrow, 'scope, 'data, T, L, N>>
+    where
+        L: Managed<'scope, 'data> + Typecheck,
+    {
+        if !self.has_managed_layout::<L>() {
+            Err(ArrayLayoutError::NotManaged {
+                element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
+                name: L::NAME.into(),
+            })?;
+        }
+
+        Ok(ManagedAccessorMut::new(&mut self.data))
+    }
+
+    /// Create a mutable accessor for managed data of type `L` without checking any invariants.
+    ///
+    /// Safety:
+    ///
+    /// Mutating Julia data is generally unsafe. You must guarantee that you're allowed to mutate
+    /// its content, and that no running Julia code is accessing this data. The element type must
+    /// be compatible with `L`.
+    pub unsafe fn managed_data_mut_unchecked<'borrow, L>(
+        &'borrow mut self,
+    ) -> ManagedAccessorMut<'borrow, 'scope, 'data, T, L, N>
+    where
+        L: Managed<'scope, 'data>,
+    {
+        ManagedAccessorMut::new(&mut self.data)
+    }
+
+    /// Create a mutable accessor for value data.
+    ///
+    /// Thanks to the restrictions on `T` the data is guaranteed to be as an array of
+    /// `Option<Ref<Value>>`s.
+    ///
+    /// Safety:
+    ///
+    /// Mutating Julia data is generally unsafe. You must guarantee that you're allowed to mutate
+    /// its content, and that no running Julia code is accessing this data.
     pub unsafe fn value_data_mut<'borrow>(
         &'borrow mut self,
-    ) -> JlrsResult<PtrArrayAccessorMut<'borrow, 'scope, 'data, ValueRef<'scope, 'data>>> {
-        self.tracked.data.value_data_mut()
+    ) -> ValueAccessorMut<'borrow, 'scope, 'data, T, N>
+    where
+        T: Managed<'scope, 'data> + ConstructType,
+    {
+        // No need for checks, guaranteed to have inline layout
+        ValueAccessorMut::new(&mut self.data)
+    }
+
+    /// Try to create a mutable accessor for value data.
+    ///
+    /// If the elements are stored inline `ArrayLayoutError::NotPointer` is returned.
+    ///
+    /// Safety:
+    ///
+    /// Mutating Julia data is generally unsafe. You must guarantee that you're allowed to mutate
+    /// its content, and that no running Julia code is accessing this data.
+    pub unsafe fn try_value_data_mut<'borrow>(
+        &'borrow mut self,
+    ) -> JlrsResult<ValueAccessorMut<'borrow, 'scope, 'data, T, N>> {
+        if !self.has_value_layout() {
+            Err(ArrayLayoutError::NotPointer {
+                element_type: self.element_type().error_string_or(CANNOT_DISPLAY_TYPE),
+            })?;
+        }
+
+        Ok(ValueAccessorMut::new(&mut self.data))
+    }
+
+    /// Create a mutable accessor for managed data of type `L` without checking any invariants.
+    ///
+    /// Safety:
+    ///
+    /// Mutating Julia data is generally unsafe. You must guarantee that you're allowed to mutate
+    /// its content, and that no running Julia code is accessing this data. The elements must not
+    /// be stored inline.
+    pub unsafe fn value_data_mut_unchecked<'borrow>(
+        &'borrow mut self,
+    ) -> ValueAccessorMut<'borrow, 'scope, 'data, T, N> {
+        ValueAccessorMut::new(&mut self.data)
+    }
+
+    /// Create a mutable accessor for indeterminate data.
+    ///
+    /// Safety:
+    ///
+    /// Mutating Julia data is generally unsafe. You must guarantee that you're allowed to mutate
+    /// its content, and that no running Julia code is accessing this data.
+    pub unsafe fn indeterminate_data_mut<'borrow>(
+        &'borrow mut self,
+    ) -> IndeterminateAccessorMut<'borrow, 'scope, 'data, T, N> {
+        IndeterminateAccessorMut::new(&mut self.data)
     }
 }
 
-impl<'tracked, 'scope, T> TrackedArrayMut<'tracked, 'scope, 'static, TypedArray<'scope, 'static, T>>
-where
-    T: ValidField,
-{
-    /// Add capacity for `inc` more elements at the end of the array. The array must be
-    /// one-dimensional. If the array isn't one-dimensional an exception is thrown.
-    ///
-    /// Safety: Mutating things that should absolutely not be mutated is not prevented.
-    pub unsafe fn grow_end<'target, Tgt>(
-        &mut self,
-        target: Tgt,
-        inc: usize,
-    ) -> TargetException<'target, 'static, (), Tgt>
-    where
-        Tgt: Target<'target>,
-    {
-        self.tracked.data.grow_end(target, inc)
-    }
-
-    /// Add capacity for `inc` more elements at the end of the array. The array must be
-    /// one-dimensional. If the array isn't one-dimensional an exception is thrown.
-    ///
-    /// Safety: Mutating things that should absolutely not be mutated is not prevented. If an
-    /// exception is thrown, it isn't caught.
-    pub unsafe fn grow_end_unchecked(&mut self, inc: usize) {
-        self.tracked.data.grow_end_unchecked(inc)
-    }
-
-    /// Remove `dec` elements from the end of the array.  The array must be one-dimensional. If
-    /// the array isn't one-dimensional an exception is thrown.
-    ///
-    /// Safety: Mutating things that should absolutely not be mutated is not prevented.
-    pub unsafe fn del_end<'target, Tgt>(
-        &mut self,
-        target: Tgt,
-        dec: usize,
-    ) -> TargetException<'target, 'static, (), Tgt>
-    where
-        Tgt: Target<'target>,
-    {
-        self.tracked.data.del_end(target, dec)
-    }
-
-    /// Remove `dec` elements from the end of the array.  The array must be one-dimensional. If
-    /// the array isn't one-dimensional an exception is thrown.
-    ///
-    /// Safety: Mutating things that should absolutely not be mutated is not prevented. If an
-    /// exception is thrown, it isn't caught.
-    pub unsafe fn del_end_unchecked(&mut self, dec: usize) {
-        self.tracked.data.del_end_unchecked(dec)
-    }
-
-    /// Add capacity for `inc` more elements at the start of the array. The array must be
-    /// one-dimensional. If the array isn't one-dimensional an exception is thrown.
-    ///
-    /// Safety: Mutating things that should absolutely not be mutated is not prevented.
-    pub unsafe fn grow_begin<'target, Tgt>(
-        &mut self,
-        target: Tgt,
-        inc: usize,
-    ) -> TargetException<'target, 'static, (), Tgt>
-    where
-        Tgt: Target<'target>,
-    {
-        self.tracked.data.grow_begin(target, inc)
-    }
-
-    /// Add capacity for `inc` more elements at the start of the array. The array must be
-    /// one-dimensional. If the array isn't one-dimensional an exception is thrown.
-    ///
-    /// Safety: Mutating things that should absolutely not be mutated is not prevented. If an
-    /// exception is thrown, it isn't caught.
-    pub unsafe fn grow_begin_unchecked(&mut self, inc: usize) {
-        self.tracked.data.grow_begin_unchecked(inc)
-    }
-
-    /// Remove `dec` elements from the start of the array.  The array must be one-dimensional. If
-    /// the array isn't one-dimensional an exception is thrown.
-    ///
-    /// Safety: Mutating things that should absolutely not be mutated is not prevented.
-    pub unsafe fn del_begin<'target, Tgt>(
-        &mut self,
-        target: Tgt,
-        dec: usize,
-    ) -> TargetException<'target, 'static, (), Tgt>
-    where
-        Tgt: Target<'target>,
-    {
-        self.tracked.data.del_begin(target, dec)
-    }
-
-    /// Remove `dec` elements from the start of the array.  The array must be one-dimensional. If
-    /// the array isn't one-dimensional an exception is thrown.
-    ///
-    /// Safety: Mutating things that should absolutely not be mutated is not prevented. If an
-    /// exception is thrown, it isn't caught.
-    pub unsafe fn del_begin_unchecked(&mut self, dec: usize) {
-        self.tracked.data.del_begin_unchecked(dec)
-    }
-}
-
-impl<'tracked, 'scope, 'data> Deref
-    for TrackedArrayMut<'tracked, 'scope, 'data, Array<'scope, 'data>>
-{
-    type Target = TrackedArray<'tracked, 'scope, 'data, Array<'scope, 'data>>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.tracked
-    }
-}
-
-impl<'tracked, 'scope, 'data, T> Deref
-    for TrackedArrayMut<'tracked, 'scope, 'data, TypedArray<'scope, 'data, T>>
-where
-    T: ValidField,
-{
-    type Target = TrackedArray<'tracked, 'scope, 'data, TypedArray<'scope, 'data, T>>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.tracked
-    }
-}
-
-impl<'tracked, 'scope, 'data, T: Managed<'scope, 'data>> Drop
-    for TrackedArrayMut<'tracked, 'scope, 'data, T>
-{
-    fn drop(&mut self) {
+impl<'scope, 'data, T, const N: isize> TrackedArrayBaseMut<'scope, 'data, T, N> {
+    pub(crate) fn track_exclusive(array: ArrayBase<'scope, 'data, T, N>) -> JlrsResult<Self> {
         unsafe {
-            Ledger::unborrow_exclusive(self.tracked.data.as_value()).unwrap();
+            let mut array_v = array.as_value();
+            if array.how() == How::PointerToOwner {
+                let owner = jlrs_array_data_owner(array.unwrap(Private));
+                array_v = Value::wrap_non_null(NonNull::new_unchecked(owner), Private);
+            }
+
+            let success = Ledger::try_borrow_exclusive(array_v)?;
+            assert!(success);
+
+            Ok(TrackedArrayBaseMut { data: array })
         }
     }
 }
+
+impl<'scope, 'data, T, const N: isize> Deref for TrackedArrayBaseMut<'scope, 'data, T, N> {
+    type Target = TrackedArrayBase<'scope, 'data, T, N>;
+
+    fn deref(&self) -> &Self::Target {
+        unsafe { std::mem::transmute(self) }
+    }
+}
+
+impl<T, const N: isize> Drop for TrackedArrayBaseMut<'_, '_, T, N> {
+    fn drop(&mut self) {
+        unsafe {
+            let array = self.data;
+            let mut array_v = array.as_value();
+            if array.how() == How::PointerToOwner {
+                let owner = jlrs_array_data_owner(array.unwrap(Private));
+                array_v = Value::wrap_non_null(NonNull::new_unchecked(owner), Private);
+            }
+
+            let success = Ledger::unborrow_exclusive(array_v).expect("Failed to untrack shared");
+            assert!(success);
+        }
+    }
+}
+
+pub type TrackedArray<'scope, 'data> = TrackedArrayBase<'scope, 'data, Unknown, -1>;
+pub type TrackedTypedArray<'scope, 'data, T> = TrackedArrayBase<'scope, 'data, T, -1>;
+pub type TrackedRankedArray<'scope, 'data, const N: isize> =
+    TrackedArrayBase<'scope, 'data, Unknown, N>;
+pub type TrackedTypedRankedArray<'scope, 'data, T, const N: isize> =
+    TrackedArrayBase<'scope, 'data, T, N>;
+
+pub type TrackedVector<'scope, 'data> = TrackedArrayBase<'scope, 'data, Unknown, 1>;
+pub type TrackedTypedVector<'scope, 'data, T> = TrackedArrayBase<'scope, 'data, T, 1>;
+
+pub type TrackedMatrix<'scope, 'data> = TrackedArrayBase<'scope, 'data, Unknown, 2>;
+pub type TrackedTypedMatrix<'scope, 'data, T> = TrackedArrayBase<'scope, 'data, T, 2>;
+
+pub type TrackedArrayMut<'scope, 'data> = TrackedArrayBaseMut<'scope, 'data, Unknown, -1>;
+pub type TrackedTypedArrayMut<'scope, 'data, T> = TrackedArrayBaseMut<'scope, 'data, T, -1>;
+pub type TrackedRankedArrayMut<'scope, 'data, const N: isize> =
+    TrackedArrayBaseMut<'scope, 'data, Unknown, N>;
+pub type TrackedTypedRankedArrayMut<'scope, 'data, T, const N: isize> =
+    TrackedArrayBaseMut<'scope, 'data, T, N>;
+
+pub type TrackedVectorMut<'scope, 'data> = TrackedArrayBaseMut<'scope, 'data, Unknown, 1>;
+pub type TrackedTypedVectorMut<'scope, 'data, T> = TrackedArrayBaseMut<'scope, 'data, T, 1>;
+
+pub type TrackedMatrixMut<'scope, 'data> = TrackedArrayBaseMut<'scope, 'data, Unknown, 2>;
+pub type TrackedTypedMatrixMut<'scope, 'data, T> = TrackedArrayBaseMut<'scope, 'data, T, 2>;

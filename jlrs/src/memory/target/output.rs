@@ -11,55 +11,37 @@
 //!
 //! ```
 //! # use jlrs::prelude::*;
-//! # use jlrs::util::test::JULIA;
 //! # fn main() {
-//! # JULIA.with(|j| {
-//! # let mut julia = j.borrow_mut();
-//! # let mut frame = StackFrame::new();
-//! # let mut julia = julia.instance(&mut frame);
+//! let mut julia = Builder::new().start_local().unwrap();
 //!
-//! julia
-//!     .scope(|mut frame| {
-//!         let output = frame.output();
+//! julia.local_scope::<_, 1>(|mut frame| {
+//!     let output = frame.local_output();
 //!
-//!         let _v = frame.scope(|_| {
-//!             // The output has been allocated in the parent
-//!             // scope's frame, so by using it as a target the
-//!             // result can be returned from this subscope.
-//!             Ok(Value::new(output, 1u64))
-//!         })?;
-//!
-//!         Ok(())
-//!     })
-//!     .unwrap();
-//! # });
+//!     let _v = frame.local_scope::<_, 0>(|_| {
+//!         // The output has been allocated in the parent
+//!         // scope's frame, so by using it as a target the
+//!         // result can be returned from this subscope.
+//!         Value::new(output, 1u64)
+//!     });
+//! });
 //! # }
 //! ```
 //!
 //! ```
 //! # use jlrs::prelude::*;
-//! # use jlrs::util::test::JULIA;
 //! # fn main() {
-//! # JULIA.with(|j| {
-//! # let mut julia = j.borrow_mut();
-//! # let mut frame = StackFrame::new();
-//! # let mut julia = julia.instance(&mut frame);
+//! let mut julia = Builder::new().start_local().unwrap();
 //!
-//! julia
-//!     .scope(|mut frame| {
-//!         let mut output = frame.output();
+//! julia.local_scope::<_, 1>(|mut frame| {
+//!     let mut output = frame.local_output();
 //!
-//!         let _v = frame.scope(|_| {
-//!             // _v1 can be used until the output is used again.
-//!             let _v1 = Value::new(&mut output, 2u64);
+//!     let _v = frame.local_scope::<_, 0>(|_| {
+//!         // _v1 can be used until the output is used again.
+//!         let _v1 = Value::new(&mut output, 2u64);
 //!
-//!             Ok(Value::new(output, 1u64))
-//!         })?;
-//!
-//!         Ok(())
-//!     })
-//!     .unwrap();
-//! # });
+//!         Value::new(output, 1u64)
+//!     });
+//! });
 //! # }
 //! ```
 

@@ -28,7 +28,7 @@ use std::ffi::c_void;
 use jl_sys::{
     jl_unbox_float32, jl_unbox_float64, jl_unbox_int16, jl_unbox_int32, jl_unbox_int64,
     jl_unbox_int8, jl_unbox_uint16, jl_unbox_uint32, jl_unbox_uint64, jl_unbox_uint8,
-    jl_unbox_voidpointer,
+    jl_unbox_voidpointer, jlrs_unbox_long, jlrs_unbox_ulong,
 };
 
 use super::into_julia::IntoJulia;
@@ -48,6 +48,12 @@ use crate::data::managed::value::Value;
 ///
 /// [`Value::unbox`]: crate::data::managed::value::Value::unbox
 /// [`ValidLayout`]: crate::data::layout::valid_layout::ValidLayout
+#[diagnostic::on_unimplemented(
+    message = "the trait bound `{Self}: Unbox` is not satisfied",
+    label = "the trait `Unbox` is not implemented for `{Self}`",
+    note = "Custom types that implement `Unbox` should be generated with JlrsCore.reflect",
+    note = "Do not implement `ForeignType`, `OpaqueType`, or `ParametricVariant` unless this type is exported to Julia with `julia_module!`"
+)]
 pub unsafe trait Unbox {
     /// The type of the unboxed data. Must be `#[repr(C)]`.
     type Output: Sized + Clone;
@@ -90,18 +96,8 @@ impl_unboxer!(i64, jl_unbox_int64);
 impl_unboxer!(f32, jl_unbox_float32);
 impl_unboxer!(f64, jl_unbox_float64);
 impl_unboxer!(*mut c_void, jl_unbox_voidpointer);
-
-#[cfg(not(target_pointer_width = "64"))]
-impl_unboxer!(usize, jl_unbox_uint32);
-
-#[cfg(not(target_pointer_width = "64"))]
-impl_unboxer!(isize, jl_unbox_int32);
-
-#[cfg(target_pointer_width = "64")]
-impl_unboxer!(usize, jl_unbox_uint64);
-
-#[cfg(target_pointer_width = "64")]
-impl_unboxer!(isize, jl_unbox_int64);
+impl_unboxer!(usize, jlrs_unbox_ulong);
+impl_unboxer!(isize, jlrs_unbox_long);
 
 unsafe impl<T: IntoJulia> Unbox for *mut T {
     type Output = Self;

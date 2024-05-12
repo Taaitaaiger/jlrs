@@ -3,8 +3,7 @@
 use std::{ffi::CStr, ptr::NonNull};
 
 use jl_sys::{
-    jl_cpu_threads, jl_get_ARCH, jl_get_UNAME, jl_getallocationgranularity, jl_getpagesize,
-    jl_git_branch, jl_git_commit, jl_is_debugbuild, jl_n_threads, jl_ver_is_release, jl_ver_major,
+    jl_cpu_threads, jl_get_UNAME, jl_is_debugbuild, jl_n_threads, jl_ver_is_release, jl_ver_major,
     jl_ver_minor, jl_ver_patch, jl_ver_string,
 };
 use jlrs_macros::julia_version;
@@ -38,18 +37,6 @@ impl Info {
         unsafe { jl_n_threads.load(::std::sync::atomic::Ordering::Relaxed) as usize }
     }
 
-    /// The page size used by the garbage collector.
-    #[inline]
-    pub fn page_size() -> usize {
-        unsafe { jl_getpagesize() as usize }
-    }
-
-    /// The allocation granularity.
-    #[inline]
-    pub fn allocation_granularity() -> usize {
-        unsafe { jl_getallocationgranularity() as usize }
-    }
-
     /// Returns `true` if a debug build of Julia is used.
     #[inline]
     pub fn is_debugbuild() -> bool {
@@ -71,20 +58,20 @@ impl Info {
         }
     }
 
-    /// The CPU architecture.
-    #[inline]
-    pub fn arch() -> StrOrBytes<'static> {
-        unsafe {
-            let cstr =
-                Symbol::wrap_non_null(NonNull::new_unchecked(jl_get_ARCH()), Private).as_cstr();
+    // /// The CPU architecture.
+    // #[inline]
+    // pub fn arch() -> StrOrBytes<'static> {
+    //     unsafe {
+    //         let cstr =
+    //             Symbol::wrap_non_null(NonNull::new_unchecked(jl_get_ARCH()), Private).as_cstr();
 
-            if let Ok(rstr) = cstr.to_str() {
-                Ok(rstr)
-            } else {
-                Err(cstr.to_bytes())
-            }
-        }
-    }
+    //         if let Ok(rstr) = cstr.to_str() {
+    //             Ok(rstr)
+    //         } else {
+    //             Err(cstr.to_bytes())
+    //         }
+    //     }
+    // }
 
     /// The major version of Julia.
     #[inline]
@@ -108,26 +95,6 @@ impl Info {
     #[inline]
     pub fn is_release() -> bool {
         unsafe { jl_ver_is_release() != 0 }
-    }
-
-    /// Returns the git branch that was used to compile the used version of Julia.
-    #[inline]
-    pub fn git_branch() -> StrOrBytes<'static> {
-        unsafe {
-            let cstr = CStr::from_ptr(jl_git_branch());
-
-            if let Ok(rstr) = cstr.to_str() {
-                Ok(rstr)
-            } else {
-                Err(cstr.to_bytes())
-            }
-        }
-    }
-
-    /// Returns the git commit that was used to compile the used version of Julia.
-    #[inline]
-    pub fn git_commit() -> &'static str {
-        unsafe { CStr::from_ptr(jl_git_commit()).to_str().unwrap() }
     }
 
     /// Returns the version string of the used version of Julia.

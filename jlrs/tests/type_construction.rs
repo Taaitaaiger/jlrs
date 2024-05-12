@@ -1,19 +1,23 @@
 mod util;
 
-#[cfg(feature = "sync-rt")]
+#[cfg(feature = "local-rt")]
 mod tests {
     use jlrs::{
+        convert::to_symbol::ToSymbol,
         data::{
             managed::{type_var::TypeVar, union::Union, union_all::UnionAll},
             types::{
-                abstract_types::{AbstractChar, AbstractString, Integer, Real},
+                abstract_type::{
+                    AbstractArray, AbstractChar, AbstractString, Integer, Real, RefTypeConstructor,
+                },
                 construct_type::{
                     ArrayTypeConstructor, ConstantIsize, ConstructType, Name, TypeVarConstructor,
-                    UnionTypeConstructor,
+                    TypeVarName, TypeVars, UnionTypeConstructor,
                 },
             },
         },
         prelude::*,
+        tvar, tvars,
     };
 
     use super::util::JULIA;
@@ -24,17 +28,17 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
-                .scope(|mut frame| {
+                .returning::<JlrsResult<_>>().scope(|mut frame| {
                     let ty = <ArrayTypeConstructor<AbstractChar, ConstantIsize<2>> as ConstructType>::construct_type(&mut frame);
                     assert!(ty.is::<DataType>());
                     let inner_ty = unsafe {ty.cast_unchecked::<DataType>()};
                     assert!(inner_ty.is::<Array>());
 
-                    let elem_param = inner_ty.parameter(&mut frame, 0).unwrap();
+                    let elem_param = inner_ty.parameter(0).unwrap();
                     assert_eq!(elem_param, AbstractChar::construct_type(&mut frame));
                     assert!(elem_param.cast::<DataType>().unwrap().is_abstract());
 
-                    let rank_param = inner_ty.parameter(&mut frame, 1).unwrap();
+                    let rank_param = inner_ty.parameter(1).unwrap();
                     assert_eq!(rank_param.unbox::<isize>().unwrap(), 2);
                     Ok(())
                 })
@@ -48,15 +52,15 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
-                .scope(|mut frame| {
+                .returning::<JlrsResult<_>>().scope(|mut frame| {
                     let ty = <ArrayTypeConstructor<AbstractChar, TypeVarConstructor<Name<'N'>>> as ConstructType>::construct_type(&mut frame);
                     let ua = ty.cast::<UnionAll>().unwrap();
                     let base = ua.base_type();
 
-                    let elem_param = base.parameter(&mut frame, 0).unwrap();
+                    let elem_param = base.parameter(0).unwrap();
                     assert_eq!(elem_param, AbstractChar::construct_type(&mut frame));
 
-                    let rank_param = base.parameter(&mut frame, 1).unwrap();
+                    let rank_param = base.parameter(1).unwrap();
                     assert!(rank_param.is::<TypeVar>());
                     Ok(())
                 })
@@ -70,15 +74,15 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
-                .scope(|mut frame| {
+                .returning::<JlrsResult<_>>().scope(|mut frame| {
                     let ty = <ArrayTypeConstructor<TypeVarConstructor<Name<'T'>>, ConstantIsize<1>> as ConstructType>::construct_type(&mut frame);
                     let ua = ty.cast::<UnionAll>().unwrap();
                     let base = ua.base_type();
 
-                    let elem_param = base.parameter(&mut frame, 0).unwrap();
+                    let elem_param = base.parameter(0).unwrap();
                     assert!(elem_param.is::<TypeVar>());
 
-                    let rank_param = base.parameter(&mut frame, 1).unwrap();
+                    let rank_param = base.parameter(1).unwrap();
                     assert_eq!(rank_param.unbox::<isize>().unwrap(), 1);
                     Ok(())
                 })
@@ -92,6 +96,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
                     let ty = <ArrayTypeConstructor<
                         TypeVarConstructor<Name<'T'>, AbstractChar>,
@@ -100,10 +105,10 @@ mod tests {
                     let ua = ty.cast::<UnionAll>().unwrap();
                     let base = ua.base_type();
 
-                    let elem_param = base.parameter(&mut frame, 0).unwrap();
+                    let elem_param = base.parameter(0).unwrap();
                     assert!(elem_param.is::<TypeVar>());
 
-                    let rank_param = base.parameter(&mut frame, 1).unwrap();
+                    let rank_param = base.parameter(1).unwrap();
                     assert_eq!(rank_param.unbox::<isize>().unwrap(), 1);
                     Ok(())
                 })
@@ -117,7 +122,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
-                .scope(|mut frame| {
+                .returning::<JlrsResult<_>>().scope(|mut frame| {
                     let ty = <UnionTypeConstructor<AbstractChar, Integer> as ConstructType>::construct_type(&mut frame);
                     let un = ty.cast::<Union>().unwrap();
                     let variants = un.variants();
@@ -145,6 +150,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
                     let ty = <UnionTypeConstructor<
                         AbstractChar,
@@ -166,6 +172,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
                     let ty = <UnionTypeConstructor<
                         Integer,
@@ -174,6 +181,62 @@ mod tests {
                     let un = ty.cast::<Union>().unwrap();
                     let variants = un.variants();
                     assert_eq!(variants.len(), 2); // Integer <: Real
+
+                    Ok(())
+                })
+                .unwrap();
+        });
+    }
+
+    fn construct_with_env() {
+        JULIA.with(|j| {
+            let mut frame = StackFrame::new();
+            let mut jlrs = j.borrow_mut();
+
+            jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
+                .scope(|mut frame| {
+                    type Foo = encode_as_constant_bytes!("Foo");
+                    type Env = tvars!(
+                        tvar!(Foo; Integer),
+                        tvar!('M'),
+                        tvar!('A'; AbstractArray<tvar!(Foo), tvar!('M')>)
+                    );
+                    type Ty = RefTypeConstructor<tvar!('A')>;
+
+                    let sym = Foo::symbol(&frame);
+                    assert_eq!(sym.as_str().unwrap(), "Foo");
+
+                    let env = Env::into_env(&mut frame);
+
+                    let unwrapped_ty = Ty::construct_type_with_env(&mut frame, &env);
+                    assert!(unwrapped_ty.is::<DataType>());
+                    let ty = unwrapped_ty
+                        .cast::<DataType>()
+                        .unwrap()
+                        .wrap_with_env(&mut frame, &env);
+
+                    assert!(ty.is::<UnionAll>());
+                    let ua = unsafe { ty.cast_unchecked::<UnionAll>() };
+
+                    assert_eq!(ua.var().name().as_str().unwrap(), "Foo");
+
+                    let body = ua.body().cast::<UnionAll>().unwrap();
+                    assert_eq!(body.var().name().as_str().unwrap(), "M");
+
+                    let body = body.body().cast::<UnionAll>().unwrap();
+                    assert_eq!(body.var().name().as_str().unwrap(), "A");
+
+                    let body = body.body();
+                    assert!(body.is::<DataType>());
+                    let dt = unsafe { body.cast_unchecked::<DataType>() };
+                    let param = dt.parameter(0).unwrap();
+
+                    assert!(param.is::<TypeVar>());
+                    let tvar = unsafe { param.cast_unchecked::<TypeVar>() };
+                    let env_param = env.get("A".to_symbol(&frame)).unwrap();
+
+                    assert_eq!(tvar.as_value(), env_param);
 
                     Ok(())
                 })
@@ -190,5 +253,6 @@ mod tests {
         construct_union_type();
         construct_union_type_three_variants();
         construct_union_type_overlapping_variants();
+        construct_with_env();
     }
 }

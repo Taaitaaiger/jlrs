@@ -1,5 +1,5 @@
 mod util;
-#[cfg(feature = "sync-rt")]
+#[cfg(feature = "local-rt")]
 mod tests {
     use jlrs::prelude::*;
 
@@ -10,13 +10,17 @@ mod tests {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
-            let out = jlrs.instance(&mut frame).scope(|mut frame| {
-                let output = frame.output();
+            let out = jlrs
+                .instance(&mut frame)
+                .returning::<JlrsResult<_>>()
+                .scope(|mut frame| {
+                    let output = frame.output();
 
-                frame
-                    .scope(|mut frame| frame.scope(|_| Ok(Value::new(output, 1usize))))?
-                    .unbox::<usize>()
-            });
+                    frame
+                        .returning::<JlrsResult<_>>()
+                        .scope(|mut frame| frame.scope(|_| Ok(Value::new(output, 1usize))))?
+                        .unbox::<usize>()
+                });
 
             assert_eq!(out.unwrap(), 1);
         });
@@ -27,21 +31,27 @@ mod tests {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
-            let out = jlrs.instance(&mut frame).scope(|mut frame| {
-                let output = frame.output();
+            let out = jlrs
+                .instance(&mut frame)
+                .returning::<JlrsResult<_>>()
+                .scope(|mut frame| {
+                    let output = frame.output();
 
-                frame
-                    .scope(|mut frame| {
-                        frame.scope(|mut frame| unsafe {
-                            let func = Module::base(&frame).function(&frame, "+")?.as_managed();
-                            let v1 = Value::new(frame.as_mut(), 1usize);
-                            let v2 = Value::new(frame.as_mut(), 2usize);
-                            Ok(func.call2(output, v1, v2))
-                        })
-                    })?
-                    .unwrap()
-                    .unbox::<usize>()
-            });
+                    frame
+                        .scope(|mut frame| {
+                            frame
+                                .returning::<JlrsResult<_>>()
+                                .scope(|mut frame| unsafe {
+                                    let func =
+                                        Module::base(&frame).function(&frame, "+")?.as_managed();
+                                    let v1 = Value::new(frame.as_mut(), 1usize);
+                                    let v2 = Value::new(frame.as_mut(), 2usize);
+                                    Ok(func.call2(output, v1, v2))
+                                })
+                        })?
+                        .unwrap()
+                        .unbox::<usize>()
+                });
 
             assert_eq!(out.unwrap(), 3);
         });

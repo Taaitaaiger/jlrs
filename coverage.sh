@@ -2,14 +2,13 @@
 
 set -euxo pipefail
 
-export JULIA_DIR=$HOME/julia-1.9.2
-export LD_LIBRARY_PATH=$JULIA_DIR/lib:$JULIA_DIR/lib/julia
+#export JULIA_DIR=$HOME/julia-1.9.3
+#export LD_LIBRARY_PATH=$JULIA_DIR/lib:$JULIA_DIR/lib/julia
 echo "backend: Gtk3Agg" > matplotlibrc
 
 cargo llvm-cov clean --workspace;
-cargo llvm-cov --features full,julia-1-9 --workspace --no-report
+cargo llvm-cov --features full,julia-1-11,ccall --workspace --no-report
 cargo llvm-cov --example ccall --no-report -- --test-threads=1
-cargo llvm-cov --example ccall_with_threads --no-report
 cargo llvm-cov run --example async_tasks --no-report
 cargo llvm-cov run --example call_julia --no-report
 cargo llvm-cov run --example fully_async_async_std --no-report

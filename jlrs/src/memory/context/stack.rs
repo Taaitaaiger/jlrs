@@ -10,19 +10,21 @@
 use std::{
     cell::{Cell, UnsafeCell},
     ffi::c_void,
+    fmt,
     ptr::{null_mut, NonNull},
 };
 
-use jl_sys::{jl_gc_wb, jl_tagged_gensym, jl_value_t};
+use jl_sys::{jl_tagged_gensym, jl_value_t, jlrs_gc_wb};
 use once_cell::sync::Lazy;
 
 use crate::{
     call::Call,
     data::{
-        managed::{module::JlrsCore, private::ManagedPriv, symbol::Symbol, value::Value, Managed},
+        managed::{module::Module, private::ManagedPriv, symbol::Symbol, value::Value, Managed},
         types::foreign_type::{create_foreign_type_nostack, ForeignType},
     },
-    memory::{stack_frame::PinnedFrame, target::unrooted::Unrooted, PTls},
+    memory::{target::unrooted::Unrooted, PTls},
+    prelude::LocalScope,
     private::Private,
 };
 
@@ -30,6 +32,16 @@ use crate::{
 #[derive(Default)]
 pub(crate) struct Stack {
     slots: UnsafeCell<Vec<Cell<*mut c_void>>>,
+}
+
+impl fmt::Debug for Stack {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let n_slots = unsafe { NonNull::new_unchecked(self.slots.get()).as_ref().capacity() };
+        f.debug_struct("Stack")
+            .field("addr", &self.slots.get())
+            .field("n_slots", &n_slots)
+            .finish()
+    }
 }
 
 // This is incorrect, Stack cannot be used from multiple threads, but ForeignType can only be
@@ -83,43 +95,51 @@ pub(crate) static STACK_TYPE_NAME: Lazy<StaticSymbol> = Lazy::new(|| unsafe {
 impl Stack {
     // Create the foreign type Stack in the JlrsCore module, or return immediately if it already
     // exists.
-    pub(crate) fn init<const N: usize>(frame: &PinnedFrame<N>) {
+    #[cfg_attr(
+        not(any(
+            feature = "local-rt",
+            feature = "async-rt",
+            feature = "multi-rt",
+            feature = "ccall"
+        )),
+        allow(unused)
+    )]
+    pub(crate) unsafe fn init() {
         unsafe {
             let unrooted = Unrooted::new();
-            let module = JlrsCore::module(&unrooted);
-            let sym = STACK_TYPE_NAME.as_symbol();
-            if module.global(&unrooted, sym).is_ok() {
-                return;
-            }
 
-            let lock_fn = module
-                .global(&unrooted, "lock_init_lock")
-                .unwrap()
-                .as_value();
+            unrooted.local_scope::<_, 1>(|mut frame| {
+                let module = Module::jlrs_core(&unrooted);
 
-            let unlock_fn = module
-                .global(&unrooted, "unlock_init_lock")
-                .unwrap()
-                .as_value();
+                let sym = STACK_TYPE_NAME.as_symbol();
+                if module.global(&unrooted, sym).is_ok() {
+                    return;
+                }
+                let lock_fn = module
+                    .global(&unrooted, "lock_init_lock")
+                    .unwrap()
+                    .as_value();
 
-            lock_fn.call0(unrooted).unwrap();
+                let unlock_fn = module
+                    .global(&unrooted, "unlock_init_lock")
+                    .unwrap()
+                    .as_value();
 
-            if module.global(unrooted, sym).is_ok() {
+                lock_fn.call0(unrooted).unwrap();
+
+                if module.global(unrooted, sym).is_ok() {
+                    unlock_fn.call0(unrooted).unwrap();
+                    return;
+                }
+
+                // Safety: create_foreign_type is called with the correct arguments, the new type is
+                // rooted until the constant has been set, and we've just checked if JlrsCore.Stack
+                // already exists.
+                let dt = create_foreign_type_nostack::<Self, _>(&mut frame, sym, module);
+                module.set_const_unchecked(sym, dt.as_value());
+
                 unlock_fn.call0(unrooted).unwrap();
-                return;
-            }
-
-            // Safety: create_foreign_type is called with the correct arguments, the new type is
-            // rooted until the constant has been set, and we've just checked if JlrsCore.Stack
-            // already exists.
-            let dt_ref = create_foreign_type_nostack::<Self, _>(unrooted, sym, module);
-            let ptr = dt_ref.ptr();
-            frame.set_sync_root(ptr.cast().as_ptr());
-
-            let dt = dt_ref.as_managed();
-            module.set_const_unchecked(sym, dt.as_value());
-
-            unlock_fn.call0(unrooted).unwrap();
+            });
         };
     }
 
@@ -135,7 +155,7 @@ impl Stack {
             slots.push(Cell::new(root.cast().as_ptr()));
         }
 
-        jl_gc_wb(self as *const _ as *mut _, root.as_ptr());
+        jlrs_gc_wb(self as *const _ as *mut _, root.as_ptr().cast());
     }
 
     // Reserve a slot on the stack.
@@ -170,7 +190,7 @@ impl Stack {
         // no active borrows.
         let slots = &*self.slots.get();
         slots[offset].set(root.cast().as_ptr());
-        jl_gc_wb(self as *const _ as *mut _, root.as_ptr());
+        jlrs_gc_wb(self as *const _ as *mut _, root.as_ptr().cast());
     }
 
     // Pop roots from the stack, the new length is `offset`.
@@ -198,6 +218,10 @@ impl Stack {
     // Create a new stack and move it to Julia.
     // Safety: root after allocating
     #[inline]
+    #[cfg_attr(
+        not(any(feature = "local-rt", feature = "async-rt", feature = "ccall")),
+        allow(unused)
+    )]
     pub(crate) unsafe fn alloc() -> *mut Self {
         let global = Unrooted::new();
         let stack = Value::new(global, Stack::default());

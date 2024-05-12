@@ -1,3 +1,4 @@
+mod constant_bytes;
 #[cfg(feature = "derive")]
 mod derive;
 #[cfg(feature = "ccall")]
@@ -10,7 +11,7 @@ use proc_macro::TokenStream;
 use self::derive::*;
 #[cfg(feature = "ccall")]
 use self::module::*;
-use self::version::emit_if_compatible;
+use self::{constant_bytes::*, version::emit_if_compatible};
 
 /// Export functions, types and constants defined in Rust as a Julia module.
 ///
@@ -21,7 +22,7 @@ use self::version::emit_if_compatible;
 /// The syntax is as follows:
 ///
 /// ```ignore
-/// julia_module! {
+/// julia_macro! {
 ///     // init_function_name is the name of the generated initialization function.
 ///     //
 ///     // The name of the generated function must be unique, it's recommended you prefix it with
@@ -34,16 +35,16 @@ use self::version::emit_if_compatible;
 ///     // The `as <exposed_name>` part is optional, by default the function is exported with the
 ///     // name it has in Rust, the exposed name can end in an exclamation mark.
 ///     //
-///     // A docstring can be provided with the doc attribute; if multiple functions are exported
+///     // A docstring can be provided with a doc comment; if multiple functions are exported
 ///     // with the same name it shoud only be documented once. All exported items can be
-///     // documented, a multi-line docstring can be created by providing multiple doc attributes
-///     // for the same item.
+///     // documented.
 ///     //
 ///     // If the function doesn't need to call into Julia, you can annotate it with `#[gc_safe]`
 ///     // to allow the GC to run without having to wait until the function has returned.
-///     #[doc = "    bar(arr::Array)"]
-///     #[doc = ""]
-///     #[doc = "Documentation for this function"]
+///
+///     ///     bar(arr::Array)
+///     ///
+///     /// Documentation for this function"]
 ///     #[gc_safe]
 ///     fn foo(arr: Array) -> usize as bar;
 ///
@@ -64,31 +65,12 @@ use self::version::emit_if_compatible;
 ///     // If a method takes `self` in some way, it is tracked by default. You can opt out of this
 ///     // behavior with the `#[untracked_self]` attribute.
 ///     #[untracked_self]
-///     in MyType fn add(&mut self, incr: u32) -> RustResultRet<u32>  as increment!;
-/// 
+///     in MyType fn add(&mut self, incr: u32) -> JlrsResult<u32>  as increment!;
+///
 ///     // Exports the alias `MyTypeAlias` for `MyType`.
 ///     //
 ///     // This is exposes as `const MyTypeAlias = MyType`.
 ///     type MyTypeAlias = MyType;
-///
-///     // Exports the function `long_running_func`, the returned closure is executed on another
-///     // thread.
-///     //
-///     // After dispatching the closure to another thread, the generated Julia function waits for
-///     // the closure to return using an `AsyncCondition`. Because the closure is executed on
-///     // another thread you can't call Julia functions or allocate Julia data from it, but it is
-///     // possible to (mutably) access Julia data by tracking it.
-///     //
-///     // In order to be able to use tracked data from the closure,  `Unbound` managed types must
-///     // be used. Only `(Typed)ValueUnbound` and `(Typed)ArrayUnbound` exist,  they're aliases
-///     // for `(Typed)Value` and `(Typed)Array` with static lifetimes. The generated Julia
-///     // function guarantees all data passed as an argument lives at least until the closure has
-///     // finished, the tracked data must only be shared with that closure.
-///     //
-///     // In practice calling a function annotated with `#[gc_safe]` is much more performant.
-///     async fn long_running_func(
-///         array: ArrayUnbound
-///     ) -> JlrsResult<impl AsyncCallback<i32>>;
 ///
 ///     // Exports `MY_CONST` as the constant `MY_CONST`, its type must implement `IntoJulia`.
 ///     // `MY_CONST` can be defined in Rust as either static or constant data, i.e. both
@@ -99,6 +81,21 @@ use self::version::emit_if_compatible;
 ///     // `MY_CONST` can be defined in Rust as either static or constant data, i.e. both
 ///     // `static MY_CONST: u8 = 1` and `const MY_CONST: u8 = 1` can be exposed this way.
 ///     static MY_CONST: u8 as MY_GLOBAL;
+///
+///     // You can loop over types to export types and functions multiple times with
+///     // different type parameters.
+///     for T in [f32, f64] {
+///         fn has_generic(t: T) -> T;
+///
+///         // POpaque<T> must implement `ParametricBase` and `ParametricVariant`.
+///         struct POpaque<T>;
+///
+///         in POpaque<T> fn new(value: T) -> TypedValueRet<POpaque<T>> as POpaque;
+///     }
+///
+///     // You can use an environment of type parameters to define generic functions.
+///     // type GenericEnv = tvars!(tvar!('T'; AbstractFloat), tvar!('N'), tvar!('A'; AbstractArray<tvar!('T'), tvar!('N')>));
+///     fn takes_generics_from_env(array: TypedValue<tvar!('A')>, data: TypedValue<tvar!('T')>) use GenericEnv;
 /// }
 /// ```
 ///
@@ -135,6 +132,16 @@ pub fn julia_module(item: TokenStream) -> TokenStream {
         Ok(a) => a,
         Err(b) => b.to_compile_error().into(),
     }
+}
+
+/// Encode the literal string passed to this macro as [`ConstantBytes`].
+///
+/// [`ConstantBytes`]: jlrs::data::types::construct_type::ConstantBytes
+#[proc_macro]
+pub fn encode_as_constant_bytes(item: TokenStream) -> TokenStream {
+    let s: syn::LitStr = syn::parse_macro_input!(item as syn::LitStr);
+    let input = s.value();
+    convert_to_constant_bytes(input)
 }
 
 /// Conditional compilation depending on the used version of Julia.

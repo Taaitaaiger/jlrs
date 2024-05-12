@@ -1,5 +1,5 @@
 mod util;
-#[cfg(feature = "sync-rt")]
+#[cfg(feature = "local-rt")]
 mod tests {
     use jlrs::prelude::*;
 
@@ -11,6 +11,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| unsafe {
                     let func = Value::eval_string(
                         &mut frame,
@@ -34,6 +35,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| unsafe {
                     let func = Value::eval_string(
                         &mut frame,
@@ -56,6 +58,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| unsafe {
                     let func = Module::base(&frame).function(&frame, "vect")?.as_managed();
                     func.call0(&mut frame).unwrap();
@@ -71,6 +74,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|frame| unsafe {
                     Module::base(&frame)
                         .function(&frame, "vect")?
@@ -90,9 +94,11 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
                     let output = frame.output();
                     frame
+                        .returning::<JlrsResult<_>>()
                         .scope(|frame| unsafe {
                             let func = Module::base(&frame).function(&frame, "vect")?.as_managed();
 
@@ -112,6 +118,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| unsafe {
                     let func = Module::base(&frame).function(&frame, "vect")?.as_managed();
                     func.call0(&mut frame).unwrap();
@@ -127,9 +134,11 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
                     let output = frame.output();
                     frame
+                        .returning::<JlrsResult<_>>()
                         .scope(|frame| unsafe {
                             let func = Module::base(&frame).function(&frame, "vect")?.as_managed();
 
@@ -147,12 +156,15 @@ mod tests {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
-            let out = jlrs.instance(&mut frame).scope(|mut frame| unsafe {
-                let func = Module::base(&frame).function(&frame, "cos")?.as_managed();
-                let angle = Value::new(&mut frame, std::f32::consts::PI);
-                let out = func.call1(&mut frame, angle).unwrap();
-                out.unbox::<f32>()
-            });
+            let out = jlrs
+                .instance(&mut frame)
+                .returning::<JlrsResult<_>>()
+                .scope(|mut frame| unsafe {
+                    let func = Module::base(&frame).function(&frame, "cos")?.as_managed();
+                    let angle = Value::new(&mut frame, std::f32::consts::PI);
+                    let out = func.call1(&mut frame, angle).unwrap();
+                    out.unbox::<f32>()
+                });
 
             assert_eq!(out.unwrap(), -1.);
         });
@@ -163,12 +175,15 @@ mod tests {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
-            let out = jlrs.instance(&mut frame).scope(|mut frame| unsafe {
-                let func = Module::base(&frame).function(&frame, "cos")?.as_managed();
-                let angle = Value::new(&mut frame, std::f32::consts::PI);
-                let out = func.call1(&frame, angle).unwrap();
-                out.as_managed().unbox::<f32>()
-            });
+            let out = jlrs
+                .instance(&mut frame)
+                .returning::<JlrsResult<_>>()
+                .scope(|mut frame| unsafe {
+                    let func = Module::base(&frame).function(&frame, "cos")?.as_managed();
+                    let angle = Value::new(&mut frame, std::f32::consts::PI);
+                    let out = func.call1(&frame, angle).unwrap();
+                    out.as_managed().unbox::<f32>()
+                });
 
             assert_eq!(out.unwrap(), -1.);
         });
@@ -180,9 +195,11 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| unsafe {
                     let output = frame.output();
                     let out = frame
+                        .returning::<JlrsResult<_>>()
                         .scope(|mut frame| {
                             let func = Module::base(&frame).function(&frame, "cos")?.as_managed();
                             let angle = Value::new(&mut frame, std::f32::consts::PI);
@@ -204,6 +221,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
                     let output = frame.output();
                     let out = frame
@@ -227,6 +245,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
                     let output = frame.output();
                     let out = frame
@@ -249,13 +268,16 @@ mod tests {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
-            let out = jlrs.instance(&mut frame).scope(|mut frame| unsafe {
-                let func = Module::base(&frame).function(&frame, "+")?.as_managed();
-                let arg0 = Value::new(&mut frame, 1u32);
-                let arg1 = Value::new(&mut frame, 2u32);
-                let out = func.call2(&mut frame, arg0, arg1).unwrap();
-                out.unbox::<u32>()
-            });
+            let out = jlrs
+                .instance(&mut frame)
+                .returning::<JlrsResult<_>>()
+                .scope(|mut frame| unsafe {
+                    let func = Module::base(&frame).function(&frame, "+")?.as_managed();
+                    let arg0 = Value::new(&mut frame, 1u32);
+                    let arg1 = Value::new(&mut frame, 2u32);
+                    let out = func.call2(&mut frame, arg0, arg1).unwrap();
+                    out.unbox::<u32>()
+                });
 
             assert_eq!(out.unwrap(), 3);
         });
@@ -266,13 +288,16 @@ mod tests {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
-            let out = jlrs.instance(&mut frame).scope(|mut frame| unsafe {
-                let func = Module::base(&frame).function(&frame, "+")?.as_managed();
-                let arg0 = Value::new(&mut frame, 1u32);
-                let arg1 = Value::new(&mut frame, 2u32);
-                let out = func.call2(&frame, arg0, arg1).unwrap();
-                out.as_managed().unbox::<u32>()
-            });
+            let out = jlrs
+                .instance(&mut frame)
+                .returning::<JlrsResult<_>>()
+                .scope(|mut frame| unsafe {
+                    let func = Module::base(&frame).function(&frame, "+")?.as_managed();
+                    let arg0 = Value::new(&mut frame, 1u32);
+                    let arg1 = Value::new(&mut frame, 2u32);
+                    let out = func.call2(&frame, arg0, arg1).unwrap();
+                    out.as_managed().unbox::<u32>()
+                });
 
             assert_eq!(out.unwrap(), 3);
         });
@@ -283,19 +308,23 @@ mod tests {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
-            let out = jlrs.instance(&mut frame).scope(|mut frame| unsafe {
-                let arg0 = Value::new(&mut frame, 1u32);
+            let out = jlrs
+                .instance(&mut frame)
+                .returning::<JlrsResult<_>>()
+                .scope(|mut frame| unsafe {
+                    let arg0 = Value::new(&mut frame, 1u32);
 
-                let output = frame.output();
-                frame
-                    .scope(|mut frame| {
-                        let func = Module::base(&frame).function(&frame, "+")?.as_managed();
-                        let arg1 = Value::new(&mut frame, 2u32);
-                        Ok(func.call(output, [arg0, arg1]))
-                    })?
-                    .into_jlrs_result()?
-                    .unbox::<u32>()
-            });
+                    let output = frame.output();
+                    frame
+                        .returning::<JlrsResult<_>>()
+                        .scope(|mut frame| {
+                            let func = Module::base(&frame).function(&frame, "+")?.as_managed();
+                            let arg1 = Value::new(&mut frame, 2u32);
+                            Ok(func.call(output, [arg0, arg1]))
+                        })?
+                        .into_jlrs_result()?
+                        .unbox::<u32>()
+                });
 
             assert_eq!(out.unwrap(), 3);
         });
@@ -306,19 +335,23 @@ mod tests {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
-            let out = jlrs.instance(&mut frame).scope(|mut frame| {
-                let output = frame.output();
-                frame
-                    .scope(|mut frame| unsafe {
-                        let func = Module::base(&frame).function(&frame, "+")?.as_managed();
-                        let arg0 = Value::new(&mut frame, 1u32);
-                        let arg1 = Value::new(&mut frame, 2u32);
+            let out = jlrs
+                .instance(&mut frame)
+                .returning::<JlrsResult<_>>()
+                .scope(|mut frame| {
+                    let output = frame.output();
+                    frame
+                        .returning::<JlrsResult<_>>()
+                        .scope(|mut frame| unsafe {
+                            let func = Module::base(&frame).function(&frame, "+")?.as_managed();
+                            let arg0 = Value::new(&mut frame, 1u32);
+                            let arg1 = Value::new(&mut frame, 2u32);
 
-                        Ok(func.call2(output, arg0, arg1))
-                    })?
-                    .unwrap()
-                    .unbox::<u32>()
-            });
+                            Ok(func.call2(output, arg0, arg1))
+                        })?
+                        .unwrap()
+                        .unbox::<u32>()
+                });
 
             assert_eq!(out.unwrap(), 3);
         });
@@ -329,13 +362,16 @@ mod tests {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
-            let out = jlrs.instance(&mut frame).scope(|mut frame| unsafe {
-                let func = Module::base(&frame).function(&frame, "+")?.as_managed();
-                let arg0 = Value::new(&mut frame, 1u32);
-                let arg1 = Value::new(&mut frame, 2u32);
-                let out = func.call2(&mut frame, arg0, arg1).unwrap();
-                out.unbox::<u32>()
-            });
+            let out = jlrs
+                .instance(&mut frame)
+                .returning::<JlrsResult<_>>()
+                .scope(|mut frame| unsafe {
+                    let func = Module::base(&frame).function(&frame, "+")?.as_managed();
+                    let arg0 = Value::new(&mut frame, 1u32);
+                    let arg1 = Value::new(&mut frame, 2u32);
+                    let out = func.call2(&mut frame, arg0, arg1).unwrap();
+                    out.unbox::<u32>()
+                });
 
             assert_eq!(out.unwrap(), 3);
         });
@@ -346,19 +382,23 @@ mod tests {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
-            let out = jlrs.instance(&mut frame).scope(|mut frame| {
-                let output = frame.output();
-                frame
-                    .scope(|mut frame| unsafe {
-                        let func = Module::base(&frame).function(&frame, "+")?.as_managed();
-                        let arg0 = Value::new(&mut frame, 1u32);
-                        let arg1 = Value::new(&mut frame, 2u32);
+            let out = jlrs
+                .instance(&mut frame)
+                .returning::<JlrsResult<_>>()
+                .scope(|mut frame| {
+                    let output = frame.output();
+                    frame
+                        .returning::<JlrsResult<_>>()
+                        .scope(|mut frame| unsafe {
+                            let func = Module::base(&frame).function(&frame, "+")?.as_managed();
+                            let arg0 = Value::new(&mut frame, 1u32);
+                            let arg1 = Value::new(&mut frame, 2u32);
 
-                        Ok(func.call2(output, arg0, arg1))
-                    })?
-                    .unwrap()
-                    .unbox::<u32>()
-            });
+                            Ok(func.call2(output, arg0, arg1))
+                        })?
+                        .unwrap()
+                        .unbox::<u32>()
+                });
 
             assert_eq!(out.unwrap(), 3);
         });
@@ -369,14 +409,17 @@ mod tests {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
-            let out = jlrs.instance(&mut frame).scope(|mut frame| unsafe {
-                let func = Module::base(&frame).function(&frame, "+")?.as_managed();
-                let arg0 = Value::new(&mut frame, 1u32);
-                let arg1 = Value::new(&mut frame, 2u32);
-                let arg2 = Value::new(&mut frame, 3u32);
-                let out = func.call3(&mut frame, arg0, arg1, arg2).unwrap();
-                out.unbox::<u32>()
-            });
+            let out = jlrs
+                .instance(&mut frame)
+                .returning::<JlrsResult<_>>()
+                .scope(|mut frame| unsafe {
+                    let func = Module::base(&frame).function(&frame, "+")?.as_managed();
+                    let arg0 = Value::new(&mut frame, 1u32);
+                    let arg1 = Value::new(&mut frame, 2u32);
+                    let arg2 = Value::new(&mut frame, 3u32);
+                    let out = func.call3(&mut frame, arg0, arg1, arg2).unwrap();
+                    out.unbox::<u32>()
+                });
 
             assert_eq!(out.unwrap(), 6);
         });
@@ -387,14 +430,17 @@ mod tests {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
-            let out = jlrs.instance(&mut frame).scope(|mut frame| unsafe {
-                let func = Module::base(&frame).function(&frame, "+")?.as_managed();
-                let arg0 = Value::new(&mut frame, 1u32);
-                let arg1 = Value::new(&mut frame, 2u32);
-                let arg2 = Value::new(&mut frame, 3u32);
-                let out = func.call3(&frame, arg0, arg1, arg2).unwrap();
-                out.as_managed().unbox::<u32>()
-            });
+            let out = jlrs
+                .instance(&mut frame)
+                .returning::<JlrsResult<_>>()
+                .scope(|mut frame| unsafe {
+                    let func = Module::base(&frame).function(&frame, "+")?.as_managed();
+                    let arg0 = Value::new(&mut frame, 1u32);
+                    let arg1 = Value::new(&mut frame, 2u32);
+                    let arg2 = Value::new(&mut frame, 3u32);
+                    let out = func.call3(&frame, arg0, arg1, arg2).unwrap();
+                    out.as_managed().unbox::<u32>()
+                });
 
             assert_eq!(out.unwrap(), 6);
         });
@@ -405,20 +451,24 @@ mod tests {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
-            let out = jlrs.instance(&mut frame).scope(|mut frame| {
-                let output = frame.output();
-                frame
-                    .scope(|mut frame| unsafe {
-                        let func = Module::base(&frame).function(&frame, "+")?.as_managed();
-                        let arg0 = Value::new(&mut frame, 1u32);
-                        let arg1 = Value::new(&mut frame, 2u32);
-                        let arg2 = Value::new(&mut frame, 3u32);
+            let out = jlrs
+                .instance(&mut frame)
+                .returning::<JlrsResult<_>>()
+                .scope(|mut frame| {
+                    let output = frame.output();
+                    frame
+                        .returning::<JlrsResult<_>>()
+                        .scope(|mut frame| unsafe {
+                            let func = Module::base(&frame).function(&frame, "+")?.as_managed();
+                            let arg0 = Value::new(&mut frame, 1u32);
+                            let arg1 = Value::new(&mut frame, 2u32);
+                            let arg2 = Value::new(&mut frame, 3u32);
 
-                        Ok(func.call3(output, arg0, arg1, arg2))
-                    })?
-                    .unwrap()
-                    .unbox::<u32>()
-            });
+                            Ok(func.call3(output, arg0, arg1, arg2))
+                        })?
+                        .unwrap()
+                        .unbox::<u32>()
+                });
 
             assert_eq!(out.unwrap(), 6);
         });
@@ -429,14 +479,17 @@ mod tests {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
-            let out = jlrs.instance(&mut frame).scope(|mut frame| unsafe {
-                let func = Module::base(&frame).function(&frame, "+")?.as_managed();
-                let arg0 = Value::new(&mut frame, 1u32);
-                let arg1 = Value::new(&mut frame, 2u32);
-                let arg2 = Value::new(&mut frame, 3u32);
-                let out = func.call3(&mut frame, arg0, arg1, arg2).unwrap();
-                out.unbox::<u32>()
-            });
+            let out = jlrs
+                .instance(&mut frame)
+                .returning::<JlrsResult<_>>()
+                .scope(|mut frame| unsafe {
+                    let func = Module::base(&frame).function(&frame, "+")?.as_managed();
+                    let arg0 = Value::new(&mut frame, 1u32);
+                    let arg1 = Value::new(&mut frame, 2u32);
+                    let arg2 = Value::new(&mut frame, 3u32);
+                    let out = func.call3(&mut frame, arg0, arg1, arg2).unwrap();
+                    out.unbox::<u32>()
+                });
 
             assert_eq!(out.unwrap(), 6);
         });
@@ -447,20 +500,24 @@ mod tests {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
-            let out = jlrs.instance(&mut frame).scope(|mut frame| {
-                let output = frame.output();
-                frame
-                    .scope(|mut frame| unsafe {
-                        let func = Module::base(&frame).function(&frame, "+")?.as_managed();
-                        let arg0 = Value::new(&mut frame, 1u32);
-                        let arg1 = Value::new(&mut frame, 2u32);
-                        let arg2 = Value::new(&mut frame, 3u32);
+            let out = jlrs
+                .instance(&mut frame)
+                .returning::<JlrsResult<_>>()
+                .scope(|mut frame| {
+                    let output = frame.output();
+                    frame
+                        .returning::<JlrsResult<_>>()
+                        .scope(|mut frame| unsafe {
+                            let func = Module::base(&frame).function(&frame, "+")?.as_managed();
+                            let arg0 = Value::new(&mut frame, 1u32);
+                            let arg1 = Value::new(&mut frame, 2u32);
+                            let arg2 = Value::new(&mut frame, 3u32);
 
-                        Ok(func.call3(output, arg0, arg1, arg2))
-                    })?
-                    .unwrap()
-                    .unbox::<u32>()
-            });
+                            Ok(func.call3(output, arg0, arg1, arg2))
+                        })?
+                        .unwrap()
+                        .unbox::<u32>()
+                });
 
             assert_eq!(out.unwrap(), 6);
         });
@@ -471,15 +528,18 @@ mod tests {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
-            let out = jlrs.instance(&mut frame).scope(|mut frame| unsafe {
-                let func = Module::base(&frame).function(&frame, "+")?.as_managed();
-                let arg0 = Value::new(&mut frame, 1u32);
-                let arg1 = Value::new(&mut frame, 2u32);
-                let arg2 = Value::new(&mut frame, 3u32);
-                let arg3 = Value::new(&mut frame, 4u32);
-                let out = func.call(&mut frame, [arg0, arg1, arg2, arg3]).unwrap();
-                out.unbox::<u32>()
-            });
+            let out = jlrs
+                .instance(&mut frame)
+                .returning::<JlrsResult<_>>()
+                .scope(|mut frame| unsafe {
+                    let func = Module::base(&frame).function(&frame, "+")?.as_managed();
+                    let arg0 = Value::new(&mut frame, 1u32);
+                    let arg1 = Value::new(&mut frame, 2u32);
+                    let arg2 = Value::new(&mut frame, 3u32);
+                    let arg3 = Value::new(&mut frame, 4u32);
+                    let out = func.call(&mut frame, [arg0, arg1, arg2, arg3]).unwrap();
+                    out.unbox::<u32>()
+                });
 
             assert_eq!(out.unwrap(), 10);
         });
@@ -490,15 +550,18 @@ mod tests {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
-            let out = jlrs.instance(&mut frame).scope(|mut frame| unsafe {
-                let func = Module::base(&frame).function(&frame, "+")?.as_managed();
-                let arg0 = Value::new(&mut frame, 1u32);
-                let arg1 = Value::new(&mut frame, 2u32);
-                let arg2 = Value::new(&mut frame, 3u32);
-                let arg3 = Value::new(&mut frame, 4u32);
-                let out = func.call(&frame, [arg0, arg1, arg2, arg3]).unwrap();
-                out.as_managed().unbox::<u32>()
-            });
+            let out = jlrs
+                .instance(&mut frame)
+                .returning::<JlrsResult<_>>()
+                .scope(|mut frame| unsafe {
+                    let func = Module::base(&frame).function(&frame, "+")?.as_managed();
+                    let arg0 = Value::new(&mut frame, 1u32);
+                    let arg1 = Value::new(&mut frame, 2u32);
+                    let arg2 = Value::new(&mut frame, 3u32);
+                    let arg3 = Value::new(&mut frame, 4u32);
+                    let out = func.call(&frame, [arg0, arg1, arg2, arg3]).unwrap();
+                    out.as_managed().unbox::<u32>()
+                });
 
             assert_eq!(out.unwrap(), 10);
         });
@@ -509,21 +572,25 @@ mod tests {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
-            let out = jlrs.instance(&mut frame).scope(|mut frame| {
-                let output = frame.output();
-                frame
-                    .scope(|mut frame| unsafe {
-                        let func = Module::base(&frame).function(&frame, "+")?.as_managed();
-                        let arg0 = Value::new(&mut frame, 1u32);
-                        let arg1 = Value::new(&mut frame, 2u32);
-                        let arg2 = Value::new(&mut frame, 3u32);
-                        let arg3 = Value::new(&mut frame, 4u32);
+            let out = jlrs
+                .instance(&mut frame)
+                .returning::<JlrsResult<_>>()
+                .scope(|mut frame| {
+                    let output = frame.output();
+                    frame
+                        .returning::<JlrsResult<_>>()
+                        .scope(|mut frame| unsafe {
+                            let func = Module::base(&frame).function(&frame, "+")?.as_managed();
+                            let arg0 = Value::new(&mut frame, 1u32);
+                            let arg1 = Value::new(&mut frame, 2u32);
+                            let arg2 = Value::new(&mut frame, 3u32);
+                            let arg3 = Value::new(&mut frame, 4u32);
 
-                        Ok(func.call(output, [arg0, arg1, arg2, arg3]))
-                    })?
-                    .unwrap()
-                    .unbox::<u32>()
-            });
+                            Ok(func.call(output, [arg0, arg1, arg2, arg3]))
+                        })?
+                        .unwrap()
+                        .unbox::<u32>()
+                });
 
             assert_eq!(out.unwrap(), 10);
         });
@@ -534,21 +601,25 @@ mod tests {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
-            let out = jlrs.instance(&mut frame).scope(|mut frame| {
-                let output = frame.output();
-                frame
-                    .scope(|mut frame| unsafe {
-                        let func = Module::base(&frame).function(&frame, "+")?.as_managed();
-                        let arg0 = Value::new(&mut frame, 1u32);
-                        let arg1 = Value::new(&mut frame, 2u32);
-                        let arg2 = Value::new(&mut frame, 3u32);
-                        let arg3 = Value::new(&mut frame, 4u32);
+            let out = jlrs
+                .instance(&mut frame)
+                .returning::<JlrsResult<_>>()
+                .scope(|mut frame| {
+                    let output = frame.output();
+                    frame
+                        .returning::<JlrsResult<_>>()
+                        .scope(|mut frame| unsafe {
+                            let func = Module::base(&frame).function(&frame, "+")?.as_managed();
+                            let arg0 = Value::new(&mut frame, 1u32);
+                            let arg1 = Value::new(&mut frame, 2u32);
+                            let arg2 = Value::new(&mut frame, 3u32);
+                            let arg3 = Value::new(&mut frame, 4u32);
 
-                        Ok(func.call(output, [arg0, arg1, arg2, arg3]))
-                    })?
-                    .unwrap()
-                    .unbox::<u32>()
-            });
+                            Ok(func.call(output, [arg0, arg1, arg2, arg3]))
+                        })?
+                        .unwrap()
+                        .unbox::<u32>()
+                });
 
             assert_eq!(out.unwrap(), 10);
         });
@@ -559,21 +630,25 @@ mod tests {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
-            let out = jlrs.instance(&mut frame).scope(|mut frame| {
-                let output = frame.output();
-                frame
-                    .scope(|mut frame| unsafe {
-                        let func = Module::base(&frame).function(&frame, "+")?.as_managed();
-                        let arg0 = Value::new(&mut frame, 1u32);
-                        let arg1 = Value::new(&mut frame, 2u32);
-                        let arg2 = Value::new(&mut frame, 3u32);
-                        let arg3 = Value::new(&mut frame, 4u32);
+            let out = jlrs
+                .instance(&mut frame)
+                .returning::<JlrsResult<_>>()
+                .scope(|mut frame| {
+                    let output = frame.output();
+                    frame
+                        .returning::<JlrsResult<_>>()
+                        .scope(|mut frame| unsafe {
+                            let func = Module::base(&frame).function(&frame, "+")?.as_managed();
+                            let arg0 = Value::new(&mut frame, 1u32);
+                            let arg1 = Value::new(&mut frame, 2u32);
+                            let arg2 = Value::new(&mut frame, 3u32);
+                            let arg3 = Value::new(&mut frame, 4u32);
 
-                        Ok(func.clone().call(output, [arg0, arg1, arg2, arg3]))
-                    })?
-                    .unwrap()
-                    .unbox::<u32>()
-            });
+                            Ok(func.clone().call(output, [arg0, arg1, arg2, arg3]))
+                        })?
+                        .unwrap()
+                        .unbox::<u32>()
+                });
 
             assert_eq!(out.unwrap(), 10);
         });

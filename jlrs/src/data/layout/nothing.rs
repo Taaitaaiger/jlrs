@@ -26,9 +26,9 @@ unsafe impl Unbox for Nothing {
 
 unsafe impl IntoJulia for Nothing {
     #[inline]
-    fn julia_type<'scope, T>(target: T) -> DataTypeData<'scope, T>
+    fn julia_type<'scope, Tgt>(target: Tgt) -> DataTypeData<'scope, Tgt>
     where
-        T: Target<'scope>,
+        Tgt: Target<'scope>,
     {
         DataType::nothing_type(&target).root(target)
     }

@@ -1,5 +1,5 @@
 mod util;
-#[cfg(feature = "sync-rt")]
+#[cfg(feature = "local-rt")]
 mod tests {
     use jlrs::prelude::*;
 
@@ -17,7 +17,7 @@ mod tests {
     }
 
     fn cannot_init_again() {
-        JULIA.with(|_j| unsafe { assert!(RuntimeBuilder::new().start().is_err()) });
+        JULIA.with(|_j| assert!(Builder::new().start_local().is_err()));
     }
 
     fn include_error() {

@@ -24,14 +24,14 @@
 
 use std::ptr::NonNull;
 
-use super::{union_all::UnionAll, Managed};
+use super::{union_all::UnionAll, value::typed::TypedValueRet, Managed};
 use crate::{
-    convert::ccall_types::CCallArg,
+    convert::ccall_types::{CCallArg, CCallReturn},
     data::{
         layout::valid_layout::ValidLayout,
         managed::{datatype::DataType, value::Value},
         types::{
-            abstract_types::{AnyType, RefTypeConstructor},
+            abstract_type::{AnyType, RefTypeConstructor},
             construct_type::ConstructType,
             typecheck::Typecheck,
         },
@@ -338,4 +338,35 @@ where
 unsafe impl<'scope, T: ConstructType> CCallArg for CCallRef<'scope, T> {
     type CCallArgType = RefTypeConstructor<T>;
     type FunctionArgType = T;
+}
+
+/// A `Ref` used as the return type of a `ccall`ed function.
+///
+/// When this type is returned by a function exported with the `julia_module` macro, the
+/// generated Julia function will contain a `ccall` invocation that returns `Ref{T}`, while
+/// `TypedValueRet<T>` would lead to a `ccall` invocation that returns `Any`.
+#[repr(transparent)]
+pub struct CCallRefRet<T: ConstructType>(TypedValueRet<T>);
+
+impl<T: ConstructType> CCallRefRet<T> {
+    /// Convert a `TypedValueRet<T>` to a `CCallRefRet<T>`.
+    pub fn new(value: TypedValueRet<T>) -> Self {
+        CCallRefRet(value)
+    }
+
+    pub fn into_typed_value(self) -> TypedValueRet<T> {
+        self.0
+    }
+}
+
+unsafe impl<T: ConstructType> CCallReturn for CCallRefRet<T> {
+    type FunctionReturnType = T;
+
+    type CCallReturnType = RefTypeConstructor<T>;
+
+    type ReturnAs = Self;
+
+    unsafe fn return_or_throw(self) -> Self::ReturnAs {
+        self
+    }
 }

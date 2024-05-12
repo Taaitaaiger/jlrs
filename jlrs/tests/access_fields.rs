@@ -1,5 +1,5 @@
 mod util;
-#[cfg(feature = "sync-rt")]
+#[cfg(feature = "local-rt")]
 mod tests {
     #[cfg(not(feature = "julia-1-6"))]
     use std::sync::atomic::Ordering;
@@ -17,6 +17,7 @@ mod tests {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| unsafe {
                     let mut tys = [Value::new(&mut frame, 0usize)];
                     let res = Module::main(&frame)
@@ -46,6 +47,7 @@ mod tests {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| unsafe {
                     // Returns (1, 2, 3) as Tuple{UInt32, UInt16, Int64}
                     let func = Module::main(&frame)
@@ -77,6 +79,7 @@ mod tests {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| unsafe {
                     // Returns (1, 2, 3) as Tuple{UInt32, UInt16, Int64}
                     let func = Module::main(&frame)
@@ -98,6 +101,7 @@ mod tests {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| unsafe {
                     // Returns (1, 2, 3) as Tuple{UInt32, UInt16, Int64}
                     let func = Module::main(&frame)
@@ -119,6 +123,7 @@ mod tests {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| unsafe {
                     //mutable struct MutableStruct
                     //  x
@@ -160,6 +165,7 @@ mod tests {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| unsafe {
                     //mutable struct MutableStruct
                     //  x
@@ -194,16 +200,17 @@ mod tests {
 
             let oob_idx = jlrs
                 .instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| unsafe {
                     let idx = Value::new(&mut frame, 4usize);
                     let data = vec![1.0f64, 2., 3.];
-                    let array = Array::from_vec_unchecked(&mut frame, data, 3)?;
+                    let array = TypedArray::<f64>::from_vec_unchecked(&mut frame, data, 3);
                     let func = Module::base(&frame)
                         .function(&frame, "getindex")?
                         .as_managed();
                     let out = func.call2(&mut frame, array.as_value(), idx).unwrap_err();
 
-                    assert_eq!(out.datatype_name().unwrap(), "BoundsError");
+                    assert_eq!(out.datatype_name(), "BoundsError");
 
                     let field_names = out.field_names();
                     let f0: String = field_names[0].as_string().unwrap();
@@ -229,10 +236,13 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| unsafe {
                     let idx = Value::new(&mut frame, 4usize);
                     let data = vec![1.0f64, 2., 3.];
-                    let array = Array::from_vec_unchecked(&mut frame, data, 3)?;
+                    let array =
+                        TypedArray::<f64>::from_vec(&mut frame, data, 3)?.into_jlrs_result()?;
+
                     let func = Module::base(&frame)
                         .function(&frame, "getindex")?
                         .as_managed();
@@ -255,10 +265,12 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| unsafe {
                     let idx = Value::new(&mut frame, 4usize);
                     let data = vec![1.0f64, 2., 3.];
-                    let array = Array::from_vec_unchecked(&mut frame, data, 3)?;
+                    let ty = DataType::float64_type(&frame);
+                    let array = Array::from_vec_for_unchecked(&mut frame, ty.as_value(), data, 3);
                     let func = Module::base(&frame)
                         .function(&frame, "getindex")?
                         .as_managed();
@@ -283,10 +295,11 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| unsafe {
                     let idx = Value::new(&mut frame, 4usize);
                     let data = vec![1.0f64, 2., 3.];
-                    let array = Array::from_vec_unchecked(&mut frame, data, 3)?;
+                    let array = TypedArray::<f64>::from_vec_unchecked(&mut frame, data, 3);
                     let func = Module::base(&frame)
                         .function(&frame, "getindex")?
                         .as_managed();
@@ -311,6 +324,7 @@ mod tests {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| unsafe {
                     let value = Value::eval_string(&mut frame, MIXED_BAG_JL)
                         .into_jlrs_result()?

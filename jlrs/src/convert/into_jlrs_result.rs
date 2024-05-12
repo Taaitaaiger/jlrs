@@ -1,19 +1,15 @@
-//! Convert a `JuliaResult` to a `JlrsResult`.
-//!
-//! A `JuliaResult` contains an exception in its `Err` variant, if you're only interested in
-//! the error message you can convert it to a `JlrsException` with the [`IntoJlrsResult`] trait
-//! defined in this module.
+//! Convert data to a `JlrsResult`.
 
 use crate::{
     data::managed::Managed,
     error::{JlrsError, JlrsResult, JuliaResult, CANNOT_DISPLAY_VALUE},
 };
 
-/// Extension trait that lets you convert a `JuliaResult` to a `JlrsResult`.
+/// Convert data to a `JlrsResult`.
 ///
-/// If an exception is thrown, this trait's only method converts the exception to an error message
-/// by calling `Base.showerror`.
-pub trait IntoJlrsResult<T>: private::IntoJlrsResultPriv {
+/// By default this trait is only implemented for `JuliaResult`. If an exception is thrown, it's
+/// converted to an error message by calling `Base.showerror`.
+pub trait IntoJlrsResult<T> {
     /// Convert `self` to `JlrsResult` by calling `Base.showerror` if an exception has been
     /// thrown.
     fn into_jlrs_result(self) -> JlrsResult<T>;
@@ -27,11 +23,4 @@ impl<T> IntoJlrsResult<T> for JuliaResult<'_, '_, T> {
             Err(e) => JlrsError::exception_error(e.error_string_or(CANNOT_DISPLAY_VALUE))?,
         }
     }
-}
-
-mod private {
-    use crate::error::JuliaResult;
-
-    pub trait IntoJlrsResultPriv {}
-    impl<T> IntoJlrsResultPriv for JuliaResult<'_, '_, T> {}
 }

@@ -6,10 +6,10 @@ use crate::data::managed::array::dimensions::{Dimensions, Dims};
 
 /// An n-dimensional array whose contents have been copied from Julia to Rust.
 ///
-/// You can create this struct by calling [`Array::copy_inline_data`]. The data has a column-major
+/// You can create this struct by calling [`BitsAccessor::to_copied_array`]. The data has a column-major
 /// order and can be indexed with anything that implements [`Dims`].
 ///
-/// [`Array::copy_inline_data`]: crate::data::managed::array::Array::copy_inline_data
+/// [`BitsAccessor::to_copied_array`]: crate::data::managed::array::data::accessor::BitsAccessor::to_copied_array
 #[derive(Debug)]
 pub struct CopiedArray<T> {
     data: Box<[T]>,
@@ -30,13 +30,13 @@ impl<T> CopiedArray<T> {
     /// Returns a reference to the element at the given n-dimensional index if the index is valid,
     /// `None` otherwise.
     pub fn get<D: Dims>(&self, idx: D) -> Option<&T> {
-        Some(&self.data[self.dimensions.index_of(&idx).ok()?])
+        Some(&self.data[self.dimensions.index_of(&idx).unwrap()])
     }
 
     /// Returns a mutable reference to the element at the given n-dimensional index if the index
     /// is valid, `None` otherwise.
     pub fn get_mut<D: Dims>(&mut self, idx: D) -> Option<&mut T> {
-        Some(&mut self.data[self.dimensions.index_of(&idx).ok()?])
+        Some(&mut self.data[self.dimensions.index_of(&idx).unwrap()])
     }
 
     /// Returns the array's data as a slice, the data is in column-major order.

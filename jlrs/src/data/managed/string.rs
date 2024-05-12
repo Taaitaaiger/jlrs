@@ -4,12 +4,11 @@ use std::{
     ffi::CStr,
     fmt::{Debug, Formatter, Result as FmtResult},
     marker::PhantomData,
-    mem,
     ptr::NonNull,
     str,
 };
 
-use jl_sys::{jl_pchar_to_string, jl_string_type};
+use jl_sys::{jl_pchar_to_string, jl_string_ptr, jl_string_type, jlrs_string_len};
 
 use super::Ref;
 use crate::{
@@ -29,10 +28,10 @@ pub struct JuliaString<'scope>(*const u8, PhantomData<&'scope ()>);
 impl<'scope> JuliaString<'scope> {
     /// Create a new Julia string.
     #[inline]
-    pub fn new<'target, V, T>(target: T, string: V) -> StringData<'target, T>
+    pub fn new<'target, V, Tgt>(target: Tgt, string: V) -> StringData<'target, Tgt>
     where
         V: AsRef<str>,
-        T: Target<'target>,
+        Tgt: Target<'target>,
     {
         let str_ref = string.as_ref();
         let len = str_ref.len();
@@ -45,10 +44,10 @@ impl<'scope> JuliaString<'scope> {
 
     /// Create a new Julia string.
     #[inline]
-    pub fn new_bytes<'target, V, T>(target: T, bytes: V) -> StringData<'target, T>
+    pub fn new_bytes<'target, V, Tgt>(target: Tgt, bytes: V) -> StringData<'target, Tgt>
     where
         V: AsRef<[u8]>,
-        T: Target<'target>,
+        Tgt: Target<'target>,
     {
         let bytes_ref = bytes.as_ref();
         let len = bytes_ref.len();
@@ -64,7 +63,7 @@ impl<'scope> JuliaString<'scope> {
     pub fn len(self) -> usize {
         // Safety: the pointer points to valid data, the length of the array is stored at the
         // beginning
-        unsafe { *self.0.cast() }
+        unsafe { jlrs_string_len(self.unwrap(Private).cast()) }
     }
 
     /// Returns the string as a `CStr`.
@@ -72,8 +71,8 @@ impl<'scope> JuliaString<'scope> {
     pub fn as_c_str(self) -> &'scope CStr {
         // Safety: The string is terminated with a null character.
         unsafe {
-            let str_begin = self.0.add(mem::size_of::<usize>());
-            CStr::from_ptr(str_begin.cast())
+            let str_begin = jl_string_ptr(self.unwrap(Private).cast());
+            CStr::from_ptr(str_begin)
         }
     }
 
@@ -82,7 +81,7 @@ impl<'scope> JuliaString<'scope> {
     pub fn as_bytes(self) -> &'scope [u8] {
         unsafe {
             let len = self.len();
-            let str_begin = self.0.add(mem::size_of::<usize>());
+            let str_begin = jl_string_ptr(self.unwrap(Private).cast()).cast();
             std::slice::from_raw_parts(str_begin, len)
         }
     }
@@ -108,6 +107,8 @@ impl_construct_type_managed!(JuliaString, 1, jl_string_type);
 impl_julia_typecheck!(JuliaString<'scope>, jl_string_type, 'scope);
 
 unsafe impl Unbox for String {
+    // Julia strings may contain null bytes, so unbox as Vec<u8> if it isn't a valid string,
+    // instead of unboxing as CString in general to account for those bytes.
     type Output = Result<String, Vec<u8>>;
     #[inline]
     unsafe fn unbox(value: Value) -> Self::Output {
@@ -127,7 +128,7 @@ impl Debug for JuliaString<'_> {
 
 impl<'scope> ManagedPriv<'scope, '_> for JuliaString<'scope> {
     type Wraps = u8;
-    type TypeConstructorPriv<'target, 'da> = JuliaString<'target>;
+    type WithLifetimes<'target, 'da> = JuliaString<'target>;
     const NAME: &'static str = "String";
 
     // Safety: `inner` must not have been freed yet, the result must never be
@@ -154,11 +155,12 @@ impl_valid_layout!(StringRef, JuliaString, jl_string_type);
 
 use crate::memory::target::TargetType;
 
-/// `JuliaString` or `StringRef`, depending on the target type `T`.
-pub type StringData<'target, T> = <T as TargetType<'target>>::Data<'static, JuliaString<'target>>;
+/// `JuliaString` or `StringRef`, depending on the target type `Tgt`.
+pub type StringData<'target, Tgt> =
+    <Tgt as TargetType<'target>>::Data<'static, JuliaString<'target>>;
 
-/// `JuliaResult<JuliaString>` or `JuliaResultRef<StringRef>`, depending on the target type `T`.
-pub type StringResult<'target, T> = TargetResult<'target, 'static, JuliaString<'target>, T>;
+/// `JuliaResult<JuliaString>` or `JuliaResultRef<StringRef>`, depending on the target type `Tgt`.
+pub type StringResult<'target, Tgt> = TargetResult<'target, 'static, JuliaString<'target>, Tgt>;
 
 impl_ccall_arg_managed!(JuliaString, 1);
 impl_into_typed!(JuliaString);

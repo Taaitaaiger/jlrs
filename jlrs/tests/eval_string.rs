@@ -1,5 +1,5 @@
 mod util;
-#[cfg(feature = "sync-rt")]
+#[cfg(feature = "local-rt")]
 mod tests {
     use jlrs::{error::JuliaResult, prelude::*};
 
@@ -10,6 +10,7 @@ mod tests {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
                     with_result(Value::eval_string(&mut frame, string));
                     Ok(())
@@ -26,27 +27,31 @@ mod tests {
 
     fn runtime_error() {
         eval_string("[1, 2, 3][4]", |result| {
-            assert_eq!(result.unwrap_err().datatype_name().unwrap(), "BoundsError");
+            assert_eq!(result.unwrap_err().datatype_name(), "BoundsError");
         });
     }
 
-    #[cfg(not(feature = "julia-1-10"))]
+    #[cfg(any(
+        feature = "julia-1-6",
+        feature = "julia-1-7",
+        feature = "julia-1-8",
+        feature = "julia-1-9"
+    ))]
     fn syntax_error() {
         eval_string("asdf fdsa asdf fdsa", |result| {
-            assert_eq!(
-                result.unwrap_err().datatype_name().unwrap(),
-                "ErrorException"
-            );
+            assert_eq!(result.unwrap_err().datatype_name(), "ErrorException");
         });
     }
 
-    #[cfg(feature = "julia-1-10")]
+    #[cfg(not(any(
+        feature = "julia-1-6",
+        feature = "julia-1-7",
+        feature = "julia-1-8",
+        feature = "julia-1-9"
+    )))]
     fn syntax_error() {
         eval_string("asdf fdsa asdf fdsa", |result| {
-            assert_eq!(
-                result.unwrap_err().datatype_name().unwrap(),
-                "UndefVarError"
-            );
+            assert_eq!(result.unwrap_err().datatype_name(), "UndefVarError");
         });
     }
 
@@ -61,6 +66,7 @@ mod tests {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| unsafe {
                     let func = Module::main(&frame)
                         .function(&frame, "increase")?
@@ -79,6 +85,7 @@ mod tests {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| unsafe {
                     Value::eval_string(
                         &mut frame,

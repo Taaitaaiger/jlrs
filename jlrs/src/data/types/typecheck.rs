@@ -9,26 +9,17 @@
 //! [`Value::is`]: crate::data::managed::value::Value::is
 //! [`Managed`]: crate::data::managed::Managed
 //! [`Unbox`]: crate::convert::unbox::Unbox
-use std::ffi::c_void;
+use std::{ffi::c_void, marker::PhantomData};
 
-// TODO: Unify with abstract types
-#[julia_version(until = "1.9")]
-use jl_sys::jl_typedslot_type;
-use jl_sys::{
-    jl_code_info_type, jl_globalref_type, jl_gotonode_type, jl_intrinsic_type,
-    jl_linenumbernode_type, jl_namedtuple_typename, jl_newvarnode_type, jl_phicnode_type,
-    jl_phinode_type, jl_pinode_type, jl_quotenode_type, jl_slotnumber_type, jl_string_type,
-    jl_upsilonnode_type,
-};
-use jlrs_macros::julia_version;
+// TODO: Unify with other ConstructType and abstract types?
+use jl_sys::jl_string_type;
 
+use super::abstract_type::AbstractType;
 use crate::{
     convert::into_julia::IntoJulia,
-    data::managed::{
-        datatype::DataType, private::ManagedPriv, type_name::TypeName, union_all::UnionAll, Managed,
-    },
+    data::managed::{datatype::DataType, type_name::TypeName, union_all::UnionAll, Managed},
     memory::target::unrooted::Unrooted,
-    private::Private,
+    prelude::LocalScope,
 };
 
 /// This trait is used in combination with [`Value::is`] and [`DataType::is`] to check if that
@@ -41,9 +32,29 @@ use crate::{
 /// [`Value::is`]: crate::data::managed::value::Value::is
 /// [`Unbox`]: crate::convert::unbox::Unbox
 /// [`Managed`]: crate::data::managed::Managed
+#[diagnostic::on_unimplemented(
+    message = "the trait bound `{Self}: Typecheck` is not satisfied",
+    label = "the trait `Typecheck` is not implemented for `{Self}`",
+    note = "Custom types that implement `Typecheck` should be generated with JlrsCore.reflect",
+    note = "Do not implement `ForeignType`, `OpaqueType`, or `ParametricVariant` unless this type is exported to Julia with `julia_module!`"
+)]
 pub unsafe trait Typecheck {
     /// Returns whether the property implied by `Self` holds true.
     fn typecheck(t: DataType) -> bool;
+}
+
+/// Type that implements [`Typecheck`] for every [`AbstractType`] `A`.
+///
+/// The typecheck returns `true` if the type is a subtype of `A`.
+pub struct AbstractTypecheck<A: AbstractType>(PhantomData<A>);
+
+unsafe impl<A: AbstractType> Typecheck for AbstractTypecheck<A> {
+    fn typecheck(t: DataType) -> bool {
+        t.unrooted_target().local_scope::<_, 1>(|mut frame| {
+            let ty = A::construct_type(&mut frame);
+            t.as_value().subtype(ty)
+        })
+    }
 }
 
 #[doc(hidden)]
@@ -110,9 +121,9 @@ unsafe impl<T: IntoJulia> Typecheck for *mut T {
             }
 
             let params = t.parameters();
-            let params = params.data().as_slice();
+            let param = params.data().get(global, 0);
             let inner_ty = T::julia_type(global);
-            if params[0].unwrap_unchecked().as_value() != inner_ty.as_value() {
+            if param.unwrap_unchecked().as_value() != inner_ty.as_value() {
                 return false;
             }
 
@@ -193,22 +204,12 @@ unsafe impl Typecheck for TypeType {
 }
 
 /// A typecheck that can be used in combination with `DataType::is`. This method returns true if
-/// the value is a dispatch tuple.
-pub struct DispatchTuple;
-unsafe impl Typecheck for DispatchTuple {
-    #[inline]
-    fn typecheck(t: DataType) -> bool {
-        t.is_dispatch_tuple()
-    }
-}
-
-/// A typecheck that can be used in combination with `DataType::is`. This method returns true if
 /// a value of this type is a named tuple.
 pub struct NamedTuple;
 unsafe impl Typecheck for NamedTuple {
     #[inline]
     fn typecheck(t: DataType) -> bool {
-        unsafe { t.unwrap_non_null(Private).as_ref().name == jl_namedtuple_typename }
+        unsafe { t.type_name() == TypeName::of_namedtuple(&Unrooted::new()) }
     }
 }
 
@@ -239,7 +240,7 @@ unsafe impl Typecheck for PrimitiveType {
     fn typecheck(t: DataType) -> bool {
         unsafe {
             t.is::<Immutable>()
-                && !t.layout().is_none()
+                && t.has_layout()
                 && t.n_fields().unwrap_unchecked() == 0
                 && t.size().unwrap_unchecked() > 0
         }
@@ -266,76 +267,6 @@ unsafe impl Typecheck for Singleton {
     }
 }
 
-/// A typecheck that can be used in combination with `DataType::is`. This method returns true if
-/// a value of this type is a slot.
-pub struct Slot;
-
-#[julia_version(until = "1.9")]
-unsafe impl Typecheck for Slot {
-    #[inline]
-    fn typecheck(t: DataType) -> bool {
-        unsafe { t.unwrap(Private) == jl_slotnumber_type || t.unwrap(Private) == jl_typedslot_type }
-    }
-}
-
-#[julia_version(since = "1.10")]
-unsafe impl Typecheck for Slot {
-    #[inline]
-    fn typecheck(t: DataType) -> bool {
-        unsafe { t.unwrap(Private) == jl_slotnumber_type }
-    }
-}
-
-/// A typecheck that can be used in combination with `DataType::is`. This method returns true if
-/// a value of this type is a global reference.
-pub struct GlobalRef;
-impl_julia_typecheck!(GlobalRef, jl_globalref_type);
-
-/// A typecheck that can be used in combination with `DataType::is`. This method returns true if
-/// a value of this type is a Goto node.
-pub struct GotoNode;
-impl_julia_typecheck!(GotoNode, jl_gotonode_type);
-
-/// A typecheck that can be used in combination with `DataType::is`. This method returns true if
-/// a value of this type is a Pi node.
-pub struct PiNode;
-impl_julia_typecheck!(PiNode, jl_pinode_type);
-
-/// A typecheck that can be used in combination with `DataType::is`. This method returns true if
-/// a value of this type is a Phi node.
-pub struct PhiNode;
-impl_julia_typecheck!(PhiNode, jl_phinode_type);
-
-/// A typecheck that can be used in combination with `DataType::is`. This method returns true if
-/// a value of this type is a PhiC node.
-pub struct PhiCNode;
-impl_julia_typecheck!(PhiCNode, jl_phicnode_type);
-
-/// A typecheck that can be used in combination with `DataType::is`. This method returns true if
-/// a value of this type is an Upsilon node.
-pub struct UpsilonNode;
-impl_julia_typecheck!(UpsilonNode, jl_upsilonnode_type);
-
-/// A typecheck that can be used in combination with `DataType::is`. This method returns true if
-/// a value of this type is a Quote node.
-pub struct QuoteNode;
-impl_julia_typecheck!(QuoteNode, jl_quotenode_type);
-
-/// A typecheck that can be used in combination with `DataType::is`. This method returns true if
-/// a value of this type is an NewVar node.
-pub struct NewVarNode;
-impl_julia_typecheck!(NewVarNode, jl_newvarnode_type);
-
-/// A typecheck that can be used in combination with `DataType::is`. This method returns true if
-/// a value of this type is a Line node.
-pub struct LineNode;
-impl_julia_typecheck!(LineNode, jl_linenumbernode_type);
-
-/// A typecheck that can be used in combination with `DataType::is`. This method returns true if
-/// a value of this type is code info.
-pub struct CodeInfo;
-impl_julia_typecheck!(CodeInfo, jl_code_info_type);
-
 impl_julia_typecheck!(String, jl_string_type);
 
 /// A typecheck that can be used in combination with `DataType::is`. This method returns true if
@@ -357,11 +288,6 @@ unsafe impl Typecheck for LLVMPointer {
         unsafe { t.type_name() == TypeName::of_llvmpointer(&Unrooted::new()) }
     }
 }
-
-/// A typecheck that can be used in combination with `DataType::is`. This method returns true if
-/// a value of this type is an intrinsic.
-pub struct Intrinsic;
-impl_julia_typecheck!(Intrinsic, jl_intrinsic_type);
 
 /// A typecheck that can be used in combination with `DataType::is`. This method returns true if
 /// instances of the type can be created.

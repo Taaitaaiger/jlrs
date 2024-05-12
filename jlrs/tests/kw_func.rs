@@ -1,5 +1,5 @@
 mod util;
-#[cfg(feature = "sync-rt")]
+#[cfg(feature = "local-rt")]
 mod tests {
     use jlrs::prelude::*;
 
@@ -11,6 +11,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<()>>()
                 .scope(|mut frame| unsafe {
                     let a_value = Value::new(&mut frame, 1isize);
                     let func = Module::main(&frame)
@@ -34,6 +35,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| unsafe {
                     let a_value = Value::new(&mut frame, 1isize);
                     let b_value = Value::new(&mut frame, 10isize);
@@ -63,6 +65,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| unsafe {
                     let b_value = Value::new(&mut frame, 10isize);
                     let func = Module::main(&frame)
@@ -91,6 +94,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| unsafe {
                     let a_value = Value::new(&mut frame, 1isize);
                     let b_value = Value::new(&mut frame, 10isize);
@@ -120,6 +124,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| unsafe {
                     let a_value = Value::new(&mut frame, 1isize);
                     let b_value = Value::new(&mut frame, 10isize);
@@ -150,6 +155,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| unsafe {
                     let a_value = Value::new(&mut frame, 1isize);
                     let b_value = Value::new(&mut frame, 10isize);
@@ -180,6 +186,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| unsafe {
                     let a_value = Value::new(&mut frame, 1isize);
                     let b_value = Value::new(&mut frame, 10isize);
@@ -211,6 +218,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| unsafe {
                     let a_value = Value::new(&mut frame, 1isize);
                     let b_value = Value::new(&mut frame, 10isize);
@@ -243,6 +251,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| unsafe {
                     let a_value = Value::new(&mut frame, 1f32);
                     let b_value = Value::new(&mut frame, 10f32);
@@ -272,6 +281,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| unsafe {
                     let a_value = Value::new(&mut frame, 1f32);
                     let b_value = Value::new(&mut frame, 10f64);

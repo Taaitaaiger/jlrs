@@ -1,5 +1,5 @@
 mod util;
-#[cfg(feature = "sync-rt")]
+#[cfg(feature = "local-rt")]
 mod tests {
     use jlrs::{
         memory::gc::{Gc, GcCollection},
@@ -18,14 +18,15 @@ mod tests {
             jlrs.enable_gc(true);
             assert!(jlrs.gc_is_enabled());
 
-            jlrs.scope(|frame| {
-                frame.enable_gc(false);
-                assert!(!frame.gc_is_enabled());
-                frame.enable_gc(true);
-                assert!(frame.gc_is_enabled());
-                Ok(())
-            })
-            .unwrap();
+            jlrs.returning::<JlrsResult<_>>()
+                .scope(|frame| {
+                    frame.enable_gc(false);
+                    assert!(!frame.gc_is_enabled());
+                    frame.enable_gc(true);
+                    assert!(frame.gc_is_enabled());
+                    Ok(())
+                })
+                .unwrap();
         })
     }
 
@@ -39,14 +40,15 @@ mod tests {
             jlrs.gc_collect(GcCollection::Incremental);
             jlrs.gc_collect(GcCollection::Full);
 
-            jlrs.scope(|frame| {
-                frame.gc_collect(GcCollection::Auto);
-                frame.gc_collect(GcCollection::Incremental);
-                frame.gc_collect(GcCollection::Full);
+            jlrs.returning::<JlrsResult<_>>()
+                .scope(|frame| {
+                    frame.gc_collect(GcCollection::Auto);
+                    frame.gc_collect(GcCollection::Incremental);
+                    frame.gc_collect(GcCollection::Full);
 
-                Ok(())
-            })
-            .unwrap();
+                    Ok(())
+                })
+                .unwrap();
         })
     }
 
@@ -57,11 +59,12 @@ mod tests {
             let mut jlrs = jlrs.instance(&mut frame);
             jlrs.gc_safepoint();
 
-            jlrs.scope(|frame| {
-                frame.gc_safepoint();
-                Ok(())
-            })
-            .unwrap();
+            jlrs.returning::<JlrsResult<_>>()
+                .scope(|frame| {
+                    frame.gc_safepoint();
+                    Ok(())
+                })
+                .unwrap();
         })
     }
 

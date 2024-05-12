@@ -1,3 +1,60 @@
+#### v0.20
+
+- Add support for Julia 1.11. Bump MSRV to 1.78.
+
+- The layout of builtin types defined by the C API like `jl_datatype_t` and `jl_module_t` are opaque to jlrs. Any access to their internals is delegated to functions defined in jl-sys's support library.
+
+- The support library can be compiled with support for cross-language LTO by enabling the `lto` feature.
+
+- Bindings to the C API are written manually. A few features of Julia make it annoying to use bindgen to generate them.
+
+- Unused internal types have been removed, `Expr` is no longer considered an internal type.
+
+- Static symbols can be defined with the `define_static_symbol` macro. 
+
+- Arrays have been redesigned to be more consistent with the rest of jlrs: there is a single fundamental array type, `ArrayBase`, and a bunch of aliases that expose additional static type information if desired. The first type parameter of a `TypedArray` is the type constructor of the element type, not the element type's layout. Many functions now return a `TypedArray` instead of an `Array`.
+
+- Array functions that have been removed in Julia 1.11, like `jl_reshape_array`, have been removed completely. Call the Julia function instead.
+
+- Separate types are used for different array accessors.
+
+- The `construct_type_with_env` method has been added to `ConstructType`, it can be used to construct types which take type parameters from an environment.
+
+- Async callbacks have been removed from `julia_module`. You can use `BackgroundTask` or `DelegatedTask` instead, the latter is available since Julia 1.9. Background tasks can't access Julia data or call into Julia, delegated tasks can.
+
+- `RustResult` has been removed.
+
+- Generic functions that take type parameters from an environment can be exported to Julia with `julia_module`.
+
+- Support for async-std has been dropped.
+
+- The async runtime can no longer be created with additional worker threads. Tasks no longer have an affinity.
+
+- tokio's oneshot channel is always used to transfer the result of a task.
+
+- async-channel is always used to communicate with the async runtime and persistent tasks.
+
+- The `AsyncRuntime` trait has been renamed to `Executor`. Fewer functions and types have to be implemented to define a custom executor.
+
+- A multithreaded runtime is available when `multi-rt` is enabled, it requires using at least Julia 1.9. It allows calling into Julia from arbitrary threads, and can be combined with the async runtime to create thread pools that can call into Julia. These thread pools replace the worker threads the async runtime used to have.
+
+- The number of threads that Julia starts can be configured with `Builder`, even if no async runtime is used.
+
+- The sync runtime has been deprecated in favor of the local runtime. The feature `sync-rt` has been renamed to `local-rt`.
+
+- The Julia runtime is accessed through handles. Different runtime modes have different handle types; e.g. the local runtime has a `LocalHandle`, the async runtime an `AsyncHandle`, etc.
+
+- `WeakHandle` has been added as an alternative to `Unrooted`, a `WeakHandle` can be acquired from any thread known to Julia and is pinned to the current stack frame.
+
+- The local runtime does not automatically allocate a stack, this can be done manually with the `Stack::with_stack` method. Using local scopes is strongly recommended over dynamic scopes. All handles can allocate a stack.
+
+- Scopes can return arbitrary types, the return type is no longer required to be a `JlrsResult`.
+
+- Custom diagnostics are emitted when `ValidLayout`, `Unbox`, `IntoJulia`, `ConstructType`, `Typecheck` or `ForeignType` has not been implemented to explicitly warn you probably don't want `ForeignType`'s blanket impementations for these traits.
+
+- Initializing Julia is considered safe as long as no custom system image is used.
+
+
 #### v0.19
 
 - A GC-safe `GcSafeRwLock`, `GcSafeMutex`, `GcSafeFairMutex`, and `GcSafeOnceLock` have been added. These synchronization primitives allow for garbage to be collected while waiting for access to be granted.
@@ -83,7 +140,7 @@
 
  - `CCall` now has `invoke` methods to avoid having to manually create a stack frame.
 
- - Global Julia data can be cached in a static container by using `StaticGlobal` and `StaticSymbol`.
+ - Global Julia data can be cached in a static container by using `StaticGlobal` and `StaticRef`.
 
  - `TrackArray` has been removed, the trait methods are now implemented directly by `(Typed)Array`. The tracking methods have been renamed to `track_shared` and `track_exclusive`.
 

@@ -1,5 +1,5 @@
 mod util;
-#[cfg(feature = "sync-rt")]
+#[cfg(feature = "local-rt")]
 #[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7")))]
 mod tests {
     use jlrs::prelude::*;
@@ -11,6 +11,7 @@ mod tests {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
                     let ty = unsafe {
                         Module::main(&frame)
@@ -40,6 +41,7 @@ mod tests {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
                     let ty = unsafe {
                         Module::main(&frame)
@@ -73,6 +75,7 @@ mod tests {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
                     let ty = unsafe {
                         Module::main(&frame)
@@ -106,6 +109,7 @@ mod tests {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|frame| {
                     let ty = unsafe {
                         Module::main(&frame)
@@ -115,33 +119,9 @@ mod tests {
                             .as_value()
                     };
 
-                    assert!(ty.cast::<DataType>()?.is_pointer_field(0)?);
-                    assert!(ty.cast::<DataType>()?.is_atomic_field(0)?);
-                    assert!(ty.cast::<DataType>()?.is_atomic_field(20).is_err());
-
-                    Ok(())
-                })
-                .unwrap();
-        })
-    }
-
-    #[cfg(feature = "extra-fields")]
-    fn read_atomic_field_of_ptr_wrapper() {
-        JULIA.with(|j| {
-            let mut frame = StackFrame::new();
-            let mut jlrs = j.borrow_mut();
-            jlrs.instance(&mut frame)
-                .scope(|frame| {
-                    unsafe {
-                        assert_eq!(
-                            DataType::datatype_type(&frame)
-                                .type_name()
-                                .cache(&frame)
-                                .as_managed()
-                                .len(),
-                            0
-                        )
-                    }
+                    assert!(ty.cast::<DataType>()?.is_pointer_field(0).unwrap());
+                    assert!(ty.cast::<DataType>()?.is_atomic_field(0).unwrap());
+                    assert!(ty.cast::<DataType>()?.is_atomic_field(20).is_none());
 
                     Ok(())
                 })
@@ -155,7 +135,5 @@ mod tests {
         read_large_atomic_field();
         read_oddly_sized_atomic_field();
         atomic_union_is_pointer_field();
-        #[cfg(feature = "extra-fields")]
-        read_atomic_field_of_ptr_wrapper();
     }
 }

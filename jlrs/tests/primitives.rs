@@ -1,5 +1,5 @@
 mod util;
-#[cfg(feature = "sync-rt")]
+#[cfg(feature = "local-rt")]
 mod tests {
     use jlrs::prelude::*;
 
@@ -11,6 +11,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
                     let p1 = Value::new(&mut frame, 1u8);
                     let p2 = Value::new(&mut frame, 2u16);
@@ -42,6 +43,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
                     let p1 = Value::new(&mut frame, 1u8);
                     let p2 = Value::new(&mut frame, 2u16);
@@ -73,6 +75,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
                     let p1 = Value::new(&mut frame, 1i8);
                     let p2 = Value::new(&mut frame, 2i16);
@@ -104,6 +107,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
                     let p1 = Value::new(&mut frame, 1i8);
                     let p2 = Value::new(&mut frame, 2i16);
@@ -135,6 +139,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
                     let p1 = Value::new(&mut frame, 1f32);
                     let p2 = Value::new(&mut frame, 2f64);
@@ -157,6 +162,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
                     let p1 = Value::new(&mut frame, 1f32);
                     let p2 = Value::new(&mut frame, 2f64);
@@ -179,6 +185,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
                     let p1 = Value::new(&mut frame, true);
                     let u1 = p1.unbox::<bool>()?.as_bool();
@@ -195,6 +202,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
                     let p1 = Value::new(&mut frame, false);
                     let u1 = p1.unbox::<bool>()?.as_bool();
@@ -211,6 +219,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
                     let p1 = Value::new(&mut frame, 'a');
                     let u1 = p1.unbox::<char>()?.try_as_char();
@@ -227,6 +236,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
                     let p1 = Value::new(&mut frame, 'a');
                     let u1 = p1.unbox::<char>()?.try_as_char();
@@ -243,13 +253,13 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|frame| {
                     let nothing = Value::nothing(&frame);
                     assert!(nothing.is::<Nothing>());
                     assert!(!nothing.is::<f32>());
                     assert!(nothing.datatype().is::<Nothing>());
-                    assert_eq!(nothing.datatype_name().unwrap(), "Nothing");
-                    assert!(!nothing.is_array_of::<f32>());
+                    assert_eq!(nothing.datatype_name(), "Nothing");
                     assert_eq!(nothing.field_names().len(), 0);
                     assert_eq!(nothing.n_fields(), 0);
 
@@ -267,6 +277,7 @@ mod tests {
                     let mut jlrs = j.borrow_mut();
 
                     jlrs.instance(&mut frame)
+                        .returning::<JlrsResult<_>>()
                         .scope(|mut frame| {
                             let val = Value::new(&mut frame, $val);
                             assert!(val.is::<$from>());
@@ -302,6 +313,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
+                .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
                     let val = Value::new(&mut frame, func as *mut std::ffi::c_void);
                     assert!(val.is::<*mut std::ffi::c_void>());

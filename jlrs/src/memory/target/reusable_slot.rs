@@ -13,54 +13,36 @@
 //!
 //! ```
 //! # use jlrs::prelude::*;
-//! # use jlrs::util::test::JULIA;
 //! # fn main() {
-//! # JULIA.with(|j| {
-//! # let mut julia = j.borrow_mut();
-//! # let mut frame = StackFrame::new();
-//! # let mut julia = julia.instance(&mut frame);
+//! let mut julia = Builder::new().start_local().unwrap();
 //!
-//! julia
-//!     .scope(|mut frame| {
-//!         let reusable_slot = frame.reusable_slot();
+//! julia.local_scope::<_, 1>(|mut frame| {
+//!     let reusable_slot = frame.local_reusable_slot();
 //!
-//!         let _v = frame.scope(|_| {
-//!             // The reusable slot has been allocated in the parent
-//!             // scope's frame, so by using it as a target the
-//!             // result can be returned from this subscope.
-//!             Ok(Value::new(reusable_slot, 1u64))
-//!         })?;
-//!
-//!         Ok(())
-//!     })
-//!     .unwrap();
-//! # });
+//!     let _v = frame.local_scope::<_, 0>(|_| {
+//!         // The reusable slot has been allocated in the parent
+//!         // scope's frame, so by using it as a target the
+//!         // result can be returned from this subscope.
+//!         Value::new(reusable_slot, 1u64)
+//!     });
+//! });
 //! # }
 //! ```
 //!
 //! ```
 //! # use jlrs::prelude::*;
-//! # use jlrs::util::test::JULIA;
 //! # fn main() {
-//! # JULIA.with(|j| {
-//! # let mut julia = j.borrow_mut();
-//! # let mut frame = StackFrame::new();
-//! # let mut julia = julia.instance(&mut frame);
+//! let mut julia = Builder::new().start_local().unwrap();
 //!
-//! julia
-//!     .scope(|mut frame| {
-//!         let mut reusable_slot = frame.reusable_slot();
+//! julia.local_scope::<_, 1>(|mut frame| {
+//!     let mut reusable_slot = frame.local_reusable_slot();
 //!
-//!         let _v = frame.scope(|_| {
-//!             // This data can be used until you leave the parent scope,
-//!             // it will be rooted until the reusable slot is used again.
-//!             Ok(Value::new(&mut reusable_slot, 2u64))
-//!         })?;
-//!
-//!         Ok(())
-//!     })
-//!     .unwrap();
-//! # });
+//!     let _v = frame.local_scope::<_, 0>(|_| {
+//!         // This data can be used until you leave the parent scope,
+//!         // it will be rooted until the reusable slot is used again.
+//!         Value::new(&mut reusable_slot, 2u64)
+//!     });
+//! });
 //! # }
 //! ```
 
