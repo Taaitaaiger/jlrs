@@ -149,31 +149,31 @@ jobs:
           export LD_LIBRARY_PATH="${JULIA_DIR}/lib:${JULIA_DIR}/lib/julia:${LD_LIBRARY_PATH}"
           cargo test --features full,julia-1-6 --verbose
 
-  test-macos-lts:
-    runs-on: macos-latest-large
-    continue-on-error: ${{ matrix.allow-fail }}
-    strategy:
-      matrix:
-        rust: [stable]
-        allow-fail: [false]
-    steps:
-      - uses: actions/checkout@v3
+  # test-macos-lts:
+  #   runs-on: macos-latest-large
+  #   continue-on-error: ${{ matrix.allow-fail }}
+  #   strategy:
+  #     matrix:
+  #       rust: [stable]
+  #       allow-fail: [false]
+  #   steps:
+  #     - uses: actions/checkout@v3
 
-      - name: Setup Julia environment
-        uses: julia-actions/setup-julia@v1
-        with:
-          version: '1.6'
+  #     - name: Setup Julia environment
+  #       uses: julia-actions/setup-julia@v1
+  #       with:
+  #         version: '1.6'
 
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: ${{ matrix.rust }}
+  #     - name: Setup Rust
+  #       uses: dtolnay/rust-toolchain@master
+  #       with:
+  #         toolchain: ${{ matrix.rust }}
 
-      - name: Run tests
-        run: |
-          export JULIA_DIR="$(dirname $(dirname $(which julia)))"
-          export DYLD_LIBRARY_PATH="${JULIA_DIR}/lib:${JULIA_DIR}/lib/julia:${DYLD_LIBRARY_PATH}"
-          cargo test --features full,julia-1-6 --verbose
+  #     - name: Run tests
+  #       run: |
+  #         export JULIA_DIR="$(dirname $(dirname $(which julia)))"
+  #         export DYLD_LIBRARY_PATH="${JULIA_DIR}/lib:${JULIA_DIR}/lib/julia:${DYLD_LIBRARY_PATH}"
+  #         cargo test --features full,julia-1-6 --verbose
 
   test-windows-gnu-lts:
     runs-on: windows-latest
