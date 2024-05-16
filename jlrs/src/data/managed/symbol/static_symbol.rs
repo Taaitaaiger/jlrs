@@ -1,7 +1,7 @@
 //! Static references to `Symbol`s.
 
 use std::{
-    ffi::c_void,
+    ffi::{c_char, c_void},
     fmt::Debug,
     hash::{Hash, Hasher},
     marker::PhantomData,
@@ -70,7 +70,7 @@ macro_rules! define_static_symbol {
                 #[inline(never)]
                 unsafe fn init() -> $crate::data::managed::symbol::Symbol<'static> {
                     const N: usize = $sym.as_bytes().len();
-                    const INNER_PTR: *mut i8 = $sym.as_ptr() as *const i8 as *mut i8;
+                    const INNER_PTR: *mut ::std::ffi::c_char = $sym.as_ptr() as *const ::std::ffi::c_char as *mut ::std::ffi::c_char;
                     let ptr = $crate::data::managed::symbol::static_symbol::new_symbol(INNER_PTR, N);
                     PTR.store(ptr, ::std::sync::atomic::Ordering::Relaxed);
                     $crate::data::managed::symbol::static_symbol::convert_void_ptr(ptr)
@@ -111,7 +111,7 @@ macro_rules! define_static_binary_symbol {
                 #[inline(never)]
                 unsafe fn init() -> $crate::data::managed::symbol::Symbol<'static> {
                     const N: usize = $sym.len();
-                    const INNER_PTR: *mut i8 = $sym.as_ptr() as *const i8 as *mut i8;
+                    const INNER_PTR: *mut ::std::ffi::c_char = $sym.as_ptr() as *const ::std::ffi::c_char as *mut ::std::ffi::c_char;
                     let ptr = $crate::data::managed::symbol::static_symbol::new_symbol(INNER_PTR, N);
                     PTR.store(ptr, ::std::sync::atomic::Ordering::Relaxed);
                     $crate::data::managed::symbol::static_symbol::convert_void_ptr(ptr)
@@ -414,6 +414,6 @@ pub unsafe fn convert_void_ptr(ptr: *mut c_void) -> Symbol<'static> {
 // Creates a new symbol, ptr and len must the pointer and length of a string slice `&str`.
 #[doc(hidden)]
 #[inline(always)]
-pub unsafe fn new_symbol<'target>(ptr: *mut i8, len: usize) -> *mut c_void {
+pub unsafe fn new_symbol<'target>(ptr: *mut c_char, len: usize) -> *mut c_void {
     jl_symbol_n(ptr, len) as *mut _
 }
