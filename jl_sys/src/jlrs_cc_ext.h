@@ -112,7 +112,6 @@ extern "C" {
     // Removed array functions
     jl_value_t *jlrs_arrayref(jl_array_t *a, size_t i);
     void jlrs_arrayset(jl_array_t *a, jl_value_t *v, size_t i);
-    int jlrs_array_isassigned(jl_array_t *a, size_t i);
     jl_value_t *jlrs_array_data_owner(jl_array_t *a);
     char *jlrs_array_typetagdata(jl_array_t *a);
     

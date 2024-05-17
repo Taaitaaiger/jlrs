@@ -345,16 +345,6 @@ extern "C"
 #endif
     }
 
-    int jlrs_array_isassigned(jl_array_t *a, size_t i)
-    {
-#if JULIA_VERSION_MINOR >= 11
-        jl_genericmemoryref_t ref = jlrs_memoryrefindex(a->ref, i);
-        return jlrs_memoryref_isassigned(ref, 0);
-#else
-    return jl_array_isassigned(a, i);
-#endif
-    }
-
     jl_value_t *jlrs_array_data_owner(jl_array_t *a)
     {
 #if JULIA_VERSION_MINOR >= 11
