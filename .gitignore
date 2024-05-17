@@ -26,3 +26,5 @@ libjulia_module_test.so
 expanded.rs
 
 .idea
+
+test_all_versions.sh

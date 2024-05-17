@@ -1,5 +1,3 @@
-use crate::jl_gcframe_t;
-
 extern "C" {
     pub fn jlrs_typeof(v: *mut crate::types::jl_value_t) -> *mut crate::types::jl_value_t;
 }
@@ -2646,9 +2644,6 @@ extern "C" {
     );
 }
 extern "C" {
-    pub fn jlrs_array_isassigned(a: *mut crate::types::jl_array_t, i: usize) -> ::std::ffi::c_int;
-}
-extern "C" {
     pub fn jlrs_array_data_owner(a: *mut crate::types::jl_array_t)
         -> *mut crate::types::jl_value_t;
 }
@@ -2675,7 +2670,7 @@ extern "C" {
 }
 extern "C" {
     pub fn jlrs_ptls_from_gcstack(
-        pgcstack: *mut *mut jl_gcframe_t,
+        pgcstack: *mut *mut crate::types::jl_gcframe_t,
     ) -> *mut crate::types::jl_tls_states_t;
 }
 extern "C" {
@@ -3271,4 +3266,368 @@ extern "C" {
     pub fn jlrs_genericmemory_typetagdata(
         m: *mut crate::types::jl_genericmemory_t,
     ) -> *mut ::std::ffi::c_char;
+}
+#[cfg_attr(
+    all(
+        any(windows, target_os = "windows", feature = "windows"),
+        any(target_env = "msvc", feature = "yggdrasil")
+    ),
+    link(name = "libjulia", kind = "raw-dylib")
+)]
+extern "C" {
+    pub fn jl_excstack_state(
+        #[cfg(not(any(
+            feature = "julia-1-6",
+            feature = "julia-1-7",
+            feature = "julia-1-8",
+            feature = "julia-1-9",
+            feature = "julia-1-10",
+        )))]
+        ct: *mut crate::types::jl_task_t,
+    ) -> usize;
+}
+#[cfg_attr(
+    all(
+        any(windows, target_os = "windows", feature = "windows"),
+        any(target_env = "msvc", feature = "yggdrasil")
+    ),
+    link(name = "libjulia", kind = "raw-dylib")
+)]
+extern "C" {
+    pub fn jl_enter_handler(
+        #[cfg(not(any(
+            feature = "julia-1-6",
+            feature = "julia-1-7",
+            feature = "julia-1-8",
+            feature = "julia-1-9",
+            feature = "julia-1-10",
+        )))]
+        ct: *mut crate::types::jl_task_t,
+        eh: *mut ::std::ffi::c_void,
+    );
+}
+#[cfg(not(feature = "julia-1-6"))]
+#[cfg_attr(
+    all(
+        any(windows, target_os = "windows", feature = "windows"),
+        any(target_env = "msvc", feature = "yggdrasil"),
+    ),
+    link(name = "libjulia", kind = "raw-dylib")
+)]
+extern "C" {
+    pub fn jl_setjmp(
+        ptr: *mut ::std::ffi::c_void,
+        #[cfg(not(any(
+            feature = "julia-1-6",
+            feature = "julia-1-7",
+            feature = "julia-1-8",
+            feature = "julia-1-9",
+            feature = "julia-1-10",
+        )))]
+        savesigs: std::ffi::c_int,
+    );
+}
+#[cfg_attr(
+    all(
+        any(windows, target_os = "windows", feature = "windows"),
+        any(target_env = "msvc", feature = "yggdrasil")
+    ),
+    link(name = "libjulia", kind = "raw-dylib")
+)]
+extern "C" {
+    pub fn jl_eh_restore_state(
+        #[cfg(not(any(
+            feature = "julia-1-6",
+            feature = "julia-1-7",
+            feature = "julia-1-8",
+            feature = "julia-1-9",
+            feature = "julia-1-10",
+        )))]
+        ct: *mut crate::types::jl_task_t,
+        eh: *mut ::std::ffi::c_void,
+    );
+}
+#[cfg_attr(
+    all(
+        any(windows, target_os = "windows", feature = "windows"),
+        any(target_env = "msvc", feature = "yggdrasil")
+    ),
+    link(name = "libjulia", kind = "raw-dylib")
+)]
+extern "C" {
+    pub fn jl_current_exception(
+        #[cfg(not(any(
+            feature = "julia-1-6",
+            feature = "julia-1-7",
+            feature = "julia-1-8",
+            feature = "julia-1-9",
+            feature = "julia-1-10",
+        )))]
+        ct: *mut crate::types::jl_task_t,
+        ct: *mut crate::types::jl_task_t,
+    ) -> *mut crate::types::jl_value_t;
+}
+#[cfg_attr(
+    all(
+        any(windows, target_os = "windows", feature = "windows"),
+        any(target_env = "msvc", feature = "yggdrasil")
+    ),
+    link(name = "libjulia", kind = "raw-dylib")
+)]
+extern "C" {
+    pub fn jl_get_world_counter() -> usize;
+}
+#[cfg_attr(
+    all(
+        any(windows, target_os = "windows", feature = "windows"),
+        any(target_env = "msvc", feature = "yggdrasil")
+    ),
+    link(name = "libjulia", kind = "raw-dylib")
+)]
+extern "C" {
+    pub fn jl_apply_generic(
+        F: *mut crate::types::jl_value_t,
+        args: *mut *mut crate::types::jl_value_t,
+        nargs: u32,
+    ) -> *mut crate::types::jl_value_t;
+}
+#[cfg_attr(
+    all(
+        any(windows, target_os = "windows", feature = "windows"),
+        any(target_env = "msvc", feature = "yggdrasil")
+    ),
+    link(name = "libjulia", kind = "raw-dylib")
+)]
+extern "C" {
+    pub fn jl_init();
+}
+#[cfg_attr(
+    all(
+        any(windows, target_os = "windows", feature = "windows"),
+        any(target_env = "msvc", feature = "yggdrasil")
+    ),
+    link(name = "libjulia", kind = "raw-dylib")
+)]
+extern "C" {
+    pub fn jl_init_with_image(
+        julia_bindir: *const ::std::os::raw::c_char,
+        image_path: *const ::std::os::raw::c_char,
+    );
+}
+#[cfg_attr(
+    all(
+        any(windows, target_os = "windows", feature = "windows"),
+        any(target_env = "msvc", feature = "yggdrasil")
+    ),
+    link(name = "libjulia", kind = "raw-dylib")
+)]
+extern "C" {
+    // TODO: is this ok?
+    pub static mut jl_options: std::mem::MaybeUninit<u8>;
+}
+#[cfg_attr(
+    all(
+        any(windows, target_os = "windows", feature = "windows"),
+        any(target_env = "msvc", feature = "yggdrasil")
+    ),
+    link(name = "libjulia", kind = "raw-dylib")
+)]
+#[cfg(not(any(
+    feature = "julia-1-6",
+    feature = "julia-1-7",
+    feature = "julia-1-8",
+    feature = "julia-1-9",
+)))]
+extern "C" {
+    pub static mut jl_small_typeof: [*mut crate::types::jl_datatype_t; 128usize];
+}
+#[cfg_attr(
+    all(
+        any(windows, target_os = "windows", feature = "windows"),
+        any(target_env = "msvc", feature = "yggdrasil")
+    ),
+    link(name = "libjulia", kind = "raw-dylib")
+)]
+#[cfg(any(
+    feature = "julia-1-6",
+    feature = "julia-1-7",
+    feature = "julia-1-8",
+    feature = "julia-1-9",
+    feature = "julia-1-10",
+))]
+extern "C" {
+    pub fn jl_arrayref(a: *mut crate::types::jl_array_t, i: usize)
+        -> *mut crate::types::jl_value_t;
+}
+#[cfg_attr(
+    all(
+        any(windows, target_os = "windows", feature = "windows"),
+        any(target_env = "msvc", feature = "yggdrasil")
+    ),
+    link(name = "libjulia", kind = "raw-dylib")
+)]
+#[cfg(any(
+    feature = "julia-1-6",
+    feature = "julia-1-7",
+    feature = "julia-1-8",
+    feature = "julia-1-9",
+    feature = "julia-1-10",
+))]
+extern "C" {
+    pub fn jl_arrayset(
+        a: *mut crate::types::jl_array_t,
+        v: *mut crate::types::jl_value_t,
+        i: usize,
+    );
+}
+#[cfg_attr(
+    all(
+        any(windows, target_os = "windows", feature = "windows"),
+        any(target_env = "msvc", feature = "yggdrasil")
+    ),
+    link(name = "libjulia", kind = "raw-dylib")
+)]
+#[cfg(any(
+    feature = "julia-1-6",
+    feature = "julia-1-7",
+    feature = "julia-1-8",
+    feature = "julia-1-9",
+    feature = "julia-1-10",
+))]
+extern "C" {
+    pub fn jl_array_typetagdata(a: *mut crate::types::jl_array_t) -> *mut ::std::os::raw::c_char;
+}
+#[cfg_attr(
+    all(
+        any(windows, target_os = "windows", feature = "windows"),
+        any(target_env = "msvc", feature = "yggdrasil")
+    ),
+    link(name = "libjulia", kind = "raw-dylib")
+)]
+extern "C" {
+    pub fn jl_gc_queue_root(root: *const crate::types::jl_value_t);
+}
+#[cfg_attr(
+    all(
+        any(windows, target_os = "windows", feature = "windows"),
+        any(target_env = "msvc", feature = "yggdrasil")
+    ),
+    link(name = "libjulia", kind = "raw-dylib")
+)]
+extern "C" {
+    pub fn jl_compute_fieldtypes(
+        st: *mut crate::types::jl_datatype_t,
+        stack: *mut ::std::os::raw::c_void,
+        #[cfg(not(any(
+            feature = "julia-1-6",
+            feature = "julia-1-7",
+            feature = "julia-1-8",
+            feature = "julia-1-9",
+            feature = "julia-1-10",
+        )))]
+        cacheable: std::ffi::c_int,
+    ) -> *mut crate::types::jl_svec_t;
+}
+#[cfg_attr(
+    all(
+        any(windows, target_os = "windows", feature = "windows"),
+        any(target_env = "msvc", feature = "yggdrasil")
+    ),
+    link(name = "libjulia", kind = "raw-dylib")
+)]
+#[cfg(not(feature = "julia-1-6"))]
+extern "C" {
+    pub fn jl_get_pgcstack() -> *mut *mut crate::types::jl_gcframe_t;
+}
+#[cfg_attr(
+    all(
+        any(windows, target_os = "windows", feature = "windows"),
+        any(target_env = "msvc", feature = "yggdrasil")
+    ),
+    link(name = "libjulia", kind = "raw-dylib")
+)]
+
+extern "C" {
+    pub fn jl_egal(
+        a: *const crate::types::jl_value_t,
+        b: *const crate::types::jl_value_t,
+    ) -> ::std::os::raw::c_int;
+}
+
+#[cfg_attr(
+    all(
+        any(windows, target_os = "windows", feature = "windows"),
+        any(target_env = "msvc", feature = "yggdrasil")
+    ),
+    link(name = "libjulia", kind = "raw-dylib")
+)]
+#[cfg(not(feature = "julia-1-6"))]
+extern "C" {
+    pub fn jl_egal__bits(
+        a: *const crate::types::jl_value_t,
+        b: *const crate::types::jl_value_t,
+        dt: *mut crate::types::jl_datatype_t,
+    ) -> ::std::os::raw::c_int;
+}
+#[cfg_attr(
+    all(
+        any(windows, target_os = "windows", feature = "windows"),
+        any(target_env = "msvc", feature = "yggdrasil")
+    ),
+    link(name = "libjulia", kind = "raw-dylib")
+)]
+#[cfg(not(any(
+    feature = "julia-1-6",
+    feature = "julia-1-7",
+    feature = "julia-1-8",
+    feature = "julia-1-9",
+)))]
+extern "C" {
+    pub fn jl_egal__bitstag(
+        a: *const crate::types::jl_value_t,
+        b: *const crate::types::jl_value_t,
+        dtag: isize,
+    ) -> ::std::os::raw::c_int;
+}
+#[cfg_attr(
+    all(
+        any(windows, target_os = "windows", feature = "windows"),
+        any(target_env = "msvc", feature = "yggdrasil")
+    ),
+    link(name = "libjulia", kind = "raw-dylib")
+)]
+#[cfg(any(
+    feature = "julia-1-6",
+    feature = "julia-1-7",
+    feature = "julia-1-8",
+    feature = "julia-1-9",
+))]
+extern "C" {
+    pub fn jl_egal__special(
+        a: *const crate::types::jl_value_t,
+        b: *const crate::types::jl_value_t,
+        dt: crate::types::jl_datatype_t,
+    ) -> ::std::os::raw::c_int;
+}
+#[cfg_attr(
+    all(
+        any(windows, target_os = "windows", feature = "windows"),
+        any(target_env = "msvc", feature = "yggdrasil")
+    ),
+    link(name = "libjulia", kind = "raw-dylib")
+)]
+#[cfg(not(feature = "julia-1-6"))]
+extern "C" {
+    pub fn jl_egal__unboxed(
+        a: *const crate::types::jl_value_t,
+        b: *const crate::types::jl_value_t,
+        #[cfg(not(any(
+            feature = "julia-1-7",
+            feature = "julia-1-8",
+            feature = "julia-1-9",
+        )))]
+        dtag: isize,
+        #[cfg(any(feature = "julia-1-7", feature = "julia-1-8", feature = "julia-1-9",))]
+        dtag: crate::types::jl_datatype_t,
+    ) -> ::std::os::raw::c_int;
 }
