@@ -3216,12 +3216,10 @@ const unsafe fn jlrs_array_ndims_fast(a: *mut jl_array_t) -> usize {
     }
 
     let a = a as *mut u8;
-    let header = NonNull::new_unchecked(a)
+    let tagged = a
         .sub(std::mem::size_of::<TaggedValue>())
-        .cast::<TaggedValue>()
-        .as_ref()
-        .header
-        .header;
+        .cast::<TaggedValue>();
+    let header = NonNull::new_unchecked(tagged).as_ref().header.header;
     let dt = (header & !15) as *mut RawDataType;
     let params = NonNull::new_unchecked(dt).as_ref().parameters as *mut *mut usize;
     params.add(2).read().read()
