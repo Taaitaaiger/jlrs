@@ -45,12 +45,15 @@ use crate::{
 /// behavior. The type in Rust must always be `#[repr(C)]`. The `DataType` must be an isbits-type.
 ///
 /// [`Value::new`]: crate::data::managed::value::Value::new
-#[cfg_attr(feature = "diagnostics", diagnostic::on_unimplemented(
-    message = "the trait bound `{Self}: IntoJulia` is not satisfied",
-    label = "the trait `IntoJulia` is not implemented for `{Self}`",
-    note = "Custom types that implement `IntoJulia` should be generated with JlrsCore.reflect",
-    note = "Do not implement `ForeignType`, `OpaqueType`, or `ParametricVariant` unless this type is exported to Julia with `julia_module!`"
-))]
+#[cfg_attr(
+    feature = "diagnostics",
+    diagnostic::on_unimplemented(
+        message = "the trait bound `{Self}: IntoJulia` is not satisfied",
+        label = "the trait `IntoJulia` is not implemented for `{Self}`",
+        note = "Custom types that implement `IntoJulia` should be generated with JlrsCore.reflect",
+        note = "Do not implement `ForeignType`, `OpaqueType`, or `ParametricVariant` unless this type is exported to Julia with `julia_module!`"
+    )
+)]
 pub unsafe trait IntoJulia: Sized + 'static {
     /// Returns the associated Julia type of the implementor.
     ///

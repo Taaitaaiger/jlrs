@@ -26,7 +26,8 @@ use std::{
 #[julia_version(until = "1.10")]
 use jl_sys::{jl_apply_array_type, jl_reshape_array};
 use jl_sys::{
-    jl_array_del_end, jl_array_grow_end, jl_value_t, jlrs_array_typetagdata, jlrs_arrayref, jlrs_arrayset
+    jl_array_del_end, jl_array_grow_end, jl_value_t, jlrs_array_typetagdata, jlrs_arrayref,
+    jlrs_arrayset,
 };
 use jlrs_macros::julia_version;
 
@@ -1712,5 +1713,8 @@ const unsafe fn jlrs_array_data_fast(a: *mut jl_sys::jl_array_t) -> *mut std::ff
         ref_inner: GenericMemoryRef,
     }
 
-    NonNull::new_unchecked(a as *mut RawArray).as_ref().ref_inner.ptr_or_offset
+    NonNull::new_unchecked(a as *mut RawArray)
+        .as_ref()
+        .ref_inner
+        .ptr_or_offset
 }

@@ -155,7 +155,7 @@ use crate::{
             valid_layout::{ValidField, ValidLayout},
         },
         managed::{
-            private::ManagedPriv, type_name::TypeName, type_var::TypeVar, union_all::UnionAll, Ref
+            private::ManagedPriv, type_name::TypeName, type_var::TypeVar, union_all::UnionAll, Ref,
         },
         types::{
             abstract_type::AnyType,
