@@ -20,12 +20,7 @@ extern "C"
     jl_value_t *jlrs_svecref(void *t, size_t i);          // X
     jl_value_t *jlrs_svecset(void *t, size_t i, void *x); // X
     size_t jlrs_array_len(jl_array_t *a);
-#if JULIA_VERSION_MINOR <= 10
     void *jlrs_array_data(jl_array_t *a);
-#endif
-#if JULIA_VERSION_MINOR >= 11
-    void *jlrs_array_data(jl_array_t *a);
-#endif
     size_t jlrs_array_ndims(jl_array_t *a);
     jl_value_t *jlrs_exprarg(jl_expr_t *e, size_t n);            // X
     void jlrs_exprargset(jl_expr_t *e, size_t n, jl_value_t *v); // X

@@ -689,15 +689,18 @@ pub unsafe trait ParametricVariant: ParametricBase {
 /// [`Ref::leak`]: crate::data::managed::Ref::leak
 /// [`write_barrier`]: crate::memory::gc::write_barrier
 
-#[cfg_attr(feature = "diagnostics", diagnostic::on_unimplemented(
-    message = "the trait bound `{Self}: ForeignLayout` is not satisfied",
-    label = "the trait `ForeignLayout` is not implemented for `{Self}`",
-    note = "Unless you are calling a function that explicitly takes an implementation of \
+#[cfg_attr(
+    feature = "diagnostics",
+    diagnostic::on_unimplemented(
+        message = "the trait bound `{Self}: ForeignLayout` is not satisfied",
+        label = "the trait `ForeignLayout` is not implemented for `{Self}`",
+        note = "Unless you are calling a function that explicitly takes an implementation of \
     `ForeignType`, this diagnostic is likely incorrect",
-    note = "It is more likely that the issue lies with not implementing `ValidLayout`, `IntoJulia`, `Typecheck`, `Unbox` or `ConstructType`",
-    note = "Custom types that implement the traits mentioned in the previous note should be generated with JlrsCore.reflect",
-    note = "Do not implement `ForeignType`, `OpaqueType`, or `ParametricVariant` unless this type is exported to Julia with `julia_module!`"
-))]
+        note = "It is more likely that the issue lies with not implementing `ValidLayout`, `IntoJulia`, `Typecheck`, `Unbox` or `ConstructType`",
+        note = "Custom types that implement the traits mentioned in the previous note should be generated with JlrsCore.reflect",
+        note = "Do not implement `ForeignType`, `OpaqueType`, or `ParametricVariant` unless this type is exported to Julia with `julia_module!`"
+    )
+)]
 pub unsafe trait ForeignType: Sized + Send + 'static {
     #[doc(hidden)]
     const TYPE_FN: Option<unsafe fn() -> DataType<'static>> = None;

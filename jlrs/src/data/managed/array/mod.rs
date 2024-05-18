@@ -124,10 +124,10 @@ use std::{
 use jl_sys::{
     jl_alloc_vec_any, jl_apply_array_type, jl_array_eltype, jl_array_rank, jl_array_t,
     jl_array_to_string, jl_gc_add_ptr_finalizer, jl_new_struct_uninit, jl_pchar_to_array,
-    jlrs_array_data, jlrs_array_data_owner, jlrs_array_dims_ptr, jlrs_array_has_pointers,
-    jlrs_array_how, jlrs_array_is_pointer_array, jlrs_array_is_union_array, jlrs_array_len,
-    jlrs_array_ndims,
+    jlrs_array_data, jlrs_array_data_owner, jlrs_array_has_pointers, jlrs_array_how,
+    jlrs_array_is_pointer_array, jlrs_array_is_union_array, jlrs_array_len,
 };
+use jlrs_macros::julia_version;
 
 use self::{
     data::accessor::{
@@ -1738,30 +1738,40 @@ impl<'scope, 'data, T, const N: isize> ArrayBase<'scope, 'data, T, N> {
     }
 
     /// Returns the number of dimensions (i.e. the rank) of this array.
+    #[inline]
     pub fn n_dims(self) -> usize {
-        unsafe { jlrs_array_ndims(self.unwrap(Private)) }
+        if N != -1 {
+            N as usize
+        } else {
+            unsafe { jlrs_array_ndims_fast(self.unwrap(Private)) }
+        }
     }
 
     /// Returns the const parameter, `N`.
+    #[inline]
     pub const fn generic_rank(self) -> isize {
         N
     }
 
     /// Returns `true` if the elements are stored as pointers, i.e. `Option<ValueRef>`.
+    #[inline]
     pub fn ptr_array(self) -> bool {
         unsafe { jlrs_array_is_pointer_array(self.unwrap(Private)) != 0 }
     }
 
     /// Returns `true` if the elements are stored inline and contain references to managed data.
+    #[inline]
     pub fn has_ptr(self) -> bool {
         unsafe { jlrs_array_has_pointers(self.unwrap(Private)) != 0 }
     }
 
+    #[inline]
     pub fn union_array(self) -> bool {
         unsafe { jlrs_array_is_union_array(self.unwrap(Private)) != 0 }
     }
 
     /// Returns the dimensions of this array.
+    #[inline]
     pub fn dimensions<'borrow>(&'borrow self) -> ArrayDimensions<'borrow, N> {
         unsafe {
             let ptr = jlrs_array_dims_ptr(self.unwrap(Private));
@@ -1772,6 +1782,7 @@ impl<'scope, 'data, T, const N: isize> ArrayBase<'scope, 'data, T, N> {
     }
 
     /// Returns a pointer to this array's data.
+    #[inline]
     pub unsafe fn data_ptr(self) -> *mut c_void {
         jlrs_array_data(self.unwrap(Private))
     }
@@ -1932,6 +1943,7 @@ impl<'scope, 'data, T, const N: isize> ArrayBase<'scope, 'data, T, N> {
     ///
     /// No mutable accessors to this data must exist. The element type must be an isbits type, and
     /// `L` must be a valid field layout of the element type.
+    #[inline]
     pub unsafe fn bits_data_unchecked<'borrow, L>(
         &'borrow self,
     ) -> BitsAccessor<'borrow, 'scope, 'data, T, L, N>
@@ -1949,6 +1961,7 @@ impl<'scope, 'data, T, const N: isize> ArrayBase<'scope, 'data, T, N> {
     /// Safety:
     ///
     /// No other accessors to this data must exist.
+    #[inline]
     pub unsafe fn bits_data_mut<'borrow>(
         &'borrow mut self,
     ) -> BitsAccessorMut<'borrow, 'scope, 'data, T, T, N>
@@ -2015,6 +2028,7 @@ impl<'scope, 'data, T, const N: isize> ArrayBase<'scope, 'data, T, N> {
     ///
     /// No other accessors to this data must exist. The element type must be an isbits type, and
     /// `L` must be a valid field layout of the element type.
+    #[inline]
     pub unsafe fn bits_data_mut_unchecked<'borrow, L>(
         &'borrow mut self,
     ) -> BitsAccessorMut<'borrow, 'scope, 'data, T, L, N>
@@ -2032,6 +2046,7 @@ impl<'scope, 'data, T, const N: isize> ArrayBase<'scope, 'data, T, N> {
     /// Safety:
     ///
     /// No mutable accessors to this data must exist.
+    #[inline]
     pub unsafe fn inline_data<'borrow>(
         &'borrow self,
     ) -> InlineAccessor<'borrow, 'scope, 'data, T, T, N>
@@ -2050,6 +2065,7 @@ impl<'scope, 'data, T, const N: isize> ArrayBase<'scope, 'data, T, N> {
     /// Safety:
     ///
     /// No mutable accessors to this data must exist.
+    #[inline]
     pub unsafe fn inline_data_with_layout<'borrow, L>(
         &'borrow self,
     ) -> InlineAccessor<'borrow, 'scope, 'data, T, L, N>
@@ -2098,6 +2114,7 @@ impl<'scope, 'data, T, const N: isize> ArrayBase<'scope, 'data, T, N> {
     ///
     /// No mutable accessors to this data must exist. The elements must be stored inline, and `L`
     /// must be a valid field layout of the element type.
+    #[inline]
     pub unsafe fn inline_data_unchecked<'borrow, L>(
         &'borrow self,
     ) -> InlineAccessor<'borrow, 'scope, 'data, T, L, N>
@@ -2115,6 +2132,7 @@ impl<'scope, 'data, T, const N: isize> ArrayBase<'scope, 'data, T, N> {
     /// Safety:
     ///
     /// No other accessors to this data must exist.
+    #[inline]
     pub unsafe fn inline_data_mut<'borrow>(
         &'borrow mut self,
     ) -> InlineAccessorMut<'borrow, 'scope, 'data, T, T, N>
@@ -2133,6 +2151,7 @@ impl<'scope, 'data, T, const N: isize> ArrayBase<'scope, 'data, T, N> {
     /// Safety:
     ///
     /// No other accessors to this data must exist.
+    #[inline]
     pub unsafe fn inline_data_mut_with_layout<'borrow, L>(
         &'borrow mut self,
     ) -> InlineAccessorMut<'borrow, 'scope, 'data, T, L, N>
@@ -2182,6 +2201,7 @@ impl<'scope, 'data, T, const N: isize> ArrayBase<'scope, 'data, T, N> {
     ///
     /// No other accessors to this data must exist. The elements must be stored inline, and `L`
     /// must be a valid field layout of the element type.
+    #[inline]
     pub unsafe fn inline_data_mut_unchecked<'borrow, L>(
         &'borrow mut self,
     ) -> InlineAccessorMut<'borrow, 'scope, 'data, T, L, N>
@@ -2198,6 +2218,7 @@ impl<'scope, 'data, T, const N: isize> ArrayBase<'scope, 'data, T, N> {
     /// Safety:
     ///
     /// No mutable accessors to this data must exist.
+    #[inline]
     pub unsafe fn union_data<'borrow>(
         &'borrow self,
     ) -> BitsUnionAccessor<'borrow, 'scope, 'data, T, N>
@@ -2237,6 +2258,7 @@ impl<'scope, 'data, T, const N: isize> ArrayBase<'scope, 'data, T, N> {
     ///
     /// No mutable accessors to this data must exist. The element type must be a union of isbits
     /// types.
+    #[inline]
     pub unsafe fn union_data_unchecked<'borrow>(
         &'borrow self,
     ) -> BitsUnionAccessor<'borrow, 'scope, 'data, T, N> {
@@ -2250,6 +2272,7 @@ impl<'scope, 'data, T, const N: isize> ArrayBase<'scope, 'data, T, N> {
     /// Safety:
     ///
     /// No other accessors to this data must exist.
+    #[inline]
     pub unsafe fn union_data_mut<'borrow>(
         &'borrow mut self,
     ) -> BitsUnionAccessorMut<'borrow, 'scope, 'data, T, N>
@@ -2289,6 +2312,7 @@ impl<'scope, 'data, T, const N: isize> ArrayBase<'scope, 'data, T, N> {
     ///
     /// No other accessors to this data must exist. The element type must be a union of isbits
     /// types.
+    #[inline]
     pub unsafe fn union_data_mut_unchecked<'borrow>(
         &'borrow mut self,
     ) -> BitsUnionAccessorMut<'borrow, 'scope, 'data, T, N> {
@@ -2303,6 +2327,7 @@ impl<'scope, 'data, T, const N: isize> ArrayBase<'scope, 'data, T, N> {
     /// Safety:
     ///
     /// No mutable accessors to this data must exist.
+    #[inline]
     pub unsafe fn managed_data<'borrow>(
         &'borrow self,
     ) -> ManagedAccessor<'borrow, 'scope, 'data, T, T, N>
@@ -2342,6 +2367,7 @@ impl<'scope, 'data, T, const N: isize> ArrayBase<'scope, 'data, T, N> {
     ///
     /// No mutable accessors to this data must exist. The element type must be compatible with
     /// `L`.
+    #[inline]
     pub unsafe fn managed_data_unchecked<'borrow, L>(
         &'borrow self,
     ) -> ManagedAccessor<'borrow, 'scope, 'data, T, L, N>
@@ -2359,6 +2385,7 @@ impl<'scope, 'data, T, const N: isize> ArrayBase<'scope, 'data, T, N> {
     /// Safety:
     ///
     /// No other accessors to this data must exist.
+    #[inline]
     pub unsafe fn managed_data_mut<'borrow>(
         &'borrow mut self,
     ) -> ManagedAccessorMut<'borrow, 'scope, 'data, T, T, N>
@@ -2398,6 +2425,7 @@ impl<'scope, 'data, T, const N: isize> ArrayBase<'scope, 'data, T, N> {
     ///
     /// No other accessors to this data must exist. The element type must be compatible with
     /// `L`.
+    #[inline]
     pub unsafe fn managed_data_mut_unchecked<'borrow, L>(
         &'borrow mut self,
     ) -> ManagedAccessorMut<'borrow, 'scope, 'data, T, L, N>
@@ -2415,6 +2443,7 @@ impl<'scope, 'data, T, const N: isize> ArrayBase<'scope, 'data, T, N> {
     /// Safety:
     ///
     /// No mutable accessors to this data must exist.
+    #[inline]
     pub unsafe fn value_data<'borrow>(&'borrow self) -> ValueAccessor<'borrow, 'scope, 'data, T, N>
     where
         T: Managed<'scope, 'data> + ConstructType,
@@ -2447,6 +2476,7 @@ impl<'scope, 'data, T, const N: isize> ArrayBase<'scope, 'data, T, N> {
     /// Safety:
     ///
     /// No mutable accessors to this data must exist. The elements must not be stored inline.
+    #[inline]
     pub unsafe fn value_data_unchecked<'borrow>(
         &'borrow self,
     ) -> ValueAccessor<'borrow, 'scope, 'data, T, N> {
@@ -2461,6 +2491,7 @@ impl<'scope, 'data, T, const N: isize> ArrayBase<'scope, 'data, T, N> {
     /// Safety:
     ///
     /// No other accessors to this data must exist.
+    #[inline]
     pub unsafe fn value_data_mut<'borrow>(
         &'borrow mut self,
     ) -> ValueAccessorMut<'borrow, 'scope, 'data, T, N>
@@ -2495,6 +2526,7 @@ impl<'scope, 'data, T, const N: isize> ArrayBase<'scope, 'data, T, N> {
     /// Safety:
     ///
     /// No other accessors to this data must exist. The elements must not be stored inline.
+    #[inline]
     pub unsafe fn value_data_mut_unchecked<'borrow>(
         &'borrow mut self,
     ) -> ValueAccessorMut<'borrow, 'scope, 'data, T, N> {
@@ -2506,6 +2538,7 @@ impl<'scope, 'data, T, const N: isize> ArrayBase<'scope, 'data, T, N> {
     /// Safety:
     ///
     /// No mutable accessors to this data must exist.
+    #[inline]
     pub unsafe fn indeterminate_data<'borrow>(
         &'borrow self,
     ) -> IndeterminateAccessor<'borrow, 'scope, 'data, T, N> {
@@ -2517,6 +2550,7 @@ impl<'scope, 'data, T, const N: isize> ArrayBase<'scope, 'data, T, N> {
     /// Safety:
     ///
     /// No other accessors to this data must exist.
+    #[inline]
     pub unsafe fn indeterminate_data_mut<'borrow>(
         &'borrow mut self,
     ) -> IndeterminateAccessorMut<'borrow, 'scope, 'data, T, N> {
@@ -2592,6 +2626,7 @@ impl<'scope, 'data, const N: isize> ArrayBase<'scope, 'data, Unknown, N> {
 
 impl<'scope, 'data, T, const N: isize> ArrayBase<'scope, 'data, T, N> {
     /// Forget the rank of this array.
+    #[inline]
     pub fn forget_rank(self) -> ArrayBase<'scope, 'data, T, -1> {
         ArrayBase(
             self.unwrap_non_null(Private),
@@ -2602,6 +2637,7 @@ impl<'scope, 'data, T, const N: isize> ArrayBase<'scope, 'data, T, N> {
     }
 
     /// Forget the element type of this array.
+    #[inline]
     pub fn forget_type(self) -> ArrayBase<'scope, 'data, Unknown, N> {
         ArrayBase(
             self.unwrap_non_null(Private),
@@ -2612,6 +2648,7 @@ impl<'scope, 'data, T, const N: isize> ArrayBase<'scope, 'data, T, N> {
     }
 
     /// Asserts that the rank is correct.
+    #[inline]
     pub fn assert_rank(self) {
         if N == -1 {
             return;
@@ -2823,7 +2860,6 @@ impl<'scope, 'data, T, const N: isize> ManagedPriv<'scope, 'data>
 }
 
 unsafe impl<const N: isize> ValidField for Option<RankedArrayRef<'_, '_, N>> {
-    #[inline]
     fn valid_field(v: Value) -> bool {
         if v.is::<DataType>() {
             let dt = unsafe { v.cast_unchecked::<DataType>() };
@@ -2875,7 +2911,6 @@ unsafe impl<const N: isize> ValidField for Option<RankedArrayRef<'_, '_, N>> {
 unsafe impl<T: ConstructType, const N: isize> ValidField
     for Option<TypedRankedArrayRef<'_, '_, T, N>>
 {
-    #[inline]
     fn valid_field(v: Value) -> bool {
         if v.is::<DataType>() {
             let dt = unsafe { v.cast_unchecked::<DataType>() };
@@ -2999,6 +3034,7 @@ unsafe impl<'scope, 'data, const N: isize> ConstructType for RankedArray<'scope,
         }
     }
 
+    #[inline]
     fn base_type<'target, Tgt>(target: &Tgt) -> Option<Value<'target, 'static>>
     where
         Tgt: Target<'target>,
@@ -3119,4 +3155,72 @@ unsafe extern "C" fn droparray<T>(a: Array) {
 
     let data = Vec::from_raw_parts(data_ptr, sz, sz);
     std::mem::drop(data);
+}
+
+// If LTO is not enabled accessing arrays is very slow, so we're going to optimize
+// the common case a little.
+#[julia_version(until = "1.10")]
+#[inline]
+const unsafe fn jlrs_array_dims_ptr(a: *mut jl_array_t) -> *mut usize {
+    #[repr(C)]
+    struct RawArray {
+        data: *mut c_void,
+        length: usize,
+        flags: u16,
+        elsize: u16,
+        offset: u32,
+        nrows: usize,
+    }
+
+    const OFFSET: usize = std::mem::offset_of!(RawArray, nrows);
+    (a as *mut u8).add(OFFSET) as *mut usize
+}
+
+#[julia_version(since = "1.11")]
+#[inline]
+const unsafe fn jlrs_array_dims_ptr(a: *mut jl_array_t) -> *mut usize {
+    #[repr(C)]
+    struct GenericMemoryRef {
+        ptr_or_offset: *mut std::ffi::c_void,
+        mem: *mut std::ffi::c_void,
+    }
+
+    #[repr(C)]
+    struct RawArray {
+        ref_inner: GenericMemoryRef,
+    }
+
+    const OFFSET: usize = std::mem::size_of::<RawArray>();
+    (a as *mut u8).add(OFFSET) as *mut usize
+}
+
+const unsafe fn jlrs_array_ndims_fast(a: *mut jl_array_t) -> usize {
+    #[repr(C)]
+    struct RawDataType {
+        name: *mut c_void,
+        super_ty: *mut c_void,
+        parameters: *mut c_void,
+    }
+
+    #[repr(C)]
+    union Header {
+        header: usize,
+        next: *mut TaggedValue,
+        ty: *mut RawDataType,
+        bits: usize,
+    }
+
+    #[repr(C)]
+    struct TaggedValue {
+        header: Header,
+    }
+
+    let a = a as *mut u8;
+    let tagged = a
+        .sub(std::mem::size_of::<TaggedValue>())
+        .cast::<TaggedValue>();
+    let header = NonNull::new_unchecked(tagged).as_ref().header.header;
+    let dt = (header & !15) as *mut RawDataType;
+    let params = NonNull::new_unchecked(dt).as_ref().parameters as *mut *mut usize;
+    params.add(2).read().read()
 }

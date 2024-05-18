@@ -350,10 +350,12 @@ pub struct CCallRefRet<T: ConstructType>(TypedValueRet<T>);
 
 impl<T: ConstructType> CCallRefRet<T> {
     /// Convert a `TypedValueRet<T>` to a `CCallRefRet<T>`.
+    #[inline]
     pub fn new(value: TypedValueRet<T>) -> Self {
         CCallRefRet(value)
     }
 
+    #[inline]
     pub fn into_typed_value(self) -> TypedValueRet<T> {
         self.0
     }
@@ -361,11 +363,10 @@ impl<T: ConstructType> CCallRefRet<T> {
 
 unsafe impl<T: ConstructType> CCallReturn for CCallRefRet<T> {
     type FunctionReturnType = T;
-
     type CCallReturnType = RefTypeConstructor<T>;
-
     type ReturnAs = Self;
 
+    #[inline]
     unsafe fn return_or_throw(self) -> Self::ReturnAs {
         self
     }
