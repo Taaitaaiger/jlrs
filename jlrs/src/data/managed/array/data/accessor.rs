@@ -26,8 +26,7 @@ use std::{
 #[julia_version(until = "1.10")]
 use jl_sys::{jl_apply_array_type, jl_reshape_array};
 use jl_sys::{
-    jl_array_del_end, jl_array_grow_end, jl_value_t, jlrs_array_data, jlrs_array_typetagdata,
-    jlrs_arrayref, jlrs_arrayset,
+    jl_array_del_end, jl_array_grow_end, jl_value_t, jlrs_array_typetagdata, jlrs_arrayref, jlrs_arrayset
 };
 use jlrs_macros::julia_version;
 
@@ -375,7 +374,7 @@ where
         let idx = array_dims.index_of(&index)?;
 
         unsafe {
-            let elem = jlrs_array_data(self.array.unwrap(Private))
+            let elem = jlrs_array_data_fast(self.array.unwrap(Private))
                 .cast::<L>()
                 .add(idx);
 
@@ -390,7 +389,7 @@ where
         let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
         let idx = self.array.dimensions().index_of_unchecked(&index);
 
-        let elem = jlrs_array_data(self.array.unwrap(Private))
+        let elem = jlrs_array_data_fast(self.array.unwrap(Private))
             .cast::<L>()
             .add(idx);
 
@@ -401,7 +400,7 @@ where
     pub fn as_slice<'a>(&'a self) -> &'a [L] {
         unsafe {
             let sz = self.array.dimensions().size();
-            let ptr = jlrs_array_data(self.array.unwrap(Private)).cast::<L>();
+            let ptr = jlrs_array_data_fast(self.array.unwrap(Private)).cast::<L>();
             std::slice::from_raw_parts(ptr, sz)
         }
     }
@@ -410,7 +409,7 @@ where
     pub fn into_slice(self) -> &'borrow [L] {
         unsafe {
             let sz = self.array.dimensions().size();
-            let ptr = jlrs_array_data(self.array.unwrap(Private)).cast::<L>();
+            let ptr = jlrs_array_data_fast(self.array.unwrap(Private)).cast::<L>();
             std::slice::from_raw_parts(ptr, sz)
         }
     }
@@ -434,7 +433,7 @@ where
         let idx = array_dims.index_of(&index)?;
 
         unsafe {
-            let elem = jlrs_array_data(self.array.unwrap(Private))
+            let elem = jlrs_array_data_fast(self.array.unwrap(Private))
                 .cast::<MaybeUninit<L>>()
                 .add(idx);
 
@@ -449,7 +448,7 @@ where
         let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
         let idx = self.array.dimensions().index_of_unchecked(&index);
 
-        let elem = jlrs_array_data(self.array.unwrap(Private))
+        let elem = jlrs_array_data_fast(self.array.unwrap(Private))
             .cast::<MaybeUninit<L>>()
             .add(idx);
 
@@ -460,7 +459,7 @@ where
     pub fn as_uninit_slice<'a>(&'a self) -> &'a [MaybeUninit<L>] {
         unsafe {
             let sz = self.array.dimensions().size();
-            let ptr = jlrs_array_data(self.array.unwrap(Private)).cast::<MaybeUninit<L>>();
+            let ptr = jlrs_array_data_fast(self.array.unwrap(Private)).cast::<MaybeUninit<L>>();
             std::slice::from_raw_parts(ptr, sz)
         }
     }
@@ -469,7 +468,7 @@ where
     pub fn into_uninit_slice(self) -> &'borrow [MaybeUninit<L>] {
         unsafe {
             let sz = self.array.dimensions().size();
-            let ptr = jlrs_array_data(self.array.unwrap(Private)).cast::<MaybeUninit<L>>();
+            let ptr = jlrs_array_data_fast(self.array.unwrap(Private)).cast::<MaybeUninit<L>>();
             std::slice::from_raw_parts(ptr, sz)
         }
     }
@@ -504,7 +503,7 @@ impl<'borrow, 'scope, 'data, T, L, D: Dims, const N: isize> Index<D>
         let idx = array_dims.index_of(&index).unwrap();
 
         unsafe {
-            let elem = jlrs_array_data(self.array.unwrap(Private))
+            let elem = jlrs_array_data_fast(self.array.unwrap(Private))
                 .cast::<L>()
                 .add(idx);
 
@@ -548,7 +547,7 @@ where
         let idx = array_dims.index_of(&index)?;
 
         unsafe {
-            let elem = jlrs_array_data(self.array.unwrap(Private))
+            let elem = jlrs_array_data_fast(self.array.unwrap(Private))
                 .cast::<L>()
                 .add(idx);
 
@@ -563,7 +562,7 @@ where
         let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
         let idx = self.array.dimensions().index_of_unchecked(&index);
 
-        let elem = jlrs_array_data(self.array.unwrap(Private))
+        let elem = jlrs_array_data_fast(self.array.unwrap(Private))
             .cast::<L>()
             .add(idx);
 
@@ -578,7 +577,7 @@ where
         let idx = array_dims.index_of(&index)?;
 
         unsafe {
-            let elem = jlrs_array_data(self.array.unwrap(Private))
+            let elem = jlrs_array_data_fast(self.array.unwrap(Private))
                 .cast::<MaybeUninit<L>>()
                 .add(idx);
 
@@ -593,7 +592,7 @@ where
         let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
         let idx = self.array.dimensions().index_of_unchecked(&index);
 
-        let elem = jlrs_array_data(self.array.unwrap(Private))
+        let elem = jlrs_array_data_fast(self.array.unwrap(Private))
             .cast::<MaybeUninit<L>>()
             .add(idx);
 
@@ -611,7 +610,7 @@ where
         match idx {
             None => Err(value),
             Some(idx) => unsafe {
-                let elem = jlrs_array_data(self.array.unwrap(Private))
+                let elem = jlrs_array_data_fast(self.array.unwrap(Private))
                     .cast::<L>()
                     .add(idx);
 
@@ -628,7 +627,7 @@ where
         let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
         let idx = self.array.dimensions().index_of_unchecked(&index);
 
-        let elem = jlrs_array_data(self.array.unwrap(Private))
+        let elem = jlrs_array_data_fast(self.array.unwrap(Private))
             .cast::<L>()
             .add(idx);
 
@@ -639,7 +638,7 @@ where
     pub fn as_mut_slice<'a>(&'a mut self) -> &'a mut [L] {
         unsafe {
             let sz = self.array.dimensions().size();
-            let ptr = jlrs_array_data(self.array.unwrap(Private)).cast::<L>();
+            let ptr = jlrs_array_data_fast(self.array.unwrap(Private)).cast::<L>();
             std::slice::from_raw_parts_mut(ptr, sz)
         }
     }
@@ -648,7 +647,7 @@ where
     pub fn into_mut_slice(self) -> &'borrow mut [L] {
         unsafe {
             let sz = self.array.dimensions().size();
-            let ptr = jlrs_array_data(self.array.unwrap(Private)).cast::<L>();
+            let ptr = jlrs_array_data_fast(self.array.unwrap(Private)).cast::<L>();
             std::slice::from_raw_parts_mut(ptr, sz)
         }
     }
@@ -657,7 +656,7 @@ where
     pub fn as_mut_uninit_slice<'a>(&'a mut self) -> &'a mut [MaybeUninit<L>] {
         unsafe {
             let sz = self.array.dimensions().size();
-            let ptr = jlrs_array_data(self.array.unwrap(Private)).cast::<MaybeUninit<L>>();
+            let ptr = jlrs_array_data_fast(self.array.unwrap(Private)).cast::<MaybeUninit<L>>();
             std::slice::from_raw_parts_mut(ptr, sz)
         }
     }
@@ -666,7 +665,7 @@ where
     pub fn into_mut_uninit_slice(self) -> &'borrow mut [MaybeUninit<L>] {
         unsafe {
             let sz = self.array.dimensions().size();
-            let ptr = jlrs_array_data(self.array.unwrap(Private)).cast::<MaybeUninit<L>>();
+            let ptr = jlrs_array_data_fast(self.array.unwrap(Private)).cast::<MaybeUninit<L>>();
             std::slice::from_raw_parts_mut(ptr, sz)
         }
     }
@@ -767,7 +766,7 @@ impl<'borrow, 'scope, 'data, T, L, D: Dims, const N: isize> Index<D>
         let idx = array_dims.index_of(&index).unwrap();
 
         unsafe {
-            let elem = jlrs_array_data(self.array.unwrap(Private))
+            let elem = jlrs_array_data_fast(self.array.unwrap(Private))
                 .cast::<L>()
                 .add(idx);
 
@@ -785,7 +784,7 @@ impl<'borrow, 'scope, 'data, T, L, D: Dims, const N: isize> IndexMut<D>
         let idx = array_dims.index_of(&index).unwrap();
 
         unsafe {
-            let elem = jlrs_array_data(self.array.unwrap(Private))
+            let elem = jlrs_array_data_fast(self.array.unwrap(Private))
                 .cast::<L>()
                 .add(idx);
 
@@ -833,7 +832,7 @@ where
         let idx = array_dims.index_of(&index)?;
 
         unsafe {
-            let elem = jlrs_array_data(self.array.unwrap(Private))
+            let elem = jlrs_array_data_fast(self.array.unwrap(Private))
                 .cast::<L>()
                 .add(idx);
 
@@ -848,7 +847,7 @@ where
         let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
         let idx = self.array.dimensions().index_of_unchecked(&index);
 
-        let elem = jlrs_array_data(self.array.unwrap(Private))
+        let elem = jlrs_array_data_fast(self.array.unwrap(Private))
             .cast::<L>()
             .add(idx);
 
@@ -862,7 +861,7 @@ where
         let idx = array_dims.index_of(&index)?;
 
         unsafe {
-            let elem = jlrs_array_data(self.array.unwrap(Private))
+            let elem = jlrs_array_data_fast(self.array.unwrap(Private))
                 .cast::<MaybeUninit<L>>()
                 .add(idx);
 
@@ -877,7 +876,7 @@ where
         let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
         let idx = self.array.dimensions().index_of_unchecked(&index);
 
-        let elem = jlrs_array_data(self.array.unwrap(Private))
+        let elem = jlrs_array_data_fast(self.array.unwrap(Private))
             .cast::<MaybeUninit<L>>()
             .add(idx);
 
@@ -888,7 +887,7 @@ where
     pub fn as_slice<'a>(&'a self) -> &'a [L] {
         unsafe {
             let sz = self.array.dimensions().size();
-            let ptr = jlrs_array_data(self.array.unwrap(Private)).cast::<L>();
+            let ptr = jlrs_array_data_fast(self.array.unwrap(Private)).cast::<L>();
             std::slice::from_raw_parts(ptr, sz)
         }
     }
@@ -897,7 +896,7 @@ where
     pub fn into_slice(self) -> &'borrow [L] {
         unsafe {
             let sz = self.array.dimensions().size();
-            let ptr = jlrs_array_data(self.array.unwrap(Private)).cast::<L>();
+            let ptr = jlrs_array_data_fast(self.array.unwrap(Private)).cast::<L>();
             std::slice::from_raw_parts(ptr, sz)
         }
     }
@@ -906,7 +905,7 @@ where
     pub fn as_uninit_slice<'a>(&'a self) -> &'a [MaybeUninit<L>] {
         unsafe {
             let sz = self.array.dimensions().size();
-            let ptr = jlrs_array_data(self.array.unwrap(Private)).cast::<MaybeUninit<L>>();
+            let ptr = jlrs_array_data_fast(self.array.unwrap(Private)).cast::<MaybeUninit<L>>();
             std::slice::from_raw_parts(ptr, sz)
         }
     }
@@ -915,7 +914,7 @@ where
     pub fn into_uninit_slice(self) -> &'borrow [MaybeUninit<L>] {
         unsafe {
             let sz = self.array.dimensions().size();
-            let ptr = jlrs_array_data(self.array.unwrap(Private)).cast::<MaybeUninit<L>>();
+            let ptr = jlrs_array_data_fast(self.array.unwrap(Private)).cast::<MaybeUninit<L>>();
             std::slice::from_raw_parts(ptr, sz)
         }
     }
@@ -932,7 +931,7 @@ impl<'borrow, 'scope, 'data, T, L, D: Dims, const N: isize> Index<D>
         let idx = array_dims.index_of(&index).unwrap();
 
         unsafe {
-            let elem = jlrs_array_data(self.array.unwrap(Private))
+            let elem = jlrs_array_data_fast(self.array.unwrap(Private))
                 .cast::<L>()
                 .add(idx);
 
@@ -1038,7 +1037,7 @@ impl<'borrow, 'scope, 'data, T, const N: isize> ValueAccessor<'borrow, 'scope, '
         let idx = array_dims.index_of(&index)?;
 
         unsafe {
-            let elem = jlrs_array_data(self.array.unwrap(Private))
+            let elem = jlrs_array_data_fast(self.array.unwrap(Private))
                 .cast::<AtomicValueRef<Value>>()
                 .add(idx);
 
@@ -1061,7 +1060,7 @@ impl<'borrow, 'scope, 'data, T, const N: isize> ValueAccessor<'borrow, 'scope, '
         let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
         let idx = self.array.dimensions().index_of_unchecked(&index);
 
-        let elem = jlrs_array_data(self.array.unwrap(Private))
+        let elem = jlrs_array_data_fast(self.array.unwrap(Private))
             .cast::<AtomicValueRef<Value>>()
             .add(idx);
 
@@ -1075,7 +1074,7 @@ impl<'borrow, 'scope, 'data, T, const N: isize> ValueAccessor<'borrow, 'scope, '
     pub fn as_slice<'a>(&'a self) -> &'a [AtomicValueRef<Value<'scope, 'data>>] {
         unsafe {
             let sz = self.array.dimensions().size();
-            let ptr = jlrs_array_data(self.array.unwrap(Private)).cast();
+            let ptr = jlrs_array_data_fast(self.array.unwrap(Private)).cast();
             std::slice::from_raw_parts(ptr, sz)
         }
     }
@@ -1084,7 +1083,7 @@ impl<'borrow, 'scope, 'data, T, const N: isize> ValueAccessor<'borrow, 'scope, '
     pub fn into_slice(self) -> &'borrow [AtomicValueRef<Value<'scope, 'data>>] {
         unsafe {
             let sz = self.array.dimensions().size();
-            let ptr = jlrs_array_data(self.array.unwrap(Private)).cast();
+            let ptr = jlrs_array_data_fast(self.array.unwrap(Private)).cast();
             std::slice::from_raw_parts(ptr, sz)
         }
     }
@@ -1101,7 +1100,7 @@ impl<'borrow, 'scope, 'data, T, D: Dims, const N: isize> Index<D>
         let idx = array_dims.index_of(&index).unwrap();
 
         unsafe {
-            let elem = jlrs_array_data(self.array.unwrap(Private))
+            let elem = jlrs_array_data_fast(self.array.unwrap(Private))
                 .cast::<Self::Output>()
                 .add(idx);
 
@@ -1188,7 +1187,7 @@ where
         let idx = array_dims.index_of(&index)?;
 
         unsafe {
-            let elem = jlrs_array_data(self.array.unwrap(Private))
+            let elem = jlrs_array_data_fast(self.array.unwrap(Private))
                 .cast::<AtomicValueRef<M>>()
                 .add(idx);
 
@@ -1211,7 +1210,7 @@ where
         let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
         let idx = self.array.dimensions().index_of_unchecked(&index);
 
-        let elem = jlrs_array_data(self.array.unwrap(Private))
+        let elem = jlrs_array_data_fast(self.array.unwrap(Private))
             .cast::<AtomicValueRef<M>>()
             .add(idx);
 
@@ -1225,7 +1224,7 @@ where
     pub fn as_slice<'a>(&'a self) -> &'a [AtomicValueRef<M>] {
         unsafe {
             let sz = self.array.dimensions().size();
-            let ptr = jlrs_array_data(self.array.unwrap(Private)).cast();
+            let ptr = jlrs_array_data_fast(self.array.unwrap(Private)).cast();
             std::slice::from_raw_parts(ptr, sz)
         }
     }
@@ -1234,7 +1233,7 @@ where
     pub fn into_slice(self) -> &'borrow [AtomicValueRef<M>] {
         unsafe {
             let sz = self.array.dimensions().size();
-            let ptr = jlrs_array_data(self.array.unwrap(Private)).cast();
+            let ptr = jlrs_array_data_fast(self.array.unwrap(Private)).cast();
             std::slice::from_raw_parts(ptr, sz)
         }
     }
@@ -1250,7 +1249,7 @@ impl<'borrow, 'scope, 'data, T, M: Managed<'scope, 'data>, D: Dims, const N: isi
         let idx = array_dims.index_of(&index).unwrap();
 
         unsafe {
-            let elem = jlrs_array_data(self.array.unwrap(Private))
+            let elem = jlrs_array_data_fast(self.array.unwrap(Private))
                 .cast::<Self::Output>()
                 .add(idx);
 
@@ -1684,4 +1683,34 @@ impl<'scope, 'data, T, const N: isize> Accessor<'scope, 'data, T, N>
 impl<'scope, 'data, T, const N: isize> AccessorMut<'scope, 'data, T, N>
     for IndeterminateAccessorMut<'_, 'scope, 'data, T, N>
 {
+}
+
+// If LTO is not enabled accessing arrays is very slow, so we're going to optimize
+// the common case a little.
+#[julia_version(until = "1.10")]
+#[inline]
+const unsafe fn jlrs_array_data_fast(a: *mut jl_sys::jl_array_t) -> *mut std::ffi::c_void {
+    #[repr(C)]
+    struct RawArray {
+        ptr: *mut std::ffi::c_void,
+    }
+
+    NonNull::new_unchecked(a as *mut RawArray).as_ref().ptr
+}
+
+#[julia_version(since = "1.11")]
+#[inline]
+const unsafe fn jlrs_array_data_fast(a: *mut jl_sys::jl_array_t) -> *mut std::ffi::c_void {
+    #[repr(C)]
+    struct GenericMemoryRef {
+        ptr_or_offset: *mut std::ffi::c_void,
+        mem: *mut std::ffi::c_void,
+    }
+
+    #[repr(C)]
+    struct RawArray {
+        ref_inner: GenericMemoryRef,
+    }
+
+    NonNull::new_unchecked(a as *mut RawArray).as_ref().ref_inner.ptr_or_offset
 }

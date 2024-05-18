@@ -1149,22 +1149,6 @@ extern "C" {
 
     pub fn jlrs_array_len(a: *mut crate::types::jl_array_t) -> usize;
 
-    #[cfg(any(
-        feature = "julia-1-6",
-        feature = "julia-1-7",
-        feature = "julia-1-8",
-        feature = "julia-1-9",
-        feature = "julia-1-10",
-    ))]
-    pub fn jlrs_array_data(a: *mut crate::types::jl_array_t) -> *mut std::ffi::c_void;
-
-    #[cfg(not(any(
-        feature = "julia-1-6",
-        feature = "julia-1-7",
-        feature = "julia-1-8",
-        feature = "julia-1-9",
-        feature = "julia-1-10",
-    )))]
     pub fn jlrs_array_data(a: *mut crate::types::jl_array_t) -> *mut std::ffi::c_void;
 
     pub fn jlrs_array_ndims(a: *mut crate::types::jl_array_t) -> usize;
