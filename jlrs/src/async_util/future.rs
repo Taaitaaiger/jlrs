@@ -9,7 +9,7 @@ use std::{
     task::{Context, Poll, Waker},
 };
 
-use jl_sys::{jl_call, jl_call1, jl_exception_occurred, jl_get_current_task};
+use jl_sys::{jl_call, jl_call1, jl_exception_occurred, jlrs_current_task};
 use jlrs_macros::julia_version;
 
 use crate::{
@@ -48,7 +48,7 @@ where
     F: Future<Output = T>,
 {
     pub unsafe fn new(fut: F) -> Self {
-        debug_assert!(!jl_get_current_task().is_null(), "invalid_thread");
+        debug_assert!(!jlrs_current_task().is_null(), "invalid_thread");
         let ptls = get_tls();
         GcSafeFuture {
             fut,
@@ -97,7 +97,7 @@ where
     H: Clone,
 {
     pub unsafe fn new(fut: F, on_error: H) -> Self {
-        debug_assert!(!jl_get_current_task().is_null(), "invalid_thread");
+        debug_assert!(!jlrs_current_task().is_null(), "invalid_thread");
         TryCatchFuture {
             fut,
             on_error,
@@ -153,7 +153,7 @@ where
 {
     pub fn new(fut: F) -> Self {
         unsafe {
-            debug_assert!(!jl_get_current_task().is_null(), "invalid_thread");
+            debug_assert!(!jlrs_current_task().is_null(), "invalid_thread");
             let ptls = get_tls();
             GcUnsafeFuture {
                 fut,
