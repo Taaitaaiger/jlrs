@@ -574,9 +574,6 @@ extern "C" {
         rhs: *mut crate::types::jl_value_t,
     );
 
-    // Unused
-    pub fn jl_field_isdefined(v: *mut crate::types::jl_value_t, i: usize) -> std::ffi::c_int;
-
     pub fn jl_islayout_inline(
         eltype: *mut crate::types::jl_value_t,
         fsz: *mut usize,
