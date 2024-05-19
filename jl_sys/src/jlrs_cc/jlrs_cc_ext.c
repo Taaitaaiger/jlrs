@@ -72,11 +72,6 @@ extern "C"
 #endif
     }
 
-    void jlrs_init()
-    {
-        jl_init();
-    }
-
 #if JULIA_VERSION_MINOR <= 10
     const jl_datatype_layout_t *jl_datatype_layout(jl_datatype_t *t)
     {
@@ -164,7 +159,6 @@ extern "C"
 
         return jl_new_structv(tupty, values, n);
     }
-
 
     uintptr_t jlrs_symbol_hash(jl_sym_t *sym)
     {
@@ -285,22 +279,40 @@ extern "C"
         return t->layout != NULL;
     }
 
-#if JULIA_VERSION_MINOR == 6
     uint8_t jlrs_datatype_isinlinealloc(jl_datatype_t *ty)
     {
+#if JULIA_VERSION_MINOR == 6
         return ty->isinlinealloc;
+#else
+    if (ty->layout && jl_datatype_layout(ty))
+    {
+        return ty->name->mayinlinealloc;
+    }
+    else
+    {
+        return 0;
+    }
+
+#endif
     }
 
     uint8_t jlrs_datatype_abstract(jl_datatype_t *ty)
     {
+#if JULIA_VERSION_MINOR == 6
         return ty->abstract;
+#else
+    return ty->name->abstract;
+#endif
     }
 
     uint8_t jlrs_datatype_mutable(jl_datatype_t *ty)
     {
+#if JULIA_VERSION_MINOR == 6
         return ty->mutabl;
-    }
+#else
+    return ty->name->mutabl;
 #endif
+    }
 
     jl_sym_t *jlrs_module_name(jl_module_t *m)
     {
@@ -413,19 +425,6 @@ extern "C"
     return (int)a->flags.how;
 #endif
     }
-
-#if JULIA_VERSION_MINOR == 6
-    void jlrs_init_with_image(const char *julia_bindir, const char *image_relative_path)
-    {
-        jl_init_with_image__threading(julia_bindir, image_relative_path);
-    }
-#else
-    void jlrs_init_with_image(const char *julia_bindir, const char *image_relative_path)
-    {
-        jl_init_with_image(julia_bindir, image_relative_path);
-    }
-#endif
-
 #ifdef __cplusplus
 }
 #endif

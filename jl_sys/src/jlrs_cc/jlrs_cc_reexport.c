@@ -5,12 +5,7 @@ extern "C"
 {
 #endif
     jl_value_t *jlrs_typeof(jl_value_t *v) { return jl_typeof(v); }
-#if JULIA_VERSION_MINOR <= 6
     void jlrs_gc_wb(void *parent, void *ptr) { jl_gc_wb(parent, ptr); }
-#endif
-#if JULIA_VERSION_MINOR >= 7
-    void jlrs_gc_wb(const void *parent, const void *ptr) { jl_gc_wb(parent, ptr); }
-#endif
     size_t jlrs_svec_len(jl_svec_t *t) { return jl_svec_len(t); }
     jl_value_t **jlrs_svec_data(jl_svec_t *t) { return jl_svec_data(t); }
     jl_value_t *jlrs_svecref(void *t, size_t i) { return jl_svecref(t, i); }

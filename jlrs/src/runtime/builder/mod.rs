@@ -18,7 +18,7 @@ use std::{
 
 #[cfg(feature = "async-rt")]
 pub use async_builder::*;
-use jl_sys::{jlrs_init, jlrs_init_with_image, jlrs_set_nthreads};
+use jl_sys::{jl_init, jl_init_with_image, jlrs_set_nthreads};
 #[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8")))]
 use jl_sys::{jlrs_set_nthreadpools, jlrs_set_nthreads_per_pool};
 
@@ -306,9 +306,9 @@ unsafe fn init_julia(options: &Builder) {
         let bindir = CString::new(julia_bindir_str).unwrap();
         let im_rel_path = CString::new(image_path_str).unwrap();
 
-        jlrs_init_with_image(bindir.as_ptr(), im_rel_path.as_ptr())
+        jl_init_with_image(bindir.as_ptr(), im_rel_path.as_ptr())
     } else {
-        jlrs_init();
+        jl_init();
     }
 }
 

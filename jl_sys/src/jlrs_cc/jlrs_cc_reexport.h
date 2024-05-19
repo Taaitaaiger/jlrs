@@ -9,22 +9,17 @@ extern "C"
 {
 #endif
     jl_value_t *jlrs_typeof(jl_value_t *v);
-#if JULIA_VERSION_MINOR <= 6
     void jlrs_gc_wb(void *parent, void *ptr);
-#endif
-#if JULIA_VERSION_MINOR >= 7
-    void jlrs_gc_wb(const void *parent, const void *ptr);
-#endif
     size_t jlrs_svec_len(jl_svec_t *t);
     jl_value_t **jlrs_svec_data(jl_svec_t *t);
-    jl_value_t *jlrs_svecref(void *t, size_t i);          // X
-    jl_value_t *jlrs_svecset(void *t, size_t i, void *x); // X
+    jl_value_t *jlrs_svecref(void *t, size_t i);
+    jl_value_t *jlrs_svecset(void *t, size_t i, void *x);
     size_t jlrs_array_len(jl_array_t *a);
     void *jlrs_array_data(jl_array_t *a);
     size_t jlrs_array_ndims(jl_array_t *a);
-    jl_value_t *jlrs_exprarg(jl_expr_t *e, size_t n);            // X
-    void jlrs_exprargset(jl_expr_t *e, size_t n, jl_value_t *v); // X
-    size_t jlrs_expr_nargs(jl_expr_t *e);                        // X
+    jl_value_t *jlrs_exprarg(jl_expr_t *e, size_t n);
+    void jlrs_exprargset(jl_expr_t *e, size_t n, jl_value_t *v);
+    size_t jlrs_expr_nargs(jl_expr_t *e);
     size_t jlrs_nparams(jl_datatype_t *t);
     size_t jlrs_string_len(jl_value_t *s);
     jl_svec_t *jlrs_get_fieldtypes(jl_datatype_t *st);
@@ -43,7 +38,7 @@ extern "C"
     intptr_t jlrs_unbox_long(jl_value_t *x);
     size_t jlrs_unbox_ulong(jl_value_t *x);
     jl_value_t *jlrs_apply(jl_value_t **args, uint32_t nargs); // X
-    jl_task_t *jlrs_current_task();                            // X
+    jl_task_t *jlrs_current_task();
     const jl_datatype_layout_t *jlrs_datatype_layout(jl_datatype_t *t);
 #ifdef __cplusplus
 }

@@ -5,8 +5,8 @@ use std::{
 
 use jl_sys::{
     bindings::{
-        jl_alloc_array_1d, jl_array_any_type, jl_gc_add_ptr_finalizer, jl_gc_collect,
-        jl_is_initialized, jlrs_get_ptls_states, jlrs_init,
+        jl_alloc_array_1d, jl_array_any_type, jl_gc_add_ptr_finalizer, jl_gc_collect, jl_init,
+        jl_is_initialized, jlrs_get_ptls_states,
     },
     gc_frame::{sized_local_scope, unsized_local_scope},
     types::jl_gc_collection_t,
@@ -71,7 +71,7 @@ fn gc_frame_tests() {
     unsafe {
         // Test that data is not freed until frame has been popped from GC stack.
 
-        jlrs_init();
+        jl_init();
         assert!(jl_is_initialized() != 0);
 
         test_sized_gc_frame();

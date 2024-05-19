@@ -18,15 +18,15 @@ fn main() {
         return;
     }
 
-    println!("cargo:rerun-if-changed=src/jlrs_cc_ext.c");
-    println!("cargo:rerun-if-changed=src/jlrs_cc_hacks.c");
-    println!("cargo:rerun-if-changed=src/jlrs_cc_reexport.c");
-    println!("cargo:rerun-if-changed=src/jlrs_cc_fast_tls.c");
-    println!("cargo:rerun-if-changed=src/jlrs_cc_ext.h");
-    println!("cargo:rerun-if-changed=src/jlrs_cc_hacks.h");
-    println!("cargo:rerun-if-changed=src/jlrs_cc_reexport.h");
-    println!("cargo:rerun-if-changed=src/jlrs_cc.h");
-    println!("cargo:rerun-if-changed=src/jlrs_cc_fast_tls.h");
+    println!("cargo:rerun-if-changed=src/jlrs_cc/jlrs_cc_ext.c");
+    println!("cargo:rerun-if-changed=src/jlrs_cc/jlrs_cc_hacks.c");
+    println!("cargo:rerun-if-changed=src/jlrs_cc/jlrs_cc_reexport.c");
+    println!("cargo:rerun-if-changed=src/jlrs_cc/jlrs_cc_fast_tls.c");
+    println!("cargo:rerun-if-changed=src/jlrs_cc/jlrs_cc_ext.h");
+    println!("cargo:rerun-if-changed=src/jlrs_cc/jlrs_cc_hacks.h");
+    println!("cargo:rerun-if-changed=src/jlrs_cc/jlrs_cc_reexport.h");
+    println!("cargo:rerun-if-changed=src/jlrs_cc/jlrs_cc.h");
+    println!("cargo:rerun-if-changed=src/jlrs_cc/jlrs_cc_fast_tls.h");
     println!("cargo:rerun-if-env-changed=JULIA_DIR");
 
     let julia_dir =
@@ -193,10 +193,10 @@ fn compile_jlrs_cc(julia_dir: &str, target: Option<Target>) {
 
     cfg_if! {
         if #[cfg(feature = "yggdrasil")] {
-            c.file("src/jlrs_cc_ext.c")
-                .file("src/jlrs_cc_reexport.c")
-                .file("src/jlrs_cc_hacks.c")
-                .file("src/jlrs_cc_fast_tls.c");
+            c.file("src/jlrs_cc/jlrs_cc_ext.c")
+                .file("src/jlrs_cc/jlrs_cc_reexport.c")
+                .file("src/jlrs_cc/jlrs_cc_hacks.c")
+                .file("src/jlrs_cc/jlrs_cc_fast_tls.c");
 
             match target {
                 Some(Target::I686) => {
@@ -221,19 +221,19 @@ fn compile_jlrs_cc(julia_dir: &str, target: Option<Target>) {
             cfg_if! {
                 if #[cfg(target_env = "msvc")] {
                     let julia_dll_a = format!("{}/lib/libjulia.dll.a", julia_dir);
-                    c.file("src/jlrs_cc_ext.cc")
-                        .file("src/jlrs_cc_reexport.cc")
-                        .file("src/jlrs_cc_hacks.cc")
-                        .file("src/jlrs_cc_fast_tls.cc")
+                    c.file("src/jlrs_cc/jlrs_cc_ext.cc")
+                        .file("src/jlrs_cc/jlrs_cc_reexport.cc")
+                        .file("src/jlrs_cc/jlrs_cc_hacks.cc")
+                        .file("src/jlrs_cc/jlrs_cc_fast_tls.cc")
                         .cpp(true)
                         .flag("/std:c++20")
                         .object(&julia_dll_a);
                 } else {
                     c
-                        .file("src/jlrs_cc_ext.c")
-                        .file("src/jlrs_cc_reexport.c")
-                        .file("src/jlrs_cc_hacks.c")
-                        .file("src/jlrs_cc_fast_tls.c");
+                        .file("src/jlrs_cc/jlrs_cc_ext.c")
+                        .file("src/jlrs_cc/jlrs_cc_reexport.c")
+                        .file("src/jlrs_cc/jlrs_cc_hacks.c")
+                        .file("src/jlrs_cc/jlrs_cc_fast_tls.c");
                 }
             }
         }

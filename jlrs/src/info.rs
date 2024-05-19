@@ -37,6 +37,23 @@ impl Info {
         unsafe { jl_n_threads.load(::std::sync::atomic::Ordering::Relaxed) as usize }
     }
 
+    #[julia_version(since = "1.9")]
+    /// Number of threads per thread pool.
+    pub fn n_threads_per_pool() -> &'static [u32] {
+        unsafe {
+            let n_pools = jl_sys::jl_n_threadpools.get() as usize;
+            let n_threads_per_pool = jl_sys::jl_n_threads_per_pool.get();
+            std::slice::from_raw_parts(n_threads_per_pool as _, n_pools)
+        }
+    }
+
+    #[julia_version(since = "1.10")]
+    #[inline]
+    /// Number of GC threads Julia can use.
+    pub fn n_gc_threads() -> usize {
+        unsafe { jl_sys::jl_n_gcthreads as usize }
+    }
+
     /// Returns `true` if a debug build of Julia is used.
     #[inline]
     pub fn is_debugbuild() -> bool {

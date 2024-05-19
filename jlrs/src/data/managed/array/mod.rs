@@ -113,6 +113,8 @@ pub mod data;
 pub mod dimensions;
 pub mod tracked;
 
+#[julia_version(since = "1.11")]
+use std::ptr::null_mut;
 use std::{
     ffi::c_void,
     fmt::{Debug, Formatter, Result as FmtResult},
@@ -131,10 +133,6 @@ use jlrs_macros::julia_version;
 
 #[julia_version(until = "1.10")]
 use self::dimensions::Dims;
-
-#[julia_version(since = "1.11")]
-use std::ptr::null_mut;
-
 use self::{
     data::accessor::{
         BitsAccessor, BitsAccessorMut, BitsUnionAccessor, BitsUnionAccessorMut,

@@ -135,9 +135,10 @@ use jl_sys::{
     jl_exception_occurred, jl_false, jl_field_index, jl_gc_add_finalizer, jl_gc_add_ptr_finalizer,
     jl_get_nth_field, jl_get_nth_field_noalloc, jl_has_typevar, jl_interrupt_exception, jl_isa,
     jl_memory_exception, jl_new_struct_uninit, jl_nothing, jl_object_id,
-    jl_readonlymemory_exception, jl_set_nth_field, jl_stackovf_exception, jl_stderr_obj,
-    jl_stdout_obj, jl_subtype, jl_true, jl_typeof_str, jl_undefref_exception, jl_value_t,
-    jlrs_call_unchecked, jlrs_egal, jlrs_field_isptr,
+    jl_readonlymemory_exception, jl_set_nth_field, jl_stackovf_exception, jl_static_show,
+    jl_stderr_obj, jl_stderr_stream, jl_stdout_obj, jl_stdout_stream, jl_subtype, jl_true,
+    jl_typeof_str, jl_undefref_exception, jl_value_t, jlrs_call_unchecked, jlrs_egal,
+    jlrs_field_isptr,
 };
 use jlrs_macros::julia_version;
 
@@ -458,6 +459,25 @@ impl Value<'_, '_> {
         let types = types.as_ref();
         let applied = jl_apply_type(self.unwrap(Private), types.as_ptr() as *mut _, types.len());
         target.data_from_ptr(NonNull::new_unchecked(applied), Private)
+    }
+}
+
+/// The `stdin` and `stdout` streams
+pub enum Stream {
+    Stdout,
+    Stderr,
+}
+
+impl Value<'_, '_> {
+    /// Show this value
+    pub fn show(self, stream: Stream) -> usize {
+        unsafe {
+            let stream = match stream {
+                Stream::Stdout => jl_stdout_stream(),
+                Stream::Stderr => jl_stderr_stream(),
+            };
+            jl_static_show(stream, self.unwrap(Private))
+        }
     }
 }
 
@@ -1535,6 +1555,54 @@ impl<'scope> Value<'scope, 'static> {
     {
         // Safety: global constant
         unsafe { Value::wrap_non_null(NonNull::new_unchecked(jl_pair_type), Private) }
+    }
+
+    #[julia_version(since = "1.11")]
+    /// The `Pair` type
+    #[inline]
+    pub fn an_empty_memory_any<Tgt>(_: &Tgt) -> Self
+    where
+        Tgt: Target<'scope>,
+    {
+        // Safety: global constant
+        unsafe {
+            Value::wrap_non_null(
+                NonNull::new_unchecked(jl_sys::jl_an_empty_memory_any),
+                Private,
+            )
+        }
+    }
+
+    #[julia_version(since = "1.8")]
+    /// The `Array{UInt64,1}` type
+    #[inline]
+    pub fn array_uint64_type<Tgt>(_: &Tgt) -> Self
+    where
+        Tgt: Target<'scope>,
+    {
+        // Safety: global constant
+        unsafe {
+            Value::wrap_non_null(
+                NonNull::new_unchecked(jl_sys::jl_array_uint64_type),
+                Private,
+            )
+        }
+    }
+
+    #[julia_version(since = "1.11")]
+    /// The `Array{UInt32,1}` type
+    #[inline]
+    pub fn array_uint32_type<Tgt>(_: &Tgt) -> Self
+    where
+        Tgt: Target<'scope>,
+    {
+        // Safety: global constant
+        unsafe {
+            Value::wrap_non_null(
+                NonNull::new_unchecked(jl_sys::jl_array_uint32_type),
+                Private,
+            )
+        }
     }
 }
 

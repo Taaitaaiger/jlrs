@@ -30,8 +30,6 @@ extern "C" {
     jl_datatype_t *jlrs_dimtuple_type(size_t rank);
     jl_value_t *jlrs_tuple_of(jl_value_t **values, size_t n);
 
-    void jlrs_init(void);
-
     jl_value_t *jlrs_call_unchecked(jl_function_t *f, jl_value_t **args, uint32_t nargs);
 
     int jlrs_datatype_has_layout(jl_datatype_t *t);
@@ -48,11 +46,9 @@ extern "C" {
     uint8_t jlrs_datatype_zeroinit(jl_datatype_t *ty);
     uint8_t jlrs_datatype_isconcretetype(jl_datatype_t *ty);
 
-#if JULIA_VERSION_MINOR == 6
     uint8_t jlrs_datatype_isinlinealloc(jl_datatype_t *ty);
     uint8_t jlrs_datatype_abstract(jl_datatype_t *ty);
     uint8_t jlrs_datatype_mutable(jl_datatype_t *ty);
-#endif // JULIA_VERSION_MINOR == 6
 
     // option field setters
     void jlrs_set_nthreads(int16_t nthreads);

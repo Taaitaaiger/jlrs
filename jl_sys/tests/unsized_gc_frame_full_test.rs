@@ -1,5 +1,5 @@
 use jl_sys::{
-    bindings::{jl_alloc_array_1d, jl_array_any_type, jl_is_initialized, jlrs_init},
+    bindings::{jl_alloc_array_1d, jl_array_any_type, jl_init, jl_is_initialized},
     gc_frame::unsized_local_scope,
 };
 
@@ -16,7 +16,7 @@ fn test_unsized_sized_gc_frame_full() {
 #[should_panic]
 fn unsized_gc_frame_full_test() {
     unsafe {
-        jlrs_init();
+        jl_init();
         assert!(jl_is_initialized() != 0);
         test_unsized_sized_gc_frame_full();
     }

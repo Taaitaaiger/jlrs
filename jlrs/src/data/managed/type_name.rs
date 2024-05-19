@@ -193,6 +193,38 @@ impl<'base> TypeName<'base> {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_namedtuple_typename), Private) }
     }
+
+    #[julia_version(since = "1.11")]
+    /// The typename of the `UnionAll` `GenericMemory`.
+    #[inline]
+    pub fn of_genericmemory<Tgt>(_: &Tgt) -> Self
+    where
+        Tgt: Target<'base>,
+    {
+        // Safety: global constant
+        unsafe {
+            Self::wrap_non_null(
+                NonNull::new_unchecked(jl_sys::jl_genericmemory_typename),
+                Private,
+            )
+        }
+    }
+
+    #[julia_version(since = "1.11")]
+    /// The typename of the `UnionAll` `GenericMemoryRef`.
+    #[inline]
+    pub fn of_genericmemoryref<Tgt>(_: &Tgt) -> Self
+    where
+        Tgt: Target<'base>,
+    {
+        // Safety: global constant
+        unsafe {
+            Self::wrap_non_null(
+                NonNull::new_unchecked(jl_sys::jl_genericmemoryref_typename),
+                Private,
+            )
+        }
+    }
 }
 
 impl_julia_typecheck!(TypeName<'scope>, jl_typename_type, 'scope);
