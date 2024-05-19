@@ -257,7 +257,6 @@ impl<'scope> DataType<'scope> {
         }
     }
 
-    #[julia_version(until = "1.6")]
     /// Returns true if this is an abstract type.
     #[inline]
     pub fn is_abstract(self) -> bool {
@@ -265,26 +264,11 @@ impl<'scope> DataType<'scope> {
         unsafe { jl_sys::jlrs_datatype_abstract(self.unwrap(Private)) != 0 }
     }
 
-    #[julia_version(since = "1.7")]
-    /// Returns true if this is an abstract type.
-    #[inline]
-    pub fn is_abstract(self) -> bool {
-        self.type_name().is_abstract()
-    }
-
-    #[julia_version(until = "1.6")]
     /// Returns true if this is a mutable type.
     #[inline]
     pub fn mutable(self) -> bool {
         // Safety: the pointer points to valid data
         unsafe { jl_sys::jlrs_datatype_mutable(self.unwrap(Private)) != 0 }
-    }
-
-    #[julia_version(since = "1.7")]
-    /// Returns true if this is a mutable type.
-    #[inline]
-    pub fn mutable(self) -> bool {
-        self.type_name().is_mutable()
     }
 
     /// Returns true if this type can have instances
@@ -308,24 +292,11 @@ impl<'scope> DataType<'scope> {
         unsafe { jlrs_datatype_zeroinit(self.unwrap(Private)) != 0 }
     }
 
-    #[julia_version(until = "1.6")]
     /// Returns true if a value of this type stores its data inline.
     #[inline]
     pub fn is_inline_alloc(self) -> bool {
         // Safety: the pointer points to valid data
         unsafe { jl_sys::jlrs_datatype_isinlinealloc(self.unwrap(Private)) != 0 }
-    }
-
-    #[julia_version(since = "1.7")]
-    /// Returns true if a value of this type stores its data inline.
-    #[inline]
-    pub fn is_inline_alloc(self) -> bool {
-        // Safety: the pointer points to valid data, so it must have a TypeName.
-        unsafe {
-            jlrs_datatype_has_layout(self.unwrap(Private)) != 0
-                && !jlrs_datatype_layout(self.unwrap(Private)).is_null()
-                && self.type_name().mayinlinealloc()
-        }
     }
 
     /// Whether this is declared with 'primitive type' keyword (sized, no fields, and immutable)
@@ -1141,6 +1112,32 @@ impl<'target> DataType<'target> {
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_expr_type), Private) }
+    }
+
+    #[julia_version(since = "1.11")]
+    /// The type `BFloat16`.
+    #[inline]
+    pub fn bfloat16_type<Tgt>(_: &Tgt) -> Self
+    where
+        Tgt: Target<'target>,
+    {
+        // Safety: global constant
+        unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_sys::jl_bfloat16_type), Private) }
+    }
+
+    /// The type `Ptr{UInt8}`.
+    #[inline]
+    pub fn uint8pointer_type<Tgt>(_: &Tgt) -> Self
+    where
+        Tgt: Target<'target>,
+    {
+        // Safety: global constant
+        unsafe {
+            Self::wrap_non_null(
+                NonNull::new_unchecked(jl_sys::jl_uint8pointer_type),
+                Private,
+            )
+        }
     }
 }
 

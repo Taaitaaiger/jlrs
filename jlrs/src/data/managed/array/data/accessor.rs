@@ -24,8 +24,8 @@ use std::{
 };
 
 use jl_sys::{
-    jl_array_del_end, jl_array_grow_end, jl_value_t, jlrs_array_typetagdata, jlrs_arrayref,
-    jlrs_arrayset,
+    jl_array_del_end, jl_array_grow_end, jl_array_ptr_1d_append, jl_array_ptr_1d_push, jl_value_t,
+    jlrs_array_typetagdata, jlrs_arrayref, jlrs_arrayset,
 };
 use jlrs_macros::julia_version;
 
@@ -51,7 +51,9 @@ use crate::{
     },
     error::{AccessError, JlrsError, TypeError, CANNOT_DISPLAY_TYPE},
     memory::target::{unrooted::Unrooted, TargetException},
-    prelude::{DataType, JlrsResult, Managed, Target, Value, ValueData, ValueRef, ValueResult},
+    prelude::{
+        DataType, JlrsResult, Managed, Target, Value, ValueData, ValueRef, ValueResult, VectorAny,
+    },
     private::Private,
 };
 
@@ -1003,6 +1005,24 @@ impl<'borrow, 'scope, 'data, T, const N: isize> ValueAccessorMut<'borrow, 'scope
         ValueAccessorMut {
             array: *array,
             _data: PhantomData,
+        }
+    }
+}
+
+impl<'borrow, 'scope, const N: isize>
+    ValueAccessorMut<'borrow, 'scope, 'static, Value<'scope, 'static>, N>
+{
+    /// Push a new value to the end of this vector.
+    pub fn push(&mut self, value: Value) {
+        unsafe {
+            jl_array_ptr_1d_push(self.array.unwrap(Private), value.unwrap(Private));
+        }
+    }
+
+    /// Append the data from `arr` to the end of this vector.
+    pub fn append(&mut self, arr: VectorAny) {
+        unsafe {
+            jl_array_ptr_1d_append(self.array.unwrap(Private), arr.unwrap(Private));
         }
     }
 }

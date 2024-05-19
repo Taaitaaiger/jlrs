@@ -12,7 +12,7 @@ use std::{
     path::Path,
 };
 
-use jl_sys::{jl_atexit_hook, jl_is_initialized, jlrs_init, jlrs_init_with_image};
+use jl_sys::{jl_atexit_hook, jl_init, jl_init_with_image, jl_is_initialized};
 
 use crate::{
     call::Call,
@@ -72,9 +72,9 @@ impl PendingJulia {
             let bindir = CString::new(julia_bindir_str).unwrap();
             let im_rel_path = CString::new(image_path_str).unwrap();
 
-            jlrs_init_with_image(bindir.as_ptr(), im_rel_path.as_ptr());
+            jl_init_with_image(bindir.as_ptr(), im_rel_path.as_ptr());
         } else {
-            jlrs_init();
+            jl_init();
         }
 
         assert!(jl_is_initialized() != 0);
