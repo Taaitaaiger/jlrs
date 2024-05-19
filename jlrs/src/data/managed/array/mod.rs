@@ -129,13 +129,19 @@ use jl_sys::{
 };
 use jlrs_macros::julia_version;
 
+#[julia_version(until = "1.10")]
+use self::dimensions::Dims;
+
+#[julia_version(since = "1.11")]
+use std::ptr::null_mut;
+
 use self::{
     data::accessor::{
         BitsAccessor, BitsAccessorMut, BitsUnionAccessor, BitsUnionAccessorMut,
         IndeterminateAccessor, IndeterminateAccessorMut, InlineAccessor, InlineAccessorMut,
         ManagedAccessor, ManagedAccessorMut, ValueAccessor, ValueAccessorMut,
     },
-    dimensions::{ArrayDimensions, Dims, DimsExt, DimsRankAssert, DimsRankCheck, RankedDims},
+    dimensions::{ArrayDimensions, DimsExt, DimsRankAssert, DimsRankCheck, RankedDims},
     tracked::{TrackedArrayBase, TrackedArrayBaseMut},
 };
 use super::{
@@ -499,11 +505,24 @@ pub trait ConstructTypedArray<T: ConstructType, const N: isize> {
                 let array_type = Self::array_type(&target, &dims).as_value();
                 let array = dims.alloc_array_with_data(&target, array_type, data.as_mut_ptr() as _);
 
-                jl_gc_add_ptr_finalizer(
-                    get_tls(),
-                    array.ptr().as_ptr().cast(),
-                    droparray::<U> as *mut c_void,
-                );
+                #[cfg(not(any(
+                    feature = "julia-1-6",
+                    feature = "julia-1-7",
+                    feature = "julia-1-8",
+                    feature = "julia-1-9",
+                    feature = "julia-1-10",
+                )))]
+                let mem = jlrs_array_mem(array.ptr().as_ptr());
+                #[cfg(any(
+                    feature = "julia-1-6",
+                    feature = "julia-1-7",
+                    feature = "julia-1-8",
+                    feature = "julia-1-9",
+                    feature = "julia-1-10",
+                ))]
+                let mem = array.ptr().as_ptr().cast();
+
+                jl_gc_add_ptr_finalizer(get_tls(), mem, droparray::<U> as *mut c_void);
 
                 array
             };
@@ -541,12 +560,24 @@ pub trait ConstructTypedArray<T: ConstructType, const N: isize> {
 
         let array_type = Self::array_type(&target, &dims).as_value();
         let array = dims.alloc_array_with_data(&target, array_type, data.as_mut_ptr() as _);
+        #[cfg(not(any(
+            feature = "julia-1-6",
+            feature = "julia-1-7",
+            feature = "julia-1-8",
+            feature = "julia-1-9",
+            feature = "julia-1-10",
+        )))]
+        let mem = jlrs_array_mem(array.ptr().as_ptr());
+        #[cfg(any(
+            feature = "julia-1-6",
+            feature = "julia-1-7",
+            feature = "julia-1-8",
+            feature = "julia-1-9",
+            feature = "julia-1-10",
+        ))]
+        let mem = array.ptr().as_ptr().cast();
 
-        jl_gc_add_ptr_finalizer(
-            get_tls(),
-            array.ptr().as_ptr().cast(),
-            droparray::<U> as *mut c_void,
-        );
+        jl_gc_add_ptr_finalizer(get_tls(), mem, droparray::<U> as *mut c_void);
 
         target.data_from_ptr(array.ptr(), Private)
     }
@@ -1171,12 +1202,24 @@ impl<const N: isize> ArrayBase<'_, '_, Unknown, N> {
                 let array_type = jl_apply_array_type(ty.unwrap(Private), D::RANK as _);
                 let array_type = Value::wrap_non_null(NonNull::new_unchecked(array_type), Private);
                 let array = dims.alloc_array_with_data(&target, array_type, data.as_mut_ptr() as _);
+                #[cfg(not(any(
+                    feature = "julia-1-6",
+                    feature = "julia-1-7",
+                    feature = "julia-1-8",
+                    feature = "julia-1-9",
+                    feature = "julia-1-10",
+                )))]
+                let mem = jlrs_array_mem(array.ptr().as_ptr());
+                #[cfg(any(
+                    feature = "julia-1-6",
+                    feature = "julia-1-7",
+                    feature = "julia-1-8",
+                    feature = "julia-1-9",
+                    feature = "julia-1-10",
+                ))]
+                let mem = array.ptr().as_ptr().cast();
 
-                jl_gc_add_ptr_finalizer(
-                    get_tls(),
-                    array.ptr().as_ptr().cast(),
-                    droparray::<U> as *mut c_void,
-                );
+                jl_gc_add_ptr_finalizer(get_tls(), mem, droparray::<U> as *mut c_void);
 
                 array
             };
@@ -1217,12 +1260,24 @@ impl<const N: isize> ArrayBase<'_, '_, Unknown, N> {
         let array_type = jl_apply_array_type(ty.unwrap(Private), D::RANK as _);
         let array_type = Value::wrap_non_null(NonNull::new_unchecked(array_type), Private);
         let array = dims.alloc_array_with_data(&target, array_type, data.as_mut_ptr() as _);
+        #[cfg(not(any(
+            feature = "julia-1-6",
+            feature = "julia-1-7",
+            feature = "julia-1-8",
+            feature = "julia-1-9",
+            feature = "julia-1-10",
+        )))]
+        let mem = jlrs_array_mem(array.ptr().as_ptr());
+        #[cfg(any(
+            feature = "julia-1-6",
+            feature = "julia-1-7",
+            feature = "julia-1-8",
+            feature = "julia-1-9",
+            feature = "julia-1-10",
+        ))]
+        let mem = array.ptr().as_ptr().cast();
 
-        jl_gc_add_ptr_finalizer(
-            get_tls(),
-            array.ptr().as_ptr().cast(),
-            droparray::<U> as *mut c_void,
-        );
+        jl_gc_add_ptr_finalizer(get_tls(), mem, droparray::<U> as *mut c_void);
 
         target.data_from_ptr(array.ptr(), Private)
     }
@@ -3149,12 +3204,28 @@ where
 
 // Safety: must be used as a finalizer when moving array data from Rust to Julia
 // to ensure it's freed correctly.
+#[julia_version(until = "1.10")]
 unsafe extern "C" fn droparray<T>(a: Array) {
     let sz = a.dimensions().size();
     let data_ptr = a.data_ptr().cast::<T>();
 
     let data = Vec::from_raw_parts(data_ptr, sz, sz);
     std::mem::drop(data);
+}
+
+#[julia_version(since = "1.11")]
+unsafe extern "C" fn droparray<T>(a: *mut c_void) {
+    #[repr(C)]
+    struct GenericMemory<T> {
+        length: usize,
+        ptr: *mut T,
+    }
+
+    let a = NonNull::new_unchecked(a as *mut GenericMemory<T>).as_mut();
+    let v = Vec::from_raw_parts(a.ptr as *mut T, a.length, a.length);
+    a.ptr = null_mut();
+    a.length = 0;
+    std::mem::drop(v);
 }
 
 // If LTO is not enabled accessing arrays is very slow, so we're going to optimize
@@ -3174,6 +3245,26 @@ const unsafe fn jlrs_array_dims_ptr(a: *mut jl_array_t) -> *mut usize {
 
     const OFFSET: usize = std::mem::offset_of!(RawArray, nrows);
     (a as *mut u8).add(OFFSET) as *mut usize
+}
+
+#[julia_version(since = "1.11")]
+#[inline]
+const unsafe fn jlrs_array_mem(a: *mut jl_array_t) -> *mut jl_sys::types::jl_value_t {
+    #[repr(C)]
+    struct GenericMemoryRef {
+        ptr_or_offset: *mut std::ffi::c_void,
+        mem: *mut std::ffi::c_void,
+    }
+
+    #[repr(C)]
+    struct RawArray {
+        ref_inner: GenericMemoryRef,
+    }
+
+    NonNull::new_unchecked(a as *mut RawArray)
+        .as_ref()
+        .ref_inner
+        .mem as _
 }
 
 #[julia_version(since = "1.11")]

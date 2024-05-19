@@ -25,20 +25,11 @@ pub(crate) use array_value_data::tests::*;
 pub(crate) mod array_constructors;
 pub(crate) use array_constructors::tests::*;
 pub(crate) mod array_grow_del;
-// pub(crate) use array_grow_del::tests::*;
+pub(crate) use array_grow_del::tests::*;
 pub(crate) mod array_layouts;
 pub(crate) use array_layouts::tests::*;
 pub(crate) mod array_union_data;
 pub(crate) use array_union_data::tests::*;
-pub(crate) mod reshape_array;
-#[cfg(any(
-    feature = "julia-1-6",
-    feature = "julia-1-7",
-    feature = "julia-1-8",
-    feature = "julia-1-9",
-    feature = "julia-1-10"
-))]
-pub(crate) use reshape_array::tests::*;
 pub(crate) mod ranked_array_constructors;
 pub(crate) use ranked_array_constructors::tests::*;
 mod typed_array_constructors;

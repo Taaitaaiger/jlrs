@@ -23,8 +23,6 @@ use std::{
     sync::atomic::{AtomicPtr, Ordering},
 };
 
-#[julia_version(until = "1.10")]
-use jl_sys::{jl_apply_array_type, jl_reshape_array};
 use jl_sys::{
     jl_array_del_end, jl_array_grow_end, jl_value_t, jlrs_array_typetagdata, jlrs_arrayref,
     jlrs_arrayset,
@@ -32,11 +30,6 @@ use jl_sys::{
 use jlrs_macros::julia_version;
 
 use super::copied::CopiedArray;
-#[julia_version(until = "1.10")]
-use crate::data::managed::array::{
-    dimensions::{ArrayDimensions, CompatibleIndices, RankedDims},
-    sized_dim_tuple, ArrayBaseData, ArrayBaseResult,
-};
 use crate::{
     catch::{catch_exceptions, unwrap_exc},
     data::{
@@ -105,137 +98,6 @@ pub trait Accessor<'scope, 'data, T, const N: isize> {
             let v = jlrs_arrayref(self.array().unwrap(Private), idx);
             ValueRef::wrap(NonNull::new_unchecked(v)).root(target)
         }
-    }
-
-    /// Create a new array with dimensions `D` that shares its data with `self`.
-    ///
-    /// If the number of elements of `dims` is not equal to the number of elements
-    /// an exception is thrown, which is caught and returned.
-    #[julia_version(until = "1.10")]
-    fn reshape<'target, D, Tgt>(
-        &self,
-        target: Tgt,
-        dims: D,
-    ) -> ArrayBaseResult<'target, 'data, Tgt, T, -1>
-    where
-        D: RankedDims,
-        Tgt: Target<'target>,
-    {
-        // todo: check size
-
-        target.with_local_scope::<_, _, 1>(|target, mut frame| unsafe {
-            let arr = self.array();
-            let elty_ptr = arr.element_type().unwrap(Private);
-
-            // Safety: The array type is rooted until the array has been constructed, all C API
-            // functions are called with valid data. If an exception is thrown it's caught.
-            let callback = || {
-                let array_type = jl_apply_array_type(elty_ptr, dims.rank());
-
-                let tuple = sized_dim_tuple(&mut frame, &dims);
-
-                jl_reshape_array(array_type, arr.unwrap(Private), tuple.unwrap(Private))
-            };
-
-            let res = match catch_exceptions(callback, unwrap_exc) {
-                Ok(array_ptr) => Ok(NonNull::new_unchecked(array_ptr)),
-                Err(e) => Err(e),
-            };
-
-            target.result_from_ptr(res, Private)
-        })
-    }
-
-    /// Create a new array with dimensions `D` that shares its data with `self` without checking
-    /// any invariants.
-    ///
-    /// If the number of elements of `dims` is not equal to the number of elements
-    /// an exception is thrown which is not caught.
-    #[julia_version(until = "1.10")]
-    unsafe fn reshape_unchecked<'target, D, Tgt>(
-        &self,
-        target: Tgt,
-        dims: D,
-    ) -> ArrayBaseData<'target, 'data, Tgt, T, -1>
-    where
-        D: RankedDims,
-        Tgt: Target<'target>,
-    {
-        target.with_local_scope::<_, _, 1>(|target, mut frame| {
-            let arr = self.array();
-            let elty_ptr = arr.element_type().unwrap(Private);
-            let array_type = jl_apply_array_type(elty_ptr, dims.rank());
-            let tuple = sized_dim_tuple(&mut frame, &dims);
-            let arr = jl_reshape_array(array_type, arr.unwrap(Private), tuple.unwrap(Private));
-
-            target.data_from_ptr(NonNull::new_unchecked(arr), Private)
-        })
-    }
-
-    /// See [`ArrayBase::reshape`]. The only difference is that the rank of the returned array is
-    /// set.
-    #[julia_version(until = "1.10")]
-    fn reshape_ranked<'target, D, Tgt, const M: isize>(
-        &self,
-        target: Tgt,
-        dims: D,
-    ) -> JlrsResult<ArrayBaseResult<'target, 'data, Tgt, T, M>>
-    where
-        D: RankedDims,
-        Tgt: Target<'target>,
-    {
-        let _ = D::ASSERT_RANKED;
-        let _ = <(ArrayDimensions<'_, M>, D) as CompatibleIndices<_, _>>::ASSERT_COMPATIBLE;
-
-        // todo: check size
-
-        target.with_local_scope::<_, _, 1>(|target, mut frame| unsafe {
-            let arr = self.array();
-            let elty_ptr = arr.element_type().unwrap(Private);
-
-            // Safety: The array type is rooted until the array has been constructed, all C API
-            // functions are called with valid data. If an exception is thrown it's caught.
-            let callback = || {
-                let array_type = jl_apply_array_type(elty_ptr, dims.rank());
-
-                let tuple = sized_dim_tuple(&mut frame, &dims);
-
-                jl_reshape_array(array_type, arr.unwrap(Private), tuple.unwrap(Private))
-            };
-
-            let res = match catch_exceptions(callback, unwrap_exc) {
-                Ok(array_ptr) => Ok(NonNull::new_unchecked(array_ptr)),
-                Err(e) => Err(e),
-            };
-
-            Ok(target.result_from_ptr(res, Private))
-        })
-    }
-
-    /// See [`ArrayBase::reshape_unchecked`]. The only difference is that the rank of the returned
-    /// array is set.
-    #[julia_version(until = "1.10")]
-    unsafe fn reshape_ranked_unchecked<'target, D, Tgt, const M: isize>(
-        &self,
-        target: Tgt,
-        dims: D,
-    ) -> ArrayBaseData<'target, 'data, Tgt, T, M>
-    where
-        D: RankedDims,
-        Tgt: Target<'target>,
-    {
-        let _ = D::ASSERT_RANKED;
-        let _ = <(ArrayDimensions<'_, M>, D) as CompatibleIndices<_, _>>::ASSERT_COMPATIBLE;
-
-        target.with_local_scope::<_, _, 1>(|target, mut frame| {
-            let arr = self.array();
-            let elty_ptr = arr.element_type().unwrap(Private);
-            let array_type = jl_apply_array_type(elty_ptr, dims.rank());
-            let tuple = sized_dim_tuple(&mut frame, &dims);
-            let arr = jl_reshape_array(array_type, arr.unwrap(Private), tuple.unwrap(Private));
-
-            target.data_from_ptr(NonNull::new_unchecked(arr), Private)
-        })
     }
 }
 
