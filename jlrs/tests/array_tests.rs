@@ -9,8 +9,7 @@ fn array_tests() {
     array_constructor_tests();
     array_conversion_tests();
     array_fields_and_flags_tests();
-    // FIXME
-    // array_grow_del_tests();
+    array_grow_del_tests();
     array_inline_data_mut_tests();
     array_inline_data_tests();
     array_layouts_tests();
@@ -22,14 +21,6 @@ fn array_tests() {
     array_value_data_mut_tests();
     array_value_data_tests();
     ranked_array_constructors_tests();
-    #[cfg(any(
-        feature = "julia-1-6",
-        feature = "julia-1-7",
-        feature = "julia-1-8",
-        feature = "julia-1-9",
-        feature = "julia-1-10"
-    ))]
-    reshape_array_tests();
     typed_array_constructors_tests();
     typed_ranked_array_constructors_tests();
     typed_vector_constructors_test();

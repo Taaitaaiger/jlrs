@@ -580,19 +580,6 @@ extern "C" {
         dims: *mut crate::types::jl_value_t,
     ) -> *mut crate::types::jl_array_t;
 
-    #[cfg(any(
-        feature = "julia-1-6",
-        feature = "julia-1-7",
-        feature = "julia-1-8",
-        feature = "julia-1-9",
-        feature = "julia-1-10",
-    ))]
-    pub fn jl_reshape_array(
-        atype: *mut crate::types::jl_value_t,
-        data: *mut crate::types::jl_array_t,
-        dims: *mut crate::types::jl_value_t,
-    ) -> *mut crate::types::jl_array_t;
-
     pub fn jl_ptr_to_array_1d(
         atype: *mut crate::types::jl_value_t,
         data: *mut std::ffi::c_void,
