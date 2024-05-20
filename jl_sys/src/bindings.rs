@@ -1272,8 +1272,6 @@ extern "C" {
 
     pub fn jlrs_array_typetagdata(a: *mut crate::types::jl_array_t) -> *mut std::ffi::c_char;
 
-    pub fn jlrs_array_dims_ptr(a: *mut crate::types::jl_array_t) -> *mut usize;
-
     pub fn jlrs_array_is_pointer_array(a: *mut crate::types::jl_array_t) -> std::ffi::c_int;
 
     pub fn jlrs_array_is_union_array(a: *mut crate::types::jl_array_t) -> std::ffi::c_int;

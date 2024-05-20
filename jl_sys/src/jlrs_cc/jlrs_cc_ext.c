@@ -375,15 +375,6 @@ extern "C"
 #endif
     }
 
-    size_t *jlrs_array_dims_ptr(jl_array_t *a)
-    {
-#if JULIA_VERSION_MINOR >= 11
-        return a->dimsize;
-#else
-    return &a->nrows;
-#endif
-    }
-
     int jlrs_array_is_pointer_array(jl_array_t *a)
     {
 #if JULIA_VERSION_MINOR >= 11

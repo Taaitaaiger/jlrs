@@ -1,7 +1,6 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use jlrs::{
-    prelude::*, runtime::handle::local_handle::LocalHandle,
-    weak_handle, weak_handle_unchecked,
+    prelude::*, runtime::handle::local_handle::LocalHandle, weak_handle, weak_handle_unchecked,
 };
 #[cfg(not(target_os = "windows"))]
 use pprof::{

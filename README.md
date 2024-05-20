@@ -139,10 +139,10 @@ A runtime lets initialize Julia from Rust application, the following features en
   threads. It can be combined with the `async-rt` feature to create Julia-aware thread pools. This
   feature requires Julia 1.9 or higher.
 
-**WARNING**: Runtime features must only be enabled by applications that embed Julia. Libraries 
+**WARNING**: Runtime features must only be enabled by applications that embed Julia. Libraries
 must never enable a runtime feature.
 
-**WARNING**: When a runtime feature is enabled on Linux, set `RUSTFLAGS="-Clink-args=-rdynamic"` 
+**WARNING**: When a runtime feature is enabled on Linux, set `RUSTFLAGS="-Clink-args=-rdynamic"`
 if you want fast code.
 
 ### Utilities

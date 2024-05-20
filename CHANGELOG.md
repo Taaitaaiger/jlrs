@@ -10,7 +10,7 @@
 
 - Unused internal types have been removed, `Expr` is no longer considered an internal type.
 
-- Static symbols can be defined with the `define_static_symbol` macro. 
+- Static symbols can be defined with the `define_static_symbol` macro.
 
 - Arrays have been redesigned to be more consistent with the rest of jlrs: there is a single fundamental array type, `ArrayBase`, and a bunch of aliases that expose additional static type information if desired. The first type parameter of a `TypedArray` is the type constructor of the element type, not the element type's layout. Many functions now return a `TypedArray` instead of an `Array`.
 

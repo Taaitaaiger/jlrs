@@ -9,12 +9,12 @@ extern "C"
 {
 #endif
 
-    // There are several functions that are marked as JL_DLLEXPORT but not present in 
+    // There are several functions that are marked as JL_DLLEXPORT but not present in
     // jl_exported_funcs.inc. These functions are unavailable in libjulia, but can be found in
     // libjulia_internal. So, we acquire a handle to that library and load the missing symbols at
     // runtime.
     //
-    // This is obviously a hack, but less so than than manually reimplementing these functions. 
+    // This is obviously a hack, but less so than than manually reimplementing these functions.
     void jlrs_init_missing_functions(void);
 
 #if JULIA_VERSION_MINOR >= 7
