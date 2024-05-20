@@ -18,8 +18,8 @@ extern "C"
     void jlrs_init_missing_functions(void);
 
 #if JULIA_VERSION_MINOR >= 7
-    void jlrs_lock_nogc(jl_value_t *v);
-    void jlrs_unlock_nogc(jl_value_t *v);
+    void jlrs_lock_value(jl_value_t *v);
+    void jlrs_unlock_value(jl_value_t *v);
 #endif // JULIA_VERSION_MINOR >= 7
 
 #if JULIA_VERSION_MINOR >= 11

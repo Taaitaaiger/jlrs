@@ -8,7 +8,7 @@ use std::{
 
 use jl_sys::jlrs_array_typetagdata;
 #[julia_version(since = "1.7")]
-use jl_sys::{jl_value_t, jlrs_lock_nogc, jlrs_unlock_nogc};
+use jl_sys::{jl_value_t, jlrs_lock_value, jlrs_unlock_value};
 use jlrs_macros::julia_version;
 
 use super::{Value, ValueRef};
@@ -575,7 +575,7 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
                 self.offset = 0;
             }
             _ => {
-                jlrs_lock_nogc(self.value.unwrap().ptr().as_ptr());
+                jlrs_lock_value(self.value.unwrap().ptr().as_ptr());
                 self.state = ViewState::Locked;
             }
         }
@@ -642,7 +642,7 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
             .read();
 
         if locked {
-            jlrs_unlock_nogc(self.value.unwrap().ptr().as_ptr());
+            jlrs_unlock_value(self.value.unwrap().ptr().as_ptr());
             self.state = ViewState::Unlocked;
         }
 
@@ -778,7 +778,7 @@ impl Drop for FieldAccessor<'_, '_> {
         if self.state == ViewState::Locked {
             debug_assert!(!self.value.is_none());
             // Safety: the value is currently locked.
-            unsafe { jlrs_unlock_nogc(self.value.unwrap().ptr().as_ptr()) }
+            unsafe { jlrs_unlock_value(self.value.unwrap().ptr().as_ptr()) }
         }
     }
 }

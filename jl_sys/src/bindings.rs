@@ -1309,10 +1309,10 @@ extern "C" {
     pub fn jlrs_typename_mayinlinealloc(tn: *mut crate::types::jl_typename_t) -> u8;
 
     #[cfg(not(feature = "julia-1-6"))]
-    pub fn jlrs_lock_nogc(v: *mut crate::types::jl_value_t);
+    pub fn jlrs_lock_value(v: *mut crate::types::jl_value_t);
 
     #[cfg(not(feature = "julia-1-6"))]
-    pub fn jlrs_unlock_nogc(v: *mut crate::types::jl_value_t);
+    pub fn jlrs_unlock_value(v: *mut crate::types::jl_value_t);
 
     // Added in Julia 1.8
 
