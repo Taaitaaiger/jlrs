@@ -1000,6 +1000,7 @@
 
 use std::sync::atomic::{AtomicBool, Ordering};
 
+use jl_sys::jlrs_init_missing_functions;
 #[cfg(feature = "local-rt")]
 use once_cell::sync::OnceCell;
 use prelude::Managed;
@@ -1166,6 +1167,7 @@ pub(crate) unsafe fn init_jlrs(install_jlrs_core: &InstallJlrsCore) {
         return;
     }
 
+    jlrs_init_missing_functions();
     init_foreign_type_registry();
     init_constructed_type_cache();
     init_symbol_cache();

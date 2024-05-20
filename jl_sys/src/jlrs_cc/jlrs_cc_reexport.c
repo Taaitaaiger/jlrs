@@ -48,19 +48,38 @@ extern "C"
     jl_value_t *jlrs_apply(jl_value_t **args, uint32_t nargs) { return jl_apply(args, nargs); }
     jl_task_t *jlrs_current_task()
     {
-        #if JULIA_VERSION_MINOR == 6
+#if JULIA_VERSION_MINOR == 6
         return jl_current_task;
-        #else
-        jl_gcframe_t **pgcstack = jl_get_pgcstack();
-        if (pgcstack == NULL)
-        {
-            return NULL;
-        }
+#else
+    jl_gcframe_t **pgcstack = jl_get_pgcstack();
+    if (pgcstack == NULL)
+    {
+        return NULL;
+    }
 
-        return container_of(pgcstack, jl_task_t, gcstack);
-        #endif
+    return container_of(pgcstack, jl_task_t, gcstack);
+#endif
     }
     const jl_datatype_layout_t *jlrs_datatype_layout(jl_datatype_t *t) { return jl_datatype_layout(t); }
+    int8_t jlrs_gc_safe_enter(jl_ptls_t ptls)
+    {
+        return jl_gc_safe_enter(ptls);
+    }
+
+    int8_t jlrs_gc_unsafe_enter(jl_ptls_t ptls)
+    {
+        return jl_gc_unsafe_enter(ptls);
+    }
+
+    void jlrs_gc_safe_leave(jl_ptls_t ptls, int8_t state)
+    {
+        jl_gc_safe_leave(ptls, state);
+    }
+
+    void jlrs_gc_unsafe_leave(jl_ptls_t ptls, int8_t state)
+    {
+        jl_gc_unsafe_leave(ptls, state);
+    }
 #ifdef __cplusplus
 }
 #endif
