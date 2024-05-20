@@ -59,10 +59,7 @@ fn construct_array_2d_unchecked_unrooted(frame: &mut GcFrame, c: &mut Criterion)
 }
 
 #[inline(never)]
-fn construct_array_2d_unchecked_unrooted2(
-    frame: &mut GcFrame,
-    c: &mut Criterion,
-) {
+fn construct_array_2d_unchecked_unrooted2(frame: &mut GcFrame, c: &mut Criterion) {
     jlrs::define_fast_array_key!(pub Foo, f32, 2);
 
     c.bench_function("Array<f64,2>_unchecked_unrooted2", |b| {
@@ -92,10 +89,7 @@ fn construct_array_3d_arrdim_unrooted(frame: &mut GcFrame, c: &mut Criterion) {
 }
 
 #[inline(never)]
-fn construct_array_3d_arrdim_unchecked_unrooted(
-    frame: &mut GcFrame,
-    c: &mut Criterion,
-) {
+fn construct_array_3d_arrdim_unchecked_unrooted(frame: &mut GcFrame, c: &mut Criterion) {
     c.bench_function("Array<f64,3>_arrdim_unchecked_unrooted", |b| {
         b.iter(|| unsafe { TypedArray::<f64>::new_unchecked(&frame, [4, 2, 2]) })
     });
@@ -116,10 +110,7 @@ fn construct_array_4d_unchecked_unrooted(frame: &mut GcFrame, c: &mut Criterion)
 }
 
 #[inline(never)]
-fn construct_array_1d_from_slice_unrooted(
-    frame: &mut GcFrame,
-    c: &mut Criterion,
-) {
+fn construct_array_1d_from_slice_unrooted(frame: &mut GcFrame, c: &mut Criterion) {
     let mut v = [1.0; 16];
     let mut v = NonNull::from(&mut v);
     c.bench_function("Array<f64,1>_from_slice_unrooted", |b| {
@@ -131,10 +122,7 @@ fn construct_array_1d_from_slice_unrooted(
 }
 
 #[inline(never)]
-fn construct_array_1d_from_slice_unchecked_unrooted(
-    frame: &mut GcFrame,
-    c: &mut Criterion,
-) {
+fn construct_array_1d_from_slice_unchecked_unrooted(frame: &mut GcFrame, c: &mut Criterion) {
     let mut v = [1.0; 16];
     let mut v = NonNull::from(&mut v);
     c.bench_function("Array<f64,1>_from_slice_unchecked_unrooted", |b| {
@@ -156,10 +144,7 @@ fn construct_array_1d_from_vec_unrooted(frame: &mut GcFrame, c: &mut Criterion) 
 }
 
 #[inline(never)]
-fn construct_array_1d_from_vec_unchecked_unrooted(
-    frame: &mut GcFrame,
-    c: &mut Criterion,
-) {
+fn construct_array_1d_from_vec_unchecked_unrooted(frame: &mut GcFrame, c: &mut Criterion) {
     c.bench_function("Array<f64,1>_from_vec_unchecked_unrooted", |b| {
         b.iter(|| {
             let v: Vec<f64> = Vec::new();

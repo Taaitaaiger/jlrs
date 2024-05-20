@@ -113,25 +113,25 @@
 //! runtime:
 //!
 //!  - `local-rt`
-//!  
+//!
 //!    Enables the local runtime. The local runtime provides single-threaded, blocking access to
 //!    Julia.
-//!  
+//!
 //!  - `async-rt`
-//!  
+//!
 //!    Enables the async runtime. The async runtime runs on a separate thread and can be used from
 //!    multiple threads.
-//!  
+//!
 //!  - `tokio-rt`
-//!  
+//!
 //!    The async runtime requires an executor. This feature provides a tokio-based executor.
-//!  
+//!
 //!  - `multi-rt`
-//!  
+//!
 //!    Enables the multithreaded runtime. The multithreaded runtime lets you call Julia from
 //!    arbitrary threads. It can be combined with the `async-rt` feature to create Julia-aware
 //!    thread pools. This feature requires Julia 1.9 or higher.
-//!  
+//!
 //!
 //! <div class="warning"><strong>WARNING</strong>: Runtime features must only be enabled by applications that embed Julia.
 //! Libraries must never enable a runtime feature.</div>
@@ -521,7 +521,7 @@
 //!
 //!
 //! ### Async runtime
-//!  
+//!
 //! While the sync and multithreaded runtimes let you call into Julia directly from one or more
 //! threads, the async runtime runs on a background thread and uses an executor to allow
 //! running multiple tasks on that thread concurrently. Its handle type, `AsyncHandle`, can be
@@ -1000,6 +1000,7 @@
 
 use std::sync::atomic::{AtomicBool, Ordering};
 
+use jl_sys::jlrs_init_missing_functions;
 #[cfg(feature = "local-rt")]
 use once_cell::sync::OnceCell;
 use prelude::Managed;
@@ -1166,6 +1167,7 @@ pub(crate) unsafe fn init_jlrs(install_jlrs_core: &InstallJlrsCore) {
         return;
     }
 
+    jlrs_init_missing_functions();
     init_foreign_type_registry();
     init_constructed_type_cache();
     init_symbol_cache();

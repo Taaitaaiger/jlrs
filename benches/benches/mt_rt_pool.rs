@@ -3,8 +3,7 @@ use std::{cell::RefCell, future::Future};
 use criterion::{
     async_executor::AsyncExecutor, black_box, criterion_group, criterion_main, Criterion,
 };
-use jlrs::prelude::*;
-use jlrs::runtime::handle::mt_handle::MtHandle;
+use jlrs::{prelude::*, runtime::handle::mt_handle::MtHandle};
 #[cfg(not(target_os = "windows"))]
 use pprof::{
     criterion::{Output, PProfProfiler},
@@ -23,9 +22,7 @@ impl AsyncExecutor for TokioExecutor {
         RUNTIME.with(|rt_refcell| {
             let mut rt_ref = rt_refcell.borrow_mut();
             if rt_ref.is_none() {
-                *rt_ref = tokio::runtime::Builder::new_current_thread()
-                    .build()
-                    .ok();
+                *rt_ref = tokio::runtime::Builder::new_current_thread().build().ok();
             }
 
             let rt = rt_ref.as_ref().unwrap();

@@ -40,6 +40,11 @@ extern "C"
     jl_value_t *jlrs_apply(jl_value_t **args, uint32_t nargs); // X
     jl_task_t *jlrs_current_task();
     const jl_datatype_layout_t *jlrs_datatype_layout(jl_datatype_t *t);
+    int8_t jlrs_gc_safe_enter(jl_ptls_t ptls);
+    int8_t jlrs_gc_unsafe_enter(jl_ptls_t ptls);
+    void jlrs_gc_safe_leave(jl_ptls_t ptls, int8_t state);
+    void jlrs_gc_unsafe_leave(jl_ptls_t ptls, int8_t state);
+
 #ifdef __cplusplus
 }
 #endif

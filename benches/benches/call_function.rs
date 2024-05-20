@@ -115,47 +115,47 @@ fn bench_group(c: &mut Criterion) {
 
     julia.with_stack(|mut stack| {
         stack.scope(|mut frame| {
-            let func =unsafe{ 
+            let func =unsafe{
                 Value::eval_string(&frame, "function dummy(a1::Any=nothing, a2::Any=nothing, a3::Any=nothing, a4::Any=nothing, a5::Any=nothing, a6::Any=nothing)
                     @nospecialize a1 a2 a3 a4 a5 a6
                 end").unwrap().as_value()
             };
-            
+
             frame.gc_collect(jlrs::memory::gc::GcCollection::Full);
             frame.gc_collect(jlrs::memory::gc::GcCollection::Full);
             frame.gc_collect(jlrs::memory::gc::GcCollection::Full);
             call_0_unchecked(&mut frame, c, func).unwrap();
-            
+
             frame.gc_collect(jlrs::memory::gc::GcCollection::Full);
             frame.gc_collect(jlrs::memory::gc::GcCollection::Full);
             frame.gc_collect(jlrs::memory::gc::GcCollection::Full);
             call_0(&mut frame, c, func).unwrap();
-            
+
             frame.gc_collect(jlrs::memory::gc::GcCollection::Full);
             frame.gc_collect(jlrs::memory::gc::GcCollection::Full);
             frame.gc_collect(jlrs::memory::gc::GcCollection::Full);
             call_1_unchecked(&mut frame, c, func).unwrap();
-            
+
             frame.gc_collect(jlrs::memory::gc::GcCollection::Full);
             frame.gc_collect(jlrs::memory::gc::GcCollection::Full);
             frame.gc_collect(jlrs::memory::gc::GcCollection::Full);
             call_1(&mut frame, c, func).unwrap();
-            
+
             frame.gc_collect(jlrs::memory::gc::GcCollection::Full);
             frame.gc_collect(jlrs::memory::gc::GcCollection::Full);
             frame.gc_collect(jlrs::memory::gc::GcCollection::Full);
             call_2_unchecked(&mut frame, c, func).unwrap();
-            
+
             frame.gc_collect(jlrs::memory::gc::GcCollection::Full);
             frame.gc_collect(jlrs::memory::gc::GcCollection::Full);
             frame.gc_collect(jlrs::memory::gc::GcCollection::Full);
             call_2(&mut frame, c, func).unwrap();
-            
+
             frame.gc_collect(jlrs::memory::gc::GcCollection::Full);
             frame.gc_collect(jlrs::memory::gc::GcCollection::Full);
             frame.gc_collect(jlrs::memory::gc::GcCollection::Full);
             call_3_unchecked(&mut frame, c, func).unwrap();
-            
+
             frame.gc_collect(jlrs::memory::gc::GcCollection::Full);
             frame.gc_collect(jlrs::memory::gc::GcCollection::Full);
             frame.gc_collect(jlrs::memory::gc::GcCollection::Full);

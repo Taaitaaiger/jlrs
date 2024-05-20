@@ -24,10 +24,9 @@ use std::{
 };
 
 use jl_sys::{
-    jl_array_del_end, jl_array_grow_end, jl_array_ptr_1d_append, jl_array_ptr_1d_push, jl_value_t,
-    jlrs_array_typetagdata, jlrs_arrayref, jlrs_arrayset,
+    inlined::jlrs_array_data_fast, jl_array_del_end, jl_array_grow_end, jl_array_ptr_1d_append,
+    jl_array_ptr_1d_push, jl_value_t, jlrs_array_typetagdata, jlrs_arrayref, jlrs_arrayset,
 };
-use jlrs_macros::julia_version;
 
 use super::copied::CopiedArray;
 use crate::{
@@ -1566,37 +1565,4 @@ impl<'scope, 'data, T, const N: isize> Accessor<'scope, 'data, T, N>
 impl<'scope, 'data, T, const N: isize> AccessorMut<'scope, 'data, T, N>
     for IndeterminateAccessorMut<'_, 'scope, 'data, T, N>
 {
-}
-
-// If LTO is not enabled accessing arrays is very slow, so we're going to optimize
-// the common case a little.
-#[julia_version(until = "1.10")]
-#[inline]
-const unsafe fn jlrs_array_data_fast(a: *mut jl_sys::jl_array_t) -> *mut std::ffi::c_void {
-    #[repr(C)]
-    struct RawArray {
-        ptr: *mut std::ffi::c_void,
-    }
-
-    NonNull::new_unchecked(a as *mut RawArray).as_ref().ptr
-}
-
-#[julia_version(since = "1.11")]
-#[inline]
-const unsafe fn jlrs_array_data_fast(a: *mut jl_sys::jl_array_t) -> *mut std::ffi::c_void {
-    #[repr(C)]
-    struct GenericMemoryRef {
-        ptr_or_offset: *mut std::ffi::c_void,
-        mem: *mut std::ffi::c_void,
-    }
-
-    #[repr(C)]
-    struct RawArray {
-        ref_inner: GenericMemoryRef,
-    }
-
-    NonNull::new_unchecked(a as *mut RawArray)
-        .as_ref()
-        .ref_inner
-        .ptr_or_offset
 }

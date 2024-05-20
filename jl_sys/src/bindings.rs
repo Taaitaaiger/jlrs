@@ -963,6 +963,7 @@ extern "C" {
     //     nb: std::ffi::c_int,
     // ) -> *mut crate::types::jl_value_t;
 
+    // // Used indirectly
     // #[cfg(not(feature = "julia-1-6"))]
     // pub fn jl_atomic_bool_cmpswap_bits(
     //     dst: *mut std::ffi::c_char,
@@ -971,6 +972,7 @@ extern "C" {
     //     nb: std::ffi::c_int,
     // ) -> std::ffi::c_int;
 
+    // // Used indirectly
     // #[cfg(not(feature = "julia-1-6"))]
     // pub fn jl_atomic_cmpswap_bits(
     //     dt: *mut crate::types::jl_datatype_t,
@@ -1270,8 +1272,6 @@ extern "C" {
 
     pub fn jlrs_array_typetagdata(a: *mut crate::types::jl_array_t) -> *mut std::ffi::c_char;
 
-    pub fn jlrs_array_dims_ptr(a: *mut crate::types::jl_array_t) -> *mut usize;
-
     pub fn jlrs_array_is_pointer_array(a: *mut crate::types::jl_array_t) -> std::ffi::c_int;
 
     pub fn jlrs_array_is_union_array(a: *mut crate::types::jl_array_t) -> std::ffi::c_int;
@@ -1309,16 +1309,10 @@ extern "C" {
     pub fn jlrs_typename_mayinlinealloc(tn: *mut crate::types::jl_typename_t) -> u8;
 
     #[cfg(not(feature = "julia-1-6"))]
-    pub fn jlrs_lock(v: *mut crate::types::jl_value_t);
+    pub fn jlrs_lock_value(v: *mut crate::types::jl_value_t);
 
     #[cfg(not(feature = "julia-1-6"))]
-    pub fn jlrs_unlock(v: *mut crate::types::jl_value_t);
-
-    #[cfg(not(feature = "julia-1-6"))]
-    pub fn jlrs_lock_nogc(v: *mut crate::types::jl_value_t);
-
-    #[cfg(not(feature = "julia-1-6"))]
-    pub fn jlrs_unlock_nogc(v: *mut crate::types::jl_value_t);
+    pub fn jlrs_unlock_value(v: *mut crate::types::jl_value_t);
 
     // Added in Julia 1.8
 
@@ -1345,4 +1339,6 @@ extern "C" {
     pub fn jlrs_genericmemory_typetagdata(
         m: *mut crate::types::jl_genericmemory_t,
     ) -> *mut std::ffi::c_char;
+
+    pub fn jlrs_init_missing_functions();
 }

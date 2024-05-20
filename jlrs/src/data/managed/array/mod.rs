@@ -124,6 +124,7 @@ use std::{
 };
 
 use jl_sys::{
+    inlined::{jlrs_array_dims_ptr, jlrs_array_ndims_fast},
     jl_alloc_vec_any, jl_apply_array_type, jl_array_eltype, jl_array_rank, jl_array_t,
     jl_array_to_string, jl_gc_add_ptr_finalizer, jl_new_struct_uninit, jl_pchar_to_array,
     jlrs_array_data, jlrs_array_data_owner, jlrs_array_has_pointers, jlrs_array_how,
@@ -510,7 +511,7 @@ pub trait ConstructTypedArray<T: ConstructType, const N: isize> {
                     feature = "julia-1-9",
                     feature = "julia-1-10",
                 )))]
-                let mem = jlrs_array_mem(array.ptr().as_ptr());
+                let mem = jl_sys::inlined::jlrs_array_mem(array.ptr().as_ptr());
                 #[cfg(any(
                     feature = "julia-1-6",
                     feature = "julia-1-7",
@@ -565,7 +566,7 @@ pub trait ConstructTypedArray<T: ConstructType, const N: isize> {
             feature = "julia-1-9",
             feature = "julia-1-10",
         )))]
-        let mem = jlrs_array_mem(array.ptr().as_ptr());
+        let mem = jl_sys::inlined::jlrs_array_mem(array.ptr().as_ptr());
         #[cfg(any(
             feature = "julia-1-6",
             feature = "julia-1-7",
@@ -1207,7 +1208,7 @@ impl<const N: isize> ArrayBase<'_, '_, Unknown, N> {
                     feature = "julia-1-9",
                     feature = "julia-1-10",
                 )))]
-                let mem = jlrs_array_mem(array.ptr().as_ptr());
+                let mem = jl_sys::inlined::jlrs_array_mem(array.ptr().as_ptr());
                 #[cfg(any(
                     feature = "julia-1-6",
                     feature = "julia-1-7",
@@ -1265,7 +1266,7 @@ impl<const N: isize> ArrayBase<'_, '_, Unknown, N> {
             feature = "julia-1-9",
             feature = "julia-1-10",
         )))]
-        let mem = jlrs_array_mem(array.ptr().as_ptr());
+        let mem = jl_sys::inlined::jlrs_array_mem(array.ptr().as_ptr());
         #[cfg(any(
             feature = "julia-1-6",
             feature = "julia-1-7",
@@ -2613,7 +2614,7 @@ impl<'scope, 'data, T, const N: isize> ArrayBase<'scope, 'data, T, N> {
 
 // Conversions
 impl<'scope, 'data, T> ArrayBase<'scope, 'data, T, -1> {
-    /// Sets the rank of this array to `N` if `N` is equal to the rank of `self` at runtime.  
+    /// Sets the rank of this array to `N` if `N` is equal to the rank of `self` at runtime.
     pub fn set_rank<const N: isize>(self) -> JlrsResult<ArrayBase<'scope, 'data, T, N>> {
         if self.n_dims() as isize != N {
             Err(ArrayLayoutError::RankMismatch {
@@ -2643,7 +2644,7 @@ impl<'scope, 'data, T> ArrayBase<'scope, 'data, T, -1> {
 
 impl<'scope, 'data, const N: isize> ArrayBase<'scope, 'data, Unknown, N> {
     /// Sets the element type of this array to `T` if the cosntructed type of `T` is equal to the
-    /// element type of `self` at runtime.  
+    /// element type of `self` at runtime.
     pub fn set_type<T: ConstructType>(self) -> JlrsResult<ArrayBase<'scope, 'data, T, N>> {
         unsafe {
             let unrooted = Unrooted::new();
@@ -3224,92 +3225,4 @@ unsafe extern "C" fn droparray<T>(a: *mut c_void) {
     a.ptr = null_mut();
     a.length = 0;
     std::mem::drop(v);
-}
-
-// If LTO is not enabled accessing arrays is very slow, so we're going to optimize
-// the common case a little.
-#[julia_version(until = "1.10")]
-#[inline]
-const unsafe fn jlrs_array_dims_ptr(a: *mut jl_array_t) -> *mut usize {
-    #[repr(C)]
-    struct RawArray {
-        data: *mut c_void,
-        length: usize,
-        flags: u16,
-        elsize: u16,
-        offset: u32,
-        nrows: usize,
-    }
-
-    const OFFSET: usize = std::mem::offset_of!(RawArray, nrows);
-    (a as *mut u8).add(OFFSET) as *mut usize
-}
-
-#[julia_version(since = "1.11")]
-#[inline]
-const unsafe fn jlrs_array_mem(a: *mut jl_array_t) -> *mut jl_sys::types::jl_value_t {
-    #[repr(C)]
-    struct GenericMemoryRef {
-        ptr_or_offset: *mut std::ffi::c_void,
-        mem: *mut std::ffi::c_void,
-    }
-
-    #[repr(C)]
-    struct RawArray {
-        ref_inner: GenericMemoryRef,
-    }
-
-    NonNull::new_unchecked(a as *mut RawArray)
-        .as_ref()
-        .ref_inner
-        .mem as _
-}
-
-#[julia_version(since = "1.11")]
-#[inline]
-const unsafe fn jlrs_array_dims_ptr(a: *mut jl_array_t) -> *mut usize {
-    #[repr(C)]
-    struct GenericMemoryRef {
-        ptr_or_offset: *mut std::ffi::c_void,
-        mem: *mut std::ffi::c_void,
-    }
-
-    #[repr(C)]
-    struct RawArray {
-        ref_inner: GenericMemoryRef,
-    }
-
-    const OFFSET: usize = std::mem::size_of::<RawArray>();
-    (a as *mut u8).add(OFFSET) as *mut usize
-}
-
-const unsafe fn jlrs_array_ndims_fast(a: *mut jl_array_t) -> usize {
-    #[repr(C)]
-    struct RawDataType {
-        name: *mut c_void,
-        super_ty: *mut c_void,
-        parameters: *mut c_void,
-    }
-
-    #[repr(C)]
-    union Header {
-        header: usize,
-        next: *mut TaggedValue,
-        ty: *mut RawDataType,
-        bits: usize,
-    }
-
-    #[repr(C)]
-    struct TaggedValue {
-        header: Header,
-    }
-
-    let a = a as *mut u8;
-    let tagged = a
-        .sub(std::mem::size_of::<TaggedValue>())
-        .cast::<TaggedValue>();
-    let header = NonNull::new_unchecked(tagged).as_ref().header.header;
-    let dt = (header & !15) as *mut RawDataType;
-    let params = NonNull::new_unchecked(dt).as_ref().parameters as *mut *mut usize;
-    params.add(2).read().read()
 }

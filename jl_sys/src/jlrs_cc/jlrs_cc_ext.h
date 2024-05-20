@@ -110,8 +110,7 @@ extern "C" {
     void jlrs_arrayset(jl_array_t *a, jl_value_t *v, size_t i);
     jl_value_t *jlrs_array_data_owner(jl_array_t *a);
     char *jlrs_array_typetagdata(jl_array_t *a);
-    
-    size_t *jlrs_array_dims_ptr(jl_array_t *a);
+
     int jlrs_array_is_pointer_array(jl_array_t *a);
     int jlrs_array_is_union_array(jl_array_t *a);
     int jlrs_array_has_pointers(jl_array_t *a);
