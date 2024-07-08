@@ -145,14 +145,12 @@ use self::{
 };
 use super::{
     string::{JuliaString, StringData},
+    symbol::static_symbol::{NSym, StaticSymbol, TSym},
     union::Union,
 };
 use crate::{
     catch::{catch_exceptions, unwrap_exc},
-    convert::{
-        ccall_types::{CCallArg, CCallReturn},
-        to_symbol::ToSymbol,
-    },
+    convert::ccall_types::{CCallArg, CCallReturn},
     data::{
         layout::{
             is_bits::IsBits,
@@ -164,7 +162,7 @@ use crate::{
         },
         types::{
             abstract_type::AnyType,
-            construct_type::{BitsUnionCtor, ConstructType},
+            construct_type::{BitsUnionCtor, ConstructType, IfConcreteElse},
             typecheck::Typecheck,
         },
     },
@@ -3012,9 +3010,9 @@ unsafe impl<'scope, 'data, T: ConstructType, const N: isize> ConstructType
         let ty = UnionAll::array_type(&target);
 
         if N == -1 {
-            target.with_local_scope::<_, _, 3>(|target, mut frame| unsafe {
+            target.with_local_scope::<_, _, 2>(|target, mut frame| unsafe {
                 let elty = T::construct_type(&mut frame);
-                let tn_n = TypeVar::new_unchecked(&mut frame, "N", None, None);
+                let tn_n = ty.body().cast_unchecked::<UnionAll>().var();
                 let applied = ty.apply_types_unchecked(&mut frame, [elty, tn_n.as_value()]);
 
                 UnionAll::rewrap(target, applied.cast_unchecked::<DataType>())
@@ -3047,18 +3045,29 @@ unsafe impl<'scope, 'data, T: ConstructType, const N: isize> ConstructType
         let ty = UnionAll::array_type(&target);
 
         if N == -1 {
-            let n_sym = "N".to_symbol(&target);
-            let n_param = env.get(n_sym).expect("TypeVar N is not in env");
+            let n_sym = NSym::get_symbol(&target);
+            let n_param = match env.get(n_sym) {
+                Some(n_param) => n_param.as_value(),
+                _ => ty.base_type().parameter(1).unwrap(),
+            };
 
-            target.with_local_scope::<_, _, 1>(|target, mut frame| unsafe {
-                let t = T::construct_type_with_env(&mut frame, env);
-                ty.apply_types_unchecked(target, [t, n_param.as_value()])
-            })
-        } else {
             target.with_local_scope::<_, _, 2>(|target, mut frame| unsafe {
                 let t = T::construct_type_with_env(&mut frame, env);
+                let applied = ty.apply_types_unchecked(&mut frame, [t, n_param]);
+                assert!(applied.is::<DataType>());
+                applied
+                    .cast_unchecked::<DataType>()
+                    .wrap_with_env(target, env)
+            })
+        } else {
+            target.with_local_scope::<_, _, 3>(|target, mut frame| unsafe {
+                let t = T::construct_type_with_env(&mut frame, env);
                 let n = Value::new(&mut frame, N);
-                ty.apply_types_unchecked(target, [t, n])
+                let applied = ty.apply_types_unchecked(&mut frame, [t, n]);
+                assert!(applied.is::<DataType>());
+                applied
+                    .cast_unchecked::<DataType>()
+                    .wrap_with_env(target, env)
             })
         }
     }
@@ -3104,14 +3113,24 @@ unsafe impl<'scope, 'data, const N: isize> ConstructType for RankedArray<'scope,
         Tgt: Target<'target>,
     {
         let ty = UnionAll::array_type(&target);
-        let t_sym = "T".to_symbol(&target);
+        let t_sym = TSym::get_symbol(&target);
         let t_param = env.get(t_sym).expect("TypeVar T is not in env");
 
         if N == -1 {
-            let n_sym = "N".to_symbol(&target);
-            let n_param = env.get(n_sym).expect("TypeVar N is not in env");
+            let n_sym = NSym::get_symbol(&target);
+            let n_param = match env.get(n_sym) {
+                Some(n_param) => n_param.as_value(),
+                _ => unsafe {
+                    ty.body()
+                        .cast_unchecked::<UnionAll>()
+                        .body()
+                        .cast_unchecked::<DataType>()
+                        .parameter(1)
+                        .unwrap()
+                },
+            };
 
-            unsafe { ty.apply_types_unchecked(target, [t_param.as_value(), n_param.as_value()]) }
+            unsafe { ty.apply_types_unchecked(target, [t_param.as_value(), n_param]) }
         } else {
             target.with_local_scope::<_, _, 1>(|target, mut frame| unsafe {
                 let n = Value::new(&mut frame, N);
@@ -3137,15 +3156,16 @@ unsafe impl<const N: isize> CCallReturn for RankedArrayRet<N> {
         self
     }
 }
+
 unsafe impl<'scope, 'data, T: ConstructType, const N: isize> CCallArg
     for TypedRankedArray<'scope, 'data, T, N>
 {
-    type CCallArgType = Self;
+    type CCallArgType = IfConcreteElse<Self, AnyType>;
     type FunctionArgType = Self;
 }
 
 unsafe impl<T: ConstructType, const N: isize> CCallReturn for TypedRankedArrayRet<T, N> {
-    type CCallReturnType = TypedRankedArray<'static, 'static, T, N>;
+    type CCallReturnType = IfConcreteElse<TypedRankedArray<'static, 'static, T, N>, AnyType>;
     type FunctionReturnType = TypedRankedArray<'static, 'static, T, N>;
     type ReturnAs = Self;
 

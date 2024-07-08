@@ -201,7 +201,7 @@ impl GcStack {
 
 // Safety: Julia must have been initialized, must only be called from a thread known to Julia via `jlrs_unsized_scope`.
 #[inline]
-unsafe extern "C" fn unsized_scope_trampoline<T, F>(
+unsafe extern "C-unwind" fn unsized_scope_trampoline<T, F>(
     frame: *mut jl_gcframe_t,
     callback: *mut c_void,
     result: *mut c_void,

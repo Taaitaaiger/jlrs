@@ -312,6 +312,70 @@ pub unsafe trait ConstructType: Sized {
         Tgt: Target<'target>;
 }
 
+/// Returns the type constructed with the `ConstructType` implementation of `T1` if it is a
+/// concrete type, otherwise that of `T2`.
+pub struct IfConcreteElse<T1: ConstructType, T2: ConstructType> {
+    _marker: PhantomData<(T1, T2)>,
+}
+
+unsafe impl<T1: ConstructType, T2: ConstructType> ConstructType for IfConcreteElse<T1, T2> {
+    type Static = IfConcreteElse<T1::Static, T2::Static>;
+
+    fn construct_type_uncached<'target, Tgt>(target: Tgt) -> ValueData<'target, 'static, Tgt>
+    where
+        Tgt: Target<'target>,
+    {
+        let t1 = T1::construct_type(&target);
+        unsafe {
+            let v = t1.as_value();
+            if v.is::<DataType>() {
+                if v.cast_unchecked::<DataType>().is_concrete_type() {
+                    return t1.root(target);
+                }
+            }
+
+            T2::construct_type(target)
+        }
+    }
+
+    fn construct_type_with_env_uncached<'target, Tgt>(
+        target: Tgt,
+        env: &crate::data::types::construct_type::TypeVarEnv,
+    ) -> ValueData<'target, 'static, Tgt>
+    where
+        Tgt: Target<'target>,
+    {
+        let t1 = T1::construct_type_with_env_uncached(&target, env);
+        unsafe {
+            let v = t1.as_value();
+            if v.is::<DataType>() {
+                if v.cast_unchecked::<DataType>().is_concrete_type() {
+                    return t1.root(target);
+                }
+            }
+
+            T2::construct_type_with_env_uncached(target, env)
+        }
+    }
+
+    fn base_type<'target, Tgt>(target: &Tgt) -> Option<Value<'target, 'static>>
+    where
+        Tgt: Target<'target>,
+    {
+        let t1 = T1::construct_type(&target);
+        unsafe {
+            let v = t1.as_value();
+            if v.is::<DataType>() {
+                if v.cast_unchecked::<DataType>().is_concrete_type() {
+                    return T1::base_type(target);
+                }
+            }
+
+            T2::base_type(target)
+        }
+    }
+}
+
 /// Cache a single constructible type.
 ///
 /// By default, constructible types with type parameters are significantly slower to access than
@@ -1057,11 +1121,11 @@ unsafe impl<T: ConstructType, N: ConstructType> ConstructType for ArrayTypeConst
                 let ty_param = T::construct_type(&mut frame);
                 let rank_param = N::construct_type(&mut frame);
                 let params = [ty_param, rank_param];
-                let applied = Self::base_type(&frame)
+                Self::base_type(&frame)
                     .unwrap_unchecked()
-                    .apply_type_unchecked(&mut frame, params);
-
-                UnionAll::rewrap(target, applied.cast_unchecked::<DataType>())
+                    .apply_type_unchecked(&mut frame, params)
+                    .cast_unchecked::<DataType>()
+                    .rewrap(target)
             })
         }
     }
@@ -1083,13 +1147,15 @@ unsafe impl<T: ConstructType, N: ConstructType> ConstructType for ArrayTypeConst
         Tgt: Target<'target>,
     {
         unsafe {
-            target.with_local_scope::<_, _, 2>(|target, mut frame| {
+            target.with_local_scope::<_, _, 3>(|target, mut frame| {
                 let ty_param = T::construct_type_with_env(&mut frame, env);
                 let rank_param = N::construct_type_with_env(&mut frame, env);
                 let params = [ty_param, rank_param];
                 Self::base_type(&frame)
                     .unwrap_unchecked()
-                    .apply_type_unchecked(target, params)
+                    .apply_type_unchecked(&mut frame, params)
+                    .cast_unchecked::<DataType>()
+                    .wrap_with_env(target, env)
             })
         }
     }

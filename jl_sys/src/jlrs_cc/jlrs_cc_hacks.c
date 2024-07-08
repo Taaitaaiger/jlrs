@@ -50,7 +50,6 @@ extern "C"
 #if JULIA_VERSION_MINOR >= 7
     void jlrs_lock_value(jl_value_t *v)
     {
-
         assert(jl_lock_value_func && "jl_lock_value_func not loaded");
         jl_lock_value_func(v);
     }

@@ -959,3 +959,33 @@ pub struct HasElidedParamTypeConstructor<T, U> {
     _t: ::std::marker::PhantomData<T>,
     _u: ::std::marker::PhantomData<U>,
 }
+
+#[derive(
+    Copy,
+    Clone,
+    Debug,
+    PartialEq,
+    Enum,
+    Unbox,
+    IntoJulia,
+    ConstructType,
+    IsBits,
+    Typecheck,
+    ValidField,
+    ValidLayout,
+    CCallArg,
+    CCallReturn,
+)]
+#[jlrs(julia_type = "Main.StandardEnum")]
+#[repr(i32)]
+pub enum StandardEnum {
+    #[allow(non_camel_case_types)]
+    #[jlrs(julia_enum_variant = "Main.se_a")]
+    SeA = 1,
+    #[allow(non_camel_case_types)]
+    #[jlrs(julia_enum_variant = "Main.se_b")]
+    SeB = 2,
+    #[allow(non_camel_case_types)]
+    #[jlrs(julia_enum_variant = "Main.se_c")]
+    SeC = 3,
+}

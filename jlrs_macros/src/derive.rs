@@ -223,12 +223,23 @@ impl JlrsFieldAttr {
 
 pub fn impl_into_julia(ast: &syn::DeriveInput) -> TokenStream {
     let name = &ast.ident;
-    if !is_repr_c(ast) {
-        panic!("IntoJulia can only be derived for types with the attribute #[repr(C)].");
+    let is_enum = is_enum(&ast.data);
+
+    if !is_enum && !is_repr_c(ast) {
+        panic!(
+            "IntoJulia can only be derived for types with the attribute #[repr(C)] {:?}.",
+            ast.data
+        );
+    } else if is_enum && !is_repr_int(ast) {
+        panic!("IntoJulia can only be derived for enums with an integer repr.");
     }
 
     let attrs = JlrsTypeAttrs::parse(ast);
-    let into_julia_fn = impl_into_julia_fn(&attrs);
+    let into_julia_fn = if !is_enum {
+        impl_into_julia_fn(&attrs)
+    } else {
+        impl_into_julia_fn_enum()
+    };
 
     let into_julia_impl = quote! {
         unsafe impl ::jlrs::convert::into_julia::IntoJulia for #name {
@@ -274,11 +285,29 @@ pub fn impl_into_julia_fn(attrs: &JlrsTypeAttrs) -> Option<TS2> {
         None
     }
 }
+pub fn impl_into_julia_fn_enum() -> Option<TS2> {
+    Some(quote! {
+        #[inline]
+        fn into_julia<'target, T>(self, target: T) -> ::jlrs::data::managed::value::ValueData<'target, 'static, T>
+        where
+            T: ::jlrs::memory::target::Target<'target>,
+        {
+            <Self as ::jlrs::data::layout::julia_enum::Enum>::as_value(&self, &target).root(target)
+        }
+    })
+}
 
 pub fn impl_unbox(ast: &syn::DeriveInput) -> TokenStream {
     let name = &ast.ident;
-    if !is_repr_c(ast) {
-        panic!("Unbox can only be derived for types with the attribute #[repr(C)].");
+    let is_enum = is_enum(&ast.data);
+
+    if !is_enum && !is_repr_c(ast) {
+        panic!(
+            "Unbox can only be derived for types with the attribute #[repr(C)] {:?}.",
+            ast.data
+        );
+    } else if is_enum && !is_repr_int(ast) {
+        panic!("Unbox can only be derived for enums with an integer repr.");
     }
 
     let generics = &ast.generics;
@@ -319,8 +348,15 @@ pub fn impl_unbox(ast: &syn::DeriveInput) -> TokenStream {
 
 pub fn impl_typecheck(ast: &syn::DeriveInput) -> TokenStream {
     let name = &ast.ident;
-    if !is_repr_c(ast) {
-        panic!("Typecheck can only be derived for types with the attribute #[repr(C)].");
+    let is_enum = is_enum(&ast.data);
+
+    if !is_enum && !is_repr_c(ast) {
+        panic!(
+            "Typecheck can only be derived for types with the attribute #[repr(C)] {:?}.",
+            ast.data
+        );
+    } else if is_enum && !is_repr_int(ast) {
+        panic!("Typecheck can only be derived for enums with an integer repr.");
     }
 
     let generics = &ast.generics;
@@ -373,6 +409,7 @@ pub fn impl_typecheck(ast: &syn::DeriveInput) -> TokenStream {
 
 pub fn impl_construct_type(ast: &syn::DeriveInput) -> TokenStream {
     let name = &ast.ident;
+
     let mut attrs = JlrsTypeAttrs::parse(ast);
     let jl_type = attrs.julia_type
         .take()
@@ -456,15 +493,12 @@ pub fn impl_construct_type(ast: &syn::DeriveInput) -> TokenStream {
                 )*
                 unsafe {
                     let types = std::mem::transmute::<&[Option<::jlrs::data::managed::value::Value>; #n_names], &[::jlrs::data::managed::value::Value; #n_names]>(&types);
-
-                    let applied = base_type
+                    base_type
                         .apply_type(&mut frame, types)
-                        .unwrap();
-
-                    ::jlrs::data::managed::union_all::UnionAll::rewrap(
-                        target,
-                        applied.cast_unchecked::<::jlrs::data::managed::datatype::DataType>(),
-                    )
+                        .unwrap()
+                        .cast::<::jlrs::data::managed::datatype::DataType>()
+                        .unwrap()
+                        .rewrap(target)
                 }
             })
         };
@@ -483,7 +517,12 @@ pub fn impl_construct_type(ast: &syn::DeriveInput) -> TokenStream {
                 )*
                 unsafe {
                     let types = std::mem::transmute::<&[Option<::jlrs::data::managed::value::Value>; #n_names], &[::jlrs::data::managed::value::Value; #n_names]>(&types);
-                    base_type.apply_type_unchecked(target, types)
+                    base_type
+                        .apply_type(&mut frame, types)
+                        .unwrap()
+                        .cast::<::jlrs::data::managed::datatype::DataType>()
+                        .unwrap()
+                        .wrap_with_env(target, env)
                 }
             })
         };
@@ -611,6 +650,16 @@ pub fn impl_has_layout(ast: &syn::DeriveInput) -> TokenStream {
 
 pub fn impl_is_bits(ast: &syn::DeriveInput) -> TokenStream {
     let name = &ast.ident;
+    let is_enum = is_enum(&ast.data);
+
+    if !is_enum && !is_repr_c(ast) {
+        panic!(
+            "IsBits can only be derived for types with the attribute #[repr(C)] {:?}.",
+            ast.data
+        );
+    } else if is_enum && !is_repr_int(ast) {
+        panic!("IsBits can only be derived for enums with an integer repr.");
+    }
 
     let generics = &ast.generics;
     let wc = match ast.generics.where_clause.as_ref() {
@@ -648,8 +697,15 @@ pub fn impl_is_bits(ast: &syn::DeriveInput) -> TokenStream {
 
 pub fn impl_valid_layout(ast: &syn::DeriveInput) -> TokenStream {
     let name = &ast.ident;
-    if !is_repr_c(ast) {
-        panic!("ValidLayout can only be derived for types with the attribute #[repr(C)].");
+    let is_enum = is_enum(&ast.data);
+
+    if !is_enum && !is_repr_c(ast) {
+        panic!(
+            "ValidLayout can only be derived for types with the attribute #[repr(C)] {:?}.",
+            ast.data
+        );
+    } else if is_enum && !is_repr_int(ast) {
+        panic!("ValidLayout can only be derived for enums with an integer repr.");
     }
 
     let generics = &ast.generics;
@@ -679,97 +735,207 @@ pub fn impl_valid_layout(ast: &syn::DeriveInput) -> TokenStream {
         }
     };
 
-    let fields = match &ast.data {
-        syn::Data::Struct(s) => &s.fields,
-        _ => panic!("ValidLayout can only be derived for structs."),
-    };
-
-    let classified_fields = match fields {
-        syn::Fields::Named(n) => ClassifiedFields::classify(n.named.iter()),
-        syn::Fields::Unit => ClassifiedFields::default(),
-        _ => panic!("ValidLayout cannot be derived for tuple structs."),
-    };
-
     let mut attrs = JlrsTypeAttrs::parse(ast);
     let jl_type = attrs.julia_type
         .take()
         .expect("ValidLayout can only be derived if the corresponding Julia type is set with #[julia_type = \"Main.MyModule.Submodule.StructType\"]");
 
-    let rs_flag_fields = classified_fields.rs_flag_fields.iter();
-    let rs_align_fields = classified_fields.rs_align_fields.iter();
-    let rs_union_fields = classified_fields.rs_union_fields.iter();
-    let rs_non_union_fields = classified_fields.rs_non_union_fields.iter();
-    let jl_union_field_idxs = classified_fields.jl_union_field_idxs.iter();
-    let jl_non_union_field_idxs = classified_fields.jl_non_union_field_idxs.iter();
+    if !is_enum {
+        let fields = match &ast.data {
+            syn::Data::Struct(s) => &s.fields,
+            _ => panic!("ValidLayout can only be derived for structs."),
+        };
 
-    let n_fields = classified_fields.jl_union_field_idxs.len()
-        + classified_fields.jl_non_union_field_idxs.len();
+        let classified_fields = match fields {
+            syn::Fields::Named(n) => ClassifiedFields::classify(n.named.iter()),
+            syn::Fields::Unit => ClassifiedFields::default(),
+            _ => panic!("ValidLayout cannot be derived for tuple structs."),
+        };
 
-    let valid_layout_impl = quote! {
-        unsafe impl #generics ::jlrs::data::layout::valid_layout::ValidLayout for #name #generics #where_clause {
-            fn valid_layout(v: ::jlrs::data::managed::value::Value) -> bool {
-                unsafe {
-                    if v.is::<::jlrs::data::managed::datatype::DataType>() {
-                        let dt = unsafe { v.cast_unchecked::<::jlrs::data::managed::datatype::DataType>() };
-                        if dt.n_fields().unwrap() as usize != #n_fields {
-                            return false;
-                        }
+        let rs_flag_fields = classified_fields.rs_flag_fields.iter();
+        let rs_align_fields = classified_fields.rs_align_fields.iter();
+        let rs_union_fields = classified_fields.rs_union_fields.iter();
+        let rs_non_union_fields = classified_fields.rs_non_union_fields.iter();
+        let jl_union_field_idxs = classified_fields.jl_union_field_idxs.iter();
+        let jl_non_union_field_idxs = classified_fields.jl_non_union_field_idxs.iter();
 
-                        let field_types = dt.field_types();
-                        let field_types_data = field_types.data();
-                        let field_types = field_types_data.as_atomic_slice().assume_immutable_non_null();
+        let n_fields = classified_fields.jl_union_field_idxs.len()
+            + classified_fields.jl_non_union_field_idxs.len();
 
-                        #(
-                            if !<#rs_non_union_fields as ::jlrs::data::layout::valid_layout::ValidField>::valid_field(field_types[#jl_non_union_field_idxs]) {
+        let valid_layout_impl = quote! {
+            unsafe impl #generics ::jlrs::data::layout::valid_layout::ValidLayout for #name #generics #where_clause {
+                fn valid_layout(v: ::jlrs::data::managed::value::Value) -> bool {
+                    unsafe {
+                        if v.is::<::jlrs::data::managed::datatype::DataType>() {
+                            let dt = unsafe { v.cast_unchecked::<::jlrs::data::managed::datatype::DataType>() };
+                            if dt.n_fields().unwrap() as usize != #n_fields {
                                 return false;
                             }
-                        )*
 
-                        #(
-                            {
-                                let field_type = field_types[#jl_union_field_idxs];
-                                if field_type.is::<::jlrs::data::managed::union::Union>() {
-                                    let u = field_type.cast_unchecked::<::jlrs::data::managed::union::Union>();
-                                    if !::jlrs::data::layout::union::correct_layout_for::<#rs_align_fields, #rs_union_fields, #rs_flag_fields>(u) {
+                            let field_types = dt.field_types();
+                            let field_types_data = field_types.data();
+                            let field_types = field_types_data.as_atomic_slice().assume_immutable_non_null();
+
+                            #(
+                                if !<#rs_non_union_fields as ::jlrs::data::layout::valid_layout::ValidField>::valid_field(field_types[#jl_non_union_field_idxs]) {
+                                    return false;
+                                }
+                            )*
+
+                            #(
+                                {
+                                    let field_type = field_types[#jl_union_field_idxs];
+                                    if field_type.is::<::jlrs::data::managed::union::Union>() {
+                                        let u = field_type.cast_unchecked::<::jlrs::data::managed::union::Union>();
+                                        if !::jlrs::data::layout::union::correct_layout_for::<#rs_align_fields, #rs_union_fields, #rs_flag_fields>(u) {
+                                            return false
+                                        }
+                                    } else {
                                         return false
                                     }
-                                } else {
-                                    return false
                                 }
-                            }
-                        )*
+                            )*
 
 
-                        return true;
+                            return true;
+                        }
+                    }
+
+                    false
+                }
+
+                #[inline]
+                fn type_object<'target, Tgt>(
+                    target: &Tgt
+                ) -> ::jlrs::data::managed::value::Value<'target, 'static>
+                where
+                    Tgt: ::jlrs::memory::target::Target<'target>,
+                {
+                    unsafe {
+                        ::jlrs::data::managed::module::Module::typed_global_cached::<::jlrs::data::managed::value::Value, _, _>(target, #jl_type).unwrap()
                     }
                 }
 
-                false
+                const IS_REF: bool = false;
             }
+        };
 
-            #[inline]
-            fn type_object<'target, Tgt>(
-                target: &Tgt
-            ) -> ::jlrs::data::managed::value::Value<'target, 'static>
-            where
-                Tgt: ::jlrs::memory::target::Target<'target>,
-            {
-                unsafe {
-                    ::jlrs::data::managed::module::Module::typed_global_cached::<::jlrs::data::managed::value::Value, _, _>(target, #jl_type).unwrap()
+        valid_layout_impl.into()
+    } else {
+        let valid_layout_impl = quote! {
+            unsafe impl #generics ::jlrs::data::layout::valid_layout::ValidLayout for #name #generics #where_clause {
+                fn valid_layout(v: ::jlrs::data::managed::value::Value) -> bool {
+                    unsafe {
+                        if v.is::<::jlrs::data::managed::datatype::DataType>() {
+                            let dt = v.cast_unchecked::<::jlrs::data::managed::datatype::DataType>();
+                            let target = <::jlrs::data::managed::datatype::DataType as ::jlrs::data::managed::Managed>::unrooted_target(dt);
+                            let ct = <Self as ::jlrs::data::types::construct_type::ConstructType>::construct_type(&target).as_value();
+
+                            return dt == ct;
+                        }
+                    }
+
+                    false
+                }
+
+                #[inline]
+                fn type_object<'target, Tgt>(
+                    target: &Tgt
+                ) -> ::jlrs::data::managed::value::Value<'target, 'static>
+                where
+                    Tgt: ::jlrs::memory::target::Target<'target>,
+                {
+                    unsafe {
+                        ::jlrs::data::managed::module::Module::typed_global_cached::<::jlrs::data::managed::value::Value, _, _>(target, #jl_type).unwrap()
+                    }
+                }
+
+                const IS_REF: bool = false;
+            }
+        };
+
+        valid_layout_impl.into()
+    }
+}
+
+pub fn impl_enum(ast: &syn::DeriveInput) -> TokenStream {
+    let name = &ast.ident;
+    let repr = get_repr_int(ast).expect("Enum can only be derived for enums with an integer repr.");
+
+    let syn::Data::Enum(data) = &ast.data else {
+        unreachable!()
+    };
+
+    let mut variants = Vec::with_capacity(data.variants.len());
+    for variant in data.variants.iter() {
+        'variant: for attr in variant.attrs.iter() {
+            if attr.path().is_ident("jlrs") {
+                let parsed: Punctuated<syn::Meta, Comma> = attr
+                    .parse_args_with(Punctuated::<syn::Meta, Token![,]>::parse_terminated)
+                    .unwrap();
+
+                for meta in parsed {
+                    let syn::Meta::NameValue(pair) = meta else {
+                        continue;
+                    };
+
+                    if !pair.path.is_ident("julia_enum_variant") {
+                        continue;
+                    }
+
+                    let syn::Expr::Lit(syn::PatLit {
+                        lit: syn::Lit::Str(s),
+                        ..
+                    }) = pair.value
+                    else {
+                        continue;
+                    };
+
+                    let variant_path = s.token().clone();
+                    variants.push(variant_path);
+                    break 'variant;
+                }
+            }
+        }
+    }
+
+    if data.variants.len() != variants.len() {
+        panic!("All enum variants must be annotated with `julia_enum_variant`")
+    }
+
+    let idents = data.variants.iter().map(|x| &x.ident);
+
+    let enum_impl = quote! {
+        unsafe impl ::jlrs::data::layout::julia_enum::Enum for #name {
+            type Super = #repr;
+            fn as_value<'target, Tgt: Target<'target>>(&self, target: &Tgt) -> Value<'target, 'static> {
+                match self {
+                    #(
+                        #name::#idents => ::jlrs::inline_static_ref!(VARIANT, Value, #variants, target),
+                    )*
                 }
             }
 
-            const IS_REF: bool = false;
+            fn as_super(&self) -> Self::Super {
+                *self as _
+            }
         }
     };
 
-    valid_layout_impl.into()
+    enum_impl.into()
 }
 
 pub fn impl_valid_field(ast: &syn::DeriveInput) -> TokenStream {
     let name = &ast.ident;
-    if !is_repr_c(ast) {
-        panic!("ValidField can only be derived for types with the attribute #[repr(C)].");
+    let is_enum = is_enum(&ast.data);
+
+    if !is_enum && !is_repr_c(ast) {
+        panic!(
+            "ValidField can only be derived for types with the attribute #[repr(C)] {:?}.",
+            ast.data
+        );
+    } else if is_enum && !is_repr_int(ast) {
+        panic!("ValidField can only be derived for enums with an integer repr.");
     }
 
     let generics = &ast.generics;
@@ -813,8 +979,15 @@ pub fn impl_valid_field(ast: &syn::DeriveInput) -> TokenStream {
 
 pub fn impl_ccall_arg(ast: &syn::DeriveInput) -> TokenStream {
     let name = &ast.ident;
-    if !is_repr_c(ast) {
-        panic!("CCallArg can only be derived for types with the attribute #[repr(C)].");
+    let is_enum = is_enum(&ast.data);
+
+    if !is_enum && !is_repr_c(ast) {
+        panic!(
+            "CCallArg can only be derived for types with the attribute #[repr(C)] {:?}.",
+            ast.data
+        );
+    } else if is_enum && !is_repr_int(ast) {
+        panic!("CCallArg can only be derived for enums with an integer repr.");
     }
 
     let generics = &ast.generics;
@@ -856,8 +1029,15 @@ pub fn impl_ccall_arg(ast: &syn::DeriveInput) -> TokenStream {
 
 pub fn impl_ccall_return(ast: &syn::DeriveInput) -> TokenStream {
     let name = &ast.ident;
-    if !is_repr_c(ast) {
-        panic!("CCallReturn can only be derived for types with the attribute #[repr(C)].");
+    let is_enum = is_enum(&ast.data);
+
+    if !is_enum && !is_repr_c(ast) {
+        panic!(
+            "CCallReturn can only be derived for types with the attribute #[repr(C)] {:?}.",
+            ast.data
+        );
+    } else if is_enum && !is_repr_int(ast) {
+        panic!("CCallReturn can only be derived for enums with an integer repr.");
     }
 
     let generics = &ast.generics;
@@ -916,4 +1096,62 @@ fn is_repr_c(ast: &syn::DeriveInput) -> bool {
     }
 
     false
+}
+
+fn is_repr_int(ast: &syn::DeriveInput) -> bool {
+    for attr in &ast.attrs {
+        if attr.path().is_ident("repr") {
+            let p: Result<syn::Path, _> = attr.parse_args();
+            if let Ok(p) = p {
+                if p.is_ident("i8")
+                    || p.is_ident("i16")
+                    || p.is_ident("i32")
+                    || p.is_ident("i64")
+                    || p.is_ident("isize")
+                    || p.is_ident("u8")
+                    || p.is_ident("u16")
+                    || p.is_ident("u32")
+                    || p.is_ident("u64")
+                    || p.is_ident("usize")
+                {
+                    return true;
+                }
+            }
+        }
+    }
+
+    false
+}
+
+fn get_repr_int(ast: &syn::DeriveInput) -> Option<syn::Ident> {
+    for attr in &ast.attrs {
+        if attr.path().is_ident("repr") {
+            let p: Result<syn::Path, _> = attr.parse_args();
+            if let Ok(p) = p {
+                if p.is_ident("i8")
+                    || p.is_ident("i16")
+                    || p.is_ident("i32")
+                    || p.is_ident("i64")
+                    || p.is_ident("isize")
+                    || p.is_ident("u8")
+                    || p.is_ident("u16")
+                    || p.is_ident("u32")
+                    || p.is_ident("u64")
+                    || p.is_ident("usize")
+                {
+                    return p.get_ident().map(Clone::clone);
+                }
+            }
+        }
+    }
+
+    None
+}
+
+fn is_enum(data: &syn::Data) -> bool {
+    match data {
+        syn::Data::Struct(_) => false,
+        syn::Data::Enum(_) => true,
+        syn::Data::Union(_) => panic!("Union types are not supported"),
+    }
 }

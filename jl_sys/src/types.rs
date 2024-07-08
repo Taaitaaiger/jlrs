@@ -71,20 +71,14 @@ impl jl_gcframe_t {
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
+#[cfg(not(any(
+    feature = "julia-1-6",
+    feature = "julia-1-7",
+    feature = "julia-1-8",
+    feature = "julia-1-9",
+    feature = "julia-1-10",
+)))]
 pub struct jl_genericmemory_t {
-    _unused: [u8; 0],
-}
-
-#[repr(C)]
-#[derive(Copy, Clone, Debug)]
-pub struct jl_genericmemoryref_t {
-    ptr_or_offset: *mut c_void,
-    mem: *mut jl_genericmemory_t,
-}
-
-#[repr(C)]
-#[derive(Copy, Clone, Debug)]
-pub struct jl_handler_t {
     _unused: [u8; 0],
 }
 
@@ -107,8 +101,11 @@ pub struct jlrs_catch_t {
 
 pub type jlrs_try_catch_trampoline_t =
     unsafe extern "C" fn(callback: *mut c_void, result: *mut c_void) -> jlrs_catch_t;
-pub type jlrs_unsized_scope_trampoline_t =
-    unsafe extern "C" fn(frame: *mut jl_gcframe_t, callback: *mut c_void, result: *mut c_void);
+pub type jlrs_unsized_scope_trampoline_t = unsafe extern "C-unwind" fn(
+    frame: *mut jl_gcframe_t,
+    callback: *mut c_void,
+    result: *mut c_void,
+);
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]

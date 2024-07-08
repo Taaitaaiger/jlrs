@@ -22,4 +22,4 @@ lto = ["jlrs/lto"]
 crate-type = ["cdylib"]
 
 [dependencies]
-jlrs = { path = "../jlrs", features = ["ccall"] }
+jlrs = { path = "../jlrs", features = ["ccall", "jlrs-derive"] }

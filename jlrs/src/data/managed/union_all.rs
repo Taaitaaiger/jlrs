@@ -166,7 +166,6 @@ impl<'scope> UnionAll<'scope> {
         target: Tgt,
         ty: DataType,
     ) -> ValueData<'target, 'static, Tgt> {
-        //
         target.with_local_scope::<_, _, 1>(|target, mut frame| unsafe {
             let params = ty.parameters();
             let params = params.data();
