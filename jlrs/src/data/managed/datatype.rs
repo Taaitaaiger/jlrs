@@ -581,6 +581,15 @@ impl<'scope> DataType<'scope> {
 
         unsafe { Some(jlrs_datatype_first_ptr(self.unwrap(Private)) != -1) }
     }
+
+    /// Wraps this type as a `UnionAll` if it has free `TypeVar`s, returns `self` otherwise.
+    #[inline]
+    pub fn rewrap<'target, Tgt: Target<'target>>(
+        self,
+        target: Tgt,
+    ) -> ValueData<'target, 'static, Tgt> {
+        UnionAll::rewrap(target, self)
+    }
 }
 
 impl DataType<'_> {
@@ -622,9 +631,13 @@ impl DataType<'_> {
                 let mut out = self.root(&mut reusable_slot).as_value();
 
                 for tidx in (0..tvars.len()).rev() {
-                    let tv = tvars.get(&reusable_slot, tidx);
+                    let Some(tv) = tvars.get(&reusable_slot, tidx) else {
+                        continue;
+                    };
+
+                    let tv = tv.as_value();
+
                     // rooted via env
-                    let tv = tv.expect("encountered null typevar").as_value();
                     debug_assert!(tv.is::<TypeVar>());
                     let tv = tv.cast_unchecked::<TypeVar>();
 

@@ -10,7 +10,8 @@ use std::{any::TypeId, marker::PhantomData, ptr::NonNull};
 
 use jl_sys::{
     jl_base_module, jl_core_module, jl_get_global, jl_is_const, jl_is_imported, jl_main_module,
-    jl_module_t, jl_module_type, jl_set_const, jl_set_global, jlrs_module_name, jlrs_module_parent,
+    jl_module_t, jl_module_type, jl_set_const, jlrs_module_name, jlrs_module_parent,
+    jlrs_set_global,
 };
 use jlrs_macros::julia_version;
 use rustc_hash::FxHashMap;
@@ -325,7 +326,7 @@ impl<'scope> Module<'scope> {
         let symbol = name.to_symbol_priv(Private);
 
         let callback = || {
-            jl_set_global(
+            jlrs_set_global(
                 self.unwrap(Private),
                 symbol.unwrap(Private),
                 value.unwrap(Private),
@@ -348,7 +349,7 @@ impl<'scope> Module<'scope> {
     {
         let symbol = name.to_symbol_priv(Private);
 
-        jl_set_global(
+        jlrs_set_global(
             self.unwrap(Private),
             symbol.unwrap(Private),
             value.unwrap(Private),

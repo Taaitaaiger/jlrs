@@ -260,6 +260,8 @@ struct HasElidedParam{T, U}
     a::T
 end
 
+@enum StandardEnum se_a=1 se_b=2 se_c=3
+
 #reflect([
 #    BitsCharBitsIntChar,
 #    BitsCharFloat32Float64,

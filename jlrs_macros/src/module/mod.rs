@@ -87,8 +87,7 @@ impl ExportedType {
                 let sym = ::jlrs::data::managed::symbol::Symbol::new(&frame, #rename);
                 let module = #override_module_fragment;
                 let ty = <#ty as ::jlrs::data::types::foreign_type::ParametricBase>::create_type(&mut output, sym, module);
-                let ty = ::jlrs::data::managed::erase_scope_lifetime(ty);
-                let ty = ::jlrs::data::managed::union_all::UnionAll::rewrap(&mut output, ty);
+                let ty = ::jlrs::data::managed::erase_scope_lifetime(ty).rewrap(&mut output);
                 module.set_const_unchecked(sym, ty);
 
                 #(

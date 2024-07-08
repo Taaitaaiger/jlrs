@@ -209,28 +209,12 @@ mod tests {
 
                     let env = Env::into_env(&mut frame);
 
-                    let unwrapped_ty = Ty::construct_type_with_env(&mut frame, &env);
-                    assert!(unwrapped_ty.is::<DataType>());
-                    let ty = unwrapped_ty
-                        .cast::<DataType>()
-                        .unwrap()
-                        .wrap_with_env(&mut frame, &env);
-
+                    let ty = Ty::construct_type_with_env(&mut frame, &env);
                     assert!(ty.is::<UnionAll>());
                     let ua = unsafe { ty.cast_unchecked::<UnionAll>() };
 
-                    assert_eq!(ua.var().name().as_str().unwrap(), "Foo");
-
-                    let body = ua.body().cast::<UnionAll>().unwrap();
-                    assert_eq!(body.var().name().as_str().unwrap(), "M");
-
-                    let body = body.body().cast::<UnionAll>().unwrap();
-                    assert_eq!(body.var().name().as_str().unwrap(), "A");
-
-                    let body = body.body();
-                    assert!(body.is::<DataType>());
-                    let dt = unsafe { body.cast_unchecked::<DataType>() };
-                    let param = dt.parameter(0).unwrap();
+                    let unwrapped_ty = ua.body().cast::<DataType>().unwrap();
+                    let param = unwrapped_ty.parameter(0).unwrap();
 
                     assert!(param.is::<TypeVar>());
                     let tvar = unsafe { param.cast_unchecked::<TypeVar>() };

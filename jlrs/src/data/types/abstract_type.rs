@@ -204,10 +204,11 @@ unsafe impl<T: ConstructType, N: ConstructType> ConstructType for AbstractArray<
             let rank_param = N::construct_type(&mut frame);
             let params = [ty_param, rank_param];
             unsafe {
-                let applied = UnionAll::abstractarray_type(&frame)
+                UnionAll::abstractarray_type(&frame)
                     .as_value()
-                    .apply_type_unchecked(&mut frame, params);
-                UnionAll::rewrap(target, applied.cast_unchecked::<DataType>())
+                    .apply_type_unchecked(&mut frame, params)
+                    .cast_unchecked::<DataType>()
+                    .rewrap(target)
             }
         })
     }
@@ -227,14 +228,16 @@ unsafe impl<T: ConstructType, N: ConstructType> ConstructType for AbstractArray<
     where
         Tgt: Target<'target>,
     {
-        target.with_local_scope::<_, _, 2>(|target, mut frame| {
+        target.with_local_scope::<_, _, 3>(|target, mut frame| {
             let ty_param = T::construct_type_with_env(&mut frame, env);
             let rank_param = N::construct_type_with_env(&mut frame, env);
             let params = [ty_param, rank_param];
             unsafe {
                 UnionAll::abstractarray_type(&frame)
                     .as_value()
-                    .apply_type_unchecked(target, params)
+                    .apply_type_unchecked(&mut frame, params)
+                    .cast_unchecked::<DataType>()
+                    .wrap_with_env(target, env)
             }
         })
     }
@@ -260,10 +263,11 @@ unsafe impl<T: ConstructType, N: ConstructType> ConstructType for DenseArray<T, 
             let rank_param = N::construct_type(&mut frame);
             let params = [ty_param, rank_param];
             unsafe {
-                let applied = UnionAll::densearray_type(&frame)
+                UnionAll::densearray_type(&frame)
                     .as_value()
-                    .apply_type_unchecked(&mut frame, params);
-                UnionAll::rewrap(target, applied.cast_unchecked::<DataType>())
+                    .apply_type_unchecked(&mut frame, params)
+                    .cast_unchecked::<DataType>()
+                    .rewrap(target)
             }
         })
     }
@@ -283,14 +287,16 @@ unsafe impl<T: ConstructType, N: ConstructType> ConstructType for DenseArray<T, 
     where
         Tgt: Target<'target>,
     {
-        target.with_local_scope::<_, _, 2>(|target, mut frame| {
+        target.with_local_scope::<_, _, 3>(|target, mut frame| {
             let ty_param = T::construct_type_with_env(&mut frame, env);
             let rank_param = N::construct_type_with_env(&mut frame, env);
             let params = [ty_param, rank_param];
             unsafe {
                 UnionAll::densearray_type(&frame)
                     .as_value()
-                    .apply_type_unchecked(target, params)
+                    .apply_type_unchecked(&mut frame, params)
+                    .cast_unchecked::<DataType>()
+                    .wrap_with_env(target, env)
             }
         })
     }
@@ -314,10 +320,11 @@ unsafe impl<T: ConstructType> ConstructType for RefTypeConstructor<T> {
             let ty_param = T::construct_type(&mut frame);
             let params = [ty_param];
             unsafe {
-                let applied = UnionAll::ref_type(&frame)
+                UnionAll::ref_type(&frame)
                     .as_value()
-                    .apply_type_unchecked(&mut frame, params);
-                UnionAll::rewrap(target, applied.cast_unchecked::<DataType>())
+                    .apply_type_unchecked(&mut frame, params)
+                    .cast_unchecked::<DataType>()
+                    .rewrap(target)
             }
         })
     }
@@ -337,13 +344,15 @@ unsafe impl<T: ConstructType> ConstructType for RefTypeConstructor<T> {
     where
         Tgt: Target<'target>,
     {
-        target.with_local_scope::<_, _, 1>(|target, mut frame| {
+        target.with_local_scope::<_, _, 2>(|target, mut frame| {
             let ty_param = T::construct_type_with_env(&mut frame, env);
             let params = [ty_param];
             unsafe {
                 UnionAll::ref_type(&frame)
                     .as_value()
-                    .apply_type_unchecked(target, params)
+                    .apply_type_unchecked(&mut frame, params)
+                    .cast_unchecked::<DataType>()
+                    .wrap_with_env(target, env)
             }
         })
     }
@@ -367,10 +376,11 @@ unsafe impl<T: ConstructType> ConstructType for TypeTypeConstructor<T> {
             let ty_param = T::construct_type(&mut frame);
             let params = [ty_param];
             unsafe {
-                let applied = UnionAll::type_type(&frame)
+                UnionAll::type_type(&frame)
                     .as_value()
-                    .apply_type_unchecked(&mut frame, params);
-                UnionAll::rewrap(target, applied.cast_unchecked::<DataType>())
+                    .apply_type_unchecked(&mut frame, params)
+                    .cast_unchecked::<DataType>()
+                    .rewrap(target)
             }
         })
     }
@@ -390,13 +400,15 @@ unsafe impl<T: ConstructType> ConstructType for TypeTypeConstructor<T> {
     where
         Tgt: Target<'target>,
     {
-        target.with_local_scope::<_, _, 1>(|target, mut frame| {
+        target.with_local_scope::<_, _, 2>(|target, mut frame| {
             let ty_param = T::construct_type_with_env(&mut frame, env);
             let params = [ty_param];
             unsafe {
                 UnionAll::type_type(&frame)
                     .as_value()
-                    .apply_type_unchecked(target, params)
+                    .apply_type_unchecked(&mut frame, params)
+                    .cast_unchecked::<DataType>()
+                    .wrap_with_env(target, env)
             }
         })
     }
@@ -420,11 +432,11 @@ unsafe impl<T: ConstructType> ConstructType for AbstractChannel<T> {
             let ty_param = T::construct_type(&mut frame);
             let params = [ty_param];
             unsafe {
-                let applied = Self::base_type(&frame)
+                Self::base_type(&frame)
                     .unwrap()
-                    .apply_type_unchecked(&mut frame, params);
-
-                UnionAll::rewrap(target, applied.cast_unchecked::<DataType>())
+                    .apply_type_unchecked(&mut frame, params)
+                    .cast_unchecked::<DataType>()
+                    .rewrap(target)
             }
         })
     }
@@ -445,13 +457,15 @@ unsafe impl<T: ConstructType> ConstructType for AbstractChannel<T> {
     where
         Tgt: Target<'target>,
     {
-        target.with_local_scope::<_, _, 1>(|target, mut frame| {
+        target.with_local_scope::<_, _, 2>(|target, mut frame| {
             let ty_param = T::construct_type_with_env(&mut frame, env);
             let params = [ty_param];
             unsafe {
                 Self::base_type(&frame)
                     .unwrap()
-                    .apply_type_unchecked(target, params)
+                    .apply_type_unchecked(&mut frame, params)
+                    .cast_unchecked::<DataType>()
+                    .wrap_with_env(target, env)
             }
         })
     }
@@ -477,11 +491,11 @@ unsafe impl<K: ConstructType, V: ConstructType> ConstructType for AbstractDict<K
             let value_param = V::construct_type(&mut frame);
             let params = [key_param, value_param];
             unsafe {
-                let applied = Self::base_type(&frame)
+                Self::base_type(&frame)
                     .unwrap()
-                    .apply_type_unchecked(&mut frame, params);
-
-                UnionAll::rewrap(target, applied.cast_unchecked::<DataType>())
+                    .apply_type_unchecked(&mut frame, params)
+                    .cast_unchecked::<DataType>()
+                    .rewrap(target)
             }
         })
     }
@@ -502,14 +516,16 @@ unsafe impl<K: ConstructType, V: ConstructType> ConstructType for AbstractDict<K
     where
         Tgt: Target<'target>,
     {
-        target.with_local_scope::<_, _, 2>(|target, mut frame| {
+        target.with_local_scope::<_, _, 3>(|target, mut frame| {
             let key_param = K::construct_type_with_env(&mut frame, env);
             let value_param = V::construct_type_with_env(&mut frame, env);
             let params = [key_param, value_param];
             unsafe {
                 Self::base_type(&frame)
                     .unwrap()
-                    .apply_type_unchecked(target, params)
+                    .apply_type_unchecked(&mut frame, params)
+                    .cast_unchecked::<DataType>()
+                    .wrap_with_env(target, env)
             }
         })
     }
@@ -533,10 +549,11 @@ unsafe impl<T: ConstructType> ConstructType for AbstractMatrix<T> {
             let ty_param = T::construct_type(&mut frame);
             let params = [ty_param];
             unsafe {
-                let applied = Self::base_type(&frame)
+                Self::base_type(&frame)
                     .unwrap()
-                    .apply_type_unchecked(&mut frame, params);
-                UnionAll::rewrap(target, applied.cast_unchecked::<DataType>())
+                    .apply_type_unchecked(&mut frame, params)
+                    .cast_unchecked::<DataType>()
+                    .rewrap(target)
             }
         })
     }
@@ -557,13 +574,15 @@ unsafe impl<T: ConstructType> ConstructType for AbstractMatrix<T> {
     where
         Tgt: Target<'target>,
     {
-        target.with_local_scope::<_, _, 1>(|target, mut frame| {
+        target.with_local_scope::<_, _, 2>(|target, mut frame| {
             let ty_param = T::construct_type_with_env(&mut frame, env);
             let params = [ty_param];
             unsafe {
                 Self::base_type(&frame)
                     .unwrap()
-                    .apply_type_unchecked(target, params)
+                    .apply_type_unchecked(&mut frame, params)
+                    .cast_unchecked::<DataType>()
+                    .wrap_with_env(target, env)
             }
         })
     }
@@ -587,10 +606,11 @@ unsafe impl<T: ConstructType> ConstructType for AbstractRange<T> {
             let ty_param = T::construct_type(&mut frame);
             let params = [ty_param];
             unsafe {
-                let applied = Self::base_type(&frame)
+                Self::base_type(&frame)
                     .unwrap()
-                    .apply_type_unchecked(&mut frame, params);
-                UnionAll::rewrap(target, applied.cast_unchecked::<DataType>())
+                    .apply_type_unchecked(&mut frame, params)
+                    .cast_unchecked::<DataType>()
+                    .rewrap(target)
             }
         })
     }
@@ -611,13 +631,15 @@ unsafe impl<T: ConstructType> ConstructType for AbstractRange<T> {
     where
         Tgt: Target<'target>,
     {
-        target.with_local_scope::<_, _, 1>(|target, mut frame| {
+        target.with_local_scope::<_, _, 2>(|target, mut frame| {
             let ty_param = T::construct_type_with_env(&mut frame, env);
             let params = [ty_param];
             unsafe {
                 Self::base_type(&frame)
                     .unwrap()
-                    .apply_type_unchecked(target, params)
+                    .apply_type_unchecked(&mut frame, params)
+                    .cast_unchecked::<DataType>()
+                    .wrap_with_env(target, env)
             }
         })
     }
@@ -641,10 +663,11 @@ unsafe impl<T: ConstructType> ConstructType for AbstractSet<T> {
             let ty_param = T::construct_type(&mut frame);
             let params = [ty_param];
             unsafe {
-                let applied = Self::base_type(&frame)
-                    .unwrap_unchecked()
-                    .apply_type_unchecked(&mut frame, params);
-                UnionAll::rewrap(target, applied.cast_unchecked::<DataType>())
+                Self::base_type(&frame)
+                    .unwrap()
+                    .apply_type_unchecked(&mut frame, params)
+                    .cast_unchecked::<DataType>()
+                    .rewrap(target)
             }
         })
     }
@@ -665,13 +688,15 @@ unsafe impl<T: ConstructType> ConstructType for AbstractSet<T> {
     where
         Tgt: Target<'target>,
     {
-        target.with_local_scope::<_, _, 1>(|target, mut frame| {
+        target.with_local_scope::<_, _, 2>(|target, mut frame| {
             let ty_param = T::construct_type_with_env(&mut frame, env);
             let params = [ty_param];
             unsafe {
                 Self::base_type(&frame)
-                    .unwrap_unchecked()
-                    .apply_type_unchecked(target, params)
+                    .unwrap()
+                    .apply_type_unchecked(&mut frame, params)
+                    .cast_unchecked::<DataType>()
+                    .wrap_with_env(target, env)
             }
         })
     }
@@ -700,10 +725,11 @@ unsafe impl<T: ConstructType, N: ConstructType> ConstructType for AbstractSlices
             let n_param = N::construct_type(&mut frame);
             let params = [ty_param, n_param];
             unsafe {
-                let applied = Self::base_type(&frame)
+                Self::base_type(&frame)
                     .unwrap()
-                    .apply_type_unchecked(&mut frame, params);
-                UnionAll::rewrap(target, applied.cast_unchecked::<DataType>())
+                    .apply_type_unchecked(&mut frame, params)
+                    .cast_unchecked::<DataType>()
+                    .rewrap(target)
             }
         })
     }
@@ -715,14 +741,16 @@ unsafe impl<T: ConstructType, N: ConstructType> ConstructType for AbstractSlices
     where
         Tgt: Target<'target>,
     {
-        target.with_local_scope::<_, _, 2>(|target, mut frame| {
+        target.with_local_scope::<_, _, 3>(|target, mut frame| {
             let ty_param = T::construct_type_with_env(&mut frame, env);
             let n_param = N::construct_type_with_env(&mut frame, env);
             let params = [ty_param, n_param];
             unsafe {
                 Self::base_type(&frame)
                     .unwrap()
-                    .apply_type_unchecked(target, params)
+                    .apply_type_unchecked(&mut frame, params)
+                    .cast_unchecked::<DataType>()
+                    .wrap_with_env(target, env)
             }
         })
     }
@@ -753,10 +781,11 @@ unsafe impl<T: ConstructType> ConstructType for AbstractUnitRange<T> {
             let ty_param = T::construct_type(&mut frame);
             let params = [ty_param];
             unsafe {
-                let applied = Self::base_type(&frame)
+                Self::base_type(&frame)
                     .unwrap()
-                    .apply_type_unchecked(&mut frame, params);
-                UnionAll::rewrap(target, applied.cast_unchecked::<DataType>())
+                    .apply_type_unchecked(&mut frame, params)
+                    .cast_unchecked::<DataType>()
+                    .rewrap(target)
             }
         })
     }
@@ -768,13 +797,15 @@ unsafe impl<T: ConstructType> ConstructType for AbstractUnitRange<T> {
     where
         Tgt: Target<'target>,
     {
-        target.with_local_scope::<_, _, 1>(|target, mut frame| {
+        target.with_local_scope::<_, _, 2>(|target, mut frame| {
             let ty_param = T::construct_type_with_env(&mut frame, env);
             let params = [ty_param];
             unsafe {
                 Self::base_type(&frame)
                     .unwrap()
-                    .apply_type_unchecked(target, params)
+                    .apply_type_unchecked(&mut frame, params)
+                    .cast_unchecked::<DataType>()
+                    .wrap_with_env(target, env)
             }
         })
     }
@@ -809,10 +840,11 @@ unsafe impl<T: ConstructType> ConstructType for AbstractVector<T> {
             let ty_param = T::construct_type(&mut frame);
             let params = [ty_param];
             unsafe {
-                let applied = Self::base_type(&frame)
+                Self::base_type(&frame)
                     .unwrap()
-                    .apply_type_unchecked(&mut frame, params);
-                UnionAll::rewrap(target, applied.cast_unchecked::<DataType>())
+                    .apply_type_unchecked(&mut frame, params)
+                    .cast_unchecked::<DataType>()
+                    .rewrap(target)
             }
         })
     }
@@ -824,13 +856,15 @@ unsafe impl<T: ConstructType> ConstructType for AbstractVector<T> {
     where
         Tgt: Target<'target>,
     {
-        target.with_local_scope::<_, _, 1>(|target, mut frame| {
+        target.with_local_scope::<_, _, 2>(|target, mut frame| {
             let ty_param = T::construct_type_with_env(&mut frame, env);
             let params = [ty_param];
             unsafe {
                 Self::base_type(&frame)
                     .unwrap()
-                    .apply_type_unchecked(target, params)
+                    .apply_type_unchecked(&mut frame, params)
+                    .cast_unchecked::<DataType>()
+                    .wrap_with_env(target, env)
             }
         })
     }
@@ -863,10 +897,11 @@ unsafe impl<T: ConstructType> ConstructType for DenseMatrix<T> {
             let ty_param = T::construct_type(&mut frame);
             let params = [ty_param];
             unsafe {
-                let applied = Self::base_type(&frame)
+                Self::base_type(&frame)
                     .unwrap()
-                    .apply_type_unchecked(&mut frame, params);
-                UnionAll::rewrap(target, applied.cast_unchecked::<DataType>())
+                    .apply_type_unchecked(&mut frame, params)
+                    .cast_unchecked::<DataType>()
+                    .rewrap(target)
             }
         })
     }
@@ -878,13 +913,15 @@ unsafe impl<T: ConstructType> ConstructType for DenseMatrix<T> {
     where
         Tgt: Target<'target>,
     {
-        target.with_local_scope::<_, _, 1>(|target, mut frame| {
+        target.with_local_scope::<_, _, 2>(|target, mut frame| {
             let ty_param = T::construct_type_with_env(&mut frame, env);
             let params = [ty_param];
             unsafe {
                 Self::base_type(&frame)
                     .unwrap()
-                    .apply_type_unchecked(target, params)
+                    .apply_type_unchecked(&mut frame, params)
+                    .cast_unchecked::<DataType>()
+                    .wrap_with_env(target, env)
             }
         })
     }
@@ -917,10 +954,11 @@ unsafe impl<T: ConstructType> ConstructType for DenseVector<T> {
             let ty_param = T::construct_type(&mut frame);
             let params = [ty_param];
             unsafe {
-                let applied = Self::base_type(&frame)
+                Self::base_type(&frame)
                     .unwrap()
-                    .apply_type_unchecked(&mut frame, params);
-                UnionAll::rewrap(target, applied.cast_unchecked::<DataType>())
+                    .apply_type_unchecked(&mut frame, params)
+                    .cast_unchecked::<DataType>()
+                    .rewrap(target)
             }
         })
     }
@@ -932,13 +970,15 @@ unsafe impl<T: ConstructType> ConstructType for DenseVector<T> {
     where
         Tgt: Target<'target>,
     {
-        target.with_local_scope::<_, _, 1>(|target, mut frame| {
+        target.with_local_scope::<_, _, 2>(|target, mut frame| {
             let ty_param = T::construct_type_with_env(&mut frame, env);
             let params = [ty_param];
             unsafe {
                 Self::base_type(&frame)
                     .unwrap()
-                    .apply_type_unchecked(target, params)
+                    .apply_type_unchecked(&mut frame, params)
+                    .cast_unchecked::<DataType>()
+                    .wrap_with_env(target, env)
             }
         })
     }
@@ -983,10 +1023,11 @@ unsafe impl<T: ConstructType> ConstructType for Enum<T> {
             let params = [ty_param];
 
             unsafe {
-                let applied = Self::base_type(&frame)
+                Self::base_type(&frame)
                     .unwrap()
-                    .apply_type_unchecked(&mut frame, params);
-                UnionAll::rewrap(target, applied.cast_unchecked::<DataType>())
+                    .apply_type_unchecked(&mut frame, params)
+                    .cast_unchecked::<DataType>()
+                    .rewrap(target)
             }
         })
     }
@@ -998,7 +1039,7 @@ unsafe impl<T: ConstructType> ConstructType for Enum<T> {
     where
         Tgt: Target<'target>,
     {
-        target.with_local_scope::<_, _, 2>(|target, mut frame| {
+        target.with_local_scope::<_, _, 3>(|target, mut frame| {
             let ty_param = T::construct_type_with_env(&mut frame, env);
 
             // Validate bound
@@ -1016,7 +1057,9 @@ unsafe impl<T: ConstructType> ConstructType for Enum<T> {
             unsafe {
                 Self::base_type(&frame)
                     .unwrap()
-                    .apply_type_unchecked(target, params)
+                    .apply_type_unchecked(&mut frame, params)
+                    .cast_unchecked::<DataType>()
+                    .wrap_with_env(target, env)
             }
         })
     }
@@ -1051,10 +1094,11 @@ unsafe impl<T: ConstructType, S: ConstructType> ConstructType for OrdinalRange<T
             let n_param = S::construct_type(&mut frame);
             let params = [ty_param, n_param];
             unsafe {
-                let applied = Self::base_type(&frame)
+                Self::base_type(&frame)
                     .unwrap()
-                    .apply_type_unchecked(&mut frame, params);
-                UnionAll::rewrap(target, applied.cast_unchecked::<DataType>())
+                    .apply_type_unchecked(&mut frame, params)
+                    .cast_unchecked::<DataType>()
+                    .rewrap(target)
             }
         })
     }
@@ -1066,14 +1110,16 @@ unsafe impl<T: ConstructType, S: ConstructType> ConstructType for OrdinalRange<T
     where
         Tgt: Target<'target>,
     {
-        target.with_local_scope::<_, _, 2>(|target, mut frame| {
+        target.with_local_scope::<_, _, 3>(|target, mut frame| {
             let ty_param = T::construct_type_with_env(&mut frame, env);
             let n_param = S::construct_type_with_env(&mut frame, env);
             let params = [ty_param, n_param];
             unsafe {
                 Self::base_type(&frame)
                     .unwrap()
-                    .apply_type_unchecked(target, params)
+                    .apply_type_unchecked(&mut frame, params)
+                    .cast_unchecked::<DataType>()
+                    .wrap_with_env(target, env)
             }
         })
     }

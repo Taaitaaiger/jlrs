@@ -468,7 +468,7 @@ mod tests {
                 .instance(&mut frame)
                 .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
-                    let main = Module::base(&frame);
+                    let main = Module::main(&frame);
                     assert!(main.global(&mut frame, "FOO").is_err());
 
                     let value = Value::new(&mut frame, 1usize);

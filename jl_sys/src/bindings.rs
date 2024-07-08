@@ -2,6 +2,7 @@
 //
 // Julia is distributed without an import lib, so we need raw dylib linkage on Windows when we're
 // building with the MSVC toolchain or with the "BinaryBuilder toolchain".
+
 #[cfg_attr(
     all(
         any(windows, target_os = "windows", feature = "windows"),
@@ -1053,6 +1054,35 @@ extern "C" {
         dims: *mut usize,
         ndims: usize,
     ) -> *mut crate::types::jl_array_t;
+
+    #[cfg(not(any(
+        feature = "julia-1-6",
+        feature = "julia-1-7",
+        feature = "julia-1-8",
+        feature = "julia-1-9",
+        feature = "julia-1-10",
+        feature = "julia-1-11",
+    )))]
+    pub fn jl_get_binding_wr(
+        m: *mut crate::types::jl_module_t,
+        var: *mut crate::types::jl_sym_t,
+        alloc: std::ffi::c_int,
+    ) -> *mut std::ffi::c_void;
+
+    #[cfg(not(any(
+        feature = "julia-1-6",
+        feature = "julia-1-7",
+        feature = "julia-1-8",
+        feature = "julia-1-9",
+        feature = "julia-1-10",
+        feature = "julia-1-11",
+    )))]
+    pub fn jl_checked_assignment(
+        m: *mut std::ffi::c_void,
+        m: *mut crate::types::jl_module_t,
+        var: *mut crate::types::jl_sym_t,
+        rhs: *mut crate::types::jl_value_t,
+    ) -> *mut std::ffi::c_void;
 }
 
 // jlrs_cc functions
@@ -1341,4 +1371,10 @@ extern "C" {
     ) -> *mut std::ffi::c_char;
 
     pub fn jlrs_init_missing_functions();
+
+    pub fn jlrs_set_global(
+        m: *mut crate::types::jl_module_t,
+        var: *mut crate::types::jl_sym_t,
+        val: *mut crate::types::jl_value_t,
+    );
 }

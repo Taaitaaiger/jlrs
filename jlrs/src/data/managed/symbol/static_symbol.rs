@@ -85,7 +85,7 @@ macro_rules! define_static_symbol {
                             $crate::data::managed::symbol::static_symbol::convert_void_ptr(ptr)
                         }
                     }
-                };
+                }
 
                 inner()
             }
@@ -417,3 +417,6 @@ pub unsafe fn convert_void_ptr(ptr: *mut c_void) -> Symbol<'static> {
 pub unsafe fn new_symbol<'target>(ptr: *mut c_char, len: usize) -> *mut c_void {
     jl_symbol_n(ptr, len) as *mut _
 }
+
+define_static_symbol!(pub NSym, "N");
+define_static_symbol!(pub TSym, "T");

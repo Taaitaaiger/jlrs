@@ -5,7 +5,7 @@ publish = false
 edition = "2021"
 
 [dev-dependencies]
-jlrs = { version = "0.20.0", path = "../jlrs", features = ["full"] }
+jlrs = { version = "0.21.0", path = "../jlrs", features = ["full"] }
 tokio = { version = "1", features = ["macros", "rt"]}
 
 [[example]]

@@ -80,6 +80,7 @@ pub mod complex;
 #[cfg(feature = "f16")]
 pub mod f16;
 pub mod is_bits;
+pub mod julia_enum;
 pub mod nothing;
 pub mod tuple;
 pub mod typed_layout;

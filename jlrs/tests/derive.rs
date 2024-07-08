@@ -3,8 +3,16 @@ mod derive_util;
 
 #[cfg(all(test, feature = "jlrs-derive", feature = "local-rt"))]
 mod tests {
+    use std::os::raw::c_void;
+
     use jlrs::{
-        data::types::construct_type::{ConstantBool, ConstructType},
+        data::{
+            layout::{
+                julia_enum::Enum,
+                valid_layout::{ValidField, ValidLayout},
+            },
+            types::construct_type::{ConstantBool, ConstructType},
+        },
         prelude::*,
     };
 
@@ -1216,6 +1224,71 @@ mod tests {
         })
     }
 
+    fn test_enums() {
+        JULIA_DERIVE.with(|j| {
+            let mut julia = j.borrow_mut();
+            let mut frame = StackFrame::new();
+
+            julia
+                .instance(&mut frame)
+                .returning::<JlrsResult<_>>()
+                .scope(|mut frame| {
+                    // Test IntoJulia, Typecheck, ValidLayout, ValidField and Unbox for each variant.
+                    let mut test_fn = |layout| -> JlrsResult<_> {
+                        let v = Value::new(&mut frame, layout);
+
+                        assert!(v.is::<StandardEnum>());
+                        assert!(StandardEnum::valid_layout(v.datatype().as_value()));
+                        assert!(StandardEnum::valid_field(v.datatype().as_value()));
+
+                        let layout_unboxed = v.unbox::<StandardEnum>()?;
+                        assert_eq!(layout, layout_unboxed);
+                        Ok(())
+                    };
+
+                    test_fn(StandardEnum::SeA)?;
+                    test_fn(StandardEnum::SeB)?;
+                    test_fn(StandardEnum::SeC)?;
+
+                    Ok(())
+                })
+                .unwrap();
+        })
+    }
+
+    fn test_enums_ccall() {
+        JULIA_DERIVE.with(|j| {
+            let mut julia = j.borrow_mut();
+            let mut frame = StackFrame::new();
+
+            julia
+                .instance(&mut frame)
+                .returning::<JlrsResult<_>>()
+                .scope(|mut frame| {
+                    // Test that enums can be passed and returned by value
+                    unsafe extern "C" fn echo(s: StandardEnum) -> StandardEnum {
+                        s
+                    }
+
+                    let echo_v = Value::new(&mut frame, echo as *mut c_void);
+                    let se_a = StandardEnum::SeA.as_value(&frame);
+                    let func = unsafe {
+                        Value::eval_string(
+                            &mut frame,
+                            "x(f, s::StandardEnum) = ccall(f, StandardEnum, (StandardEnum,), s)",
+                        )
+                    }
+                    .unwrap();
+
+                    let res = unsafe { func.call2(&mut frame, echo_v, se_a) }.unwrap();
+                    assert_eq!(se_a, res);
+
+                    Ok(())
+                })
+                .unwrap();
+        })
+    }
+
     #[test]
     fn derive_tests() {
         derive_bits_type_bool();
@@ -1259,5 +1332,7 @@ mod tests {
         derive_string();
         isbits_into_julia();
         trivial_isbits_into_julia();
+        test_enums();
+        test_enums_ccall();
     }
 }

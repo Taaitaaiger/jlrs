@@ -7,7 +7,7 @@ pub use jlrs_macros::julia_module;
 pub use jlrs_macros::{encode_as_constant_bytes, julia_version};
 #[cfg(feature = "jlrs-derive")]
 pub use jlrs_macros::{
-    CCallArg, CCallReturn, ConstructType, HasLayout, IntoJulia, IsBits, Typecheck, Unbox,
+    CCallArg, CCallReturn, ConstructType, Enum, HasLayout, IntoJulia, IsBits, Typecheck, Unbox,
     ValidField, ValidLayout,
 };
 

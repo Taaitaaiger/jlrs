@@ -82,7 +82,6 @@ use crate::{
             private::ManagedPriv,
             simple_vector::{SimpleVector, SimpleVectorData},
             symbol::Symbol,
-            union_all::UnionAll,
             value::{Value, ValueData, ValueRef},
             Managed,
         },
@@ -970,11 +969,9 @@ where
         let params = params.data();
         let params_slice = params.as_atomic_slice().assume_immutable_non_null();
 
-        let ty = base_ty.unwrap_unchecked();
-
-        let ty = UnionAll::rewrap(&mut frame, ty);
-
-        let ty = ty
+        let ty = base_ty
+            .unwrap_unchecked()
+            .rewrap(&mut frame)
             .apply_type(&mut frame, params_slice)
             .unwrap()
             .cast::<DataType>()
