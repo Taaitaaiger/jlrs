@@ -23,7 +23,7 @@ pub unsafe trait IntegerType: PrimitiveType {}
 macro_rules! impl_primitive_type {
     ($ty:ty, $super:ty) => {
         unsafe impl PrimitiveType for $ty {
-            const N_BITS: usize = size_of::<Self>();
+            const N_BITS: usize = ::std::mem::size_of::<Self>();
             type Super = $super;
         }
     };
