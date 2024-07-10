@@ -5,7 +5,7 @@
 #include <winsock2.h>
 #include <windows.h>
 
-#if JULIA_VERSION_MINOR == 6
+#if JLRS_EXPECTED_MINOR_VERSION == 6
 template <typename T>
 static inline T jl_atomic_load_relaxed(volatile T *obj)
 {
