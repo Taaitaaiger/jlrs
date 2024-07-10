@@ -561,7 +561,8 @@ macro_rules! impl_type_parameters {
         where
             Tgt: $crate::memory::target::Target<'target>,
         {
-            $crate::data::managed::simple_vector::SimpleVector::emptysvec(&target).root(target)
+            let svec = $crate::data::managed::simple_vector::SimpleVector::emptysvec(&target);
+            <$crate::data::managed::simple_vector::SimpleVector as $crate::data::managed::Managed>::root(svec, target)
         }
     };
     ($($t:tt)+) => {
@@ -582,7 +583,7 @@ macro_rules! impl_type_parameters {
                     $crate::expand_type_bound!(0, &mut frame, svec_ref, $($t)+);
                 }
 
-                svec.root(target)
+                <$crate::data::managed::simple_vector::SimpleVector as $crate::data::managed::Managed>::root(svec, target)
             })
         }
     };
@@ -598,7 +599,8 @@ macro_rules! impl_variant_parameters {
         where
             Tgt: $crate::memory::target::Target<'target>,
         {
-            $crate::data::managed::simple_vector::SimpleVector::emptysvec(&target).root(target)
+            let svec = $crate::data::managed::simple_vector::SimpleVector::emptysvec(&target);
+            <$crate::data::managed::simple_vector::SimpleVector as $crate::data::managed::Managed>::root(svec, target)
         }
     };
     ($($t:tt)+) => {
@@ -619,7 +621,7 @@ macro_rules! impl_variant_parameters {
                     $crate::expand_type_bound!(0, &mut frame, svec_ref, $($t)+);
                 }
 
-                svec.root(target)
+                <$crate::data::managed::simple_vector::SimpleVector as $crate::data::managed::Managed>::root(svec, target)
             })
         }
     };

@@ -4,65 +4,106 @@ using JlrsCore.Ledger
 using Test
 
 @testset "Freestanding functions" begin
-    @test isnothing(JuliaModuleTest.freestanding_func_trivial())
-    @inferred JuliaModuleTest.freestanding_func_trivial()
+    @test isnothing(JuliaModuleTest.takes_no_args_returns_nothing())
+    @inferred JuliaModuleTest.takes_no_args_returns_nothing()
 
-    @test JuliaModuleTest.freestanding_func_noargs() == 0
-    @inferred JuliaModuleTest.freestanding_func_noargs()
+    @test JuliaModuleTest.takes_no_args_returns_usize() == 0
+    @inferred JuliaModuleTest.takes_no_args_returns_usize()
 
-    @test JuliaModuleTest.freestanding_func_bitsarg(UInt(3)) == 4
-    @inferred JuliaModuleTest.freestanding_func_bitsarg(UInt(3))
+    @test JuliaModuleTest.takes_usize_returns_usize(UInt(3)) == 4
+    @inferred JuliaModuleTest.takes_usize_returns_usize(UInt(3))
 
-    @test JuliaModuleTest.freestanding_func_ref_bitsarg(UInt(3)) == 4
-    @test JuliaModuleTest.freestanding_func_ref_mutarg(Main) == 0
-    @test JuliaModuleTest.freestanding_func_ref_any(Main) == 0
-    @test JuliaModuleTest.freestanding_func_ref_abstract(1) == 0
+    @test JuliaModuleTest.takes_ref_usize(UInt(3)) == 4
+    @test JuliaModuleTest.takes_ref_module(Main) == 0
+    @test JuliaModuleTest.takes_ref_any(Main) == 0
+    @test JuliaModuleTest.takes_ref_number(1) == 0
 
-    @test JuliaModuleTest.freestanding_func_arrayarg(Vector{UInt32}()) == 4
-    @inferred JuliaModuleTest.freestanding_func_arrayarg(Vector{UInt32}())
+    @test JuliaModuleTest.returns_jlrs_result(false) == 3
+    @inferred JuliaModuleTest.returns_jlrs_result(false)
+    @test_throws JlrsCore.JlrsError JuliaModuleTest.returns_jlrs_result(true)
 
-    @test JuliaModuleTest.freestanding_func_arrayarg(Vector{AbstractChar}()) == sizeof(UInt)
-    @inferred JuliaModuleTest.freestanding_func_arrayarg(Vector{AbstractChar}())
+    @test JuliaModuleTest.returns_ref_bool()
+    @inferred JuliaModuleTest.returns_ref_bool()
 
-    @test JuliaModuleTest.freestanding_func_typed_arrayarg(Vector{UInt32}()) == 4
-    @inferred JuliaModuleTest.freestanding_func_typed_arrayarg(Vector{UInt32}())
+    @test JuliaModuleTest.returns_typed_value()
+    @inferred JuliaModuleTest.returns_typed_value()
+end
 
-    @test JuliaModuleTest.freestanding_func_typevaluearg(UInt(3)) == 3
-    @inferred JuliaModuleTest.freestanding_func_typevaluearg(UInt(3))
+@testset "Arrays" begin
+    @test JuliaModuleTest.takes_array(Vector{UInt32}()) == 4
+    @inferred JuliaModuleTest.takes_array(Vector{UInt32}())
 
-    @test size(JuliaModuleTest.freestanding_func_ret_array(Int32)) == (2,2)
-    @inferred Matrix{Int32} JuliaModuleTest.freestanding_func_ret_array(Int32)
-    @inferred Matrix{Int64} JuliaModuleTest.freestanding_func_ret_array(Int64)
+    @test JuliaModuleTest.takes_array(Vector{AbstractChar}()) == sizeof(UInt)
+    @inferred JuliaModuleTest.takes_array(Vector{AbstractChar}())
 
-    @test size(JuliaModuleTest.freestanding_func_ret_ranked_array0(Int32)) == ()
-    @inferred Array{Int32,0} JuliaModuleTest.freestanding_func_ret_ranked_array0(Int32)
-    @inferred Array{Int64,0} JuliaModuleTest.freestanding_func_ret_ranked_array0(Int64)
+    @test JuliaModuleTest.takes_typed_array(Vector{UInt32}()) == 4
+    @inferred JuliaModuleTest.takes_typed_array(Vector{UInt32}())
 
-    @test size(JuliaModuleTest.freestanding_func_ret_ranked_array1(Int32)) == (2,)
-    @inferred Vector{Int32} JuliaModuleTest.freestanding_func_ret_ranked_array1(Int32)
-    @inferred Vector{Int64} JuliaModuleTest.freestanding_func_ret_ranked_array1(Int64)
+    @test JuliaModuleTest.takes_typed_ranked_array(Vector{UInt32}()) == 4
+    @inferred JuliaModuleTest.takes_typed_ranked_array(Vector{UInt32}())
 
-    @test size(JuliaModuleTest.freestanding_func_ret_ranked_array2(Int32)) == (2,2)
-    @inferred Matrix{Int32} JuliaModuleTest.freestanding_func_ret_ranked_array2(Int32)
-    @inferred Matrix{Int64} JuliaModuleTest.freestanding_func_ret_ranked_array2(Int64)
+    @test JuliaModuleTest.takes_typed_value(UInt(3)) == 3
+    @inferred JuliaModuleTest.takes_typed_value(UInt(3))
 
-    @test size(JuliaModuleTest.freestanding_func_ret_ranked_array3(Int32)) == (2,2,2)
-    @inferred Array{Int32,3} JuliaModuleTest.freestanding_func_ret_ranked_array3(Int32)
-    @inferred Array{Int64,3} JuliaModuleTest.freestanding_func_ret_ranked_array3(Int64)
+    @test size(JuliaModuleTest.returns_array(Int32)) == (2,2)
+    @inferred Matrix{Int32} JuliaModuleTest.returns_array(Int32)
+    @inferred Matrix{Int64} JuliaModuleTest.returns_array(Int64)
 
-    @test size(JuliaModuleTest.freestanding_func_ret_typed_array()) == (2,2)
-    @inferred Matrix{Float32} JuliaModuleTest.freestanding_func_ret_typed_array()
-    @inferred Matrix{Float32} JuliaModuleTest.freestanding_func_ret_typed_array()
+    @test size(JuliaModuleTest.returns_rank0_array(Int32)) == ()
+    @inferred Array{Int32,0} JuliaModuleTest.returns_rank0_array(Int32)
+    @inferred Array{Int64,0} JuliaModuleTest.returns_rank0_array(Int64)
 
-    @test JuliaModuleTest.freestanding_func_ret_rust_result(false) == 3
-    @inferred JuliaModuleTest.freestanding_func_ret_rust_result(false)
-    @test_throws JlrsCore.JlrsError JuliaModuleTest.freestanding_func_ret_rust_result(true)
+    @test size(JuliaModuleTest.returns_rank1_array(Int32)) == (2,)
+    @inferred Vector{Int32} JuliaModuleTest.returns_rank1_array(Int32)
+    @inferred Vector{Int64} JuliaModuleTest.returns_rank1_array(Int64)
 
-    @test JuliaModuleTest.freestanding_func_ccall_ref_ret()
-    @inferred JuliaModuleTest.freestanding_func_ccall_ref_ret()
+    @test size(JuliaModuleTest.returns_rank2_array(Int32)) == (2,2)
+    @inferred Matrix{Int32} JuliaModuleTest.returns_rank2_array(Int32)
+    @inferred Matrix{Int64} JuliaModuleTest.returns_rank2_array(Int64)
 
-    @test JuliaModuleTest.freestanding_func_typed_value_ret()
-    @inferred JuliaModuleTest.freestanding_func_typed_value_ret()
+    @test size(JuliaModuleTest.returns_rank3_array(Int32)) == (2,2,2)
+    @inferred Array{Int32,3} JuliaModuleTest.returns_rank3_array(Int32)
+    @inferred Array{Int64,3} JuliaModuleTest.returns_rank3_array(Int64)
+
+    @test size(JuliaModuleTest.returns_typed_array()) == (2,2)
+    @inferred Matrix{Float32} JuliaModuleTest.returns_typed_array()
+
+    @test size(JuliaModuleTest.returns_typed_rank2_array()) == (2,2)
+    @inferred Matrix{Float32} JuliaModuleTest.returns_typed_rank2_array()
+end
+
+@testset "Generic arrays" begin
+    arr1 = Int[]
+    arr2 = Int[1 1; 1 1]
+    arr3 = Float32[1 1; 1 1]
+    @test JuliaModuleTest.takes_generic_typed_ranked_arrays_ctor(arr1, arr2) == Int
+    @test_throws MethodError JuliaModuleTest.takes_generic_typed_ranked_arrays_ctor(arr1, arr1)
+    @test_throws MethodError JuliaModuleTest.takes_generic_typed_ranked_arrays_ctor(arr2, arr2)
+
+    @test JuliaModuleTest.takes_generic_typed_ranked_arrays(arr1, arr2) == Int
+    @test_throws MethodError JuliaModuleTest.takes_generic_typed_ranked_arrays(arr1, arr1)
+    @test_throws MethodError JuliaModuleTest.takes_generic_typed_ranked_arrays(arr2, arr2)
+
+    @test JuliaModuleTest.takes_generic_typed_arrays_ctor(arr1, arr2) == Int
+    @test JuliaModuleTest.takes_generic_typed_arrays_ctor(arr1, arr1) == Int
+    @test JuliaModuleTest.takes_generic_typed_arrays_ctor(arr2, arr2) == Int
+
+    @test JuliaModuleTest.takes_generic_typed_arrays_ctor(arr1, arr2) == Int
+    @test JuliaModuleTest.takes_generic_typed_arrays_ctor(arr1, arr1) == Int
+    @test JuliaModuleTest.takes_generic_typed_arrays_ctor(arr2, arr2) == Int
+
+    @test JuliaModuleTest.takes_and_returns_generic_typed_ranked_array(arr1) === arr1
+
+    @test JuliaModuleTest.takes_restricted_generic_typed_arrays(arr1) === Int
+    @test JuliaModuleTest.takes_restricted_generic_typed_arrays(arr2) === Int
+    @test_throws MethodError JuliaModuleTest.takes_restricted_generic_typed_arrays(arr3)
+
+    @test JuliaModuleTest.takes_generic_typed_arrays(arr1, arr1) == Int
+    @test JuliaModuleTest.takes_generic_typed_arrays(arr1, arr2) == Int
+    @test JuliaModuleTest.takes_generic_typed_arrays(arr2, arr2) == Int
+
+    arr3 = UInt[1 1; 1 1]
+    @test_throws MethodError JuliaModuleTest.takes_generic_typed_arrays(arr1, arr3)
 end
 
 @testset "OpaqueInt" begin
@@ -147,25 +188,6 @@ end
 
     arr = Int[]
     @test_throws MethodError JuliaModuleTest.takes_generics_from_env(arr, 1)
-
-    arr1 = Int[]
-    arr2 = Int[1 1; 1 1]
-    @test JuliaModuleTest.generic_arrays(arr1, arr2) == Int
-    @test_throws MethodError JuliaModuleTest.generic_arrays(arr1, arr1)
-    @test_throws MethodError JuliaModuleTest.generic_arrays(arr2, arr2)
-
-    @test JuliaModuleTest.generic_ranked_arrays(arr1, arr2) == Int
-    @test_throws MethodError JuliaModuleTest.generic_ranked_arrays(arr1, arr1)
-    @test_throws MethodError JuliaModuleTest.generic_ranked_arrays(arr2, arr2)
-
-    @test JuliaModuleTest.generic_ranked_array_ret_self(arr1) === arr1
-
-    @test JuliaModuleTest.generic_typed_arrays(arr1, arr1) == Int
-    @test JuliaModuleTest.generic_typed_arrays(arr1, arr2) == Int
-    @test JuliaModuleTest.generic_typed_arrays(arr2, arr2) == Int
-
-    arr3 = UInt[1 1; 1 1]
-    @test_throws MethodError JuliaModuleTest.generic_typed_arrays(arr1, arr3)
 end
 
 @testset "POpaqueTwo" begin
@@ -202,35 +224,35 @@ end
 @testset "Four generics M" begin
     v1 = JuliaModuleTest.FourGenericsM{Int32, Int32, Int32, Int32}(1,2,3,4)
     v2 = JuliaModuleTest.FourGenericsM{Int32, Int32, Int32, Int64}(1,2,3,4)
-    @test JuliaModuleTest.take_four_generics_m(v1) === v1
-    @test_throws MethodError JuliaModuleTest.take_four_generics_m(v2)
+    @test JuliaModuleTest.takes_four_generics_m(v1) === v1
+    @test_throws MethodError JuliaModuleTest.takes_four_generics_m(v2)
 
     v3 = JuliaModuleTest.FourGenericsM{Int32, Int32, Int64, Int64}(1,2,3,4)
-    @test JuliaModuleTest.take_four_generics_m_trailing1(v1) === v1
-    @test JuliaModuleTest.take_four_generics_m_trailing1(v2) === v2
-    @test_throws MethodError JuliaModuleTest.take_four_generics_m_trailing1(v3)
+    @test JuliaModuleTest.takes_four_generics_m_trailing1(v1) === v1
+    @test JuliaModuleTest.takes_four_generics_m_trailing1(v2) === v2
+    @test_throws MethodError JuliaModuleTest.takes_four_generics_m_trailing1(v3)
 
     v4 = JuliaModuleTest.FourGenericsM{Int32, Int64, Int32, Int64}(1,2,3,4)
-    @test JuliaModuleTest.take_four_generics_m_trailing2(v1) === v1
-    @test JuliaModuleTest.take_four_generics_m_trailing2(v2) === v2
-    @test JuliaModuleTest.take_four_generics_m_trailing2(v3) === v3
-    @test_throws MethodError JuliaModuleTest.take_four_generics_m_trailing2(v4)
+    @test JuliaModuleTest.takes_four_generics_m_trailing2(v1) === v1
+    @test JuliaModuleTest.takes_four_generics_m_trailing2(v2) === v2
+    @test JuliaModuleTest.takes_four_generics_m_trailing2(v3) === v3
+    @test_throws MethodError JuliaModuleTest.takes_four_generics_m_trailing2(v4)
 
     v5 = JuliaModuleTest.FourGenericsM{Int32, Int64, Int64, Int64}(1,2,3,4)
-    @test JuliaModuleTest.take_four_generics_m_middle(v1) === v1
-    @test JuliaModuleTest.take_four_generics_m_middle(v2) === v2
-    @test_throws MethodError JuliaModuleTest.take_four_generics_m_middle(v3)
-    @test JuliaModuleTest.take_four_generics_m_middle(v4) === v4
-    @test_throws MethodError JuliaModuleTest.take_four_generics_m_middle(v5)
+    @test JuliaModuleTest.takes_four_generics_m_middle(v1) === v1
+    @test JuliaModuleTest.takes_four_generics_m_middle(v2) === v2
+    @test_throws MethodError JuliaModuleTest.takes_four_generics_m_middle(v3)
+    @test JuliaModuleTest.takes_four_generics_m_middle(v4) === v4
+    @test_throws MethodError JuliaModuleTest.takes_four_generics_m_middle(v5)
 
     v6 = JuliaModuleTest.FourGenericsM{Int64, Int32, Int32, Int32}(1,2,3,4)
-    @test JuliaModuleTest.take_four_generics_m_start1(v1) === v1
-    @test_throws MethodError JuliaModuleTest.take_four_generics_m_start1(v2)
-    @test JuliaModuleTest.take_four_generics_m_start1(v6) === v6
+    @test JuliaModuleTest.takes_four_generics_m_start1(v1) === v1
+    @test_throws MethodError JuliaModuleTest.takes_four_generics_m_start1(v2)
+    @test JuliaModuleTest.takes_four_generics_m_start1(v6) === v6
 
     v7 = JuliaModuleTest.FourGenericsM{Int64, Int64, Int32, Int32}(1,2,3,4)
-    @test JuliaModuleTest.take_four_generics_m_start2(v1) === v1
-    @test_throws MethodError JuliaModuleTest.take_four_generics_m_start2(v2)
-    @test JuliaModuleTest.take_four_generics_m_start2(v6) === v6
-    @test JuliaModuleTest.take_four_generics_m_start2(v7) === v7
+    @test JuliaModuleTest.takes_four_generics_m_start2(v1) === v1
+    @test_throws MethodError JuliaModuleTest.takes_four_generics_m_start2(v2)
+    @test JuliaModuleTest.takes_four_generics_m_start2(v6) === v6
+    @test JuliaModuleTest.takes_four_generics_m_start2(v7) === v7
 end

@@ -37,13 +37,18 @@ use crate::{
     data::{
         layout::valid_layout::{ValidField, ValidLayout},
         managed::{datatype::DataType, private::ManagedPriv, Managed, Ref},
-        types::{abstract_type::AnyType, construct_type::ConstructType, typecheck::Typecheck},
+        types::{
+            abstract_type::AnyType,
+            construct_type::{ArrayTypeConstructor, ConstantIsize, ConstructType},
+            typecheck::Typecheck,
+        },
     },
     error::{JlrsResult, TypeError},
     memory::{
         scope::LocalScope,
         target::{Target, TargetResult},
     },
+    prelude::{TypedArray, TypedRankedArray},
     private::Private,
 };
 
@@ -177,6 +182,26 @@ impl<'scope, 'data, U: ConstructType> TypedValue<'scope, 'data, U> {
         &'tracked mut self,
     ) -> JlrsResult<TrackedMut<'tracked, 'scope, 'data, V>> {
         self.deref_mut().track_exclusive()
+    }
+}
+
+impl<'scope, 'data, T: ConstructType, const N: isize>
+    TypedValue<'scope, 'data, ArrayTypeConstructor<T, ConstantIsize<N>>>
+{
+    /// Convert `self` to the equivalent `TypedRankedArray` type.
+    #[inline]
+    pub fn as_typed_ranked_array(self) -> TypedRankedArray<'scope, 'data, T, N> {
+        unsafe { std::mem::transmute(self) }
+    }
+}
+
+impl<'scope, 'data, T: ConstructType, N: ConstructType>
+    TypedValue<'scope, 'data, ArrayTypeConstructor<T, N>>
+{
+    /// Convert `self` to the equivalent `TypedArray` type.
+    #[inline]
+    pub fn as_typed_array(self) -> TypedArray<'scope, 'data, T> {
+        unsafe { std::mem::transmute(self) }
     }
 }
 
