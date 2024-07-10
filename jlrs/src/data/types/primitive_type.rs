@@ -1,11 +1,13 @@
 //! Primitive type trait
 
+use super::{
+    abstract_type::{AbstractChar, AbstractFloat, Integer, Signed, Unsigned},
+    construct_type::ConstructType,
+};
 use crate::prelude::{Bool, Char};
 
-use super::{abstract_type::{AbstractChar, AbstractFloat, Integer, Signed, Unsigned}, construct_type::ConstructType};
-
 /// A primitive type.
-/// 
+///
 /// Safety: must only be implemented by types that are primitive types in Julia.
 pub unsafe trait PrimitiveType: ConstructType {
     /// The size of an instance of this type in bits
@@ -15,8 +17,8 @@ pub unsafe trait PrimitiveType: ConstructType {
 }
 
 /// A primitive type.
-/// 
-/// Safety: must only be implemented by types that are primitive types in Julia and subtypes of 
+///
+/// Safety: must only be implemented by types that are primitive types in Julia and subtypes of
 /// `Integer`.
 pub unsafe trait IntegerType: PrimitiveType {}
 

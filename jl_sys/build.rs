@@ -242,14 +242,28 @@ fn compile_jlrs_cc(julia_dir: &str, target: Option<Target>) {
     #[cfg(feature = "lto")]
     c.flag("-flto=thin");
 
+    cfg_if! {
+        if #[cfg(feature = "julia-1-6")] {
+            c.define("JLRS_EXPECTED_MINOR_VERSION", Some("6"));
+        } else if #[cfg(feature = "julia-1-7")] {
+            c.define("JLRS_EXPECTED_MINOR_VERSION", Some("7"));
+        } else if #[cfg(feature = "julia-1-8")] {
+            c.define("JLRS_EXPECTED_MINOR_VERSION", Some("8"));
+        } else if #[cfg(feature = "julia-1-9")] {
+            c.define("JLRS_EXPECTED_MINOR_VERSION", Some("9"));
+        } else if #[cfg(feature = "julia-1-10")] {
+            c.define("JLRS_EXPECTED_MINOR_VERSION", Some("10"));
+        } else if #[cfg(feature = "julia-1-11")] {
+            c.define("JLRS_EXPECTED_MINOR_VERSION", Some("11"));
+        } else if #[cfg(feature = "julia-1-12")] {
+            c.define("JLRS_EXPECTED_MINOR_VERSION", Some("12"));
+        }
+    };
+
     // Enable fast (i.e. local-exec) TLS. Only enable this feature if you're embedding Julia in a
     // Rust application.
     #[cfg(all(feature = "fast-tls", not(feature = "yggdrasil")))]
     c.define("JLRS_FAST_TLS", None);
-
-    // Set JULIA_VERSION_MINOR for Julia 1.6 because julia_version.h doesn't exist
-    #[cfg(feature = "julia-1-6")]
-    c.define("JULIA_VERSION_MINOR", Some("6"));
 
     #[cfg(all(
         any(windows, target_os = "windows", feature = "windows"),
