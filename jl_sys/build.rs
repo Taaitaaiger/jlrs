@@ -265,10 +265,6 @@ fn compile_jlrs_cc(julia_dir: &str, target: Option<Target>) {
     #[cfg(all(feature = "fast-tls", not(feature = "yggdrasil")))]
     c.define("JLRS_FAST_TLS", None);
 
-    // // Set JULIA_VERSION_MINOR for Julia 1.6 because julia_version.h doesn't exist
-    // #[cfg(feature = "julia-1-6")]
-    // c.define("JULIA_VERSION_MINOR", Some("6"));
-
     #[cfg(all(
         any(windows, target_os = "windows", feature = "windows"),
         feature = "julia-1-6"
