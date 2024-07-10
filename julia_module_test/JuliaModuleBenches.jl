@@ -7,51 +7,51 @@ const opaque_int = JuliaModuleTest.OpaqueInt(Int32(-1));
 const arr = Int[1, 2, 3, 4];
 
 function runbenches()
-    println("Benchmark freestanding_func_trivial")
+    println("Benchmark takes_no_args_returns_nothing")
     scrubgc()
-    b = @benchmark JuliaModuleTest.freestanding_func_trivial() gctrial = false gcsample = false
+    b = @benchmark JuliaModuleTest.takes_no_args_returns_nothing() gctrial = false gcsample = false
     show(stdout, MIME"text/plain"(), b)
     print("\n\n")
 
-    println("Benchmark freestanding_func_noargs")
+    println("Benchmark takes_no_args_returns_usize")
     scrubgc()
-    b = @benchmark JuliaModuleTest.freestanding_func_noargs() gctrial = false gcsample = false
+    b = @benchmark JuliaModuleTest.takes_no_args_returns_usize() gctrial = false gcsample = false
     show(stdout, MIME"text/plain"(), b)
     print("\n\n")
 
-    println("Benchmark freestanding_func_bitsarg")
+    println("Benchmark takes_usize_returns_usize")
     scrubgc()
-    b = @benchmark JuliaModuleTest.freestanding_func_bitsarg(UInt(3)) gctrial = false gcsample = false
+    b = @benchmark JuliaModuleTest.takes_usize_returns_usize(UInt(3)) gctrial = false gcsample = false
     show(stdout, MIME"text/plain"(), b)
     print("\n\n")
 
-    println("Benchmark freestanding_func_ref_bitsarg")
+    println("Benchmark takes_ref_usize")
     scrubgc()
-    b = @benchmark JuliaModuleTest.freestanding_func_ref_bitsarg(UInt(3)) gctrial = false gcsample = false
+    b = @benchmark JuliaModuleTest.takes_ref_usize(UInt(3)) gctrial = false gcsample = false
     show(stdout, MIME"text/plain"(), b)
     print("\n\n")
 
-    println("Benchmark freestanding_func_ref_mutarg")
+    println("Benchmark takes_ref_module")
     scrubgc()
-    b = @benchmark JuliaModuleTest.freestanding_func_ref_mutarg(Main) gctrial = false gcsample = false
+    b = @benchmark JuliaModuleTest.takes_ref_module(Main) gctrial = false gcsample = false
     show(stdout, MIME"text/plain"(), b)
     print("\n\n")
 
-    println("Benchmark freestanding_func_ref_any")
+    println("Benchmark takes_ref_any")
     scrubgc()
-    b = @benchmark JuliaModuleTest.freestanding_func_ref_any(Main) gctrial = false gcsample = false
+    b = @benchmark JuliaModuleTest.takes_ref_any(Main) gctrial = false gcsample = false
     show(stdout, MIME"text/plain"(), b)
     print("\n\n")
 
-    println("Benchmark freestanding_func_ref_abstract")
+    println("Benchmark takes_ref_number")
     scrubgc()
-    b = @benchmark JuliaModuleTest.freestanding_func_ref_abstract(1) gctrial = false gcsample = false
+    b = @benchmark JuliaModuleTest.takes_ref_number(1) gctrial = false gcsample = false
     show(stdout, MIME"text/plain"(), b)
     print("\n\n")
 
-    println("Benchmark freestanding_func_arrayarg")
+    println("Benchmark takes_array")
     scrubgc()
-    b = @benchmark JuliaModuleTest.freestanding_func_arrayarg(Vector{UInt32}()) gctrial = false gcsample = false
+    b = @benchmark JuliaModuleTest.takes_array(Vector{UInt32}()) gctrial = false gcsample = false
     show(stdout, MIME"text/plain"(), b)
     print("\n\n")
 
@@ -61,21 +61,21 @@ function runbenches()
     show(stdout, MIME"text/plain"(), b)
     print("\n\n")
 
-    println("Benchmark freestanding_func_typevaluearg")
+    println("Benchmark takes_typed_value")
     scrubgc()
-    b = @benchmark JuliaModuleTest.freestanding_func_typevaluearg(UInt(3)) gctrial = false gcsample = false
+    b = @benchmark JuliaModuleTest.takes_typed_value(UInt(3)) gctrial = false gcsample = false
     show(stdout, MIME"text/plain"(), b)
     print("\n\n")
 
-    println("Benchmark freestanding_func_ret_array")
+    println("Benchmark returns_array")
     scrubgc()
-    b = @benchmark JuliaModuleTest.freestanding_func_ret_array(Int32) gctrial = false gcsample = false
+    b = @benchmark JuliaModuleTest.returns_array(Int32) gctrial = false gcsample = false
     show(stdout, MIME"text/plain"(), b)
     print("\n\n")
 
-    println("Benchmark freestanding_func_ret_rust_result")
+    println("Benchmark returns_jlrs_result")
     scrubgc()
-    b = @benchmark JuliaModuleTest.freestanding_func_ret_rust_result(false) gctrial = false gcsample = false
+    b = @benchmark JuliaModuleTest.returns_jlrs_result(false) gctrial = false gcsample = false
     show(stdout, MIME"text/plain"(), b)
     print("\n\n")
 
