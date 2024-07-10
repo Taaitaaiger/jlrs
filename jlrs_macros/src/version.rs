@@ -6,7 +6,60 @@ const MAJOR_VERSION: usize = 1;
 const LTS_MINOR_VERSION: usize = 6;
 const NIGHTLY_MINOR_VERSION: usize = 12;
 
-#[cfg(feature = "julia-1-6")]
+#[cfg(not(any(
+    feature = "julia-1-6",
+    feature = "julia-1-7",
+    feature = "julia-1-8",
+    feature = "julia-1-9",
+    feature = "julia-1-10",
+    feature = "julia-1-11",
+    feature = "julia-1-12",
+)))]
+compile_error!(
+    "A Julia version must be selected by enabling exactly one of the following version features:
+    julia-1-6
+    julia-1-7
+    julia-1-8
+    julia-1-9
+    julia-1-10
+    julia-1-11
+    julia-1-12"
+);
+
+#[cfg(any(
+    all(feature = "julia-1-6", feature = "julia-1-7"),
+    all(feature = "julia-1-6", feature = "julia-1-8"),
+    all(feature = "julia-1-6", feature = "julia-1-9"),
+    all(feature = "julia-1-6", feature = "julia-1-10"),
+    all(feature = "julia-1-6", feature = "julia-1-11"),
+    all(feature = "julia-1-6", feature = "julia-1-12"),
+    all(feature = "julia-1-7", feature = "julia-1-8"),
+    all(feature = "julia-1-7", feature = "julia-1-9"),
+    all(feature = "julia-1-7", feature = "julia-1-10"),
+    all(feature = "julia-1-7", feature = "julia-1-11"),
+    all(feature = "julia-1-7", feature = "julia-1-12"),
+    all(feature = "julia-1-8", feature = "julia-1-9"),
+    all(feature = "julia-1-8", feature = "julia-1-10"),
+    all(feature = "julia-1-8", feature = "julia-1-11"),
+    all(feature = "julia-1-8", feature = "julia-1-12"),
+    all(feature = "julia-1-9", feature = "julia-1-10"),
+    all(feature = "julia-1-9", feature = "julia-1-11"),
+    all(feature = "julia-1-9", feature = "julia-1-12"),
+    all(feature = "julia-1-10", feature = "julia-1-11"),
+    all(feature = "julia-1-10", feature = "julia-1-12"),
+    all(feature = "julia-1-11", feature = "julia-1-12"),
+))]
+compile_error!("Multiple Julia version features have been enabled");
+
+// Avoid a second error if no version feature is enabled
+#[cfg(not(any(
+    feature = "julia-1-7",
+    feature = "julia-1-8",
+    feature = "julia-1-9",
+    feature = "julia-1-10",
+    feature = "julia-1-11",
+    feature = "julia-1-12",
+)))]
 const SELECTED_MINOR_VERSION: usize = 6;
 #[cfg(feature = "julia-1-7")]
 const SELECTED_MINOR_VERSION: usize = 7;

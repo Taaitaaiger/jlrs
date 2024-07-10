@@ -10,6 +10,10 @@
 #include <julia_version.h>
 #endif
 
+#if JLRS_EXPECTED_MINOR_VERSION != JULIA_VERSION_MINOR
+#error Mismatch between selected Julia version and detected version
+#endif
+
 #include "jlrs_cc_windows.h"
 
 #include <julia.h>
