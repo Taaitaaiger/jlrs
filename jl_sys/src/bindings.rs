@@ -720,16 +720,17 @@ extern "C" {
     pub fn jl_gc_safepoint();
 
     // Used indirectly
-    pub fn jl_excstack_state(
-        #[cfg(not(any(
-            feature = "julia-1-6",
-            feature = "julia-1-7",
-            feature = "julia-1-8",
-            feature = "julia-1-9",
-            feature = "julia-1-10",
-        )))]
-        ct: *mut crate::types::jl_task_t,
-    ) -> usize;
+    pub static mut jl_excstack_state: *mut std::ffi::c_void;
+    // pub fn jl_excstack_state(
+    //     #[cfg(not(any(
+    //         feature = "julia-1-6",
+    //         feature = "julia-1-7",
+    //         feature = "julia-1-8",
+    //         feature = "julia-1-9",
+    //         feature = "julia-1-10",
+    //     )))]
+    //     ct: *mut crate::types::jl_task_t,
+    // ) -> usize;
 
     // Used indirectly
     pub fn jl_enter_handler(
