@@ -333,6 +333,9 @@ pub trait ManagedRef<'scope, 'data>:
 {
     /// The managed type associated with this `Ref`.
     type Managed: Managed<'scope, 'data>;
+
+    // Convert `self` to an explicit `Ref` type.
+    fn into_ref(self) -> Ref<'scope, 'data, Self::Managed>;
 }
 
 impl<'scope, 'data, T> ManagedRef<'scope, 'data> for Ref<'scope, 'data, T>
@@ -342,6 +345,10 @@ where
     Option<Self>: ValidField,
 {
     type Managed = T;
+
+    fn into_ref(self) -> Ref<'scope, 'data, Self::Managed> {
+        self
+    }
 }
 
 /// Trait implemented by all managed types.
@@ -570,6 +577,16 @@ impl<'scope, 'data, W: Managed<'scope, 'data>> Ref<'scope, 'data, W> {
         self.0
     }
 }
+
+/// Alias to convert a managed type `V` to its `Ret`-alias.
+pub type Ret<'scope, V> = Ref<'static, 'static, <V as Managed<'scope, 'static>>::InScope<'static>>;
+
+/// Alias to convert a `Ref`-type `V` to its `Ret`-alias.
+pub type RefRet<'scope, V> = Ref<
+    'static,
+    'static,
+    <<V as ManagedRef<'scope, 'static>>::Managed as Managed<'scope, 'static>>::InScope<'static>,
+>;
 
 /// Atomic pointer field.
 #[repr(transparent)]

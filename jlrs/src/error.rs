@@ -4,9 +4,13 @@ use std::{error::Error as StdErr, pin::Pin, sync::Arc};
 
 use thiserror::Error;
 
-use crate::data::managed::{
-    array::dimensions::Dimensions,
-    value::{Value, ValueRef},
+use crate::{
+    data::managed::{
+        array::dimensions::Dimensions,
+        value::{Value, ValueRef, ValueRet},
+        RefRet, Ret,
+    },
+    prelude::{Managed, ManagedRef, Target, TargetType, ValueData},
 };
 
 pub(crate) static CANNOT_DISPLAY_TYPE: &'static str = "<Cannot display type>";
@@ -36,6 +40,156 @@ pub type JuliaResult<'frame, 'data, V = Value<'frame, 'data>> = Result<V, Value<
 /// This type alias is similar to [`JuliaResult`], but can contain unrooted data.
 pub type JuliaResultRef<'frame, 'data, V = ValueRef<'frame, 'data>> =
     Result<V, ValueRef<'frame, 'data>>;
+
+/// Rooted or unrooted Julia result depending on the target type Tgt.
+pub type JuliaResultData<'target, 'scope, 'data, V, Tgt> = Result<
+    <Tgt as TargetType<'target>>::Data<'static, <V as Managed<'scope, 'static>>::InScope<'target>>,
+    ValueData<'target, 'static, Tgt>,
+>;
+
+/// Rooted or unrooted Julia exception depending on the target type Tgt.
+pub type JuliaResultDataU<'target, 'data, V, Tgt> = Result<V, ValueData<'target, 'static, Tgt>>;
+
+/// Alias for `Result<V, ValueRet>`.
+pub type JuliaResultRet<V = ValueRet> = Result<V, ValueRet>;
+
+/// Extension trait for `JuliaResult`.
+pub trait JuliaResultExt<'scope, V> {
+    /// Leak the content of `self`.
+    fn leak(self) -> JuliaResultRet<Ret<'scope, V>>
+    where
+        V: Managed<'scope, 'static>;
+
+    /// Leak the content of `self` if it's an `Err`.
+    fn leak_exception(self) -> JuliaResultRet<V>;
+
+    /// Re-root self with the given target.
+    fn root<'target, Tgt: Target<'target>>(
+        self,
+        target: Tgt,
+    ) -> JuliaResultData<'target, 'scope, 'static, V, Tgt>
+    where
+        V: Managed<'scope, 'static>;
+
+    /// Re-root the exception with the given target.
+    fn root_exception<'target, Tgt: Target<'target>>(
+        self,
+        target: Tgt,
+    ) -> JuliaResultDataU<'target, 'static, V, Tgt>;
+}
+
+impl<'scope, V> JuliaResultExt<'scope, V> for JuliaResult<'scope, 'static, V> {
+    fn leak(self) -> JuliaResultRet<Ret<'scope, V>>
+    where
+        V: Managed<'scope, 'static>,
+    {
+        match self {
+            Ok(v) => Ok(v.leak()),
+            Err(e) => Err(e.leak()),
+        }
+    }
+
+    fn leak_exception(self) -> JuliaResultRet<V> {
+        match self {
+            Ok(v) => Ok(v),
+            Err(e) => Err(e.leak()),
+        }
+    }
+
+    fn root<'target, Tgt: Target<'target>>(
+        self,
+        target: Tgt,
+    ) -> JuliaResultData<'target, 'scope, 'static, V, Tgt>
+    where
+        V: Managed<'scope, 'static>,
+    {
+        match self {
+            Ok(v) => Ok(v.root(target)),
+            Err(e) => Err(e.root(target)),
+        }
+    }
+
+    fn root_exception<'target, Tgt: Target<'target>>(
+        self,
+        target: Tgt,
+    ) -> JuliaResultDataU<'target, 'static, V, Tgt> {
+        match self {
+            Ok(v) => Ok(v),
+            Err(e) => Err(e.root(target)),
+        }
+    }
+}
+
+/// Extension trait for `JuliaResultRef`.
+pub trait JuliaResultRefExt<'scope, V> {
+    /// Leak the content of `self`.
+    fn leak(self) -> JuliaResultRet<RefRet<'scope, V>>
+    where
+        V: ManagedRef<'scope, 'static>;
+
+    /// Leak the content of `self` if it's an `Err`.
+    fn leak_exception(self) -> JuliaResultRet<V>;
+
+    /// Re-root self with the given target.
+    ///
+    /// Safety: `self` must not have been freed by the GC yet.
+    unsafe fn root<'target, Tgt: Target<'target>>(
+        self,
+        target: Tgt,
+    ) -> JuliaResultData<'target, 'scope, 'static, V::Managed, Tgt>
+    where
+        V: ManagedRef<'scope, 'static>;
+
+    /// Re-root the exception with the given target.
+    ///
+    /// Safety: `self` must not have been freed by the GC yet.
+    unsafe fn root_exception<'target, Tgt: Target<'target>>(
+        self,
+        target: Tgt,
+    ) -> JuliaResultDataU<'target, 'static, V, Tgt>;
+}
+
+impl<'scope, V> JuliaResultRefExt<'scope, V> for JuliaResultRef<'scope, 'static, V> {
+    fn leak(self) -> JuliaResultRet<RefRet<'scope, V>>
+    where
+        V: ManagedRef<'scope, 'static>,
+    {
+        match self {
+            Ok(v) => Ok(v.into_ref().leak()),
+            Err(e) => Err(e.leak()),
+        }
+    }
+
+    fn leak_exception(self) -> JuliaResultRet<V> {
+        match self {
+            Ok(v) => Ok(v),
+            Err(e) => Err(e.leak()),
+        }
+    }
+
+    unsafe fn root<'target, Tgt: Target<'target>>(
+        self,
+        target: Tgt,
+    ) -> JuliaResultData<'target, 'scope, 'static, V::Managed, Tgt>
+    where
+        V: ManagedRef<'scope, 'static>,
+    {
+        match self {
+            Ok(v) => Ok(v.into_ref().root(target)),
+            Err(e) => Err(e.root(target)),
+        }
+    }
+
+    unsafe fn root_exception<'target, Tgt: Target<'target>>(
+        self,
+        target: Tgt,
+    ) -> JuliaResultDataU<'target, 'static, V, Tgt> {
+        match self {
+            Ok(v) => Ok(v),
+            Err(e) => Err(e.root(target)),
+        }
+    }
+}
 
 /// Runtime errors.
 #[derive(Debug, Error, Clone)]
