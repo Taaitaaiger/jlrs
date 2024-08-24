@@ -1,3 +1,11 @@
+#### v0.22
+
+- Add several aliases for `JuliaResult` so they can be more easily returned from an exported funtion.
+
+- Add `JuliaRestultExt` and `JuliaRestultExt` extension traits to expose methods to leak or root a result.
+
+- Add `into_ref` method to `ManagedRef` that converts an arbitrary `ManagedRef` to a specific `Ref` type.
+
 #### v0.21
 
 - Support generating bindings for Julia enums with integer base types in combination with JlrsCore.Reflect and the `Enum` derive macro.
