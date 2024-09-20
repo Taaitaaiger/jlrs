@@ -11,9 +11,10 @@ are actively tested. Using the current stable version of Julia is highly recomme
 supported Rust version is currently 1.77.
 
 This readme only contains information about what features are supported by jlrs, what
-prerequisites must be met, and how to meet them. For information and examples about how to use
-jlrs, please read the [docs](https://docs.rs/jlrs). The documentation assumes you are already
-familiar with the Julia and Rust programming languages.
+prerequisites must be met, and how to meet them. A complete tutorial is available
+[here](https://taaitaaiger.github.io/jlrs-tutorial/). For more information and examples about how
+to use jlrs, please read the [docs](https://docs.rs/jlrs). All documentation assumes you are
+already familiar with the Julia and Rust programming languages.
 
 
 ## Overview

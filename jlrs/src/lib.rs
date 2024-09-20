@@ -5,6 +5,7 @@
 //! are actively tested. Using the current stable version of Julia is highly recommended. The
 //! minimum supported Rust version is currently 1.77.
 //!
+//! A tutorial is available [here](https://taaitaaiger.github.io/jlrs-tutorial/).
 //!
 //! # Overview
 //!
