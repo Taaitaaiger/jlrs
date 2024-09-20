@@ -13,7 +13,7 @@ pub use jlrs_macros::{
 
 #[cfg(any(feature = "local-rt", feature = "async-rt", feature = "ccall"))]
 pub use crate::memory::stack_frame::StackFrame;
-#[cfg(any(feature = "async-rt", feature = "local-rt"))]
+#[cfg(any(feature = "async-rt", feature = "local-rt", feature = "multi-rt"))]
 pub use crate::runtime::builder::Builder;
 #[cfg(feature = "tokio-rt")]
 pub use crate::runtime::executor::tokio_exec::*;

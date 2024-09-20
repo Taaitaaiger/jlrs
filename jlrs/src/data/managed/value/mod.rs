@@ -85,8 +85,8 @@ macro_rules! named_tuple {
     };
     ($frame:expr, $name:expr => $value:expr, $($rest:tt)+) => {
         {
-            const n: usize = $crate::count!($($rest)+);
-            let mut pairs: [::std::mem::MaybeUninit::<($crate::data::managed::symbol::Symbol, $crate::data::managed::value::Value)>; n] = [::std::mem::MaybeUninit::uninit(); n];
+            const N: usize = $crate::count!($($rest)+);
+            let mut pairs: [::std::mem::MaybeUninit::<($crate::data::managed::symbol::Symbol, $crate::data::managed::value::Value)>; N] = [::std::mem::MaybeUninit::uninit(); N];
             let name = $crate::convert::to_symbol::ToSymbol::to_symbol(&$name, &$frame);
 
             pairs[0].write((name, $value));
@@ -105,10 +105,10 @@ macro_rules! named_tuple {
             let name = $crate::convert::to_symbol::ToSymbol::to_symbol(&$name, &$frame);
             $pairs[$i].write((name, $value));
 
-            let pairs: &[($crate::data::managed::symbol::Symbol, $crate::data::managed::value::Value); n] = unsafe {
+            let pairs: &[($crate::data::managed::symbol::Symbol, $crate::data::managed::value::Value); N] = unsafe {
                 ::std::mem::transmute::<
-                    &[::std::mem::MaybeUninit::<($crate::data::managed::symbol::Symbol, $crate::data::managed::value::Value)>; n],
-                    &[($crate::data::managed::symbol::Symbol, $crate::data::managed::value::Value); n]
+                    &[::std::mem::MaybeUninit::<($crate::data::managed::symbol::Symbol, $crate::data::managed::value::Value)>; N],
+                    &[($crate::data::managed::symbol::Symbol, $crate::data::managed::value::Value); N]
                 >($pairs)
             };
 
