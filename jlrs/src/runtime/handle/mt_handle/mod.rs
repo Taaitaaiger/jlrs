@@ -5,10 +5,7 @@ use std::num::NonZeroUsize;
 use std::{cell::Cell, marker::PhantomData, path::Path, pin::Pin, sync::atomic::AtomicUsize};
 
 use atomic::Ordering;
-use jl_sys::{
-    jl_adopt_thread, jl_atexit_hook, jlrs_gc_safe_enter, jlrs_gc_unsafe_enter, jlrs_ppgcstack,
-    jlrs_ptls_from_gcstack,
-};
+use jl_sys::{jl_adopt_thread, jl_atexit_hook, jlrs_gc_safe_enter, jlrs_ptls_from_gcstack};
 use parking_lot::{Condvar, Mutex};
 
 #[cfg(feature = "async")]
@@ -277,31 +274,27 @@ pub(crate) fn wait_loop() {
 unsafe fn drop_handle() {
     let n_handles = N_HANDLES.fetch_sub(1, Ordering::Relaxed);
     if n_handles == 1 {
-        let pgcstack = jlrs_ppgcstack();
-        let ptls = if pgcstack.is_null() {
+        let _ = std::thread::spawn(|| {
             let pgcstack = jl_adopt_thread();
-            jlrs_ptls_from_gcstack(pgcstack)
-        } else {
             let ptls = jlrs_ptls_from_gcstack(pgcstack);
-            jlrs_gc_unsafe_enter(ptls);
-            ptls
-        };
 
-        set_pending_exit();
+            set_pending_exit();
 
-        let weak_handle = weak_handle_unchecked!();
-        let notify_main = JlrsCore::notify_main(&weak_handle);
+            let weak_handle = weak_handle_unchecked!();
+            let notify_main = JlrsCore::notify_main(&weak_handle);
 
-        if let Err(err) = notify_main.call0(&weak_handle) {
-            weak_handle.local_scope::<_, 1>(|mut frame| {
-                panic!(
-                    "unexpected error when calling JlrsCore.Threads.notify_main: {:?}",
-                    err.root(&mut frame)
-                );
-            });
-        }
+            if let Err(err) = notify_main.call0(&weak_handle) {
+                weak_handle.local_scope::<_, 1>(|mut frame| {
+                    panic!(
+                        "unexpected error when calling JlrsCore.Threads.notify_main: {:?}",
+                        err.root(&mut frame)
+                    );
+                });
+            }
 
-        jlrs_gc_safe_enter(ptls);
-        notify(&EXIT_LOCK);
+            jlrs_gc_safe_enter(ptls);
+            notify(&EXIT_LOCK);
+        })
+        .join();
     }
 }
