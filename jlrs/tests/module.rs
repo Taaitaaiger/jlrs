@@ -314,6 +314,7 @@ mod tests {
         })
     }
 
+    #[julia_version(until = "1.11")]
     fn set_const_twice() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -438,6 +439,7 @@ mod tests {
         })
     }
 
+    #[julia_version(until = "1.11")]
     fn cant_redefine_const() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -546,12 +548,28 @@ mod tests {
         use_dyn_str_for_access();
         set_global();
         set_const();
+        #[cfg(any(
+            feature = "julia-1-6",
+            feature = "julia-1-7",
+            feature = "julia-1-8",
+            feature = "julia-1-8",
+            feature = "julia-1-10",
+            feature = "julia-1-11",
+        ))]
         set_const_twice();
         eval_using();
         module_parent();
         extend_lifetime_with_root();
         is_imported();
         submodule_must_be_module();
+        #[cfg(any(
+            feature = "julia-1-6",
+            feature = "julia-1-7",
+            feature = "julia-1-8",
+            feature = "julia-1-8",
+            feature = "julia-1-10",
+            feature = "julia-1-11",
+        ))]
         cant_redefine_const();
         set_global_unchecked();
         set_const_unchecked();

@@ -1357,7 +1357,7 @@ extern "C" {
     #[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8",)))]
     pub fn jlrs_set_nthreads_per_pool(nthreads_per_pool: *const i16);
 
-    // Added in Julia 1.10
+    // Added in Julia 1.11
 
     #[cfg(not(any(
         feature = "julia-1-6",
