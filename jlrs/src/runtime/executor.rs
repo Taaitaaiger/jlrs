@@ -145,7 +145,7 @@ pub mod tokio_exec {
 
             #[cfg(feature = "tokio-net")]
             if self.enable_io {
-                builder.enable_io()
+                builder.enable_io();
             }
 
             let runtime = builder.build().expect("unable to build tokio runtime");
