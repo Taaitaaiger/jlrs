@@ -149,6 +149,35 @@ jobs:
           export LD_LIBRARY_PATH="${JULIA_DIR}/lib:${JULIA_DIR}/lib/julia:${LD_LIBRARY_PATH}"
           cargo test --features full,julia-1-10 --verbose
 
+  test-macos-lts:
+    runs-on: macos-latest
+    continue-on-error: ${{ matrix.allow-fail }}
+    strategy:
+      matrix:
+        rust: [stable, beta]
+        allow-fail: [false]
+        include:
+          - rust: nightly
+            allow-fail: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Julia environment
+        uses: julia-actions/setup-julia@v2
+        with:
+          version: '1.10'
+
+      - name: Setup Rust
+        uses:  dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ matrix.rust }}
+
+      - name: Run tests
+        run: |
+          export JULIA_DIR="$(dirname $(dirname $(which julia)))"
+          export DYLD_LIBRARY_PATH="${JULIA_DIR}/lib:${JULIA_DIR}/lib/julia:${DYLD_LIBRARY_PATH}"
+          cargo test --features full,julia-1-10 --verbose
+
   test-windows-gnu-lts:
     runs-on: windows-latest
     continue-on-error: ${{ matrix.allow-fail }}
@@ -168,12 +197,6 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ matrix.rust }}
-
-      - name: Install JlrsCore
-        run: julia --color=yes -e 'using Pkg; Pkg.add("JlrsCore"); VERSION >= v"1.5-" && !isdir(joinpath(DEPOT_PATH[1], "registries", "General")) && Pkg.Registry.add("General")'
-        shell: bash
-        env:
-          JULIA_PKG_SERVER: ""
 
       - name: Run tests
         run: |
@@ -201,12 +224,6 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ matrix.rust }}
-
-      - name: Install JlrsCore
-        run: julia --color=yes -e 'using Pkg; Pkg.add("JlrsCore"); VERSION >= v"1.5-" && !isdir(joinpath(DEPOT_PATH[1], "registries", "General")) && Pkg.Registry.add("General")'
-        shell: bash
-        env:
-          JULIA_PKG_SERVER: ""
 
       - name: Run tests
         run: |
@@ -240,7 +257,6 @@ jobs:
           cargo build --features julia-1-11
           cp ./target/debug/libjulia_module_test.so .
           julia JuliaModuleTest.jl
-
 
   julia-module-test-windows-gnu:
     runs-on: windows-latest
@@ -318,7 +334,6 @@ jobs:
           cargo build --features julia-1-11
           cp ./target/debug/libjulia_module_test.so .
           julia JuliaModuleTest.jl
-
 
   julia-module-test-windows-gnu-pre:
     runs-on: windows-latest
