@@ -25,7 +25,7 @@ jobs:
       - name: Setup Julia environment
         uses: julia-actions/setup-julia@v2
         with:
-          version: '1.10'
+          version: '1.11'
 
       - name: Setup Rust
         uses:  dtolnay/rust-toolchain@master
@@ -36,7 +36,7 @@ jobs:
         run: |
           export JULIA_DIR="$(dirname $(dirname $(which julia)))"
           export LD_LIBRARY_PATH="${JULIA_DIR}/lib:${JULIA_DIR}/lib/julia:${LD_LIBRARY_PATH}"
-          cargo test --features full,julia-1-10 --verbose
+          cargo test --features full,julia-1-11 --verbose
 
   test-macos:
     runs-on: macos-latest
@@ -54,7 +54,7 @@ jobs:
       - name: Setup Julia environment
         uses: julia-actions/setup-julia@v2
         with:
-          version: '1.10'
+          version: '1.11'
 
       - name: Setup Rust
         uses:  dtolnay/rust-toolchain@master
@@ -65,7 +65,7 @@ jobs:
         run: |
           export JULIA_DIR="$(dirname $(dirname $(which julia)))"
           export DYLD_LIBRARY_PATH="${JULIA_DIR}/lib:${JULIA_DIR}/lib/julia:${DYLD_LIBRARY_PATH}"
-          cargo test --features full,julia-1-10 --verbose
+          cargo test --features full,julia-1-11 --verbose
 
   test-windows-gnu:
     runs-on: windows-latest
@@ -83,7 +83,7 @@ jobs:
       - name: Setup Julia environment
         uses: julia-actions/setup-julia@v2
         with:
-          version: '1.10'
+          version: '1.11'
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@master
@@ -91,7 +91,7 @@ jobs:
           toolchain: ${{ matrix.rust }}
 
       - name: Run tests
-        run: cargo test --features full,julia-1-10 --verbose
+        run: cargo test --features full,julia-1-11 --verbose
 
   test-windows-msvc:
     runs-on: windows-latest
@@ -110,108 +110,7 @@ jobs:
         id: setup-julia
         uses: julia-actions/setup-julia@v2
         with:
-          version: '1.10'
-
-      - uses: ilammy/msvc-dev-cmd@v1
-
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: ${{ matrix.rust }}
-
-      - name: Run tests
-        run: cargo test --features full,julia-1-10 --verbose
-
-  test-linux-pre:
-    runs-on: ubuntu-latest
-    continue-on-error: ${{ matrix.allow-fail }}
-    strategy:
-      matrix:
-        rust: [stable]
-        allow-fail: [false]
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Julia environment
-        uses: julia-actions/setup-julia@v2
-        with:
-          version: 'pre'
-
-      - name: Setup Rust
-        uses:  dtolnay/rust-toolchain@master
-        with:
-          toolchain: ${{ matrix.rust }}
-
-      - name: Run tests
-        run: |
-          export JULIA_DIR="$(dirname $(dirname $(which julia)))"
-          export LD_LIBRARY_PATH="${JULIA_DIR}/lib:${JULIA_DIR}/lib/julia:${LD_LIBRARY_PATH}"
-          cargo test --features full,julia-1-11 --verbose
-
-  test-macos-pre:
-    runs-on: macos-latest
-    continue-on-error: ${{ matrix.allow-fail }}
-    strategy:
-      matrix:
-        rust: [stable]
-        allow-fail: [false]
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Julia environment
-        uses: julia-actions/setup-julia@v2
-        with:
-          version: 'pre'
-
-      - name: Setup Rust
-        uses:  dtolnay/rust-toolchain@master
-        with:
-          toolchain: ${{ matrix.rust }}
-
-      - name: Run tests
-        run: |
-          export JULIA_DIR="$(dirname $(dirname $(which julia)))"
-          export DYLD_LIBRARY_PATH="${JULIA_DIR}/lib:${JULIA_DIR}/lib/julia:${DYLD_LIBRARY_PATH}"
-          cargo test --features full,julia-1-11 --verbose
-
-  test-windows-gnu-pre:
-    runs-on: windows-latest
-    continue-on-error: ${{ matrix.allow-fail }}
-    strategy:
-      matrix:
-        rust: [stable-x86_64-pc-windows-gnu, beta-x86_64-pc-windows-gnu]
-        allow-fail: [false]
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Julia environment
-        uses: julia-actions/setup-julia@v2
-        with:
-          version: 'pre'
-
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: ${{ matrix.rust }}
-
-      - name: Run tests
-        run: cargo test --features full,julia-1-11 --verbose
-
-  test-windows-msvc-pre:
-    runs-on: windows-latest
-    continue-on-error: ${{ matrix.allow-fail }}
-    strategy:
-      matrix:
-        rust: [stable-x86_64-pc-windows-msvc, beta-x86_64-pc-windows-msvc]
-        allow-fail: [false]
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Julia environment
-        id: setup-julia
-        uses: julia-actions/setup-julia@v2
-        with:
-          version: 'pre'
+          version: '1.11'
 
       - uses: ilammy/msvc-dev-cmd@v1
 
@@ -236,7 +135,7 @@ jobs:
       - name: Setup Julia environment
         uses: julia-actions/setup-julia@v2
         with:
-          version: '1.6'
+          version: '1.10'
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@master
@@ -248,7 +147,7 @@ jobs:
           julia -e "import Pkg; Pkg.add(\"JlrsCore\")"
           export JULIA_DIR="$(dirname $(dirname $(which julia)))"
           export LD_LIBRARY_PATH="${JULIA_DIR}/lib:${JULIA_DIR}/lib/julia:${LD_LIBRARY_PATH}"
-          cargo test --features full,julia-1-6 --verbose
+          cargo test --features full,julia-1-10 --verbose
 
   test-windows-gnu-lts:
     runs-on: windows-latest
@@ -263,7 +162,7 @@ jobs:
       - name: Setup Julia environment
         uses: julia-actions/setup-julia@v2
         with:
-          version: '1.6'
+          version: '1.10'
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@master
@@ -278,7 +177,7 @@ jobs:
 
       - name: Run tests
         run: |
-          cargo test --features full,julia-1-6 --verbose
+          cargo test --features full,julia-1-10 --verbose
 
   test-windows-msvc-lts:
     runs-on: windows-latest
@@ -294,7 +193,7 @@ jobs:
         id: setup-julia
         uses: julia-actions/setup-julia@v2
         with:
-          version: '1.6'
+          version: '1.10'
 
       - uses: ilammy/msvc-dev-cmd@v1
 
@@ -311,7 +210,7 @@ jobs:
 
       - name: Run tests
         run: |
-          cargo test --features full,julia-1-6 --verbose
+          cargo test --features full,julia-1-10 --verbose
 
   julia-module-test-linux:
     runs-on: ubuntu-latest
@@ -322,7 +221,7 @@ jobs:
       - name: Setup Julia environment
         uses: julia-actions/setup-julia@v2
         with:
-          version: '1.10'
+          version: '1.11'
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@master
@@ -338,7 +237,7 @@ jobs:
       - name: Run module tests
         run: |
           cd julia_module_test
-          cargo build --features julia-1-10
+          cargo build --features julia-1-11
           cp ./target/debug/libjulia_module_test.so .
           julia JuliaModuleTest.jl
 
@@ -352,7 +251,7 @@ jobs:
       - name: Setup Julia environment
         uses: julia-actions/setup-julia@v2
         with:
-          version: '1.10'
+          version: '1.11'
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@master
@@ -362,7 +261,7 @@ jobs:
       - name: Run module tests
         run: |
           cd julia_module_test
-          cargo build --features julia-1-10
+          cargo build --features julia-1-11
           cp ./target/debug/julia_module_test.* libjulia_module_test.dll
           julia JuliaModuleTest.jl
 
@@ -375,7 +274,7 @@ jobs:
       - name: Setup Julia environment
         uses: julia-actions/setup-julia@v2
         with:
-          version: '1.10'
+          version: '1.11'
 
       - name: Setup Rust
         uses:  dtolnay/rust-toolchain@master
@@ -387,7 +286,7 @@ jobs:
           export JULIA_DIR="$(dirname $(dirname $(which julia)))"
           export DYLD_LIBRARY_PATH="${JULIA_DIR}/lib:${JULIA_DIR}/lib/julia:${DYLD_LIBRARY_PATH}"
           cd julia_module_test
-          cargo build --features julia-1-10
+          cargo build --features julia-1-11
           cp ./target/debug/libjulia_module_test.* .
           julia JuliaModuleTest.jl
 
