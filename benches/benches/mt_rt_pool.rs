@@ -117,7 +117,7 @@ fn main() {
         blocking_task(&handle, &mut c);
         async_task(&handle, &mut c);
         use_local(&mut handle, &mut c);
-        
+
         Criterion::default()
             .configure_from_args()
             .final_summary();

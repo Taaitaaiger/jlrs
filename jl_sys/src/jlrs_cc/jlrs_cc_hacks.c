@@ -5,7 +5,6 @@ extern "C"
 {
 #endif
 
-#if JULIA_VERSION_MINOR >= 7
     typedef void (*jl_lock_value_func_t)(void *);
 
     static jl_lock_value_func_t jl_lock_value_func;
@@ -20,11 +19,9 @@ extern "C"
     static jl_memoryrefset_func_t jl_memoryrefset_func;
     static jl_genericmemory_typetagdata_func_t jl_genericmemory_typetagdata_func;
 #endif
-#endif
 
     void jlrs_init_missing_functions(void)
     {
-#if JULIA_VERSION_MINOR >= 7
         void ***libjulia_internal_handle_ref_v = (void ***)jl_eval_string("cglobal(:jl_libjulia_internal_handle)");
         void *libjulia_internal_handle = **libjulia_internal_handle_ref_v;
 
@@ -44,10 +41,8 @@ extern "C"
         int found_jl_genericmemory_typetagdata = jl_dlsym(libjulia_internal_handle, "jl_genericmemory_typetagdata", (void **)&jl_genericmemory_typetagdata_func, 0);
         assert(found_jl_genericmemory_typetagdata);
 #endif
-#endif
     }
 
-#if JULIA_VERSION_MINOR >= 7
     void jlrs_lock_value(jl_value_t *v)
     {
         assert(jl_lock_value_func && "jl_lock_value_func not loaded");
@@ -78,7 +73,6 @@ extern "C"
         assert(jl_genericmemory_typetagdata_func && "jl_genericmemory_typetagdata_func not loaded");
         return jl_genericmemory_typetagdata_func(m);
     }
-#endif
 #endif
 
 #ifdef __cplusplus

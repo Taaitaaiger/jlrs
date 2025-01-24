@@ -183,131 +183,48 @@ extern "C" {
     ))]
     pub static mut jl_options: std::mem::MaybeUninit<i8>;
 
-    // Removed in Julia 1.7
-
-    #[cfg(feature = "julia-1-6")]
-    pub static mut jl_vararg_type: *mut crate::types::jl_unionall_t;
-
-    #[cfg(feature = "julia-1-6")]
-    pub static mut jl_vararg_typename: *mut crate::types::jl_typename_t;
-
-    // Removed in Julia 1.9
-
-    #[cfg(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8",))]
-    pub static mut jl_n_threads: std::ffi::c_int;
-
-    // Added in Julia 1.7
-
-    #[cfg(not(feature = "julia-1-6"))]
     pub static mut jl_vararg_type: *mut crate::types::jl_datatype_t;
 
-    #[cfg(not(feature = "julia-1-6"))]
     pub static mut jl_atomicerror_type: *mut crate::types::jl_datatype_t;
 
-    #[cfg(not(feature = "julia-1-6"))]
     pub static mut jl_pair_type: *mut crate::types::jl_value_t;
 
-    // Added in Julia 1.8
-
-    #[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7",)))]
     pub static mut jl_array_uint64_type: *mut crate::types::jl_value_t;
 
-    // Added in Julia 1.9
-
-    #[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8",)))]
     pub static jl_n_threads: std::sync::atomic::AtomicI32;
 
-    #[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8",)))]
     pub static mut jl_kwcall_func: *mut crate::types::jl_value_t;
 
-    #[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8",)))]
     pub static jl_n_threadpools: std::cell::UnsafeCell<std::ffi::c_int>;
 
-    #[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8",)))]
     pub static jl_n_threads_per_pool: std::cell::UnsafeCell<*mut std::ffi::c_int>;
 
-    // Added in Julia 1.10
-
-    #[cfg(not(any(
-        feature = "julia-1-6",
-        feature = "julia-1-7",
-        feature = "julia-1-8",
-        feature = "julia-1-9",
-    )))]
     pub static mut jl_n_gcthreads: std::ffi::c_int;
 
     // Used indirectly
-    #[cfg(not(any(
-        feature = "julia-1-6",
-        feature = "julia-1-7",
-        feature = "julia-1-8",
-        feature = "julia-1-9",
-    )))]
     pub static mut jl_small_typeof: [*mut crate::types::jl_datatype_t; 128usize];
 
     // Added in Julia 1.11
 
-    #[cfg(not(any(
-        feature = "julia-1-6",
-        feature = "julia-1-7",
-        feature = "julia-1-8",
-        feature = "julia-1-9",
-        feature = "julia-1-10",
-    )))]
+    #[cfg(not(any(feature = "julia-1-10",)))]
     pub static mut jl_genericmemory_type: *mut crate::types::jl_unionall_t;
 
-    #[cfg(not(any(
-        feature = "julia-1-6",
-        feature = "julia-1-7",
-        feature = "julia-1-8",
-        feature = "julia-1-9",
-        feature = "julia-1-10",
-    )))]
+    #[cfg(not(any(feature = "julia-1-10",)))]
     pub static mut jl_genericmemory_typename: *mut crate::types::jl_typename_t;
 
-    #[cfg(not(any(
-        feature = "julia-1-6",
-        feature = "julia-1-7",
-        feature = "julia-1-8",
-        feature = "julia-1-9",
-        feature = "julia-1-10",
-    )))]
+    #[cfg(not(any(feature = "julia-1-10",)))]
     pub static mut jl_genericmemoryref_type: *mut crate::types::jl_unionall_t;
 
-    #[cfg(not(any(
-        feature = "julia-1-6",
-        feature = "julia-1-7",
-        feature = "julia-1-8",
-        feature = "julia-1-9",
-        feature = "julia-1-10",
-    )))]
+    #[cfg(not(any(feature = "julia-1-10",)))]
     pub static mut jl_genericmemoryref_typename: *mut crate::types::jl_typename_t;
 
-    #[cfg(not(any(
-        feature = "julia-1-6",
-        feature = "julia-1-7",
-        feature = "julia-1-8",
-        feature = "julia-1-9",
-        feature = "julia-1-10",
-    )))]
+    #[cfg(not(any(feature = "julia-1-10",)))]
     pub static mut jl_an_empty_memory_any: *mut crate::types::jl_value_t;
 
-    #[cfg(not(any(
-        feature = "julia-1-6",
-        feature = "julia-1-7",
-        feature = "julia-1-8",
-        feature = "julia-1-9",
-        feature = "julia-1-10",
-    )))]
+    #[cfg(not(any(feature = "julia-1-10",)))]
     pub static mut jl_bfloat16_type: *mut crate::types::jl_datatype_t;
 
-    #[cfg(not(any(
-        feature = "julia-1-6",
-        feature = "julia-1-7",
-        feature = "julia-1-8",
-        feature = "julia-1-9",
-        feature = "julia-1-10",
-    )))]
+    #[cfg(not(any(feature = "julia-1-10",)))]
     pub static mut jl_array_uint32_type: *mut crate::types::jl_value_t;
 
     pub fn jl_gc_enable(on: std::ffi::c_int) -> std::ffi::c_int;
@@ -381,7 +298,7 @@ extern "C" {
         parameters: *mut crate::types::jl_svec_t,
         fnames: *mut crate::types::jl_svec_t,
         ftypes: *mut crate::types::jl_svec_t,
-        #[cfg(not(feature = "julia-1-6"))] fattrs: *mut crate::types::jl_svec_t,
+        fattrs: *mut crate::types::jl_svec_t,
         abstr: std::ffi::c_int,
         mutabl: std::ffi::c_int,
         ninitialized: std::ffi::c_int,
@@ -619,8 +536,7 @@ extern "C" {
     pub fn jl_call(
         f: *mut crate::types::jl_value_t,
         args: *mut *mut crate::types::jl_value_t,
-        #[cfg(any(feature = "julia-1-6", feature = "julia-1-7",))] nargs: i32,
-        #[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7",)))] nargs: u32,
+        nargs: u32,
     ) -> *mut crate::types::jl_value_t;
 
     pub fn jl_call0(f: *mut crate::types::jl_value_t) -> *mut crate::types::jl_value_t;
@@ -721,64 +637,29 @@ extern "C" {
 
     // Used indirectly
     pub fn jl_excstack_state(
-        #[cfg(not(any(
-            feature = "julia-1-6",
-            feature = "julia-1-7",
-            feature = "julia-1-8",
-            feature = "julia-1-9",
-            feature = "julia-1-10",
-        )))]
-        ct: *mut crate::types::jl_task_t,
+        #[cfg(not(any(feature = "julia-1-10",)))] ct: *mut crate::types::jl_task_t,
     ) -> usize;
 
     // Used indirectly
     pub fn jl_enter_handler(
-        #[cfg(not(any(
-            feature = "julia-1-6",
-            feature = "julia-1-7",
-            feature = "julia-1-8",
-            feature = "julia-1-9",
-            feature = "julia-1-10",
-        )))]
-        ct: *mut crate::types::jl_task_t,
+        #[cfg(not(any(feature = "julia-1-10",)))] ct: *mut crate::types::jl_task_t,
         eh: *mut std::ffi::c_void,
     );
 
     // Used indirectly
     pub fn jl_eh_restore_state(
-        #[cfg(not(any(
-            feature = "julia-1-6",
-            feature = "julia-1-7",
-            feature = "julia-1-8",
-            feature = "julia-1-9",
-            feature = "julia-1-10",
-        )))]
-        ct: *mut crate::types::jl_task_t,
+        #[cfg(not(any(feature = "julia-1-10",)))] ct: *mut crate::types::jl_task_t,
         eh: *mut std::ffi::c_void,
     );
 
     // Used indirectly
     pub fn jl_eh_restore_state_noexcept(
-        #[cfg(not(any(
-            feature = "julia-1-6",
-            feature = "julia-1-7",
-            feature = "julia-1-8",
-            feature = "julia-1-9",
-            feature = "julia-1-10",
-        )))]
-        ct: *mut crate::types::jl_task_t,
+        #[cfg(not(any(feature = "julia-1-10",)))] ct: *mut crate::types::jl_task_t,
         state: usize,
     );
 
     pub fn jl_current_exception(
-        #[cfg(not(any(
-            feature = "julia-1-6",
-            feature = "julia-1-7",
-            feature = "julia-1-8",
-            feature = "julia-1-9",
-            feature = "julia-1-10",
-        )))]
-        ct: *mut crate::types::jl_task_t,
+        #[cfg(not(any(feature = "julia-1-10",)))] ct: *mut crate::types::jl_task_t,
     ) -> *mut crate::types::jl_value_t;
 
     pub fn jl_get_world_counter() -> usize;
@@ -790,10 +671,8 @@ extern "C" {
         nargs: u32,
     ) -> *mut crate::types::jl_value_t;
 
-    #[cfg_attr(feature = "julia-1-6", link_name = "jl_init__threading")]
     pub fn jl_init();
 
-    #[cfg_attr(feature = "julia-1-6", link_name = "jl_init_with_image__threading")]
     pub fn jl_init_with_image(
         julia_bindir: *const std::os::raw::c_char,
         image_path: *const std::os::raw::c_char,
@@ -815,105 +694,38 @@ extern "C" {
     pub fn jl_compute_fieldtypes(
         st: *mut crate::types::jl_datatype_t,
         stack: *mut std::os::raw::c_void,
-        #[cfg(not(any(
-            feature = "julia-1-6",
-            feature = "julia-1-7",
-            feature = "julia-1-8",
-            feature = "julia-1-9",
-            feature = "julia-1-10",
-        )))]
-        cacheable: std::ffi::c_int,
+        #[cfg(not(any(feature = "julia-1-10",)))] cacheable: std::ffi::c_int,
     ) -> *mut crate::types::jl_svec_t;
-
-    // Removed in Julia 1.7
-
-    #[cfg(feature = "julia-1-6")]
-    pub fn jl_get_ptls_states();
-
-    // Removed in Julia 1.9
-
-    #[cfg(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8",))]
-    pub fn jl_get_kwsorter(ty: *mut crate::types::jl_value_t) -> *mut crate::types::jl_value_t;
-
-    // Removed in Julia 1.10
-
-    // Used indirectly
-    #[cfg(any(
-        feature = "julia-1-6",
-        feature = "julia-1-7",
-        feature = "julia-1-8",
-        feature = "julia-1-9",
-    ))]
-    pub fn jl_egal__special(
-        a: *const crate::types::jl_value_t,
-        b: *const crate::types::jl_value_t,
-        dt: *mut crate::types::jl_datatype_t,
-    ) -> std::os::raw::c_int;
 
     // Removed in Julia 1.11
 
-    #[cfg(any(
-        feature = "julia-1-6",
-        feature = "julia-1-7",
-        feature = "julia-1-8",
-        feature = "julia-1-9",
-        feature = "julia-1-10",
-    ))]
+    #[cfg(any(feature = "julia-1-10",))]
     pub fn jl_new_array(
         atype: *mut crate::types::jl_value_t,
         dims: *mut crate::types::jl_value_t,
     ) -> *mut crate::types::jl_array_t;
 
-    #[cfg(any(
-        feature = "julia-1-6",
-        feature = "julia-1-7",
-        feature = "julia-1-8",
-        feature = "julia-1-9",
-        feature = "julia-1-10",
-    ))]
+    #[cfg(any(feature = "julia-1-10",))]
     pub fn jl_arrayref(a: *mut crate::types::jl_array_t, i: usize)
         -> *mut crate::types::jl_value_t;
 
-    #[cfg(any(
-        feature = "julia-1-6",
-        feature = "julia-1-7",
-        feature = "julia-1-8",
-        feature = "julia-1-9",
-        feature = "julia-1-10",
-    ))]
+    #[cfg(any(feature = "julia-1-10",))]
     pub fn jl_arrayset(
         a: *mut crate::types::jl_array_t,
         v: *mut crate::types::jl_value_t,
         i: usize,
     );
 
-    #[cfg(any(
-        feature = "julia-1-6",
-        feature = "julia-1-7",
-        feature = "julia-1-8",
-        feature = "julia-1-9",
-        feature = "julia-1-10",
-    ))]
+    #[cfg(any(feature = "julia-1-10",))]
     pub fn jl_array_typetagdata(a: *mut crate::types::jl_array_t) -> *mut std::os::raw::c_char;
 
-    // Added in Julia 1.7
-
     // Used indirectly
-    #[cfg(not(feature = "julia-1-6"))]
     pub fn jl_egal__unboxed(
         a: *const crate::types::jl_value_t,
         b: *const crate::types::jl_value_t,
-        #[cfg(any(feature = "julia-1-7", feature = "julia-1-8", feature = "julia-1-9",))]
-        dt: *mut crate::types::jl_datatype_t,
-        #[cfg(not(any(
-            feature = "julia-1-7",
-            feature = "julia-1-8",
-            feature = "julia-1-9",
-        )))]
         dtag: usize,
     ) -> std::os::raw::c_int;
 
-    #[cfg(not(feature = "julia-1-6"))]
     pub fn jl_get_pgcstack() -> *mut *mut crate::types::jl_gcframe_t;
 
     pub fn jl_egal(
@@ -922,7 +734,6 @@ extern "C" {
     ) -> std::os::raw::c_int;
 
     // Used indirectly
-    #[cfg(not(feature = "julia-1-6"))]
     pub fn jl_egal__bits(
         a: *const crate::types::jl_value_t,
         b: *const crate::types::jl_value_t,
@@ -930,33 +741,22 @@ extern "C" {
     ) -> std::os::raw::c_int;
 
     // Used indirectly
-    #[cfg(not(feature = "julia-1-6"))]
     pub fn jl_setjmp(
         ptr: *mut std::ffi::c_void,
-        #[cfg(not(any(
-            feature = "julia-1-6",
-            feature = "julia-1-7",
-            feature = "julia-1-8",
-            feature = "julia-1-9",
-            feature = "julia-1-10",
-        )))]
-        savesigs: std::ffi::c_int,
+        #[cfg(not(any(feature = "julia-1-10",)))] savesigs: std::ffi::c_int,
     );
 
-    // #[cfg(not(feature = "julia-1-6"))]
     // pub fn jl_atomic_new_bits(
     //     dt: *mut crate::types::jl_value_t,
     //     src: *const std::ffi::c_char,
     // ) -> *mut crate::types::jl_value_t;
 
-    // #[cfg(not(feature = "julia-1-6"))]
     // pub fn jl_atomic_store_bits(
     //     dst: *mut std::ffi::c_char,
     //     src: *const crate::types::jl_value_t,
     //     nb: std::ffi::c_int,
     // );
 
-    // #[cfg(not(feature = "julia-1-6"))]
     // pub fn jl_atomic_swap_bits(
     //     dt: *mut crate::types::jl_value_t,
     //     dst: *mut std::ffi::c_char,
@@ -965,7 +765,6 @@ extern "C" {
     // ) -> *mut crate::types::jl_value_t;
 
     // // Used indirectly
-    // #[cfg(not(feature = "julia-1-6"))]
     // pub fn jl_atomic_bool_cmpswap_bits(
     //     dst: *mut std::ffi::c_char,
     //     expected: *const crate::types::jl_value_t,
@@ -974,7 +773,6 @@ extern "C" {
     // ) -> std::ffi::c_int;
 
     // // Used indirectly
-    // #[cfg(not(feature = "julia-1-6"))]
     // pub fn jl_atomic_cmpswap_bits(
     //     dt: *mut crate::types::jl_datatype_t,
     //     rettype: *mut crate::types::jl_datatype_t,
@@ -984,33 +782,21 @@ extern "C" {
     //     nb: std::ffi::c_int,
     // ) -> *mut crate::types::jl_value_t;
 
-    // Added in Julia 1.9
-
-    #[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8",)))]
     pub fn jl_adopt_thread() -> *mut *mut crate::types::jl_gcframe_t;
 
-    #[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8",)))]
     pub fn jl_reinit_foreign_type(
         dt: *mut crate::types::jl_datatype_t,
         markfunc: crate::types::jl_markfunc_t,
         sweepfunc: crate::types::jl_sweepfunc_t,
     ) -> std::ffi::c_int;
 
-    #[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8",)))]
     pub fn jl_enter_threaded_region();
 
-    #[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8",)))]
     pub fn jl_exit_threaded_region();
 
     // Added in Julia 1.10
 
     // Used indirectly
-    #[cfg(not(any(
-        feature = "julia-1-6",
-        feature = "julia-1-7",
-        feature = "julia-1-8",
-        feature = "julia-1-9",
-    )))]
     pub fn jl_egal__bitstag(
         a: *const crate::types::jl_value_t,
         b: *const crate::types::jl_value_t,
@@ -1020,63 +806,31 @@ extern "C" {
     // Added in Julia 1.11
 
     // Used indirectly
-    #[cfg(not(any(
-        feature = "julia-1-6",
-        feature = "julia-1-7",
-        feature = "julia-1-8",
-        feature = "julia-1-9",
-        feature = "julia-1-10",
-    )))]
+    #[cfg(not(any(feature = "julia-1-10",)))]
     pub fn jl_unwrap_unionall(v: *mut crate::types::jl_value_t) -> *mut crate::types::jl_value_t;
 
     // Used indirectly
-    #[cfg(not(any(
-        feature = "julia-1-6",
-        feature = "julia-1-7",
-        feature = "julia-1-8",
-        feature = "julia-1-9",
-        feature = "julia-1-10",
-    )))]
+    #[cfg(not(any(feature = "julia-1-10",)))]
     pub fn jl_genericmemoryref(
         m: *mut crate::types::jl_genericmemory_t,
         index: usize,
     ) -> *mut crate::types::jl_value_t;
 
-    #[cfg(not(any(
-        feature = "julia-1-6",
-        feature = "julia-1-7",
-        feature = "julia-1-8",
-        feature = "julia-1-9",
-        feature = "julia-1-10",
-    )))]
+    #[cfg(not(any(feature = "julia-1-10",)))]
     pub fn jl_alloc_array_nd(
         atype: *mut crate::types::jl_value_t,
         dims: *mut usize,
         ndims: usize,
     ) -> *mut crate::types::jl_array_t;
 
-    #[cfg(not(any(
-        feature = "julia-1-6",
-        feature = "julia-1-7",
-        feature = "julia-1-8",
-        feature = "julia-1-9",
-        feature = "julia-1-10",
-        feature = "julia-1-11",
-    )))]
+    #[cfg(not(any(feature = "julia-1-10", feature = "julia-1-11",)))]
     pub fn jl_get_binding_wr(
         m: *mut crate::types::jl_module_t,
         var: *mut crate::types::jl_sym_t,
         alloc: std::ffi::c_int,
     ) -> *mut std::ffi::c_void;
 
-    #[cfg(not(any(
-        feature = "julia-1-6",
-        feature = "julia-1-7",
-        feature = "julia-1-8",
-        feature = "julia-1-9",
-        feature = "julia-1-10",
-        feature = "julia-1-11",
-    )))]
+    #[cfg(not(any(feature = "julia-1-10", feature = "julia-1-11",)))]
     pub fn jl_checked_assignment(
         m: *mut std::ffi::c_void,
         m: *mut crate::types::jl_module_t,
@@ -1324,48 +1078,27 @@ extern "C" {
         tn: *mut crate::types::jl_typename_t,
     ) -> *mut crate::types::jl_svec_t;
 
-    // Added in Julia 1.7
-
-    #[cfg(not(feature = "julia-1-6"))]
     pub fn jlrs_typename_atomicfields(tn: *mut crate::types::jl_typename_t) -> *const u32;
 
-    #[cfg(not(feature = "julia-1-6"))]
     pub fn jlrs_typename_abstract(tn: *mut crate::types::jl_typename_t) -> u8;
 
-    #[cfg(not(feature = "julia-1-6"))]
     pub fn jlrs_typename_mutable(tn: *mut crate::types::jl_typename_t) -> u8;
 
-    #[cfg(not(feature = "julia-1-6"))]
     pub fn jlrs_typename_mayinlinealloc(tn: *mut crate::types::jl_typename_t) -> u8;
 
-    #[cfg(not(feature = "julia-1-6"))]
     pub fn jlrs_lock_value(v: *mut crate::types::jl_value_t);
 
-    #[cfg(not(feature = "julia-1-6"))]
     pub fn jlrs_unlock_value(v: *mut crate::types::jl_value_t);
 
-    // Added in Julia 1.8
-
-    #[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7",)))]
     pub fn jlrs_typename_constfields(tn: *mut crate::types::jl_typename_t) -> *const u32;
 
-    // Added in Julia 1.9
-
-    #[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8",)))]
     pub fn jlrs_set_nthreadpools(nthreadpools: i8);
 
-    #[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8",)))]
     pub fn jlrs_set_nthreads_per_pool(nthreads_per_pool: *const i16);
 
     // Added in Julia 1.11
 
-    #[cfg(not(any(
-        feature = "julia-1-6",
-        feature = "julia-1-7",
-        feature = "julia-1-8",
-        feature = "julia-1-9",
-        feature = "julia-1-10",
-    )))]
+    #[cfg(not(any(feature = "julia-1-10",)))]
     pub fn jlrs_genericmemory_typetagdata(
         m: *mut crate::types::jl_genericmemory_t,
     ) -> *mut std::ffi::c_char;

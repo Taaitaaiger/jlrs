@@ -7,8 +7,6 @@
 
 use std::{marker::PhantomData, ptr::NonNull};
 
-#[julia_version(until = "1.6")]
-use jl_sys::jl_vararg_typename;
 use jl_sys::{
     jl_array_typename, jl_llvmpointer_typename, jl_namedtuple_typename, jl_pointer_typename,
     jl_tuple_typename, jl_type_typename, jl_typename_t, jl_typename_type, jl_vecelement_typename,
@@ -71,7 +69,6 @@ impl<'scope> TypeName<'scope> {
         }
     }
 
-    #[julia_version(since = "1.7")]
     /// The `atomicfields` field.
     #[inline]
     pub fn atomicfields(self) -> *const u32 {
@@ -79,7 +76,6 @@ impl<'scope> TypeName<'scope> {
         unsafe { jl_sys::jlrs_typename_atomicfields(self.unwrap(Private)) }
     }
 
-    #[julia_version(since = "1.8")]
     /// The `atomicfields` field.
     #[inline]
     pub fn constfields(self) -> *const u32 {
@@ -87,7 +83,6 @@ impl<'scope> TypeName<'scope> {
         unsafe { jl_sys::jlrs_typename_constfields(self.unwrap(Private)) }
     }
 
-    #[julia_version(since = "1.7")]
     /// The `abstract` field.
     #[inline]
     pub fn is_abstract(self) -> bool {
@@ -95,7 +90,6 @@ impl<'scope> TypeName<'scope> {
         unsafe { jl_sys::jlrs_typename_abstract(self.unwrap(Private)) != 0 }
     }
 
-    #[julia_version(since = "1.7")]
     /// The `mutabl` field.
     #[inline]
     pub fn is_mutable(self) -> bool {
@@ -103,7 +97,6 @@ impl<'scope> TypeName<'scope> {
         unsafe { jl_sys::jlrs_typename_mutable(self.unwrap(Private)) != 0 }
     }
 
-    #[julia_version(since = "1.7")]
     /// The `mayinlinealloc` field.
     #[inline]
     pub fn mayinlinealloc(self) -> bool {
@@ -141,17 +134,6 @@ impl<'base> TypeName<'base> {
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_vecelement_typename), Private) }
-    }
-
-    #[julia_version(until = "1.6")]
-    /// The typename of the `UnionAll` `Vararg`.
-    #[inline]
-    pub fn of_vararg<Tgt>(_: &Tgt) -> Self
-    where
-        Tgt: Target<'base>,
-    {
-        // Safety: global constant
-        unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_vararg_typename), Private) }
     }
 
     /// The typename of the `UnionAll` `Array`.

@@ -223,7 +223,6 @@ mod tests {
         })
     }
 
-    #[cfg(not(feature = "julia-1-6"))]
     fn vec_element_typecheck() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -525,7 +524,6 @@ mod tests {
         pointer_typecheck();
         llvm_pointer_typecheck();
         concrete_typecheck();
-        #[cfg(not(feature = "julia-1-6"))]
         vec_element_typecheck();
     }
 }

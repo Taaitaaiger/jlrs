@@ -6,9 +6,10 @@
 jlrs is a crate that provides access to the Julia C API. It can be used to embed Julia in Rust
 applications and to write interop libraries to Rust crates that can be used by Julia.
 
-Julia versions 1.6 up to and including 1.11 are supported, but only the LTS and stable versions
-are actively tested. Using the current stable version of Julia is highly recommended. The minimum
-supported Rust version is currently 1.77.
+Julia versions 1.10 and 1.11 are currently supported. In general jlrs aims to support all versions
+starting at the current LTS version, but only the LTS and stable versions are actively tested.
+Using the current stable version of Julia is highly recommended. The minimum supported Rust
+version is currently 1.77.
 
 This readme only contains information about what features are supported by jlrs, what
 prerequisites must be met, and how to meet them. A complete tutorial is available
@@ -16,35 +17,32 @@ prerequisites must be met, and how to meet them. A complete tutorial is availabl
 to use jlrs, please read the [docs](https://docs.rs/jlrs). All documentation assumes you are
 already familiar with the Julia and Rust programming languages.
 
-
 ## Overview
 
 An incomplete list of features that are currently supported by jlrs:
 
- - Access arbitrary Julia modules and their content.
- - Call Julia functions, including functions that take keyword arguments.
- - Handle exceptions or convert them to an error message, optionally with color.
- - Include and call your own Julia code.
- - Use custom system images.
- - Create values that Julia can use, and convert them back to Rust, from Rust.
- - Access the type information and fields of such values. Inline and bits-union fields can be
-   accessed directly.
- - Create and use n-dimensional arrays. The `jlrs-ndarray` feature can be enabled for
-   integration with ndarray.
- - Map Julia structs to Rust structs, the Rust implementation can be generated with the
-   JlrsCore package.
- - Structs that can be mapped to Rust include those with type parameters and bits unions.
- - Use Julia from multiple threads either directly or via Julia-aware thread pools.
- - Export Rust types, methods and functions to Julia with the `julia_module` macro.
- - Libraries that use `julia_module` can be compiled with BinaryBuilder and distributed as JLLs.
-
+- Access arbitrary Julia modules and their content.
+- Call Julia functions, including functions that take keyword arguments.
+- Handle exceptions or convert them to an error message, optionally with color.
+- Include and call your own Julia code.
+- Use custom system images.
+- Create values that Julia can use, and convert them back to Rust, from Rust.
+- Access the type information and fields of such values. Inline and bits-union fields can be
+  accessed directly.
+- Create and use n-dimensional arrays. The `jlrs-ndarray` feature can be enabled for
+  integration with ndarray.
+- Map Julia structs to Rust structs, the Rust implementation can be generated with the
+  JlrsCore package.
+- Structs that can be mapped to Rust include those with type parameters and bits unions.
+- Use Julia from multiple threads either directly or via Julia-aware thread pools.
+- Export Rust types, methods and functions to Julia with the `julia_module` macro.
+- Libraries that use `julia_module` can be compiled with BinaryBuilder and distributed as JLLs.
 
 ## Prerequisites
 
-Julia must be installed before jlrs can be used, jlrs is compatible with Julia 1.6 up to and
-including Julia 1.11. If the JlrsCore package has not been installed, it will automatically be
-installed when jlrs is initialized by default. jlrs has not been tested with juliaup yet on Linux
-and macOS.
+Julia must be installed before jlrs can be used, jlrs is compatible with Julia 1.10 and 1.11. If
+the JlrsCore package has not been installed, it will automatically be installed when jlrs is
+initialized by default. jlrs has not been tested with juliaup yet on Linux and macOS.
 
 ### Linux
 
@@ -95,10 +93,6 @@ The Julia C API is unstable and there are minor incompatibilities between differ
 Julia. To ensure the correct bindings are used for a particular version of Julia you must enable a
 version feature. The following version features currently exist:
 
- - `julia-1-6`
- - `julia-1-7`
- - `julia-1-8`
- - `julia-1-9`
  - `julia-1-10`
  - `julia-1-11`
 
@@ -109,10 +103,6 @@ these version features as follows:
 
 ```toml
 [features]
-julia-1-6 = ["jlrs/julia-1-6"]
-julia-1-7 = ["jlrs/julia-1-7"]
-julia-1-8 = ["jlrs/julia-1-8"]
-julia-1-9 = ["jlrs/julia-1-9"]
 julia-1-10 = ["jlrs/julia-1-10"]
 julia-1-11 = ["jlrs/julia-1-11"]
 ```
@@ -137,8 +127,7 @@ A runtime lets initialize Julia from Rust application, the following features en
 - `multi-rt`
 
   Enables the multithreaded runtime. The multithreaded runtime lets you call Julia from arbitrary
-  threads. It can be combined with the `async-rt` feature to create Julia-aware thread pools. This
-  feature requires Julia 1.9 or higher.
+  threads. It can be combined with the `async-rt` feature to create Julia-aware thread pools.
 
 **WARNING**: Runtime features must only be enabled by applications that embed Julia. Libraries
 must never enable a runtime feature.

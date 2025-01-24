@@ -10,7 +10,6 @@ use std::{
 };
 
 use jl_sys::{jl_call, jl_call1, jl_exception_occurred, jlrs_current_task};
-use jlrs_macros::julia_version;
 
 use crate::{
     args::Values,
@@ -193,7 +192,6 @@ pub(crate) struct TaskState<'frame, 'data> {
 
 enum AsyncMethod {
     AsyncCall,
-    #[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8")))]
     InteractiveCall,
     ScheduleAsync,
     ScheduleAsyncLocal,
@@ -203,7 +201,6 @@ impl Display for AsyncMethod {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             AsyncMethod::AsyncCall => f.write_str("asynccall"),
-            #[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8")))]
             AsyncMethod::InteractiveCall => f.write_str("interactivecall"),
             AsyncMethod::ScheduleAsync => f.write_str("scheduleasync"),
             AsyncMethod::ScheduleAsyncLocal => f.write_str("scheduleasynclocal"),
@@ -229,7 +226,6 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
     }
 
     #[inline]
-    #[julia_version(since = "1.9")]
     pub(crate) fn new_interactive<'value, V, const N: usize>(
         frame: &mut AsyncGcFrame<'frame>,
         func: Value<'value, 'data>,
@@ -278,7 +274,6 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
     }
 
     #[inline]
-    #[julia_version(since = "1.9")]
     pub(crate) fn new_interactive_with_keywords<'kw, 'value, V, const N: usize>(
         frame: &mut AsyncGcFrame<'frame>,
         func: WithKeywords<'kw, 'data>,
@@ -344,11 +339,6 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
 
             let f = match method {
                 AsyncMethod::AsyncCall => JlrsCore::async_call(&frame),
-                #[cfg(not(any(
-                    feature = "julia-1-6",
-                    feature = "julia-1-7",
-                    feature = "julia-1-8"
-                )))]
                 AsyncMethod::InteractiveCall => JlrsCore::interactive_call(&frame),
                 AsyncMethod::ScheduleAsync => JlrsCore::schedule_async(&frame),
                 AsyncMethod::ScheduleAsyncLocal => JlrsCore::schedule_async_local(&frame),
@@ -391,19 +381,11 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
         let task = unsafe {
             let f = match method {
                 AsyncMethod::AsyncCall => JlrsCore::async_call(&frame),
-                #[cfg(not(any(
-                    feature = "julia-1-6",
-                    feature = "julia-1-7",
-                    feature = "julia-1-8"
-                )))]
                 AsyncMethod::InteractiveCall => JlrsCore::interactive_call(&frame),
                 AsyncMethod::ScheduleAsync => JlrsCore::schedule_async(&frame),
                 AsyncMethod::ScheduleAsyncLocal => JlrsCore::schedule_async_local(&frame),
             };
 
-            #[cfg(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8"))]
-            let kw_call = jl_sys::jl_get_kwsorter(f.datatype().unwrap(Private).cast());
-            #[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8")))]
             let kw_call = jl_sys::jl_kwcall_func;
 
             // WithKeywords::call has to extend the provided arguments, it has been inlined so

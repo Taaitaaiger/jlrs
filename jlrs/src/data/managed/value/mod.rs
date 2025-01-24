@@ -126,15 +126,13 @@ use std::{
     usize,
 };
 
-#[julia_version(since = "1.7")]
-use jl_sys::jl_pair_type;
 use jl_sys::{
     jl_an_empty_string, jl_an_empty_vec_any, jl_any_type, jl_apply_type, jl_array_any_type,
     jl_array_int32_type, jl_array_symbol_type, jl_array_uint8_type, jl_bottom_type, jl_call,
     jl_call0, jl_call1, jl_call2, jl_call3, jl_diverror_exception, jl_emptytuple, jl_eval_string,
     jl_exception_occurred, jl_false, jl_field_index, jl_gc_add_finalizer, jl_gc_add_ptr_finalizer,
     jl_get_nth_field, jl_get_nth_field_noalloc, jl_has_typevar, jl_interrupt_exception, jl_isa,
-    jl_memory_exception, jl_new_struct_uninit, jl_nothing, jl_object_id,
+    jl_memory_exception, jl_new_struct_uninit, jl_nothing, jl_object_id, jl_pair_type,
     jl_readonlymemory_exception, jl_set_nth_field, jl_stackovf_exception, jl_static_show,
     jl_stderr_obj, jl_stderr_stream, jl_stdout_obj, jl_stdout_stream, jl_subtype, jl_true,
     jl_typeof_str, jl_undefref_exception, jl_value_t, jlrs_call_unchecked, jlrs_egal,
@@ -1546,7 +1544,6 @@ impl<'scope> Value<'scope, 'static> {
         unsafe { Value::wrap_non_null(NonNull::new_unchecked(jl_stderr_obj()), Private) }
     }
 
-    #[julia_version(since = "1.7")]
     /// The `Pair` type
     #[inline]
     pub fn pair_type<Tgt>(_: &Tgt) -> Self
@@ -1573,7 +1570,6 @@ impl<'scope> Value<'scope, 'static> {
         }
     }
 
-    #[julia_version(since = "1.8")]
     /// The `Array{UInt64,1}` type
     #[inline]
     pub fn array_uint64_type<Tgt>(_: &Tgt) -> Self

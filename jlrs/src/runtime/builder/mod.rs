@@ -15,16 +15,16 @@ use std::{
 
 #[cfg(feature = "async-rt")]
 pub use async_builder::*;
-use jl_sys::{jl_init, jl_init_with_image, jlrs_set_nthreads};
-#[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8")))]
-use jl_sys::{jlrs_set_nthreadpools, jlrs_set_nthreads_per_pool};
+use jl_sys::{
+    jl_init, jl_init_with_image, jlrs_set_nthreadpools, jlrs_set_nthreads,
+    jlrs_set_nthreads_per_pool,
+};
 
 #[cfg(any(feature = "multi-rt", feature = "local-rt"))]
 use crate::error::JlrsResult;
 #[cfg(feature = "async-rt")]
 use crate::runtime::executor::Executor;
 #[cfg(feature = "multi-rt")]
-#[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8")))]
 use crate::runtime::handle::mt_handle::MtHandle;
 #[cfg(feature = "local-rt")]
 use crate::runtime::{handle::local_handle::LocalHandle, sync_rt::PendingJulia};
@@ -40,7 +40,6 @@ pub struct Builder {
     pub(crate) image: Option<(PathBuf, PathBuf)>,
     pub(crate) install_jlrs_core: InstallJlrsCore,
     pub(crate) n_threads: usize,
-    #[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8")))]
     pub(crate) n_threadsi: usize,
 }
 
@@ -54,7 +53,6 @@ impl Builder {
             image: None,
             install_jlrs_core: InstallJlrsCore::Default,
             n_threads: 0,
-            #[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8")))]
             n_threadsi: 0,
         }
     }
@@ -87,7 +85,6 @@ impl Builder {
 
     #[inline]
     #[cfg(feature = "multi-rt")]
-    #[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8")))]
     pub fn start_mt<'env, T: 'static + Send, F>(self, func: F) -> JlrsResult<T>
     where
         F: 'env + for<'scope> FnOnce(MtHandle<'scope, 'env>) -> T + Send,
@@ -108,7 +105,6 @@ impl Builder {
         self
     }
 
-    #[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8")))]
     /// Set the number of threads allocated to the `:interactive` pool.
     ///
     /// If it's set to 0, the default value, no threads are allocated to this pool.
@@ -193,7 +189,6 @@ impl Builder {
 }
 
 #[cfg(feature = "multi-rt")]
-#[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8")))]
 mod mt_impl {
     pub(super) mod sync_impl {
         use std::thread;
@@ -277,16 +272,6 @@ unsafe fn init_julia(options: &Builder) {
 }
 
 unsafe fn set_n_threads(options: &Builder) {
-    #[cfg(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8",))]
-    {
-        if options.n_threads == 0 {
-            jlrs_set_nthreads(-1);
-        } else {
-            jlrs_set_nthreads(options.n_threads as _);
-        }
-    }
-
-    #[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8",)))]
     if options.n_threadsi != 0 {
         if options.n_threads == 0 {
             jlrs_set_nthreads(-1);

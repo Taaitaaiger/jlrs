@@ -548,28 +548,14 @@ mod tests {
         use_dyn_str_for_access();
         set_global();
         set_const();
-        #[cfg(any(
-            feature = "julia-1-6",
-            feature = "julia-1-7",
-            feature = "julia-1-8",
-            feature = "julia-1-8",
-            feature = "julia-1-10",
-            feature = "julia-1-11",
-        ))]
+        #[cfg(any(feature = "julia-1-10", feature = "julia-1-11",))]
         set_const_twice();
         eval_using();
         module_parent();
         extend_lifetime_with_root();
         is_imported();
         submodule_must_be_module();
-        #[cfg(any(
-            feature = "julia-1-6",
-            feature = "julia-1-7",
-            feature = "julia-1-8",
-            feature = "julia-1-8",
-            feature = "julia-1-10",
-            feature = "julia-1-11",
-        ))]
+        #[cfg(any(feature = "julia-1-10", feature = "julia-1-11",))]
         cant_redefine_const();
         set_global_unchecked();
         set_const_unchecked();

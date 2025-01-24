@@ -71,13 +71,7 @@ impl jl_gcframe_t {
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
-#[cfg(not(any(
-    feature = "julia-1-6",
-    feature = "julia-1-7",
-    feature = "julia-1-8",
-    feature = "julia-1-9",
-    feature = "julia-1-10",
-)))]
+#[cfg(not(any(feature = "julia-1-10",)))]
 pub struct jl_genericmemory_t {
     _unused: [u8; 0],
 }

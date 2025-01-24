@@ -1,7 +1,6 @@
 mod util;
 #[cfg(feature = "local-rt")]
 mod tests {
-    #[cfg(not(feature = "julia-1-6"))]
     use std::sync::atomic::Ordering;
 
     use jlrs::{
@@ -343,7 +342,6 @@ mod tests {
                         assert_eq!(field, 3);
                     }
 
-                    #[cfg(not(feature = "julia-1-6"))]
                     {
                         let field = value
                             .field_accessor()
@@ -388,7 +386,6 @@ mod tests {
                         assert_eq!(field.as_managed(), Module::main(&frame));
                     }
 
-                    #[cfg(not(feature = "julia-1-6"))]
                     {
                         {
                             let field = value
@@ -493,7 +490,6 @@ mod tests {
                         assert_eq!(field, -3);
                     }
 
-                    #[cfg(not(feature = "julia-1-6"))]
                     {
                         let field = value
                             .field_accessor()
@@ -538,7 +534,6 @@ mod tests {
                         assert_eq!(field, Nothing);
                     }
 
-                    #[cfg(not(feature = "julia-1-6"))]
                     {
                         {
                             let field = value

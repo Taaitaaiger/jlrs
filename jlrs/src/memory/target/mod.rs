@@ -113,7 +113,6 @@ use self::{
 };
 use super::scope::LocalScope;
 #[cfg(feature = "multi-rt")]
-#[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8")))]
 use crate::runtime::handle::mt_handle::ActiveHandle;
 use crate::{
     data::managed::Ref,
@@ -257,7 +256,6 @@ impl<'target> Target<'target> for &mut AsyncGcFrame<'target> {}
 impl<'target> Target<'target> for Unrooted<'target> {}
 
 #[cfg(feature = "multi-rt")]
-#[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8")))]
 impl<'target> Target<'target> for ActiveHandle<'target> {}
 impl<'target> Target<'target> for Pin<&'target mut WeakHandle> {}
 impl<'target> Target<'target> for StackHandle<'target> {}
@@ -410,7 +408,6 @@ impl<'target> TargetType<'target> for Unrooted<'target> {
 }
 
 #[cfg(feature = "multi-rt")]
-#[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8")))]
 impl<'target> TargetType<'target> for ActiveHandle<'target> {
     type Data<'data, T: Managed<'target, 'data>> = Ref<'target, 'data, T>;
 }
@@ -442,7 +439,6 @@ pub(crate) mod private {
         GcFrame, Output, TargetException, TargetResult, TargetType,
     };
     #[cfg(feature = "multi-rt")]
-    #[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8")))]
     use crate::runtime::handle::mt_handle::ActiveHandle;
     use crate::{
         data::managed::{
@@ -1156,7 +1152,6 @@ pub(crate) mod private {
     }
 
     #[cfg(feature = "multi-rt")]
-    #[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8")))]
     impl<'target> TargetPriv<'target> for ActiveHandle<'target> {
         // Safety: the pointer must point to valid data.
         #[inline]

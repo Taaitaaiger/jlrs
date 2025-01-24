@@ -72,7 +72,6 @@ pub(super) unsafe fn set_exit() {
 }
 
 #[cfg(feature = "multi-rt")]
-#[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8")))]
 pub(super) unsafe fn set_pending_exit() {
     JULIA_STATE.store(State::PendingExit as _, Ordering::Relaxed);
 }

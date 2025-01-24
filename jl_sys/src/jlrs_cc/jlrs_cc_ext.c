@@ -40,36 +40,20 @@ extern "C"
 
     jl_value_t *jlrs_call_unchecked(jl_function_t *f, jl_value_t **args, uint32_t nargs)
     {
-#if JULIA_VERSION_MINOR == 6
         jl_value_t *v;
+        jl_task_t *ct = jl_current_task;
         nargs++; // add f to args
         jl_value_t **argv;
         JL_GC_PUSHARGS(argv, nargs);
         argv[0] = (jl_value_t *)f;
         for (unsigned int i = 1; i < nargs; i++)
             argv[i] = args[i - 1];
-        size_t last_age = jl_get_ptls_states()->world_age;
-        jl_get_ptls_states()->world_age = jl_get_world_counter();
+        size_t last_age = ct->world_age;
+        ct->world_age = jl_get_world_counter();
         v = jl_apply(argv, nargs);
-        jl_get_ptls_states()->world_age = last_age;
+        ct->world_age = last_age;
         JL_GC_POP();
         return v;
-#else
-    jl_value_t *v;
-    jl_task_t *ct = jl_current_task;
-    nargs++; // add f to args
-    jl_value_t **argv;
-    JL_GC_PUSHARGS(argv, nargs);
-    argv[0] = (jl_value_t *)f;
-    for (unsigned int i = 1; i < nargs; i++)
-        argv[i] = args[i - 1];
-    size_t last_age = ct->world_age;
-    ct->world_age = jl_get_world_counter();
-    v = jl_apply(argv, nargs);
-    ct->world_age = last_age;
-    JL_GC_POP();
-    return v;
-#endif
     }
 
 #if JULIA_VERSION_MINOR <= 10
@@ -109,19 +93,15 @@ extern "C"
         jl_options.nthreads = nthreads;
     }
 
-#if JULIA_VERSION_MINOR >= 9
     void jlrs_set_nthreadpools(int8_t nthreadpools)
     {
         jl_options.nthreadpools = nthreadpools;
     }
-#endif
 
-#if JULIA_VERSION_MINOR >= 9
     void jlrs_set_nthreads_per_pool(const int16_t *nthreads_per_pool)
     {
         jl_options.nthreads_per_pool = nthreads_per_pool;
     }
-#endif
 
     jl_datatype_t *jlrs_dimtuple_type(size_t rank)
     {
@@ -205,7 +185,6 @@ extern "C"
         return tn->wrapper;
     }
 
-#if JULIA_VERSION_MINOR >= 7
     const uint32_t *jlrs_typename_atomicfields(jl_typename_t *tn)
     {
         return tn->atomicfields;
@@ -225,19 +204,16 @@ extern "C"
     {
         return tn->mayinlinealloc;
     }
-#endif
 
     jl_svec_t *jlrs_typename_names(jl_typename_t *tn)
     {
         return tn->names;
     }
 
-#if JULIA_VERSION_MINOR >= 8
     const uint32_t *jlrs_typename_constfields(jl_typename_t *tn)
     {
         return tn->constfields;
     }
-#endif
 
     jl_value_t *jlrs_union_a(jl_uniontype_t *u)
     {
@@ -281,37 +257,24 @@ extern "C"
 
     uint8_t jlrs_datatype_isinlinealloc(jl_datatype_t *ty)
     {
-#if JULIA_VERSION_MINOR == 6
-        return ty->isinlinealloc;
-#else
-    if (ty->layout && jl_datatype_layout(ty))
-    {
-        return ty->name->mayinlinealloc;
-    }
-    else
-    {
-        return 0;
-    }
-
-#endif
+        if (ty->layout && jl_datatype_layout(ty))
+        {
+            return ty->name->mayinlinealloc;
+        }
+        else
+        {
+            return 0;
+        }
     }
 
     uint8_t jlrs_datatype_abstract(jl_datatype_t *ty)
     {
-#if JULIA_VERSION_MINOR == 6
-        return ty->abstract;
-#else
-    return ty->name->abstract;
-#endif
+        return ty->name->abstract;
     }
 
     uint8_t jlrs_datatype_mutable(jl_datatype_t *ty)
     {
-#if JULIA_VERSION_MINOR == 6
-        return ty->mutabl;
-#else
-    return ty->name->mutabl;
-#endif
+        return ty->name->mutabl;
     }
 
     jl_sym_t *jlrs_module_name(jl_module_t *m)

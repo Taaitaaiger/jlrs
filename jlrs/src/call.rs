@@ -273,12 +273,7 @@
 
 use std::ptr::NonNull;
 
-#[julia_version(until = "1.8")]
-use jl_sys::jl_get_kwsorter;
-#[julia_version(since = "1.9")]
-use jl_sys::jl_kwcall_func;
-use jl_sys::{jl_call, jl_exception_occurred, jlrs_call_unchecked};
-use jlrs_macros::julia_version;
+use jl_sys::{jl_call, jl_exception_occurred, jl_kwcall_func, jlrs_call_unchecked};
 
 use crate::{
     args::Values,
@@ -560,9 +555,6 @@ impl<'data> Call<'data> for WithKeywords<'_, 'data> {
         V: Values<'value, 'data, N>,
         Tgt: Target<'target>,
     {
-        #[cfg(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8"))]
-        let func = jl_get_kwsorter(self.func.datatype().unwrap(Private).cast());
-        #[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8")))]
         let func = jl_kwcall_func;
 
         let values = args.into_extended_pointers_with_start(
@@ -596,9 +588,6 @@ impl<'data> Call<'data> for WithKeywords<'_, 'data> {
         V: Values<'value, 'data, N>,
         Tgt: Target<'target>,
     {
-        #[cfg(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8"))]
-        let func = jl_get_kwsorter(self.func.datatype().unwrap(Private).cast());
-        #[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8")))]
         let func = jl_kwcall_func;
 
         let values = args.into_extended_pointers_with_start(
@@ -639,7 +628,7 @@ cfg_if::cfg_if! {
             /// Creates and schedules a new task with `Base.Threads.@spawn`, and returns a future
             /// that resolves when this task is finished.
             ///
-            /// Since Julia 1.9 this task is spawned on the `:default` thread pool.
+            /// This task is spawned on the `:default` thread pool.
             ///
             /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
             /// correctness. More information can be found in the [`safety`] module. This method doesn't
@@ -657,7 +646,7 @@ cfg_if::cfg_if! {
             /// Creates and schedules a new task with `Base.Threads.@spawn`, and returns a future
             /// that resolves when this task is finished.
             ///
-            /// Since Julia 1.9 this task is spawned on the `:default` thread pool.
+            /// This task is spawned on the `:default` thread pool.
             ///
             /// This method checks if any of the arguments is currently borrowed from Rust, and
             /// returns an `AccessError::BorrowError` if any of the arguments is.
@@ -698,7 +687,7 @@ cfg_if::cfg_if! {
             /// awaitable `Future`. This method should only be called in [`PersistentTask::init`],
             /// otherwise it's not guaranteed this task can make progress.
             ///
-            /// Since Julia 1.9 this task is spawned on the `:default` thread pool.
+            /// This task is spawned on the `:default` thread pool.
             ///
             /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
             /// correctness. More information can be found in the [`safety`] module. This method doesn't
@@ -718,7 +707,7 @@ cfg_if::cfg_if! {
             /// awaitable `Future`. This method should only be called in [`PersistentTask::init`],
             /// otherwise it's not guaranteed this task can make progress.
             ///
-            /// Since Julia 1.9 this task is spawned on the `:default` thread pool.
+            /// This task is spawned on the `:default` thread pool.
             ///
             /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
             /// correctness. More information can be found in the [`safety`] module.
@@ -756,7 +745,6 @@ cfg_if::cfg_if! {
                 Ok(res)
             }
 
-            #[julia_version(since = "1.9")]
             /// Call a function on another thread with the given arguments. This method uses
             /// `Base.Threads.@spawn` to call the given function on another thread but return immediately.
             /// While `await`ing the result the async runtime can work on other tasks, the current task
@@ -777,7 +765,6 @@ cfg_if::cfg_if! {
             where
                 V: Values<'value, 'data, N>;
 
-                #[julia_version(since = "1.9")]
             /// Call a function on another thread with the given arguments. This method uses
             /// `Base.Threads.@spawn` to call the given function on another thread but return immediately.
             /// While `await`ing the result the async runtime can work on other tasks, the current task
@@ -819,7 +806,6 @@ cfg_if::cfg_if! {
                 Ok(res)
             }
 
-            #[julia_version(since = "1.9")]
             /// Does the same thing as [`CallAsync::call_async`], but the task is returned rather than an
             /// awaitable `Future`. This method should only be called in [`PersistentTask::init`],
             /// otherwise it's not guaranteed this task can make progress.
@@ -841,7 +827,6 @@ cfg_if::cfg_if! {
                 V: Values<'value, 'data, N>;
 
 
-                #[julia_version(since = "1.9")]
                 /// Does the same thing as [`CallAsync::call_async`], but the task is returned rather than an
             /// awaitable `Future`. This method should only be called in [`PersistentTask::init`],
             /// otherwise it's not guaranteed this task can make progress.
@@ -889,7 +874,7 @@ cfg_if::cfg_if! {
             /// tasks created by this method. This method should only be used with functions that do very
             /// little computational work but mostly spend their time waiting on IO.
             ///
-            /// Since Julia 1.9 this task is spawned on the `:interactive` thread pool.
+            /// This task is spawned on the `:interactive` thread pool.
             ///
             /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
             /// correctness. More information can be found in the [`safety`] module. This method doesn't
@@ -909,7 +894,7 @@ cfg_if::cfg_if! {
             /// tasks created by this method. This method should only be used with functions that do very
             /// little computational work but mostly spend their time waiting on IO.
             ///
-            /// Since Julia 1.9 this task is spawned on the `:interactive` thread pool.
+            /// This task is spawned on the `:interactive` thread pool.
             ///
             /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
             /// correctness. More information can be found in the [`safety`] module.
@@ -949,7 +934,7 @@ cfg_if::cfg_if! {
             /// than an awaitable `Future`. This method should only be called in [`PersistentTask::init`],
             /// otherwise it's not guaranteed this task can make progress.
             ///
-            /// Since Julia 1.9 this task is spawned on the `:interactive` thread pool.
+            /// This task is spawned on the `:interactive` thread pool.
             ///
             /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
             /// correctness. More information can be found in the [`safety`] module. This method doesn't
@@ -970,7 +955,7 @@ cfg_if::cfg_if! {
             /// than an awaitable `Future`. This method should only be called in [`PersistentTask::init`],
             /// otherwise it's not guaranteed this task can make progress.
             ///
-            /// Since Julia 1.9 this task is spawned on the `:interactive` thread pool.
+            /// This task is spawned on the `:interactive` thread pool.
             ///
             /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
             /// correctness. More information can be found in the [`safety`] module.
@@ -1012,7 +997,7 @@ cfg_if::cfg_if! {
             /// the main thread. This method should only be used with functions that must run on the main
             /// thread. The runtime is blocked while this task is active.
             ///
-            /// Since Julia 1.9 this task is spawned on the `:interactive` thread pool.
+            /// This task is spawned on the `:interactive` thread pool.
             ///
             /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
             /// correctness. More information can be found in the [`safety`] module. This method doesn't
@@ -1032,7 +1017,7 @@ cfg_if::cfg_if! {
             /// the main thread. This method should only be used with functions that must run on the main
             /// thread. The runtime is blocked while this task is active.
             ///
-            /// Since Julia 1.9 this task is spawned on the `:interactive` thread pool.
+            /// This task is spawned on the `:interactive` thread pool.
             ///
             /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
             /// correctness. More information can be found in the [`safety`] module.
@@ -1072,7 +1057,7 @@ cfg_if::cfg_if! {
             /// than an awaitable `Future`. This method should only be called in [`PersistentTask::init`],
             /// otherwise it's not guaranteed this task can make progress.
             ///
-            /// Since Julia 1.9 this task is spawned on the `:interactive` thread pool.
+            /// This task is spawned on the `:interactive` thread pool.
             ///
             /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
             /// correctness. More information can be found in the [`safety`] module. This method doesn't
@@ -1092,7 +1077,7 @@ cfg_if::cfg_if! {
             /// than an awaitable `Future`. This method should only be called in [`PersistentTask::init`],
             /// otherwise it's not guaranteed this task can make progress.
             ///
-            /// Since Julia 1.9 this task is spawned on the `:interactive` thread pool.
+            /// This task is spawned on the `:interactive` thread pool.
             ///
             /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
             /// correctness. More information can be found in the [`safety`] module.
@@ -1145,7 +1130,6 @@ cfg_if::cfg_if! {
                 JuliaFuture::new(frame, erase_scope_lifetime(self), args).await
             }
 
-            #[julia_version(since = "1.9")]
             #[inline]
             async unsafe fn call_async_interactive<'target, 'value, V, const N: usize>(
                 self,
@@ -1158,7 +1142,6 @@ cfg_if::cfg_if! {
                 JuliaFuture::new_interactive(frame, erase_scope_lifetime(self), args).await
             }
 
-            #[julia_version(since = "1.9")]
             #[inline]
             unsafe fn schedule_async_interactive<'target, 'value, V, const N: usize>(
                 self,
@@ -1278,7 +1261,6 @@ cfg_if::cfg_if! {
                 JuliaFuture::new(frame, erase_scope_lifetime(self.as_value()), args).await
             }
 
-            #[julia_version(since = "1.9")]
             #[inline]
             async unsafe fn call_async_interactive<'target, 'value, V, const N: usize>(
                 self,
@@ -1291,7 +1273,6 @@ cfg_if::cfg_if! {
                 JuliaFuture::new_interactive(frame, erase_scope_lifetime(self.as_value()), args).await
             }
 
-            #[julia_version(since = "1.9")]
             #[inline]
             unsafe fn schedule_async_interactive<'target, 'value, V, const N: usize>(
                 self,
@@ -1379,7 +1360,6 @@ cfg_if::cfg_if! {
                 JuliaFuture::new_with_keywords(frame, self, args).await
             }
 
-            #[julia_version(since = "1.9")]
             #[inline]
             async unsafe fn call_async_interactive<'target, 'value, V, const N: usize>(
                 self,
@@ -1392,7 +1372,6 @@ cfg_if::cfg_if! {
                 JuliaFuture::new_interactive_with_keywords(frame, self, args).await
             }
 
-            #[julia_version(since = "1.9")]
             #[inline]
             unsafe fn schedule_async_interactive<'target, 'value, V, const N: usize>(
                 self,

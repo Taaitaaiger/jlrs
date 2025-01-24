@@ -1,6 +1,4 @@
 //! Task delegated to a background thread that can call into Julia.
-//!
-//! This module is available since Julia 1.9.
 
 use std::{
     fmt,

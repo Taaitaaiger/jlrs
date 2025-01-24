@@ -4,7 +4,6 @@ use async_channel::{bounded, unbounded};
 use jl_sys::jlrs_gc_safe_enter;
 
 #[cfg(feature = "multi-rt")]
-#[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8")))]
 use crate::runtime::handle::mt_handle::MtHandle;
 use crate::{
     error::{JlrsError, RuntimeError},
@@ -57,7 +56,6 @@ impl<E: Executor<N>, const N: usize> AsyncBuilder<E, N> {
 
     #[inline]
     #[cfg(feature = "multi-rt")]
-    #[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8")))]
     pub fn start_mt<'env, T: 'static + Send, F>(self, func: F) -> JlrsResult<T>
     where
         F: 'env + Send + for<'scope> FnOnce(MtHandle<'scope, 'env>, AsyncHandle) -> T,
@@ -92,7 +90,6 @@ impl<E: Executor<N>, const N: usize> AsyncBuilder<E, N> {
         self
     }
 
-    #[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8")))]
     /// Set the number of threads allocated to the `:interactive` pool.
     ///
     /// If it's set to 0, the default value, no threads are allocated to this pool.
@@ -224,7 +221,6 @@ pub(crate) fn run_main<T: 'static + Send, R: Executor<N>, const N: usize>(
 }
 
 #[cfg(feature = "multi-rt")]
-#[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8")))]
 mod mt_impl {
     use std::{
         panic::{catch_unwind, AssertUnwindSafe},

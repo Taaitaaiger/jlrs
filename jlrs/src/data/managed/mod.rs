@@ -289,7 +289,6 @@ pub mod array;
 pub mod background_task;
 pub mod ccall_ref;
 pub mod datatype;
-#[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8")))]
 pub mod delegated_task;
 pub mod expr;
 pub mod function;
@@ -596,7 +595,6 @@ pub struct Atomic<'scope, 'data, T: Managed<'scope, 'data>> {
 }
 
 impl<'scope, 'data, T: Managed<'scope, 'data>> Atomic<'scope, 'data, T> {
-    #[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8")))]
     pub(crate) fn new() -> Self {
         Atomic {
             ptr: AtomicPtr::new(null_mut()),

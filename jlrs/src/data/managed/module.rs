@@ -13,7 +13,6 @@ use jl_sys::{
     jl_module_t, jl_module_type, jl_set_const, jlrs_module_name, jlrs_module_parent,
     jlrs_set_global,
 };
-use jlrs_macros::julia_version;
 use rustc_hash::FxHashMap;
 
 use super::{
@@ -648,7 +647,6 @@ impl JlrsCore {
     }
 
     #[inline]
-    #[julia_version(since = "1.9")]
     pub fn delegated_task<'target, Tgt>(target: &Tgt) -> DataType<'target>
     where
         Tgt: Target<'target>,
@@ -674,7 +672,6 @@ impl JlrsCore {
     }
 
     #[cfg(feature = "async")]
-    #[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8")))]
     #[inline]
     pub(crate) fn interactive_call<'target, Tgt>(target: &Tgt) -> Function<'target, 'static>
     where
