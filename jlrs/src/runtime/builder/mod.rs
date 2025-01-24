@@ -8,9 +8,6 @@
 #[cfg(feature = "async-rt")]
 pub mod async_builder;
 
-#[cfg(feature = "multi-rt")]
-#[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8")))]
-use std::thread::JoinHandle;
 use std::{
     ffi::CString,
     path::{Path, PathBuf},
@@ -91,17 +88,10 @@ impl Builder {
     #[inline]
     #[cfg(feature = "multi-rt")]
     #[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8")))]
-    pub fn spawn_mt(self) -> JlrsResult<(MtHandle, JoinHandle<()>)> {
-        mt_impl::sync_impl::spawn(self)
-    }
-
-    #[inline]
-    #[cfg(feature = "multi-rt")]
-    #[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8")))]
-    pub fn start_mt<T: 'static + Send>(
-        self,
-        func: impl 'static + Send + FnOnce(MtHandle) -> T,
-    ) -> JlrsResult<T> {
+    pub fn start_mt<'env, T: 'static + Send, F>(self, func: F) -> JlrsResult<T>
+    where
+        F: 'env + for<'scope> FnOnce(MtHandle<'scope, 'env>) -> T + Send,
+    {
         mt_impl::sync_impl::start(self, func)
     }
 
@@ -205,15 +195,11 @@ impl Builder {
 #[cfg(feature = "multi-rt")]
 #[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8")))]
 mod mt_impl {
-    use parking_lot::{Condvar, Mutex};
-    static INIT_LOCK: (Mutex<bool>, Condvar) = (Mutex::new(false), Condvar::new());
-
     pub(super) mod sync_impl {
-        use std::thread::{self, JoinHandle};
+        use std::thread;
 
         use jl_sys::jl_atexit_hook;
 
-        use super::INIT_LOCK;
         use crate::{
             error::{JlrsError, RuntimeError},
             memory::gc::gc_safe,
@@ -222,42 +208,16 @@ mod mt_impl {
                 builder::{init_runtime, Builder},
                 handle::{
                     mt_handle::{wait_loop, MtHandle, EXIT_LOCK},
-                    notify, wait,
+                    wait,
                 },
                 state::{can_init, set_exit},
             },
         };
 
-        pub(crate) fn spawn(options: Builder) -> JlrsResult<(MtHandle, JoinHandle<()>)> {
-            if !can_init() {
-                Err(RuntimeError::AlreadyInitialized)?;
-            }
-
-            let handle = thread::spawn(move || {
-                unsafe {
-                    init_runtime(&options);
-                    notify(&INIT_LOCK);
-                    wait_loop();
-
-                    // Returned from wait_main, so we're about to exit Julia because all handles have
-                    // been dropped. Next we need to wait until we've returned from `notify_main` too.
-                    gc_safe(|| wait(&EXIT_LOCK));
-                    set_exit();
-                    jl_atexit_hook(0);
-                }
-            });
-
-            wait(&INIT_LOCK);
-            let mt_handle = unsafe { MtHandle::new() };
-            Ok((mt_handle, handle))
-        }
-
-        pub(crate) fn start<T>(
-            options: Builder,
-            func: impl 'static + Send + FnOnce(MtHandle) -> T,
-        ) -> JlrsResult<T>
+        pub(crate) fn start<'env, T, F>(options: Builder, func: F) -> JlrsResult<T>
         where
             T: Send + 'static,
+            F: 'env + for<'scope> FnOnce(MtHandle<'scope, 'env>) -> T + Send,
         {
             if !can_init() {
                 Err(RuntimeError::AlreadyInitialized)?;
@@ -267,27 +227,31 @@ mod mt_impl {
                 init_runtime(&options);
             }
 
-            let handle = thread::spawn(|| unsafe {
-                let handle = MtHandle::new();
-                func(handle)
+            let ret = thread::scope(|scope| {
+                let handle = scope.spawn(|| unsafe {
+                    thread::scope(|scope| {
+                        let handle = MtHandle::new(scope);
+                        func(handle)
+                    })
+                });
+
+                unsafe {
+                    wait_loop();
+
+                    // Returned from wait_main, so we're about to exit Julia becuase all handles have
+                    // been dropped. Next we need to wait until we've returned from `notify_main` too.
+                    gc_safe(|| wait(&EXIT_LOCK));
+                    set_exit();
+                    jl_atexit_hook(0);
+
+                    handle.join()
+                }
             });
 
-            let ret = unsafe {
-                wait_loop();
-
-                // Returned from wait_main, so we're about to exit Julia becuase all handles have
-                // been dropped. Next we need to wait until we've returned from `notify_main` too.
-                gc_safe(|| wait(&EXIT_LOCK));
-                set_exit();
-                jl_atexit_hook(0);
-
-                match handle.join() {
-                    Ok(ret) => ret,
-                    Err(e) => Err(JlrsError::exception(format!("{e:?}")))?,
-                }
-            };
-
-            Ok(ret)
+            match ret {
+                Ok(ret) => Ok(ret),
+                Err(e) => Err(JlrsError::exception(format!("{e:?}")))?,
+            }
         }
     }
 }

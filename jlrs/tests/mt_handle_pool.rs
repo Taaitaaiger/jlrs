@@ -6,17 +6,15 @@ mod mt_handle {
 
     #[test]
     fn create_pool() {
-        let (julia, th) = Builder::new().spawn_mt().unwrap();
+        Builder::new()
+            .start_mt(|julia| {
+                let handle = julia
+                    .pool_builder(Tokio::<1>::new(false))
+                    .n_workers(2.try_into().unwrap())
+                    .spawn();
 
-        let handle = julia
-            .pool_builder(Tokio::<1>::new(false))
-            .n_workers(2.try_into().unwrap())
-            .spawn();
-
-        assert_eq!(handle.n_workers(), 2);
-
-        std::mem::drop(julia);
-        std::mem::drop(handle);
-        th.join().unwrap();
+                assert_eq!(handle.n_workers(), 2);
+            })
+            .unwrap();
     }
 }

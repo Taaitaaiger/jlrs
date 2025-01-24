@@ -354,7 +354,10 @@ unsafe impl<const N: usize> Dims for [usize; N] {
 unsafe impl<const N: usize> Dims for &[usize; N] {
     const RANK: isize = N as isize;
 
-    type SlicingType<'s> = Self where Self: 's;
+    type SlicingType<'s>
+        = Self
+    where
+        Self: 's;
 
     fn to_slicer<'s>(&'s self) -> Self::SlicingType<'s> {
         self
@@ -374,7 +377,10 @@ unsafe impl<const N: usize> Dims for &[usize; N] {
 unsafe impl Dims for &[usize] {
     const RANK: isize = -1;
 
-    type SlicingType<'s> = Self where Self: 's;
+    type SlicingType<'s>
+        = Self
+    where
+        Self: 's;
 
     fn to_slicer<'s>(&'s self) -> Self::SlicingType<'s> {
         self
@@ -394,7 +400,10 @@ unsafe impl Dims for &[usize] {
 unsafe impl<const N: isize> Dims for ArrayDimensions<'_, N> {
     const RANK: isize = N;
 
-    type SlicingType<'s> = &'s [usize] where Self: 's;
+    type SlicingType<'s>
+        = &'s [usize]
+    where
+        Self: 's;
 
     fn to_slicer<'s>(&'s self) -> Self::SlicingType<'s> {
         let slice = self.as_slice();

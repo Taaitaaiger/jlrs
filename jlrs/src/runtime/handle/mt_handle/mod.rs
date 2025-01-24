@@ -2,7 +2,14 @@
 
 #[cfg(feature = "async")]
 use std::num::NonZeroUsize;
-use std::{cell::Cell, marker::PhantomData, path::Path, pin::Pin, sync::atomic::AtomicUsize};
+use std::{
+    cell::Cell,
+    marker::PhantomData,
+    path::Path,
+    pin::Pin,
+    sync::atomic::AtomicUsize,
+    thread::{Scope, ScopedJoinHandle},
+};
 
 use atomic::Ordering;
 use jl_sys::{jl_adopt_thread, jl_atexit_hook, jlrs_gc_safe_enter, jlrs_ptls_from_gcstack};
@@ -38,16 +45,16 @@ pub(crate) static EXIT_LOCK: (Mutex<bool>, Condvar) = (Mutex::new(false), Condva
 
 /// A handle that lets you call into Julia from arbitrary threads.
 ///
-/// An initial `MtHandle` can be created by calling [`Builder::start_mt`] or
-/// [`Builder::spawn_mt`]. Julia exits when the all handles have been dropped.
+/// An initial `MtHandle` can be created by calling [`Builder::start_mt`]. Julia exits when the
+/// all handles have been dropped.
 ///
 /// [`Builder::start_mt`]: crate::runtime::builder::Builder::start_mt
-/// [`Builder::spawn_mt`]: crate::runtime::builder::Builder::spawn_mt
-pub struct MtHandle {
-    _marker: PhantomData<*mut ()>,
+pub struct MtHandle<'scope, 'env> {
+    _marker: PhantomData<&'scope mut &'scope ()>,
+    scope: &'scope Scope<'scope, 'env>,
 }
 
-impl MtHandle {
+impl<'scope, 'env> MtHandle<'scope, 'env> {
     /// Prepares the environment to enable calling into Julia and calls `func`.
     pub fn with<T, F>(&mut self, func: F) -> T
     where
@@ -65,38 +72,49 @@ impl MtHandle {
         }
     }
 
-    pub(crate) unsafe fn new() -> Self {
+    pub fn spawn<F, T>(&self, f: F) -> ScopedJoinHandle<'scope, T>
+    where
+        F: FnOnce(Self) -> T + Send + 'scope,
+        T: Send + 'scope,
+    {
+        let s = self.clone();
+        self.scope.spawn(|| f(s))
+    }
+
+    pub(crate) unsafe fn new(scope: &'scope Scope<'scope, 'env>) -> Self {
         N_HANDLES.fetch_add(1, Ordering::Relaxed);
         MtHandle {
             _marker: PhantomData,
+            scope,
         }
     }
 }
 
 #[cfg(feature = "async")]
-impl MtHandle {
+impl<'scope, 'env> MtHandle<'scope, 'env> {
     /// Returns a builder for a new thread pool.
     pub fn pool_builder<'a, E: Executor<N>, const N: usize>(
         &'a self,
         executor_opts: E,
-    ) -> PoolBuilder<'a, E, N> {
+    ) -> PoolBuilder<'a, 'scope, 'env, E, N> {
         let _: () = E::VALID;
         PoolBuilder::new(self, executor_opts)
     }
 }
 
-unsafe impl Send for MtHandle {}
+unsafe impl<'scope, 'env> Send for MtHandle<'scope, 'env> {}
 
-impl Clone for MtHandle {
+impl<'scope, 'env> Clone for MtHandle<'scope, 'env> {
     fn clone(&self) -> Self {
         N_HANDLES.fetch_add(1, Ordering::Relaxed);
         Self {
             _marker: PhantomData,
+            scope: self.scope,
         }
     }
 }
 
-impl Drop for MtHandle {
+impl<'scope, 'env> Drop for MtHandle<'scope, 'env> {
     fn drop(&mut self) {
         unsafe { drop_handle() }
     }
@@ -124,12 +142,11 @@ impl<'ctx> ActiveHandle<'ctx> {
     /// ```no_run
     /// # use jlrs::prelude::*;
     /// # fn main() {
-    /// # let (mut julia, th_handle) = Builder::new().spawn_mt().unwrap();
-    /// julia.with(|handle| unsafe {
-    ///     handle.include("Path/To/MyJuliaCode.jl").unwrap();
-    /// });
-    /// # std::mem::drop(julia);
-    /// # th_handle.join().unwrap();
+    /// # Builder::new().start_mt(|mut julia| {
+    ///     julia.with(|handle| unsafe {
+    ///         handle.include("Path/To/MyJuliaCode.jl").unwrap();
+    ///     });
+    /// }).unwrap();
     /// # }
     /// ```
     pub unsafe fn include<P: AsRef<Path>>(&self, path: P) -> JlrsResult<()> {
@@ -155,12 +172,11 @@ impl<'ctx> ActiveHandle<'ctx> {
     /// ```
     /// # use jlrs::prelude::*;
     /// # fn main() {
-    /// # let (mut julia, th_handle) = Builder::new().spawn_mt().unwrap();
-    /// julia.with(|handle| unsafe {
-    ///     handle.using("LinearAlgebra").unwrap();
-    /// });
-    /// # std::mem::drop(julia);
-    /// # th_handle.join().unwrap();
+    /// # Builder::new().start_mt(|mut julia| {
+    ///     julia.with(|handle| unsafe {
+    ///         handle.using("LinearAlgebra").unwrap();
+    ///     });
+    /// }).unwrap();
     /// # }
     /// ```
     pub unsafe fn using<S: AsRef<str>>(&self, module_name: S) -> JlrsResult<()> {
@@ -183,8 +199,8 @@ impl<'ctx> LocalReturning<'ctx> for ActiveHandle<'ctx> {
 
 /// Thread pool builder
 #[cfg(feature = "async-rt")]
-pub struct PoolBuilder<'a, E: Executor<N>, const N: usize> {
-    _handle: PhantomData<&'a MtHandle>,
+pub struct PoolBuilder<'a, 'scope, 'env, E: Executor<N>, const N: usize> {
+    _handle: PhantomData<&'a MtHandle<'scope, 'env>>,
     executor_opts: E,
     channel_capacity: usize,
     n_workers: NonZeroUsize,
@@ -192,7 +208,7 @@ pub struct PoolBuilder<'a, E: Executor<N>, const N: usize> {
 }
 
 #[cfg(feature = "async-rt")]
-impl<'a, E: Executor<N>, const N: usize> PoolBuilder<'a, E, N> {
+impl<'a, 'scope, 'env, E: Executor<N>, const N: usize> PoolBuilder<'a, 'scope, 'env, E, N> {
     fn new(_handle: &'a MtHandle, executor_opts: E) -> Self {
         PoolBuilder {
             _handle: PhantomData,

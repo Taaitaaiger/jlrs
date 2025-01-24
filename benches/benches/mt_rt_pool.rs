@@ -84,17 +84,6 @@ fn use_local(handle: &mut MtHandle, c: &mut Criterion) {
     });
 }
 
-fn criterion_benchmark(c: &mut Criterion) {
-    let (mut handle, th_handle) = Builder::new().spawn_mt().unwrap();
-
-    blocking_task(&handle, c);
-    async_task(&handle, c);
-    use_local(&mut handle, c);
-
-    std::mem::drop(handle);
-    th_handle.join().unwrap();
-}
-
 #[cfg(not(target_os = "windows"))]
 fn opts() -> Option<Options<'static>> {
     let mut opts = Options::default();
@@ -103,18 +92,34 @@ fn opts() -> Option<Options<'static>> {
     Some(opts)
 }
 
-#[cfg(not(target_os = "windows"))]
-criterion_group! {
-    name = mt_rt_pool;
-    config = Criterion::default().with_profiler(PProfProfiler::new(1000, Output::Flamegraph(opts())));
-    targets = criterion_benchmark
-}
+// #[cfg(not(target_os = "windows"))]
+// criterion_group! {
+//     name = mt_rt_pool;
+//     config = Criterion::default().with_profiler(PProfProfiler::new(1000, Output::Flamegraph(opts())));
+//     targets = criterion_benchmark
+// }
 
-#[cfg(target_os = "windows")]
-criterion_group! {
-    name = mt_rt_pool;
-    config = Criterion::default();
-    targets = criterion_benchmark
-}
+// #[cfg(target_os = "windows")]
+// criterion_group! {
+//     name = mt_rt_pool;
+//     config = Criterion::default();
+//     targets = criterion_benchmark
+// }
 
-criterion_main!(mt_rt_pool);
+// criterion_main!(mt_rt_pool);
+fn main() {
+    Builder::new().start_mt(|mut handle| {
+        #[cfg(not(target_os = "windows"))]
+        let mut c = Criterion::default().with_profiler(PProfProfiler::new(1000, Output::Flamegraph(opts())));
+        #[cfg(target_os = "windows")]
+        let mut c = Criterion::default();
+
+        blocking_task(&handle, &mut c);
+        async_task(&handle, &mut c);
+        use_local(&mut handle, &mut c);
+        
+        Criterion::default()
+            .configure_from_args()
+            .final_summary();
+    }).unwrap();
+}

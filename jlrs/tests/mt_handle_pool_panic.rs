@@ -22,43 +22,44 @@ mod mt_handle {
 
     #[test]
     fn worker_is_revived() {
-        let (julia, th) = Builder::new().spawn_mt().unwrap();
+        Builder::new()
+            .start_mt(|julia| {
+                let handle = julia
+                    .pool_builder(Tokio::<1>::new(false))
+                    .n_workers(1.try_into().unwrap())
+                    .spawn();
 
-        let handle = julia
-            .pool_builder(Tokio::<1>::new(false))
-            .n_workers(1.try_into().unwrap())
-            .spawn();
+                assert_eq!(handle.n_workers(), 1);
+                handle
+                    .blocking_task(|_| panic!())
+                    .try_dispatch()
+                    .unwrap()
+                    .blocking_recv()
+                    .unwrap_err();
+                handle
+                    .blocking_task(|_| 1)
+                    .try_dispatch()
+                    .unwrap()
+                    .blocking_recv()
+                    .unwrap();
+                assert_eq!(handle.n_workers(), 1);
+                handle
+                    .task(PanickingTask)
+                    .try_dispatch()
+                    .unwrap()
+                    .blocking_recv()
+                    .unwrap_err();
+                handle
+                    .blocking_task(|_| 1)
+                    .try_dispatch()
+                    .unwrap()
+                    .blocking_recv()
+                    .unwrap();
+                assert_eq!(handle.n_workers(), 1);
 
-        assert_eq!(handle.n_workers(), 1);
-        handle
-            .blocking_task(|_| panic!())
-            .try_dispatch()
-            .unwrap()
-            .blocking_recv()
-            .unwrap_err();
-        handle
-            .blocking_task(|_| 1)
-            .try_dispatch()
-            .unwrap()
-            .blocking_recv()
+                std::mem::drop(julia);
+                std::mem::drop(handle);
+            })
             .unwrap();
-        assert_eq!(handle.n_workers(), 1);
-        handle
-            .task(PanickingTask)
-            .try_dispatch()
-            .unwrap()
-            .blocking_recv()
-            .unwrap_err();
-        handle
-            .blocking_task(|_| 1)
-            .try_dispatch()
-            .unwrap()
-            .blocking_recv()
-            .unwrap();
-        assert_eq!(handle.n_workers(), 1);
-
-        std::mem::drop(julia);
-        std::mem::drop(handle);
-        th.join().unwrap();
     }
 }
