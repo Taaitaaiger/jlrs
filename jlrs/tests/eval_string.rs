@@ -31,24 +31,6 @@ mod tests {
         });
     }
 
-    #[cfg(any(
-        feature = "julia-1-6",
-        feature = "julia-1-7",
-        feature = "julia-1-8",
-        feature = "julia-1-9"
-    ))]
-    fn syntax_error() {
-        eval_string("asdf fdsa asdf fdsa", |result| {
-            assert_eq!(result.unwrap_err().datatype_name(), "ErrorException");
-        });
-    }
-
-    #[cfg(not(any(
-        feature = "julia-1-6",
-        feature = "julia-1-7",
-        feature = "julia-1-8",
-        feature = "julia-1-9"
-    )))]
     fn syntax_error() {
         eval_string("asdf fdsa asdf fdsa", |result| {
             assert_eq!(result.unwrap_err().datatype_name(), "UndefVarError");

@@ -8,10 +8,6 @@ panic = "abort"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [features]
-julia-1-6 = ["jlrs/julia-1-6"]
-julia-1-7 = ["jlrs/julia-1-7"]
-julia-1-8 = ["jlrs/julia-1-8"]
-julia-1-9 = ["jlrs/julia-1-9"]
 julia-1-10 = ["jlrs/julia-1-10"]
 julia-1-11 = ["jlrs/julia-1-11"]
 julia-1-12 = ["jlrs/julia-1-12"]

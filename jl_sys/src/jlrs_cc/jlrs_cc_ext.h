@@ -5,7 +5,8 @@
 #define JLRS_CC_EXT_H
 
 #ifdef __cplusplus
-extern "C" {
+extern "C"
+{
 #endif //__cplusplus
 
     typedef enum
@@ -53,12 +54,8 @@ extern "C" {
     // option field setters
     void jlrs_set_nthreads(int16_t nthreads);
 
-#if JULIA_VERSION_MINOR >= 9
     void jlrs_set_nthreadpools(int8_t nthreadpools);
-#endif
-#if JULIA_VERSION_MINOR >= 9
     void jlrs_set_nthreads_per_pool(const int16_t *nthreads_per_pool);
-#endif
     // tvar field getters
     jl_sym_t *jlrs_tvar_name(jl_tvar_t *tvar);
     jl_value_t *jlrs_tvar_lb(jl_tvar_t *tvar);
@@ -73,18 +70,14 @@ extern "C" {
     jl_module_t *jlrs_typename_module(jl_typename_t *tn);
     jl_value_t *jlrs_typename_wrapper(jl_typename_t *tn);
 
-#if JULIA_VERSION_MINOR >= 7
     const uint32_t *jlrs_typename_atomicfields(jl_typename_t *tn);
     uint8_t jlrs_typename_abstract(jl_typename_t *tn);
     uint8_t jlrs_typename_mutable(jl_typename_t *tn);
     uint8_t jlrs_typename_mayinlinealloc(jl_typename_t *tn);
-#endif // JULIA_VERSION_MINOR >= 7
 
     jl_svec_t *jlrs_typename_names(jl_typename_t *tn);
 
-#if JULIA_VERSION_MINOR >= 8
     const uint32_t *jlrs_typename_constfields(jl_typename_t *tn);
-#endif // JULIA_VERSION_MINOR >= 8
 
     // union field getters
     jl_value_t *jlrs_union_a(jl_uniontype_t *u);
@@ -99,11 +92,9 @@ extern "C" {
 
     uintptr_t jlrs_symbol_hash(jl_sym_t *sym);
 
-#if JULIA_VERSION_MINOR >= 9
     // enter / exit threaded region.
     void jl_enter_threaded_region(void);
     void jl_exit_threaded_region(void);
-#endif // JULIA_VERSION_MINOR >= 9
 
     // Removed array functions
     jl_value_t *jlrs_arrayref(jl_array_t *a, size_t i);

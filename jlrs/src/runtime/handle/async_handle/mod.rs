@@ -19,7 +19,6 @@ use jl_sys::{jl_gcframe_t, jlrs_gc_unsafe_enter, jlrs_gc_unsafe_leave, jlrs_ppgc
 use tokio::sync::oneshot::channel as oneshot_channel;
 
 #[cfg(feature = "multi-rt")]
-#[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8")))]
 use self::task_complete::{TaskComplete, TaskCompleteState};
 use self::{
     cancellation_token::CancellationToken,
@@ -31,7 +30,6 @@ use self::{
     persistent::PersistentHandle,
 };
 #[cfg(feature = "multi-rt")]
-#[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8")))]
 use super::mt_handle::manager::{get_manager, PoolId};
 use crate::{
     async_util::{
@@ -54,7 +52,6 @@ mod envelope;
 pub mod message;
 pub mod persistent;
 #[cfg(feature = "multi-rt")]
-#[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8")))]
 mod task_complete;
 
 /// A handle to the async runtime.
@@ -195,11 +192,6 @@ impl AsyncHandle {
         if cancel {
             match self.pool_or_token {
                 #[cfg(feature = "multi-rt")]
-                #[cfg(not(any(
-                    feature = "julia-1-6",
-                    feature = "julia-1-7",
-                    feature = "julia-1-8"
-                )))]
                 PoolIdOrToken::PoolId(pool_id) => get_manager().drop_pool(&pool_id),
                 PoolIdOrToken::Token(ref token) => token.cancel(),
             }
@@ -216,7 +208,6 @@ impl AsyncHandle {
 }
 
 #[cfg(feature = "multi-rt")]
-#[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8")))]
 impl AsyncHandle {
     /// Try to add a worker to the pool.
     ///
@@ -272,7 +263,6 @@ impl RequireSendSync for AsyncHandle {}
 #[derive(Clone)]
 enum PoolIdOrToken {
     #[cfg(feature = "multi-rt")]
-    #[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8")))]
     PoolId(PoolId),
     Token(CancellationToken),
 }
@@ -376,7 +366,6 @@ pub(crate) async unsafe fn on_main_thread<'ctx, R: Executor<N>, const N: usize>(
 //
 // The thread must be in the GC-safe state when this function is called.
 #[cfg(feature = "multi-rt")]
-#[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8")))]
 pub(super) async unsafe fn on_adopted_thread<'ctx, R: Executor<N>, const N: usize>(
     receiver: Receiver<Message>,
     token: CancellationToken,

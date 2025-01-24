@@ -1,27 +1,17 @@
-#[julia_version(windows_lts = false)]
-use std::ptr::NonNull;
 use std::{
     any::Any,
     ffi::c_void,
     mem::MaybeUninit,
     panic::{catch_unwind, AssertUnwindSafe},
-    ptr::null_mut,
+    ptr::{null_mut, NonNull},
 };
 
 use jl_sys::{jlrs_catch_t, jlrs_catch_tag_t, jlrs_try_catch};
-use jlrs_macros::julia_version;
 
-use crate::prelude::LocalScope;
-#[julia_version(windows_lts = true)]
-use crate::{
-    call::Call,
-    prelude::{Target, Value},
-};
-#[julia_version(windows_lts = false)]
 use crate::{
     data::managed::{private::ManagedPriv, Managed},
     memory::target::unrooted::Unrooted,
-    prelude::Value,
+    prelude::{LocalScope, Value},
     private::Private,
 };
 
@@ -32,7 +22,6 @@ use crate::{
 ///
 /// If an exception is thrown, there must be no pending drops. Only local scopes may be created in
 /// `func`.
-#[julia_version(windows_lts = false)]
 pub unsafe fn catch_exceptions<F, H, T, E>(func: F, exception_handler: H) -> Result<T, E>
 where
     F: FnOnce() -> T,
@@ -64,60 +53,6 @@ where
             let err: Box<Box<dyn Any + Send>> = Box::from_raw(res.error.cast());
             std::panic::resume_unwind(err)
         }
-    }
-}
-
-/// Call `func`, if an exception is thrown it is caught and `exception_handler` is called. The
-/// exception is guaranteed to be rooted inside the exception handler.
-///
-/// Safety:
-///
-/// If an exception is thrown, there must be no pending drops. Only local scopes may be created in
-/// `func`.
-#[julia_version(windows_lts = true)]
-pub unsafe fn catch_exceptions<F, H, T, E>(func: F, exception_handler: H) -> Result<T, E>
-where
-    F: FnOnce() -> T,
-    H: for<'exc> FnOnce(Value<'exc, 'static>) -> E,
-{
-    let mut func = Some(func);
-    let func = &mut func;
-    let trampoline = trampoline_for(func);
-    let mut result = MaybeUninit::<T>::uninit();
-    let unrooted = crate::memory::target::unrooted::Unrooted::new();
-
-    // The JL_TRY and JL_CATCH macros don't work when Julia 1.6 is used on Windows, so we're
-    // going to jump back to Rust code from Julia rather than C.
-    let caller = crate::data::managed::module::JlrsCore::call_catch_wrapper(&unrooted);
-    let trampoline = std::mem::transmute::<_, *mut c_void>(trampoline);
-
-    let res = unrooted.with_local_scope::<_, _, 4>(|target, mut frame| {
-        let result = &mut result;
-
-        let catch_wrapper = Value::new(&mut frame, jlrs_try_catch as *mut c_void);
-        let func = Value::new(&mut frame, func as *mut _ as *mut c_void);
-        let trampoline = Value::new(&mut frame, trampoline);
-        let result = Value::new(&mut frame, result as *mut _ as *mut c_void);
-
-        caller.call(target, [catch_wrapper, func, trampoline, result])
-    });
-
-    match res {
-        Ok(res) => {
-            let res = res.ptr().cast::<jlrs_catch_t>().as_ref();
-            match res.tag {
-                _tag @ jlrs_catch_tag_t::Ok => Ok(result.assume_init()),
-                _tag @ jlrs_catch_tag_t::Panic => {
-                    let err: Box<Box<dyn Any + Send>> = Box::from_raw(res.error.cast());
-                    std::panic::resume_unwind(err)
-                }
-                _ => ::std::hint::unreachable_unchecked(),
-            }
-        }
-        Err(exc) => unrooted.local_scope::<_, 1>(|frame| {
-            let value = exc.root(frame);
-            Err(exception_handler(value))
-        }),
     }
 }
 

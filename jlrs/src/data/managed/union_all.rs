@@ -2,8 +2,6 @@
 
 use std::{marker::PhantomData, ptr::NonNull};
 
-#[julia_version(until = "1.6")]
-use jl_sys::jl_vararg_type;
 use jl_sys::{
     jl_abstractarray_type, jl_anytuple_type_type, jl_apply_type, jl_array_type, jl_densearray_type,
     jl_llvmpointer_type, jl_namedtuple_type, jl_pointer_type, jl_ref_type, jl_type_type,
@@ -206,17 +204,6 @@ impl<'base> UnionAll<'base> {
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_anytuple_type_type), Private) }
-    }
-
-    #[julia_version(until = "1.6")]
-    /// The `UnionAll` `Vararg`.
-    #[inline]
-    pub fn vararg_type<Tgt>(_: &Tgt) -> Self
-    where
-        Tgt: Target<'base>,
-    {
-        // Safety: global constant
-        unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_vararg_type), Private) }
     }
 
     /// The `UnionAll` `AbstractArray`.

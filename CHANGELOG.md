@@ -4,6 +4,8 @@
 
 - The multithreaded runtime uses scoped threads internally, this allows closures to reference non-static data and ensures the adopted threads have exited before the runtime thread, but requires calling `MtHandle::spawn` to spawn a new thread.
 
+- The `julia-1-6`, `julia-1-7`, `julia-1-8`, and `julia-1-9` features have been removed.
+
 #### v0.22
 
 - Add several aliases for `JuliaResult` so they can be more easily returned from an exported funtion.

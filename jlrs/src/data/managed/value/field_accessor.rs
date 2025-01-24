@@ -1,15 +1,11 @@
-use std::{mem::MaybeUninit, sync::atomic::Ordering, usize};
-#[julia_version(since = "1.7")]
 use std::{
-    ptr::null_mut,
-    ptr::NonNull,
-    sync::atomic::{AtomicPtr, AtomicU16, AtomicU32, AtomicU64, AtomicU8},
+    mem::MaybeUninit,
+    ptr::{null_mut, NonNull},
+    sync::atomic::{AtomicPtr, AtomicU16, AtomicU32, AtomicU64, AtomicU8, Ordering},
+    usize,
 };
 
-use jl_sys::jlrs_array_typetagdata;
-#[julia_version(since = "1.7")]
-use jl_sys::{jl_value_t, jlrs_lock_value, jlrs_unlock_value};
-use jlrs_macros::julia_version;
+use jl_sys::{jl_value_t, jlrs_array_typetagdata, jlrs_lock_value, jlrs_unlock_value};
 
 use super::{Value, ValueRef};
 use crate::{
@@ -27,7 +23,6 @@ use crate::{
     private::Private,
 };
 
-#[julia_version(since = "1.7")]
 #[repr(C, align(16))]
 #[derive(Clone, Copy)]
 union AtomicBuffer {
@@ -35,7 +30,6 @@ union AtomicBuffer {
     ptr: *mut jl_value_t,
 }
 
-#[julia_version(since = "1.7")]
 impl AtomicBuffer {
     fn new() -> Self {
         AtomicBuffer { ptr: null_mut() }
@@ -44,10 +38,8 @@ impl AtomicBuffer {
 
 #[derive(Copy, Clone, PartialEq)]
 enum ViewState {
-    #[cfg(not(feature = "julia-1-6"))]
     Locked,
     Unlocked,
-    #[cfg(not(feature = "julia-1-6"))]
     AtomicBuffer,
     Array,
 }
@@ -65,7 +57,6 @@ enum ViewState {
 pub struct FieldAccessor<'scope, 'data> {
     value: Option<ValueRef<'scope, 'data>>,
     current_field_type: Option<DataTypeRef<'scope>>,
-    #[cfg(not(feature = "julia-1-6"))]
     buffer: AtomicBuffer,
     offset: u32,
     state: ViewState,
@@ -78,7 +69,6 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
             value: Some(value.as_ref()),
             current_field_type: Some(value.datatype().as_ref()),
             offset: 0,
-            #[cfg(not(feature = "julia-1-6"))]
             buffer: AtomicBuffer::new(),
             state: ViewState::Unlocked,
         }
@@ -112,7 +102,6 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
                 Err(AccessError::InvalidLayout { value_type })?;
             }
 
-            #[cfg(not(feature = "julia-1-6"))]
             if self.state == ViewState::AtomicBuffer {
                 debug_assert!(!T::IS_REF);
                 debug_assert!(std::mem::size_of::<T>() <= 8);
@@ -223,11 +212,9 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
                     Ordering::Relaxed,
                     Ordering::SeqCst,
                 ),
-                #[cfg(not(feature = "julia-1-6"))]
                 ViewState::Locked => {
                     self.get_locked_inline_field(is_pointer_field, next_field_type)
                 }
-                #[cfg(not(feature = "julia-1-6"))]
                 ViewState::AtomicBuffer => {
                     self.get_atomic_buffer_field(is_pointer_field, next_field_type)
                 }
@@ -237,7 +224,6 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
         Ok(self)
     }
 
-    #[julia_version(since = "1.7")]
     /// Update the accessor to point to `field`.
     ///
     /// If the field is a small atomic field `ordering` is used to read it. The ordering is
@@ -307,7 +293,6 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
     /// If the current value this accessor is accessing is locked an error is returned.
     #[inline]
     pub fn try_clone(&self) -> JlrsResult<Self> {
-        #[cfg(not(feature = "julia-1-6"))]
         if self.state == ViewState::Locked {
             Err(AccessError::Locked)?;
         }
@@ -316,24 +301,15 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
             value: self.value,
             current_field_type: self.current_field_type,
             offset: self.offset,
-            #[cfg(not(feature = "julia-1-6"))]
             buffer: self.buffer.clone(),
             state: self.state,
         })
     }
 
-    #[julia_version(since = "1.7")]
     #[inline]
     /// Returns `true` if the current value the accessor is accessing is locked.
     pub fn is_locked(&self) -> bool {
         self.state == ViewState::Locked
-    }
-
-    #[julia_version(until = "1.6")]
-    #[inline]
-    /// Returns `true` if the current value the accessor is accessing is locked.
-    pub fn is_locked(&self) -> bool {
-        false
     }
 
     /// Returns the type of the field the accessor is currently pointing at.
@@ -348,7 +324,6 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
         self.value
     }
 
-    #[julia_version(since = "1.7")]
     // Safety: the view state must be ViewState::AtomicBuffer
     unsafe fn get_atomic_buffer_field(
         &mut self,
@@ -385,7 +360,6 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
         }
     }
 
-    #[julia_version(since = "1.7")]
     // Safety: the view state must be ViewState::Unlocked
     unsafe fn get_unlocked_inline_field(
         &mut self,
@@ -415,28 +389,6 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
         }
     }
 
-    #[julia_version(until = "1.6")]
-    // Safety: the view state must be ViewState::Unlocked
-    unsafe fn get_unlocked_inline_field(
-        &mut self,
-        is_pointer_field: bool,
-        _current_field_type: DataType<'scope>,
-        next_field_type: Value<'scope, 'data>,
-        _index: usize,
-        _pointer_ordering: Ordering,
-        _inline_ordering: Ordering,
-    ) {
-        if is_pointer_field {
-            self.get_pointer_field(false, next_field_type);
-        } else if let Ok(un) = next_field_type.cast::<Union>() {
-            self.get_bits_union_field(un);
-        } else {
-            debug_assert!(next_field_type.is::<DataType>());
-            self.current_field_type = Some(next_field_type.cast_unchecked::<DataType>().as_ref());
-        }
-    }
-
-    #[julia_version(since = "1.7")]
     // Safety: the view state must be ViewState::Locked
     unsafe fn get_locked_inline_field(
         &mut self,
@@ -495,7 +447,6 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
         Ok(())
     }
 
-    #[julia_version(since = "1.7")]
     // Safety: must only be used to read an atomic field
     unsafe fn lock_or_copy_atomic(&mut self, ordering: Ordering) {
         let ptr = self
@@ -554,14 +505,7 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
                 self.state = ViewState::AtomicBuffer;
                 self.offset = 0;
             }
-            #[cfg(not(any(
-                feature = "julia-1-6",
-                feature = "julia-1-7",
-                feature = "julia-1-8",
-                feature = "julia-1-9",
-                feature = "julia-1-10",
-                feature = "julia-1-11"
-            )))]
+            #[cfg(not(any(feature = "julia-1-10", feature = "julia-1-11")))]
             sz if sz <= 16 => {
                 let atomic = &*ptr.cast::<atomic::Atomic<u128>>();
                 let v = atomic.load(ordering);
@@ -628,7 +572,6 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
         }
     }
 
-    #[julia_version(since = "1.7")]
     // Safety: must only be used to read an pointer field
     unsafe fn get_pointer_field(&mut self, locked: bool, next_field_type: Value<'scope, 'data>) {
         let value = self
@@ -668,41 +611,6 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
         }
     }
 
-    #[julia_version(until = "1.6")]
-    // Safety: must only be used to read an pointer field
-    unsafe fn get_pointer_field(&mut self, _locked: bool, next_field_type: Value<'scope, 'data>) {
-        self.value = self
-            .value
-            .unwrap()
-            .ptr()
-            .cast::<u8>()
-            .as_ptr()
-            .add(self.offset as usize)
-            .cast::<Option<ValueRef>>()
-            .read();
-
-        self.offset = 0;
-
-        if self.value.is_none() {
-            if let Ok(ty) = next_field_type.cast::<DataType>() {
-                if ty.is_concrete_type() {
-                    self.current_field_type = Some(ty.as_ref());
-                } else {
-                    self.current_field_type = None;
-                }
-            } else {
-                self.current_field_type = None;
-            }
-        } else {
-            let value = self.value.unwrap().as_value();
-            self.current_field_type = Some(value.datatype().as_ref());
-            if value.is::<Array>() {
-                self.state = ViewState::Array;
-            }
-        }
-    }
-
-    #[julia_version(since = "1.7")]
     // Safety: must only be used to read an atomic pointer field
     unsafe fn get_atomic_pointer_field(
         &mut self,
@@ -774,7 +682,6 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
 
 impl Drop for FieldAccessor<'_, '_> {
     fn drop(&mut self) {
-        #[cfg(not(feature = "julia-1-6"))]
         if self.state == ViewState::Locked {
             debug_assert!(!self.value.is_none());
             // Safety: the value is currently locked.

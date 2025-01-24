@@ -147,15 +147,10 @@ pub fn encode_as_constant_bytes(item: TokenStream) -> TokenStream {
 /// Conditional compilation depending on the used version of Julia.
 ///
 /// This macro can be used instead of a custom `cfg` to conditionally compile code for
-/// certain versions of Julia. For example, to enable a function when Julia 1.6, 1.7 or 1.10 is
-/// used on Linux, or when Julia 1.7 or 1.10 is used on Windows:
+/// certain versions of Julia. For example, to enable a function when Julia 1.10 or 1.12 is
+/// used:
 ///
-/// `#[julia_version(since = "1.6", until = "1.10", except = ["1.8", "1.9"], windows_lts = false)]`
-///
-/// By default, `since = "1.6"`, `until = "1.10"`, `except = []`, and `windows_lts = None`, so the
-/// above can be written more compactly as:
-///
-/// `#[julia_version(except = ["1.8", "1.9"], windows_lts = false)]`.
+/// `#[julia_version(since = "1.10", until = "1.12", except = ["1.11"])]`
 #[proc_macro_attribute]
 pub fn julia_version(attr: TokenStream, item: TokenStream) -> TokenStream {
     emit_if_compatible(attr, item)

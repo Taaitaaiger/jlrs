@@ -6,7 +6,6 @@ use jl_sys::{
     jl_cpu_threads, jl_get_UNAME, jl_is_debugbuild, jl_n_threads, jl_ver_is_release, jl_ver_major,
     jl_ver_minor, jl_ver_patch, jl_ver_string,
 };
-use jlrs_macros::julia_version;
 
 use crate::{
     data::managed::{private::ManagedPriv, symbol::Symbol},
@@ -23,21 +22,12 @@ impl Info {
         unsafe { jl_cpu_threads() as usize }
     }
 
-    #[julia_version(until = "1.8")]
-    #[inline]
-    /// Number of threads Julia can use.
-    pub fn n_threads() -> usize {
-        unsafe { jl_n_threads as usize }
-    }
-
-    #[julia_version(since = "1.9")]
     #[inline]
     /// Number of threads Julia can use.
     pub fn n_threads() -> usize {
         unsafe { jl_n_threads.load(::std::sync::atomic::Ordering::Relaxed) as usize }
     }
 
-    #[julia_version(since = "1.9")]
     /// Number of threads per thread pool.
     pub fn n_threads_per_pool() -> &'static [u32] {
         unsafe {
@@ -47,7 +37,6 @@ impl Info {
         }
     }
 
-    #[julia_version(since = "1.10")]
     #[inline]
     /// Number of GC threads Julia can use.
     pub fn n_gc_threads() -> usize {

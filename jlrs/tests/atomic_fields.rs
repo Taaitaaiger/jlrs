@@ -1,6 +1,5 @@
 mod util;
 #[cfg(feature = "local-rt")]
-#[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7")))]
 mod tests {
     use jlrs::prelude::*;
 

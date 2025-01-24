@@ -3,48 +3,18 @@ use std::ops::RangeInclusive;
 use proc_macro::{Delimiter, TokenStream, TokenTree};
 
 const MAJOR_VERSION: usize = 1;
-const LTS_MINOR_VERSION: usize = 6;
+const LTS_MINOR_VERSION: usize = 10;
 const NIGHTLY_MINOR_VERSION: usize = 12;
 
-#[cfg(not(any(
-    feature = "julia-1-6",
-    feature = "julia-1-7",
-    feature = "julia-1-8",
-    feature = "julia-1-9",
-    feature = "julia-1-10",
-    feature = "julia-1-11",
-    feature = "julia-1-12",
-)))]
+#[cfg(not(any(feature = "julia-1-10", feature = "julia-1-11", feature = "julia-1-12",)))]
 compile_error!(
     "A Julia version must be selected by enabling exactly one of the following version features:
-    julia-1-6
-    julia-1-7
-    julia-1-8
-    julia-1-9
     julia-1-10
     julia-1-11
     julia-1-12"
 );
 
 #[cfg(any(
-    all(feature = "julia-1-6", feature = "julia-1-7"),
-    all(feature = "julia-1-6", feature = "julia-1-8"),
-    all(feature = "julia-1-6", feature = "julia-1-9"),
-    all(feature = "julia-1-6", feature = "julia-1-10"),
-    all(feature = "julia-1-6", feature = "julia-1-11"),
-    all(feature = "julia-1-6", feature = "julia-1-12"),
-    all(feature = "julia-1-7", feature = "julia-1-8"),
-    all(feature = "julia-1-7", feature = "julia-1-9"),
-    all(feature = "julia-1-7", feature = "julia-1-10"),
-    all(feature = "julia-1-7", feature = "julia-1-11"),
-    all(feature = "julia-1-7", feature = "julia-1-12"),
-    all(feature = "julia-1-8", feature = "julia-1-9"),
-    all(feature = "julia-1-8", feature = "julia-1-10"),
-    all(feature = "julia-1-8", feature = "julia-1-11"),
-    all(feature = "julia-1-8", feature = "julia-1-12"),
-    all(feature = "julia-1-9", feature = "julia-1-10"),
-    all(feature = "julia-1-9", feature = "julia-1-11"),
-    all(feature = "julia-1-9", feature = "julia-1-12"),
     all(feature = "julia-1-10", feature = "julia-1-11"),
     all(feature = "julia-1-10", feature = "julia-1-12"),
     all(feature = "julia-1-11", feature = "julia-1-12"),
@@ -52,21 +22,8 @@ compile_error!(
 compile_error!("Multiple Julia version features have been enabled");
 
 // Avoid a second error if no version feature is enabled
-#[cfg(not(any(
-    feature = "julia-1-7",
-    feature = "julia-1-8",
-    feature = "julia-1-9",
-    feature = "julia-1-10",
-    feature = "julia-1-11",
-    feature = "julia-1-12",
-)))]
-const SELECTED_MINOR_VERSION: usize = 6;
-#[cfg(feature = "julia-1-7")]
-const SELECTED_MINOR_VERSION: usize = 7;
-#[cfg(feature = "julia-1-8")]
-const SELECTED_MINOR_VERSION: usize = 8;
-#[cfg(feature = "julia-1-9")]
-const SELECTED_MINOR_VERSION: usize = 9;
+#[cfg(not(any(feature = "julia-1-10", feature = "julia-1-11", feature = "julia-1-12",)))]
+const SELECTED_MINOR_VERSION: usize = 10;
 #[cfg(feature = "julia-1-10")]
 const SELECTED_MINOR_VERSION: usize = 10;
 #[cfg(feature = "julia-1-11")]
@@ -79,7 +36,6 @@ pub fn emit_if_compatible(attr: TokenStream, item: TokenStream) -> TokenStream {
     let mut since = None;
     let mut until = None;
     let mut except = None;
-    let mut windows_lts = None;
 
     loop {
         match tts.next() {
@@ -94,13 +50,6 @@ pub fn emit_if_compatible(attr: TokenStream, item: TokenStream) -> TokenStream {
                 "until" => {
                     expect_punt_eq(&mut tts);
                     until = Some(unwrap_version(&mut tts));
-                    if !expect_comma_or_end(&mut tts) {
-                        break;
-                    }
-                }
-                "windows_lts" => {
-                    expect_punt_eq(&mut tts);
-                    windows_lts = Some(unwrap_bool(&mut tts));
                     if !expect_comma_or_end(&mut tts) {
                         break;
                     }
@@ -123,7 +72,7 @@ pub fn emit_if_compatible(attr: TokenStream, item: TokenStream) -> TokenStream {
     let until = until.unwrap_or(Version::new(MAJOR_VERSION, NIGHTLY_MINOR_VERSION));
     let except = except.unwrap_or_default();
 
-    if should_emit(since, until, windows_lts, &except) {
+    if should_emit(since, until, &except) {
         item
     } else {
         TokenStream::new()
@@ -154,21 +103,6 @@ fn expect_comma_or_end<T: Iterator<Item = TokenTree>>(iter: &mut T) -> bool {
         }
         Some(other) => panic!("Expected =, got {}", other),
         None => false,
-    }
-}
-
-fn unwrap_bool<T: Iterator<Item = TokenTree>>(iter: &mut T) -> bool {
-    match iter.next() {
-        Some(TokenTree::Ident(ident)) => {
-            let ident = ident.to_string();
-            match ident.as_ref() {
-                "true" => true,
-                "false" => false,
-                other => panic!("Expected true or false, got {}", other),
-            }
-        }
-        Some(other) => panic!("Expected true or false, got {}", other),
-        None => panic!("Expected true or false, got nothing"),
     }
 }
 
@@ -254,12 +188,7 @@ fn selected_version() -> Version {
 }
 
 #[allow(unused_variables)]
-fn should_emit(
-    since: Version,
-    until: Version,
-    windows_lts: Option<bool>,
-    except: &[Version],
-) -> bool {
+fn should_emit(since: Version, until: Version, except: &[Version]) -> bool {
     let selected = selected_version();
     if since > selected {
         return false;
@@ -271,23 +200,6 @@ fn should_emit(
 
     if except.contains(&selected) {
         return false;
-    }
-
-    if let Some(windows_lts) = windows_lts {
-        #[cfg(any(feature = "windows", target_os = "windows"))]
-        if selected.minor == LTS_MINOR_VERSION && !windows_lts {
-            return false;
-        }
-
-        #[cfg(any(feature = "windows", target_os = "windows"))]
-        if selected.minor != LTS_MINOR_VERSION && windows_lts {
-            return false;
-        }
-
-        #[cfg(not(any(feature = "windows", target_os = "windows")))]
-        if windows_lts {
-            return false;
-        }
     }
 
     true

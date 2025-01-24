@@ -6,7 +6,6 @@ use jl_sys::{
     jl_gc_mark_queue_objarray, jl_gc_safepoint, jlrs_gc_safe_enter, jlrs_gc_safe_leave,
     jlrs_gc_unsafe_enter, jlrs_gc_unsafe_leave, jlrs_gc_wb, jlrs_ppgcstack,
 };
-use jlrs_macros::julia_version;
 
 use super::{
     get_tls,
@@ -15,10 +14,10 @@ use super::{
 };
 #[cfg(feature = "local-rt")]
 use crate::runtime::sync_rt::Julia;
-#[julia_version(since = "1.7")]
-use crate::{call::Call, data::managed::module::Module};
 use crate::{
+    call::Call,
     data::managed::{
+        module::Module,
         private::ManagedPriv,
         value::{Value, ValueRef},
     },
@@ -39,7 +38,6 @@ pub trait Gc: private::GcPriv {
         unsafe { jl_gc_enable(on as i32) != 0 }
     }
 
-    #[julia_version(since = "1.7")]
     /// Enable or disable GC logging.
     ///
     /// This method is not available when the `lts` feature is enabled.

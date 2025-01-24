@@ -1,4 +1,3 @@
-#[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8")))]
 mod delegated_task {
     use jlrs::{
         data::{

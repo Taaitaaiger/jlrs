@@ -243,15 +243,7 @@ fn compile_jlrs_cc(julia_dir: &str, target: Option<Target>) {
     c.flag("-flto=thin");
 
     cfg_if! {
-        if #[cfg(feature = "julia-1-6")] {
-            c.define("JLRS_EXPECTED_MINOR_VERSION", Some("6"));
-        } else if #[cfg(feature = "julia-1-7")] {
-            c.define("JLRS_EXPECTED_MINOR_VERSION", Some("7"));
-        } else if #[cfg(feature = "julia-1-8")] {
-            c.define("JLRS_EXPECTED_MINOR_VERSION", Some("8"));
-        } else if #[cfg(feature = "julia-1-9")] {
-            c.define("JLRS_EXPECTED_MINOR_VERSION", Some("9"));
-        } else if #[cfg(feature = "julia-1-10")] {
+        if #[cfg(feature = "julia-1-10")] {
             c.define("JLRS_EXPECTED_MINOR_VERSION", Some("10"));
         } else if #[cfg(feature = "julia-1-11")] {
             c.define("JLRS_EXPECTED_MINOR_VERSION", Some("11"));
@@ -264,23 +256,6 @@ fn compile_jlrs_cc(julia_dir: &str, target: Option<Target>) {
     // Rust application.
     #[cfg(all(feature = "fast-tls", not(feature = "yggdrasil")))]
     c.define("JLRS_FAST_TLS", None);
-
-    #[cfg(all(
-        any(windows, target_os = "windows", feature = "windows"),
-        feature = "julia-1-6"
-    ))]
-    c.define("JLRS_WINDOWS_LTS", None);
-
-    #[cfg(feature = "julia-1-6")]
-    match target {
-        Some(Target::Windows) => {
-            c.define("JLRS_WINDOWS_LTS", None);
-        }
-        Some(Target::WindowsI686) => {
-            c.define("JLRS_WINDOWS_LTS", None);
-        }
-        _ => (),
-    }
 
     c.compile("jlrs_cc");
 }

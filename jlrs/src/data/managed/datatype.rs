@@ -3,24 +3,22 @@
 use std::{ffi::CStr, marker::PhantomData, ptr::NonNull};
 
 use jl_sys::{
-    jl_abstractstring_type, jl_any_type, jl_anytuple_type, jl_argumenterror_type, jl_bool_type,
-    jl_boundserror_type, jl_char_type, jl_const_type, jl_datatype_t, jl_datatype_type,
-    jl_emptytuple_type, jl_errorexception_type, jl_expr_type, jl_field_index, jl_float16_type,
-    jl_float32_type, jl_float64_type, jl_floatingpoint_type, jl_function_type,
-    jl_has_free_typevars, jl_initerror_type, jl_int16_type, jl_int32_type, jl_int64_type,
-    jl_int8_type, jl_loaderror_type, jl_methoderror_type, jl_module_type, jl_new_structv,
-    jl_nothing_type, jl_number_type, jl_signed_type, jl_simplevector_type, jl_string_type,
-    jl_symbol_type, jl_task_type, jl_tvar_type, jl_typeerror_type, jl_typename_str,
+    jl_abstractstring_type, jl_any_type, jl_anytuple_type, jl_argumenterror_type,
+    jl_atomicerror_type, jl_bool_type, jl_boundserror_type, jl_char_type, jl_const_type,
+    jl_datatype_t, jl_datatype_type, jl_emptytuple_type, jl_errorexception_type, jl_expr_type,
+    jl_field_index, jl_float16_type, jl_float32_type, jl_float64_type, jl_floatingpoint_type,
+    jl_function_type, jl_has_free_typevars, jl_initerror_type, jl_int16_type, jl_int32_type,
+    jl_int64_type, jl_int8_type, jl_loaderror_type, jl_methoderror_type, jl_module_type,
+    jl_new_structv, jl_nothing_type, jl_number_type, jl_signed_type, jl_simplevector_type,
+    jl_string_type, jl_symbol_type, jl_task_type, jl_tvar_type, jl_typeerror_type, jl_typename_str,
     jl_typename_type, jl_typeofbottom_type, jl_uint16_type, jl_uint32_type, jl_uint64_type,
-    jl_uint8_type, jl_undefvarerror_type, jl_unionall_type, jl_uniontype_type, jl_voidpointer_type,
-    jlrs_datatype_align, jlrs_datatype_first_ptr, jlrs_datatype_has_layout, jlrs_datatype_instance,
-    jlrs_datatype_layout, jlrs_datatype_nfields, jlrs_datatype_parameters, jlrs_datatype_size,
-    jlrs_datatype_super, jlrs_datatype_typename, jlrs_datatype_zeroinit, jlrs_field_isptr,
-    jlrs_field_offset, jlrs_field_size, jlrs_get_fieldtypes, jlrs_is_concrete_type,
-    jlrs_is_primitivetype, jlrs_isbits, jlrs_nparams,
+    jl_uint8_type, jl_undefvarerror_type, jl_unionall_type, jl_uniontype_type, jl_vararg_type,
+    jl_voidpointer_type, jlrs_datatype_align, jlrs_datatype_first_ptr, jlrs_datatype_has_layout,
+    jlrs_datatype_instance, jlrs_datatype_layout, jlrs_datatype_nfields, jlrs_datatype_parameters,
+    jlrs_datatype_size, jlrs_datatype_super, jlrs_datatype_typename, jlrs_datatype_zeroinit,
+    jlrs_field_isptr, jlrs_field_offset, jlrs_field_size, jlrs_get_fieldtypes,
+    jlrs_is_concrete_type, jlrs_is_primitivetype, jlrs_isbits, jlrs_nparams,
 };
-#[julia_version(since = "1.7")]
-use jl_sys::{jl_atomicerror_type, jl_vararg_type};
 use jlrs_macros::julia_version;
 
 use super::{type_name::TypeName, value::ValueData, Ref};
@@ -232,18 +230,6 @@ impl<'scope> DataType<'scope> {
         }
     }
 
-    #[julia_version(until = "1.8")]
-    /// Returns the size of a value of this type in bytes.
-    #[inline]
-    pub fn size(self) -> Option<u32> {
-        if self.is_abstract() {
-            return None;
-        }
-        // Safety: the pointer points to valid data
-        unsafe { Some(jlrs_datatype_size(self.unwrap(Private))) }
-    }
-
-    #[julia_version(since = "1.9")]
     /// Returns the size of a value of this type in bytes.
     #[inline]
     pub fn size(self) -> Option<u32> {
@@ -421,7 +407,6 @@ impl<'scope> DataType<'scope> {
         jlrs_field_isptr(self.unwrap(Private), idx as _) != 0
     }
 
-    #[julia_version(since = "1.7")]
     /// Returns true if the field at position `idx` is an atomic field.
     pub fn is_atomic_field(self, idx: usize) -> Option<bool> {
         let n_fields = self.n_fields()?;
@@ -434,7 +419,6 @@ impl<'scope> DataType<'scope> {
         unsafe { Some(self.is_atomic_field_unchecked(idx)) }
     }
 
-    #[julia_version(since = "1.7")]
     /// Returns true if the field at position `idx` is an atomic field.
     ///
     /// Safety: an exception must not be thrown if this method is called from a `ccall`ed
@@ -458,7 +442,6 @@ impl<'scope> DataType<'scope> {
         isatomic != 0
     }
 
-    #[julia_version(since = "1.8")]
     /// Returns true if the field at position `idx` is a constant field.
     pub fn is_const_field(self, idx: usize) -> Option<bool> {
         let n_fields = self.n_fields()?;
@@ -471,7 +454,6 @@ impl<'scope> DataType<'scope> {
         unsafe { Some(self.is_const_field_unchecked(idx)) }
     }
 
-    #[julia_version(since = "1.8")]
     /// Returns true if the field at position `idx` is a constant field.
     ///
     /// Safety: an exception must not be thrown if this method is called from a `ccall`ed
@@ -785,7 +767,6 @@ impl<'target> DataType<'target> {
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_anytuple_type), Private) }
     }
 
-    #[julia_version(since = "1.7")]
     /// The type `Vararg`.
     #[inline]
     pub fn vararg_type<Tgt>(_: &Tgt) -> Self
@@ -906,7 +887,6 @@ impl<'target> DataType<'target> {
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_undefvarerror_type), Private) }
     }
 
-    #[julia_version(since = "1.7")]
     /// The type `Core.AtomicError`.
     #[inline]
     pub fn atomicerror_type<Tgt>(_: &Tgt) -> Self

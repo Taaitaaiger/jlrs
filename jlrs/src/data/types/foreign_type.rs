@@ -58,14 +58,10 @@ use std::{
 };
 
 use fnv::FnvHashMap;
-#[julia_version(except = ["1.7"])]
-use jl_sys::jl_gc_schedule_foreign_sweepfunc;
-#[julia_version(since = "1.9")]
-use jl_sys::jl_reinit_foreign_type;
 use jl_sys::{
-    jl_any_type, jl_emptysvec, jl_gc_alloc_typed, jl_new_datatype, jl_new_foreign_type, jl_value_t,
+    jl_any_type, jl_emptysvec, jl_gc_alloc_typed, jl_gc_schedule_foreign_sweepfunc,
+    jl_new_datatype, jl_new_foreign_type, jl_reinit_foreign_type, jl_value_t,
 };
-use jlrs_macros::julia_version;
 
 use super::{
     construct_type::{TypeVarConstructor, TypeVarName},
@@ -913,20 +909,6 @@ where
     target.with_local_scope::<_, _, 1>(|target, mut frame| {
         let super_type = U::super_type(&mut frame).unwrap(Private);
 
-        #[cfg(feature = "julia-1-6")]
-        let ty = jl_new_datatype(
-            name.unwrap(Private),
-            module.unwrap(Private),
-            super_type,
-            jl_emptysvec,
-            jl_emptysvec,
-            jl_emptysvec,
-            0,
-            1,
-            0,
-        );
-
-        #[cfg(not(feature = "julia-1-6"))]
         let ty = jl_new_datatype(
             name.unwrap(Private),
             module.unwrap(Private),
@@ -1004,20 +986,6 @@ where
         let super_type = U::super_type(&mut frame);
         let bounds = U::type_parameters(&mut frame);
 
-        #[cfg(feature = "julia-1-6")]
-        let ty = jl_new_datatype(
-            name.unwrap(Private),
-            module.unwrap(Private),
-            super_type.unwrap(Private),
-            bounds.unwrap(Private),
-            jl_emptysvec,
-            jl_emptysvec,
-            0,
-            1,
-            0,
-        );
-
-        #[cfg(not(feature = "julia-1-6"))]
         let ty = jl_new_datatype(
             name.unwrap(Private),
             module.unwrap(Private),
@@ -1075,7 +1043,6 @@ where
     target.data_from_ptr(NonNull::new_unchecked(ty), Private)
 }
 
-#[julia_version(since = "1.9")]
 unsafe fn reinit_foreign_type<U>(datatype: DataType) -> bool
 where
     U: ForeignType,
@@ -1102,15 +1069,6 @@ where
     } else {
         panic!()
     }
-}
-
-#[julia_version(until = "1.8")]
-#[inline]
-unsafe fn reinit_foreign_type<U>(datatype: DataType) -> bool
-where
-    U: ForeignType,
-{
-    reinit_opaque_type::<U>(datatype)
 }
 
 unsafe fn reinit_opaque_type<U>(ty: DataType) -> bool
@@ -1155,16 +1113,6 @@ where
     true
 }
 
-#[julia_version(since = "1.7", until = "1.7")]
-#[inline]
-unsafe fn do_sweep<T>(_: &mut ForeignValue<T>)
-where
-    T: ForeignType,
-{
-    // Sweep is called while the data is still reachable, a finalizer is used instead.
-}
-
-#[julia_version(except = ["1.7"])]
 #[inline]
 unsafe fn do_sweep<T>(data: &mut ForeignValue<T>)
 where
@@ -1225,14 +1173,6 @@ unsafe impl<F: ParametricVariant> IntoJulia for F {
             let res = target.data_from_ptr(NonNull::new_unchecked(ptr.cast()), Private);
 
             if Self::IS_FOREIGN {
-                // Use a finalizer for Julia 1.7 because sweep is called even though the data is rooted.
-                #[cfg(any(feature = "julia-1-7"))]
-                jl_sys::jl_gc_add_ptr_finalizer(
-                    ptls,
-                    ptr.cast(),
-                    drop_opaque::<Self> as *mut c_void,
-                );
-                #[cfg(not(feature = "julia-1-7"))]
                 jl_gc_schedule_foreign_sweepfunc(ptls, ptr.cast());
             } else {
                 jl_sys::jl_gc_add_ptr_finalizer(

@@ -17,10 +17,8 @@ extern "C"
     // This is obviously a hack, but less so than than manually reimplementing these functions.
     void jlrs_init_missing_functions(void);
 
-#if JULIA_VERSION_MINOR >= 7
     void jlrs_lock_value(jl_value_t *v);
     void jlrs_unlock_value(jl_value_t *v);
-#endif // JULIA_VERSION_MINOR >= 7
 
 #if JULIA_VERSION_MINOR >= 11
     jl_genericmemoryref_t jlrs_memoryrefindex(jl_genericmemoryref_t m JL_ROOTING_ARGUMENT, size_t idx);

@@ -38,13 +38,7 @@ pub(crate) mod tests {
         });
     }
 
-    #[cfg(any(
-        feature = "julia-1-6",
-        feature = "julia-1-7",
-        feature = "julia-1-8",
-        feature = "julia-1-9",
-        feature = "julia-1-10"
-    ))]
+    #[cfg(any(feature = "julia-1-10"))]
     fn typed_vector_grow_end_err() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -92,13 +86,7 @@ pub(crate) mod tests {
         });
     }
 
-    #[cfg(any(
-        feature = "julia-1-6",
-        feature = "julia-1-7",
-        feature = "julia-1-8",
-        feature = "julia-1-9",
-        feature = "julia-1-10"
-    ))]
+    #[cfg(any(feature = "julia-1-10"))]
     fn typed_vector_del_end_err() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -120,23 +108,11 @@ pub(crate) mod tests {
 
     pub(crate) fn array_grow_del_tests() {
         typed_vector_grow_end();
-        #[cfg(any(
-            feature = "julia-1-6",
-            feature = "julia-1-7",
-            feature = "julia-1-8",
-            feature = "julia-1-9",
-            feature = "julia-1-10"
-        ))]
+        #[cfg(any(feature = "julia-1-10"))]
         typed_vector_grow_end_err();
 
         typed_vector_del_end();
-        #[cfg(any(
-            feature = "julia-1-6",
-            feature = "julia-1-7",
-            feature = "julia-1-8",
-            feature = "julia-1-9",
-            feature = "julia-1-10"
-        ))]
+        #[cfg(any(feature = "julia-1-10"))]
         typed_vector_del_end_err();
 
         unsafe {

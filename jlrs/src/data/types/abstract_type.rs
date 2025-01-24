@@ -4,8 +4,6 @@
 
 use std::marker::PhantomData;
 
-use jlrs_macros::julia_version;
-
 use super::construct_type::{ConstructType, TypeVarEnv};
 use crate::{
     data::managed::{
@@ -702,17 +700,14 @@ unsafe impl<T: ConstructType> ConstructType for AbstractSet<T> {
     }
 }
 
-#[julia_version(since = "1.9")]
 /// Construct a new `AbstractSlices` type object from the provided type parameters.
 pub struct AbstractSlices<T: ConstructType, N: ConstructType> {
     _type: PhantomData<T>,
     _n: PhantomData<N>,
 }
 
-#[julia_version(since = "1.9")]
 unsafe impl<T: ConstructType, N: ConstructType> AbstractType for AbstractSlices<T, N> {}
 
-#[julia_version(since = "1.9")]
 unsafe impl<T: ConstructType, N: ConstructType> ConstructType for AbstractSlices<T, N> {
     type Static = AbstractSlices<T::Static, N::Static>;
 

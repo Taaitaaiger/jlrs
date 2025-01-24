@@ -1,5 +1,4 @@
 #[cfg(feature = "multi-rt")]
-#[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8")))]
 mod mt_handle {
     use jlrs::{data::managed::value::Value, memory::scope::LocalScope, runtime::builder::Builder};
 

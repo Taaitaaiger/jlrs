@@ -1,9 +1,10 @@
 //! jlrs is a crate that provides access to the Julia C API. It can be used to embed Julia in Rust
 //! applications and to write interop libraries to Rust crates that can be used by Julia.
 //!
-//! Julia versions 1.6 up to and including 1.11 are supported, but only the LTS and stable versions
-//! are actively tested. Using the current stable version of Julia is highly recommended. The
-//! minimum supported Rust version is currently 1.77.
+//! Julia versions 1.10 and 1.11 are currently supported. In general jlrs aims to support all 
+//! versions starting at the current LTS version, but only the LTS and stable versions are 
+//! actively tested. Using the current stable version of Julia is highly recommended. The minimum
+//! supported Rust version is currently 1.77.
 //!
 //! A tutorial is available [here](https://taaitaaiger.github.io/jlrs-tutorial/).
 //!
@@ -32,10 +33,9 @@
 //!
 //! # Prerequisites
 //!
-//! Julia must be installed before jlrs can be used, jlrs is compatible with Julia 1.6 up to and
-//! including Julia 1.11. If the JlrsCore package has not been installed, it will automatically be
-//! installed when jlrs is initialized by default. jlrs has not been tested with juliaup yet on
-//! Linux and macOS.
+//! Julia must be installed before jlrs can be used, jlrs is compatible with Julia 1.10 and 1.11.
+//! If the JlrsCore package has not been installed, it will automatically be installed when jlrs 
+//! is initialized by default. jlrs has not been tested with juliaup yet on Linux and macOS.
 //!
 //! ## Linux
 //!
@@ -86,10 +86,6 @@
 //! of Julia. To ensure the correct bindings are used for a particular version of Julia you must
 //! enable a version feature. The following version features currently exist:
 //!
-//!  - `julia-1-6`
-//!  - `julia-1-7`
-//!  - `julia-1-8`
-//!  - `julia-1-9`
 //!  - `julia-1-10`
 //!  - `julia-1-11`
 //!
@@ -100,10 +96,6 @@
 //!
 //! ```toml
 //! [features]
-//! julia-1-6 = ["jlrs/julia-1-6"]
-//! julia-1-7 = ["jlrs/julia-1-7"]
-//! julia-1-8 = ["jlrs/julia-1-8"]
-//! julia-1-9 = ["jlrs/julia-1-9"]
 //! julia-1-10 = ["jlrs/julia-1-10"]
 //! julia-1-11 = ["jlrs/julia-1-11"]
 //! ```
@@ -131,7 +123,7 @@
 //!
 //!    Enables the multithreaded runtime. The multithreaded runtime lets you call Julia from
 //!    arbitrary threads. It can be combined with the `async-rt` feature to create Julia-aware
-//!    thread pools. This feature requires Julia 1.9 or higher.
+//!    thread pools.
 //!
 //!
 //! <div class="warning"><strong>WARNING</strong>: Runtime features must only be enabled by applications that embed Julia.
@@ -454,7 +446,7 @@
 //! ### Multithreaded runtime
 //!
 //! The multithreaded runtime initializes Julia on some background thread, and allows calling into
-//! Julia from arbitrary threads. This runtime is available since Julia 1.9.
+//! Julia from arbitrary threads.
 //!
 //! To start this runtime you need to create a `Builder` and call [`Builder::start_mt`]. It has
 //! its own handle type, [`MtHandle`], which can be used to spawn new threads that can call into
@@ -470,7 +462,6 @@
 //!
 //! # fn main() {
 //! # #[cfg(feature = "multi-rt")]
-//! # #[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8")))]
 //! # {
 //! // When the multithreaded runtime is started the current thread initializes Julia.
 //! Builder::new().start_mt(|mt_handle| {
@@ -752,7 +743,6 @@
 //!
 //! # fn main() {
 //! # #[cfg(feature = "multi-rt")]
-//! # #[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8")))]
 //! # {
 //! Builder::new()
 //!     .async_runtime(Tokio::<3>::new(false))
