@@ -1,3 +1,9 @@
+#### v0.23
+
+- It's no longer possible to spawn a multithreaded runtime, it must be started. Spawning has been removed to avoid issues due to adopting threads that live longer than the runtime thread.
+
+- The multithreaded runtime uses scoped threads internally, this allows closures to reference non-static data and ensures the adopted threads have exited before the runtime thread, but requires calling `MtHandle::spawn` to spawn a new thread.
+
 #### v0.22
 
 - Add several aliases for `JuliaResult` so they can be more easily returned from an exported funtion.

@@ -456,10 +456,10 @@
 //! The multithreaded runtime initializes Julia on some background thread, and allows calling into
 //! Julia from arbitrary threads. This runtime is available since Julia 1.9.
 //!
-//! To start this runtime you need to create a `Builder` and call [`Builder::spawn_mt`]. It has
-//! its own handle type, [`MtHandle`], which can be cloned and sent to other threads. Unlike the
-//! local runtime's `LocalHandle`, it can't be used directly, you must call [`MtHandle::with`]
-//! first to ensure the thread is in a state where it can call into Julia.
+//! To start this runtime you need to create a `Builder` and call [`Builder::start_mt`]. It has
+//! its own handle type, [`MtHandle`], which can be used to spawn new threads that can call into
+//! Julia. Unlike the local runtime's `LocalHandle`, it can't be used directly, you must call
+//! [`MtHandle::with`] first to ensure the thread is in a state where it can call into Julia.
 //!
 //! Let's call into Julia from two separate threads to see it in action:
 //!
@@ -472,39 +472,30 @@
 //! # #[cfg(feature = "multi-rt")]
 //! # #[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8")))]
 //! # {
-//! // When the multithreaded runtime is spawned, a new thread is spawned that initializes Julia.
-//! // This thread simply waits for shutdown to be requested when the final `mt_handle` is
-//! // dropped. An `MtHandle` and a `JoinHandle` to that runtime thread are returned.
-//! let (mut mt_handle, th_handle) = Builder::new().spawn_mt().unwrap();
-//!
-//! // We can send different instances of `MtHandle` to different threads. `MtHandle` is `Send`,
-//! // not `Sync` so we need to clone it in advance.
-//! let mut mt_handle2 = mt_handle.clone();
-//!
-//! let t1 = thread::spawn(move || {
-//!     // By calling `MtHandle::with` we enable the thread to call into Julia. The handle you can
-//!     // use in that closure provides the same functionality as the local runtime's
-//!     // `LocalHandle`.
-//!     mt_handle.with(|handle| {
-//!         handle.local_scope::<_, 1>(|mut frame| unsafe {
-//!             let _v = Value::new(&mut frame, 1);
+//! // When the multithreaded runtime is started the current thread initializes Julia.
+//! Builder::new().start_mt(|mt_handle| {
+//!     let t1 = mt_handle.spawn(move |mut mt_handle| {
+//!         // By calling `MtHandle::with` we enable the thread to call into Julia. The handle you can
+//!         // use in that closure provides the same functionality as the local runtime's
+//!         // `LocalHandle`.
+//!         mt_handle.with(|handle| {
+//!             handle.local_scope::<_, 1>(|mut frame| unsafe {
+//!                 let _v = Value::new(&mut frame, 1);
+//!             })
 //!         })
-//!     })
-//! });
+//!     });
 //!
-//! let t2 = thread::spawn(move || {
-//!     mt_handle2.with(|handle| {
-//!         handle.local_scope::<_, 1>(|mut frame| unsafe {
-//!             let _v = Value::new(&mut frame, 2);
+//!     let t2 = mt_handle.spawn(move |mut mt_handle| {
+//!         mt_handle.with(|handle| {
+//!             handle.local_scope::<_, 1>(|mut frame| unsafe {
+//!                 let _v = Value::new(&mut frame, 2);
+//!             })
 //!         })
-//!     })
-//! });
+//!     });
 //!
-//! t1.join().expect("thread 1 panicked");
-//! t2.join().expect("thread 2 panicked");
-//!
-//! // No more handles exist, so the runtime thread has shut down.
-//! th_handle.join().unwrap();
+//!     t1.join().expect("thread 1 panicked");
+//!     t2.join().expect("thread 2 panicked");
+//! }).unwrap();
 //! # }
 //! # }
 //! ```
@@ -763,21 +754,15 @@
 //! # #[cfg(feature = "multi-rt")]
 //! # #[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8")))]
 //! # {
-//! let (mt_handle, async_handle, thread_handle) = Builder::new()
+//! Builder::new()
 //!     .async_runtime(Tokio::<3>::new(false))
-//!     .spawn_mt()
+//!     .start_mt(|mt_handle, _async_handle| {
+//!         let pool_handle = mt_handle
+//!             .pool_builder(Tokio::<1>::new(false))
+//!             .n_workers(2.try_into().unwrap())
+//!             .spawn();
+//!     })
 //!     .unwrap();
-//!
-//! let pool_handle = mt_handle
-//!     .pool_builder(Tokio::<1>::new(false))
-//!     .n_workers(2.try_into().unwrap())
-//!     .spawn();
-//!
-//! // All handles must be dropped .
-//! std::mem::drop(mt_handle);
-//! std::mem::drop(pool_handle);
-//! std::mem::drop(async_handle);
-//! thread_handle.join().unwrap();
 //! # }
 //! # }
 //! ```
@@ -990,7 +975,7 @@
 //! [`DataType`]: crate::data::managed::datatype::DataType
 //! [`TypedArray`]: crate::data::managed::array::TypedArray
 //! [`Builder`]: crate::runtime::builder::Builder
-//! [`Builder::spawn_mt`]: crate::runtime::builder::Builder::spawn_mt
+//! [`Builder::start_mt`]: crate::runtime::builder::Builder::start_mt
 //! [`jlrs::prelude`]: crate::prelude
 //! [`julia_module`]: jlrs_macros::julia_module
 //! [documentation]: jlrs_macros::julia_module

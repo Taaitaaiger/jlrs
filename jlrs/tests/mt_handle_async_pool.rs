@@ -5,21 +5,17 @@ mod mt_handle {
 
     #[test]
     fn create_pool() {
-        let (julia, a_h, th) = Builder::new()
+        Builder::new()
             .async_runtime(Tokio::<3>::new(false))
-            .spawn_mt()
+            .start_mt(|julia, a_h: AsyncHandle| {
+                let handle = julia
+                    .pool_builder(Tokio::<1>::new(false))
+                    .n_workers(2.try_into().unwrap())
+                    .spawn();
+
+                assert_eq!(handle.n_workers(), 2);
+                std::mem::drop(a_h);
+            })
             .unwrap();
-
-        let handle = julia
-            .pool_builder(Tokio::<1>::new(false))
-            .n_workers(2.try_into().unwrap())
-            .spawn();
-
-        assert_eq!(handle.n_workers(), 2);
-
-        std::mem::drop(julia);
-        std::mem::drop(handle);
-        std::mem::drop(a_h);
-        th.join().unwrap();
     }
 }

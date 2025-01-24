@@ -215,16 +215,16 @@ extern "C" {
     // Added in Julia 1.9
 
     #[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8",)))]
-    pub static mut jl_n_threads: std::sync::atomic::AtomicI32;
+    pub static jl_n_threads: std::sync::atomic::AtomicI32;
 
     #[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8",)))]
     pub static mut jl_kwcall_func: *mut crate::types::jl_value_t;
 
     #[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8",)))]
-    pub static mut jl_n_threadpools: std::cell::Cell<std::ffi::c_int>;
+    pub static jl_n_threadpools: std::cell::UnsafeCell<std::ffi::c_int>;
 
     #[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8",)))]
-    pub static mut jl_n_threads_per_pool: std::cell::Cell<*mut std::ffi::c_int>;
+    pub static jl_n_threads_per_pool: std::cell::UnsafeCell<*mut std::ffi::c_int>;
 
     // Added in Julia 1.10
 

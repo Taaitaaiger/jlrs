@@ -58,17 +58,10 @@ impl<E: Executor<N>, const N: usize> AsyncBuilder<E, N> {
     #[inline]
     #[cfg(feature = "multi-rt")]
     #[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8")))]
-    pub fn spawn_mt(self) -> JlrsResult<(MtHandle, AsyncHandle, JoinHandle<()>)> {
-        mt_impl::spawn_main_mt(self.builder, self.executor_opts, self.channel_capacity)
-    }
-
-    #[inline]
-    #[cfg(feature = "multi-rt")]
-    #[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8")))]
-    pub fn start_mt<T: 'static + Send>(
-        self,
-        func: impl 'static + Send + FnOnce(MtHandle, AsyncHandle) -> T,
-    ) -> JlrsResult<T> {
+    pub fn start_mt<'env, T: 'static + Send, F>(self, func: F) -> JlrsResult<T>
+    where
+        F: 'env + Send + for<'scope> FnOnce(MtHandle<'scope, 'env>, AsyncHandle) -> T,
+    {
         mt_impl::run_main_mt(
             self.builder,
             self.executor_opts,
@@ -233,12 +226,9 @@ pub(crate) fn run_main<T: 'static + Send, R: Executor<N>, const N: usize>(
 #[cfg(feature = "multi-rt")]
 #[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8")))]
 mod mt_impl {
-    use parking_lot::{Condvar, Mutex};
-    static INIT_LOCK: (Mutex<bool>, Condvar) = (Mutex::new(false), Condvar::new());
-
     use std::{
         panic::{catch_unwind, AssertUnwindSafe},
-        thread::{self, JoinHandle},
+        thread,
     };
 
     use jl_sys::jl_atexit_hook;
@@ -255,68 +245,22 @@ mod mt_impl {
                     cancellation_token::CancellationToken, channel::channel, on_main_thread,
                 },
                 mt_handle::{wait_loop, MtHandle, EXIT_LOCK},
-                notify, wait,
+                wait,
             },
             state::{can_init, set_exit},
         },
     };
 
-    pub(crate) fn spawn_main_mt<E: Executor<N>, const N: usize>(
-        builder: Builder,
-        executor_opts: E,
-        channel_capacity: usize,
-    ) -> JlrsResult<(MtHandle, AsyncHandle, JoinHandle<()>)> {
-        if !can_init() {
-            Err(RuntimeError::AlreadyInitialized)?;
-        }
-
-        let token = CancellationToken::new();
-        let t2 = token.clone();
-        let (sender, receiver) = channel(channel_capacity);
-
-        let handle = thread::spawn(move || {
-            unsafe {
-                init_runtime(&builder);
-
-                // Notify that initialization is finished
-                notify(&INIT_LOCK);
-
-                let mut base_frame = StackFrame::<N>::new_n();
-                let res = catch_unwind(AssertUnwindSafe(|| {
-                    executor_opts.block_on(on_main_thread::<E, N>(receiver, token, &mut base_frame))
-                }));
-
-                wait_loop();
-
-                let ret = match res {
-                    Ok(_) => {
-                        // Returned from wait_main, so we're about to exit Julia because all handles have
-                        // been dropped. Next we need to wait until we've returned from `notify_main` too.
-                        gc_safe(|| wait(&EXIT_LOCK));
-                        0
-                    }
-                    Err(_) => 1,
-                };
-                set_exit();
-                jl_atexit_hook(ret);
-            }
-        });
-
-        wait(&INIT_LOCK);
-        let mt_handle = unsafe { MtHandle::new() };
-        let async_handle = unsafe { AsyncHandle::new_main(sender, t2) };
-        Ok((mt_handle, async_handle, handle))
-    }
-
-    pub(crate) fn run_main_mt<T, E, const N: usize>(
+    pub(crate) fn run_main_mt<'env, T, E, F, const N: usize>(
         options: Builder,
         executor_opts: E,
         channel_capacity: usize,
-        func: impl 'static + Send + FnOnce(MtHandle, AsyncHandle) -> T,
+        func: F,
     ) -> JlrsResult<T>
     where
         T: Send + 'static,
         E: Executor<N>,
+        F: 'env + Send + for<'scope> FnOnce(MtHandle<'scope, 'env>, AsyncHandle) -> T,
     {
         if !can_init() {
             Err(RuntimeError::AlreadyInitialized)?;
@@ -332,39 +276,47 @@ mod mt_impl {
 
         let async_handle = unsafe { AsyncHandle::new_main(sender, t2) };
 
-        let handle = thread::spawn(|| unsafe {
-            let handle = MtHandle::new();
-            func(handle, async_handle)
+        let ret = thread::scope(|scope| {
+            let handle = scope.spawn(|| unsafe {
+                thread::scope(|scope| {
+                    let handle = MtHandle::new(scope);
+                    func(handle, async_handle)
+                })
+            });
+
+            unsafe {
+                let mut base_frame = StackFrame::<N>::new_n();
+                let res = catch_unwind(AssertUnwindSafe(|| {
+                    executor_opts.block_on(on_main_thread::<E, N>(
+                        receiver,
+                        token,
+                        &mut base_frame,
+                    ));
+                }));
+
+                wait_loop();
+
+                match res {
+                    Ok(_) => {
+                        // Returned from wait_main, so we're about to exit Julia becuase all handles have
+                        // been dropped. Next we need to wait until we've returned from `notify_main` too.
+                        gc_safe(|| wait(&EXIT_LOCK));
+                        set_exit();
+                        jl_atexit_hook(0);
+                    }
+                    Err(_) => {
+                        set_exit();
+                        jl_atexit_hook(1);
+                    }
+                }
+
+                handle.join()
+            }
         });
 
-        let ret = unsafe {
-            let mut base_frame = StackFrame::<N>::new_n();
-            let res = catch_unwind(AssertUnwindSafe(|| {
-                executor_opts.block_on(on_main_thread::<E, N>(receiver, token, &mut base_frame));
-            }));
-
-            wait_loop();
-
-            match res {
-                Ok(_) => {
-                    // Returned from wait_main, so we're about to exit Julia becuase all handles have
-                    // been dropped. Next we need to wait until we've returned from `notify_main` too.
-                    gc_safe(|| wait(&EXIT_LOCK));
-                    set_exit();
-                    jl_atexit_hook(0);
-                }
-                Err(_) => {
-                    set_exit();
-                    jl_atexit_hook(1);
-                }
-            }
-
-            match handle.join() {
-                Ok(ret) => ret,
-                Err(e) => Err(JlrsError::exception(format!("{e:?}")))?,
-            }
-        };
-
-        Ok(ret)
+        match ret {
+            Ok(ret) => Ok(ret),
+            Err(e) => Err(JlrsError::exception(format!("{e:?}")))?,
+        }
     }
 }
