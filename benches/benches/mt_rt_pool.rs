@@ -108,18 +108,19 @@ fn opts() -> Option<Options<'static>> {
 
 // criterion_main!(mt_rt_pool);
 fn main() {
-    Builder::new().start_mt(|mut handle| {
-        #[cfg(not(target_os = "windows"))]
-        let mut c = Criterion::default().with_profiler(PProfProfiler::new(1000, Output::Flamegraph(opts())));
-        #[cfg(target_os = "windows")]
-        let mut c = Criterion::default();
+    Builder::new()
+        .start_mt(|mut handle| {
+            #[cfg(not(target_os = "windows"))]
+            let mut c = Criterion::default()
+                .with_profiler(PProfProfiler::new(1000, Output::Flamegraph(opts())));
+            #[cfg(target_os = "windows")]
+            let mut c = Criterion::default();
 
-        blocking_task(&handle, &mut c);
-        async_task(&handle, &mut c);
-        use_local(&mut handle, &mut c);
+            blocking_task(&handle, &mut c);
+            async_task(&handle, &mut c);
+            use_local(&mut handle, &mut c);
 
-        Criterion::default()
-            .configure_from_args()
-            .final_summary();
-    }).unwrap();
+            Criterion::default().configure_from_args().final_summary();
+        })
+        .unwrap();
 }
