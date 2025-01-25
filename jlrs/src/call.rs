@@ -271,7 +271,9 @@
 //!
 //! [`named_tuple`]: crate::named_tuple
 
-use std::{future::Future, ptr::NonNull};
+#[cfg(feature = "async")]
+use std::future::Future;
+use std::ptr::NonNull;
 
 use jl_sys::{jl_call, jl_exception_occurred, jl_kwcall_func, jlrs_call_unchecked};
 
