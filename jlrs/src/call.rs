@@ -271,7 +271,7 @@
 //!
 //! [`named_tuple`]: crate::named_tuple
 
-use std::ptr::NonNull;
+use std::{future::Future, ptr::NonNull};
 
 use jl_sys::{jl_call, jl_exception_occurred, jl_kwcall_func, jlrs_call_unchecked};
 
@@ -606,7 +606,6 @@ impl<'data> Call<'data> for WithKeywords<'_, 'data> {
 
 cfg_if::cfg_if! {
     if #[cfg(feature = "async")] {
-        use async_trait::async_trait;
         use crate::{
             memory::target::frame::AsyncGcFrame,
             data::managed::{
@@ -623,7 +622,6 @@ cfg_if::cfg_if! {
         /// those methods should only be used from [`PersistentTask::init`].
         ///
         /// [`PersistentTask::init`]: crate::async_util::task::PersistentTask::init
-        #[async_trait(?Send)]
         pub trait CallAsync<'data>: Call<'data> {
             /// Creates and schedules a new task with `Base.Threads.@spawn`, and returns a future
             /// that resolves when this task is finished.
@@ -635,11 +633,11 @@ cfg_if::cfg_if! {
             /// check if any of the arguments is currently borrowed from Rust.
             ///
             /// [`safety`]: crate::safety
-            async unsafe fn call_async<'target, 'value, V, const N: usize>(
+            unsafe fn call_async<'target, 'value, V, const N: usize>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
-            ) -> JuliaResult<'target, 'data>
+            ) -> impl Future<Output = JuliaResult<'target, 'data>>
             where
                 V: Values<'value, 'data, N>;
 
@@ -655,32 +653,34 @@ cfg_if::cfg_if! {
             /// correctness. More information can be found in the [`safety`] module.
             ///
             /// [`safety`]: crate::safety
-            async unsafe fn call_async_tracked<'target, 'value, V, const N: usize>(
+            unsafe fn call_async_tracked<'target, 'value, V, const N: usize>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
-            ) -> JlrsResult<JuliaResult<'target, 'data>>
+            ) -> impl Future<Output = JlrsResult<JuliaResult<'target, 'data>>>
             where
                 V: Values<'value, 'data, N>
             {
-                let args = args.as_slice(Private);
-                let res = args
+                async move {
+                    let args = args.as_slice(Private);
+                    let res = args
                     .iter()
                     .copied()
                     .map(|arg| -> JlrsResult<()> {
 
-                            if Ledger::is_borrowed(arg)? {
-                                Err(AccessError::BorrowError)?
-                            }
-                            Ok(())
+                        if Ledger::is_borrowed(arg)? {
+                            Err(AccessError::BorrowError)?
+                        }
+                        Ok(())
                     })
                     .find(|f| f.is_err())
                     .map_or_else(
-                         || Ok(async { self.call_async(frame, args).await }),
+                        || Ok(async { self.call_async(frame, args).await }),
                         |_: _| Err(AccessError::BorrowError),
                     )?.await;
 
-                Ok(res)
+                    Ok(res)
+                }
             }
 
             /// Does the same thing as [`CallAsync::call_async`], but the task is returned rather than an
@@ -699,7 +699,7 @@ cfg_if::cfg_if! {
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
-            ) -> JuliaResult<Value<'target, 'data>, 'target, 'data>
+            ) -> JuliaResult<'target, 'data, Value<'target, 'data>>
             where
                 V: Values<'value, 'data, N>;
 
@@ -721,7 +721,7 @@ cfg_if::cfg_if! {
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
-            ) -> JlrsResult<JuliaResult<Value<'target, 'data>, 'target, 'data>>
+            ) -> JlrsResult<JuliaResult<'target, 'data, Value<'target, 'data>>>
             where
                 V: Values<'value, 'data, N>,
                 Tgt: Target<'target>,
@@ -757,11 +757,11 @@ cfg_if::cfg_if! {
             /// check if any of the arguments is currently borrowed from Rust.
             ///
             /// [`safety`]: crate::safety
-            async unsafe fn call_async_interactive<'target, 'value, V, const N: usize>(
+            unsafe fn call_async_interactive<'target, 'value, V, const N: usize>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
-            ) -> JuliaResult<'target, 'data>
+            ) -> impl Future<Output = JuliaResult<'target, 'data>>
             where
                 V: Values<'value, 'data, N>;
 
@@ -779,16 +779,17 @@ cfg_if::cfg_if! {
             /// returns an `AccessError::BorrowError` if any of the arguments is.
             ///
             /// [`safety`]: crate::safety
-            async unsafe fn call_async_interactive_tracked<'target, 'value, V, const N: usize>(
+            unsafe fn call_async_interactive_tracked<'target, 'value, V, const N: usize>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
-            ) -> JlrsResult<JuliaResult<'target, 'data>>
+            ) -> impl Future<Output = JlrsResult<JuliaResult<'target, 'data>>>
             where
                 V: Values<'value, 'data, N>
             {
-                let args = args.as_slice(Private);
-                let res = args
+                async move {
+                    let args = args.as_slice(Private);
+                    let res = args
                     .iter()
                     .copied()
                     .map(|arg| -> JlrsResult<()> {
@@ -799,11 +800,12 @@ cfg_if::cfg_if! {
                     })
                     .find(|f| f.is_err())
                     .map_or_else(
-                         || Ok(async { self.call_async_interactive(frame, args).await }),
+                        || Ok(async { self.call_async_interactive(frame, args).await }),
                         |_: _| Err(AccessError::BorrowError),
                     )?.await;
 
-                Ok(res)
+                    Ok(res)
+                }
             }
 
             /// Does the same thing as [`CallAsync::call_async`], but the task is returned rather than an
@@ -822,7 +824,7 @@ cfg_if::cfg_if! {
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
-            ) -> JuliaResult<Value<'target, 'data>, 'target, 'data>
+            ) -> JuliaResult<'target, 'data, Value<'target, 'data>>
             where
                 V: Values<'value, 'data, N>;
 
@@ -845,7 +847,7 @@ cfg_if::cfg_if! {
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
-            ) -> JlrsResult<JuliaResult<Value<'target, 'data>, 'target, 'data>>
+            ) -> JlrsResult<JuliaResult<'target, 'data, Value<'target, 'data>>>
             where
                 V: Values<'value, 'data, N>,
                 Tgt: Target<'target>,
@@ -881,11 +883,11 @@ cfg_if::cfg_if! {
             /// check if any of the arguments is currently borrowed from Rust.
             ///
             /// [`safety`]: crate::safety
-            async unsafe fn call_async_local<'target, 'value, V, const N: usize>(
+            unsafe fn call_async_local<'target, 'value, V, const N: usize>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
-            ) -> JuliaResult<'target, 'data>
+            ) -> impl Future<Output = JuliaResult<'target, 'data>>
             where
                 V: Values<'value, 'data, N>;
 
@@ -903,31 +905,33 @@ cfg_if::cfg_if! {
             /// returns an `AccessError::BorrowError` if any of the arguments is.
             ///
             /// [`safety`]: crate::safety
-            async unsafe fn call_async_local_tracked<'target, 'value, V, const N: usize>(
+            unsafe fn call_async_local_tracked<'target, 'value, V, const N: usize>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
-            ) -> JlrsResult<JuliaResult<'target, 'data>>
+            ) -> impl Future<Output = JlrsResult<JuliaResult<'target, 'data>>>
             where
                 V: Values<'value, 'data, N>
             {
-                let args = args.as_slice(Private);
-                let res = args
-                    .iter()
-                    .copied()
-                    .map(|arg| -> JlrsResult<()> {
-                        if Ledger::is_borrowed(arg)? {
-                            Err(AccessError::BorrowError)?
-                        }
-                        Ok(())
-                    })
-                    .find(|f| f.is_err())
-                    .map_or_else(
-                         || Ok(async { self.call_async_local(frame, args).await }),
-                        |_: _| Err(AccessError::BorrowError),
-                    )?.await;
+                async move {
+                    let args = args.as_slice(Private);
+                    let res = args
+                        .iter()
+                        .copied()
+                        .map(|arg| -> JlrsResult<()> {
+                            if Ledger::is_borrowed(arg)? {
+                                Err(AccessError::BorrowError)?
+                            }
+                            Ok(())
+                        })
+                        .find(|f| f.is_err())
+                        .map_or_else(
+                            || Ok(async { self.call_async_local(frame, args).await }),
+                            |_: _| Err(AccessError::BorrowError),
+                            )?.await;
 
-                Ok(res)
+                    Ok(res)
+                }
             }
 
             /// Does the same thing as [`CallAsync::call_async_local`], but the task is returned rather
@@ -946,7 +950,7 @@ cfg_if::cfg_if! {
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
-            ) -> JuliaResult<Value<'target, 'data>, 'target, 'data>
+            ) -> JuliaResult<'target, 'data, Value<'target, 'data>>
             where
                 V: Values<'value, 'data, N>;
 
@@ -969,7 +973,7 @@ cfg_if::cfg_if! {
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
-            ) -> JlrsResult<JuliaResult<Value<'target, 'data>, 'target, 'data>>
+            ) -> JlrsResult<JuliaResult<'target, 'data, Value<'target, 'data>>>
             where
                 V: Values<'value, 'data, N>,
                 Tgt: Target<'target>,
@@ -1004,11 +1008,11 @@ cfg_if::cfg_if! {
             /// check if any of the arguments is currently borrowed from Rust.
             ///
             /// [`safety`]: crate::safety
-            async unsafe fn call_async_main<'target, 'value, V, const N: usize>(
+            unsafe fn call_async_main<'target, 'value, V, const N: usize>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
-            ) -> JuliaResult<'target, 'data>
+            ) -> impl Future<Output = JuliaResult<'target, 'data>>
             where
                 V: Values<'value, 'data, N>;
 
@@ -1026,31 +1030,33 @@ cfg_if::cfg_if! {
             /// returns an `AccessError::BorrowError` if any of the arguments is.
             ///
             /// [`safety`]: crate::safety
-            async unsafe fn call_async_main_tracked<'target, 'value, V, const N: usize>(
+            unsafe fn call_async_main_tracked<'target, 'value, V, const N: usize>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
-            ) -> JlrsResult<JuliaResult<'target, 'data>>
+            ) -> impl Future<Output = JlrsResult<JuliaResult<'target, 'data>>>
             where
                 V: Values<'value, 'data, N>
             {
-                let args = args.as_slice(Private);
-                let res = args
-                    .iter()
-                    .copied()
-                    .map(|arg| -> JlrsResult<()> {
-                        if Ledger::is_borrowed(arg)? {
-                            Err(AccessError::BorrowError)?
-                        }
-                        Ok(())
-                    })
-                    .find(|f| f.is_err())
-                    .map_or_else(
-                         || Ok(async { self.call_async_main(frame, args).await }),
-                        |_: _| Err(AccessError::BorrowError),
-                    )?.await;
+                async move {
+                    let args = args.as_slice(Private);
+                    let res = args
+                        .iter()
+                        .copied()
+                        .map(|arg| -> JlrsResult<()> {
+                            if Ledger::is_borrowed(arg)? {
+                                Err(AccessError::BorrowError)?
+                            }
+                            Ok(())
+                        })
+                        .find(|f| f.is_err())
+                        .map_or_else(
+                            || Ok(async { self.call_async_main(frame, args).await }),
+                            |_: _| Err(AccessError::BorrowError),
+                        )?.await;
 
-                Ok(res)
+                    Ok(res)
+                }
             }
 
             /// Does the same thing as [`CallAsync::call_async_main`], but the task is returned rather
@@ -1069,7 +1075,7 @@ cfg_if::cfg_if! {
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
-            ) ->JuliaResult<Value<'target, 'data>, 'target, 'data>
+            ) ->JuliaResult<'target, 'data, Value<'target, 'data>>
             where
                 V: Values<'value, 'data, N>;
 
@@ -1091,7 +1097,7 @@ cfg_if::cfg_if! {
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
-            ) -> JlrsResult<JuliaResult<Value<'target, 'data>, 'target, 'data>>
+            ) -> JlrsResult<JuliaResult<'target, 'data, Value<'target, 'data>>>
             where
                 V: Values<'value, 'data, N>,
                 Tgt: Target<'target>,
@@ -1116,7 +1122,6 @@ cfg_if::cfg_if! {
             }
         }
 
-        #[async_trait(?Send)]
         impl<'data> CallAsync<'data> for Value<'_, 'data> {
             #[inline]
             async unsafe fn call_async<'target, 'value, V, const N: usize>(
@@ -1147,7 +1152,7 @@ cfg_if::cfg_if! {
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
-            ) -> JuliaResult<Value<'target, 'data>, 'target, 'data>
+            ) -> JuliaResult<'target, 'data, Value<'target, 'data>>
             where
                 V: Values<'value, 'data, N>,
             {
@@ -1167,7 +1172,7 @@ cfg_if::cfg_if! {
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
-            ) -> JuliaResult<Value<'target, 'data>, 'target, 'data>
+            ) -> JuliaResult<'target, 'data, Value<'target, 'data>>
             where
                 V: Values<'value, 'data, N>,
             {
@@ -1199,7 +1204,7 @@ cfg_if::cfg_if! {
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
-            ) -> JuliaResult<Value<'target, 'data>, 'target, 'data>
+            ) -> JuliaResult<'target, 'data, Value<'target, 'data>>
             where
                 V: Values<'value, 'data, N>,
             {
@@ -1231,7 +1236,7 @@ cfg_if::cfg_if! {
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
-            ) -> JuliaResult<Value<'target, 'data>, 'target, 'data>
+            ) -> JuliaResult<'target, 'data, Value<'target, 'data>>
             where
                 V: Values<'value, 'data, N>,
             {
@@ -1247,7 +1252,6 @@ cfg_if::cfg_if! {
             }
         }
 
-        #[async_trait(?Send)]
         impl<'data> CallAsync<'data> for Function<'_, 'data> {
             #[inline]
             async unsafe fn call_async<'target, 'value, V, const N: usize>(
@@ -1278,7 +1282,7 @@ cfg_if::cfg_if! {
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
-            ) -> JuliaResult<Value<'target, 'data>, 'target, 'data>
+            ) -> JuliaResult<'target, 'data, Value<'target, 'data>>
             where
                 V: Values<'value, 'data, N>,
             {
@@ -1290,7 +1294,7 @@ cfg_if::cfg_if! {
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
-            ) -> JuliaResult<Value<'target, 'data>, 'target, 'data>
+            ) -> JuliaResult<'target, 'data, Value<'target, 'data>>
             where
                 V: Values<'value, 'data, N>,
             {
@@ -1314,7 +1318,7 @@ cfg_if::cfg_if! {
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
-            ) -> JuliaResult<Value<'target, 'data>, 'target, 'data>
+            ) -> JuliaResult<'target, 'data, Value<'target, 'data>>
             where
                 V: Values<'value, 'data, N>,
             {
@@ -1338,7 +1342,7 @@ cfg_if::cfg_if! {
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
-            ) -> JuliaResult<Value<'target, 'data>, 'target, 'data>
+            ) -> JuliaResult<'target, 'data, Value<'target, 'data>>
             where
                 V: Values<'value, 'data, N>,
             {
@@ -1346,7 +1350,6 @@ cfg_if::cfg_if! {
             }
         }
 
-        #[async_trait(?Send)]
         impl<'data> CallAsync<'data> for WithKeywords<'_, 'data> {
             #[inline]
             async unsafe fn call_async<'target, 'value, V, const N: usize>(
@@ -1377,7 +1380,7 @@ cfg_if::cfg_if! {
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
-            ) -> JuliaResult<Value<'target, 'data>, 'target, 'data>
+            ) -> JuliaResult<'target, 'data, Value<'target, 'data>>
             where
                 V: Values<'value, 'data, N>,
             {
@@ -1399,7 +1402,7 @@ cfg_if::cfg_if! {
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
-            ) -> JuliaResult<Value<'target, 'data>, 'target, 'data>
+            ) -> JuliaResult<'target, 'data, Value<'target, 'data>>
             where
                 V: Values<'value, 'data, N>,
             {
@@ -1433,7 +1436,7 @@ cfg_if::cfg_if! {
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
-            ) -> JuliaResult<Value<'target, 'data>, 'target, 'data>
+            ) -> JuliaResult<'target, 'data, Value<'target, 'data>>
             where
                 V: Values<'value, 'data, N>,
             {
@@ -1467,7 +1470,7 @@ cfg_if::cfg_if! {
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
-            ) -> JuliaResult<Value<'target, 'data>, 'target, 'data>
+            ) -> JuliaResult<'target, 'data, Value<'target, 'data>>
             where
                 V: Values<'value, 'data, N>,
             {

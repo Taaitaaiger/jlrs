@@ -33,7 +33,6 @@ impl AsyncExecutor for TokioExecutor {
 
 struct MyTask;
 
-#[async_trait(?Send)]
 impl AsyncTask for MyTask {
     type Output = ();
 

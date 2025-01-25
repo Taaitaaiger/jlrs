@@ -9,14 +9,13 @@ struct MyTask {
     iters: isize,
 }
 
-#[async_trait(?Send)]
 impl AsyncTask for MyTask {
     // Different tasks can return different results. If successful, this task returns an `f64`.
     type Output = JlrsResult<f64>;
 
     // This is the async variation of the closure you provide `Julia::scope` when using the sync
     // runtime.
-    async fn run<'frame>(&mut self, mut frame: AsyncGcFrame<'frame>) -> Self::Output {
+    async fn run<'frame>(self, mut frame: AsyncGcFrame<'frame>) -> Self::Output {
         // Convert the two arguments to values Julia can work with.
         let dims = Value::new(&mut frame, self.dims);
         let iters = Value::new(&mut frame, self.iters);
@@ -41,7 +40,6 @@ impl AsyncTask for MyTask {
     }
 }
 
-#[async_trait(?Send)]
 impl Register for MyTask {
     // Include the custom code MyTask needs.
     async fn register<'frame>(mut frame: AsyncGcFrame<'frame>) -> JlrsResult<()> {

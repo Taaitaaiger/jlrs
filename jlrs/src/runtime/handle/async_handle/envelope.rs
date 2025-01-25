@@ -1,6 +1,4 @@
-use std::{marker::PhantomData, path::PathBuf};
-
-use async_trait::async_trait;
+use std::{future::Future, marker::PhantomData, path::PathBuf, pin::Pin};
 
 use super::{
     channel::{channel, OneshotSender},
@@ -19,25 +17,6 @@ pub(crate) struct PendingTask<T, U, Kind> {
     task: Option<T>,
     sender: U,
     _kind: PhantomData<Kind>,
-}
-
-impl<T> PendingTask<T, OneshotSender<T::Output>, Task>
-where
-    T: AsyncTask,
-{
-    #[inline]
-    pub(crate) fn new(task: T, sender: OneshotSender<T::Output>) -> Self {
-        PendingTask {
-            task: Some(task),
-            sender,
-            _kind: PhantomData,
-        }
-    }
-
-    #[inline]
-    fn split(self) -> (T, OneshotSender<T::Output>) {
-        (self.task.unwrap(), self.sender)
-    }
 }
 
 impl<T> PendingTask<T, OneshotSender<JlrsResult<()>>, RegisterTask>
@@ -59,121 +38,127 @@ where
     }
 }
 
-// Must be object-safe, so `async_trait` is required.
-#[async_trait(?Send)]
 pub(crate) trait PendingTaskEnvelope: Send {
-    async fn call(self: Box<Self>, stack: &'static Stack);
+    fn call(self: Box<Self>, stack: &'static Stack) -> Pin<Box<dyn Future<Output = ()>>>;
 }
 
-#[async_trait(?Send)]
-impl<A> PendingTaskEnvelope for PendingTask<A, OneshotSender<A::Output>, Task>
-where
-    A: AsyncTask,
-{
-    async fn call(self: Box<Self>, stack: &'static Stack) {
-        let (mut task, sender) = self.split();
-
-        // Safety: the stack slots can be reallocated because it doesn't contain any frames
-        // yet. The frame is dropped at the end of the scope, the nested hierarchy of scopes is
-        // maintained.
-        let res = unsafe {
-            let frame = AsyncGcFrame::base(&stack);
-            let res = task.call_run(frame).await;
-            stack.pop_roots(0);
-            res
-        };
-
-        sender.send(res).ok();
-    }
-}
-
-#[async_trait(?Send)]
 impl<A> PendingTaskEnvelope for PendingTask<A, OneshotSender<JlrsResult<()>>, RegisterTask>
 where
     A: Register,
 {
-    async fn call(mut self: Box<Self>, stack: &'static Stack) {
-        let sender = self.sender();
+    fn call(self: Box<Self>, stack: &'static Stack) -> Pin<Box<dyn Future<Output = ()>>> {
+        let f = async move {
+            let sender = self.sender();
 
-        // Safety: the stack slots can be reallocated because it doesn't contain any frames
-        // yet. The frame is dropped at the end of the scope, the nested hierarchy of scopes is
-        // maintained.
-        let res = unsafe {
-            let frame = AsyncGcFrame::base(&stack);
-            let res = A::register(frame).await;
-            stack.pop_roots(0);
-            res
+            // Safety: the stack slots can be reallocated because it doesn't contain any frames
+            // yet. The frame is dropped at the end of the scope, the nested hierarchy of scopes is
+            // maintained.
+            let res = unsafe {
+                let frame = AsyncGcFrame::base(&stack);
+                let res = A::register(frame).await;
+                stack.pop_roots(0);
+                res
+            };
+
+            sender.send(res).ok();
         };
 
-        sender.send(res).ok();
+        Box::pin(f)
     }
 }
 
-#[async_trait(?Send)]
+impl<A> PendingTask<A, OneshotSender<A::Output>, Task>
+where
+    A: AsyncTask,
+{
+    #[inline]
+    pub(crate) fn new(task: A, sender: OneshotSender<A::Output>) -> Self {
+        PendingTask {
+            task: Some(task),
+            sender,
+            _kind: PhantomData,
+        }
+    }
+
+    #[inline]
+    fn split(self) -> (A, OneshotSender<A::Output>) {
+        (self.task.unwrap(), self.sender)
+    }
+}
+
+impl<A> PendingTaskEnvelope for PendingTask<A, OneshotSender<A::Output>, Task>
+where
+    A: AsyncTask,
+{
+    fn call(self: Box<Self>, stack: &'static Stack) -> Pin<Box<dyn Future<Output = ()>>> {
+        let f = async move {
+            let (task, sender) = self.split();
+
+            // Safety: the stack slots can be reallocated because it doesn't contain any frames
+            // yet. The frame is dropped at the end of the scope, the nested hierarchy of scopes is
+            // maintained.
+            let res = unsafe {
+                let frame = AsyncGcFrame::base(&stack);
+                let res = task.run(frame).await;
+                stack.pop_roots(0);
+                res
+            };
+
+            sender.send(res).ok();
+        };
+
+        Box::pin(f)
+    }
+}
+
 impl<P> PendingTaskEnvelope
     for PendingTask<P, OneshotSender<JlrsResult<PersistentHandle<P>>>, Persistent>
 where
     P: PersistentTask,
 {
-    async fn call(mut self: Box<Self>, stack: &'static Stack) {
-        let (mut persistent, handle_sender) = self.split();
-        let handle_sender = handle_sender;
-        let (sender, receiver) = channel(P::CHANNEL_CAPACITY);
-        // Safety: the stack slots can be reallocated because it doesn't contain any frames
-        // yet. The frame is dropped at the end of the scope, the nested hierarchy of scopes is
-        // maintained.
-        unsafe {
-            let frame = AsyncGcFrame::base(&stack);
+    fn call(self: Box<Self>, stack: &'static Stack) -> Pin<Box<dyn Future<Output = ()>>> {
+        let f = async move {
+            let (mut persistent, handle_sender) = self.split();
+            let handle_sender = handle_sender;
+            let (sender, receiver) = channel(P::CHANNEL_CAPACITY);
+            // Safety: the stack slots can be reallocated because it doesn't contain any frames
+            // yet. The frame is dropped at the end of the scope, the nested hierarchy of scopes is
+            // maintained.
+            unsafe {
+                let frame = AsyncGcFrame::base(&stack);
 
-            match persistent.call_init(frame).await {
-                Ok(mut state) => {
-                    if let Err(_) = handle_sender.send(Ok(PersistentHandle::new(sender))) {
-                        stack.pop_roots(0);
-                        return;
-                    }
+                match persistent.call_init(frame).await {
+                    Ok(mut state) => {
+                        if let Err(_) = handle_sender.send(Ok(PersistentHandle::new(sender))) {
+                            stack.pop_roots(0);
+                            return;
+                        }
 
-                    loop {
-                        let mut msg = match receiver.recv().await {
-                            Ok(msg) => msg.msg,
-                            Err(_) => break,
-                        };
+                        loop {
+                            let mut msg = match receiver.recv().await {
+                                Ok(msg) => msg.msg,
+                                Err(_) => break,
+                            };
+
+                            let frame = AsyncGcFrame::base(&stack);
+                            let res = persistent.call_run(frame, &mut state, msg.input()).await;
+
+                            msg.respond(res);
+                        }
 
                         let frame = AsyncGcFrame::base(&stack);
-                        let res = persistent.call_run(frame, &mut state, msg.input()).await;
-
-                        msg.respond(res);
+                        persistent.exit(frame, &mut state).await;
                     }
+                    Err(e) => {
+                        handle_sender.send(Err(e)).ok();
+                    }
+                }
 
-                    let frame = AsyncGcFrame::base(&stack);
-                    persistent.exit(frame, &mut state).await;
-                }
-                Err(e) => {
-                    handle_sender.send(Err(e)).ok();
-                }
+                stack.pop_roots(0);
             }
+        };
 
-            stack.pop_roots(0);
-        }
-    }
-}
-
-trait AsyncTaskEnvelope: Send {
-    type A: AsyncTask + Send;
-
-    async fn call_run<'inner>(
-        &'inner mut self,
-        frame: AsyncGcFrame<'static>,
-    ) -> <Self::A as AsyncTask>::Output;
-}
-
-impl<A: AsyncTask> AsyncTaskEnvelope for A {
-    type A = Self;
-    #[inline]
-    async fn call_run<'inner>(
-        &'inner mut self,
-        frame: AsyncGcFrame<'static>,
-    ) -> <Self::A as AsyncTask>::Output {
-        self.run(frame).await
+        Box::pin(f)
     }
 }
 
@@ -318,22 +303,6 @@ where
     }
 }
 
-// pub(crate) struct PersistentComms<P: PersistentTask> {
-//     sender: OneshotSender<JlrsResult<PersistentHandle<P>>>,
-// }
-
-// impl<P> OneshotSender<JlrsResult<PersistentHandle<P>>>
-// where
-//     P: PersistentTask,
-// {
-//     #[inline]
-//     pub(crate) fn new(sender: OneshotSender<JlrsResult<PersistentHandle<P>>>) -> Self {
-//         PersistentComms {
-//             sender,
-//         }
-//     }
-// }
-
 impl<P> PendingTask<P, OneshotSender<JlrsResult<PersistentHandle<P>>>, Persistent>
 where
     P: PersistentTask,
@@ -457,51 +426,5 @@ impl SetErrorColorTaskEnvelope for SetErrorColorTask {
 // What follows is a significant amount of indirection to allow different tasks to have a
 // different Output types and be unaware of the used channels.
 pub(crate) enum Task {}
-#[cfg(feature = "async-closure")]
-pub(crate) enum Closure {}
 pub(crate) enum RegisterTask {}
 pub(crate) enum Persistent {}
-
-#[cfg(feature = "async-closure")]
-impl<T, U> PendingTask<T, OneshotSender<U>, Closure>
-where
-    T: AsyncFnOnce(AsyncGcFrame) -> U,
-{
-    #[inline]
-    pub(crate) fn new(task: T, sender: OneshotSender<U>) -> Self {
-        PendingTask {
-            task: Some(task),
-            sender,
-            _kind: PhantomData,
-        }
-    }
-
-    #[inline]
-    fn split(self) -> (T, OneshotSender<U>) {
-        (self.task.unwrap(), self.sender)
-    }
-}
-
-#[cfg(feature = "async-closure")]
-#[async_trait(?Send)]
-impl<A, U> PendingTaskEnvelope for PendingTask<A, OneshotSender<U>, Closure>
-where
-    A: AsyncFnOnce(AsyncGcFrame) -> U + Send,
-    U: Send,
-{
-    async fn call(self: Box<Self>, stack: &'static Stack) {
-        let (task, sender) = self.split();
-
-        // Safety: the stack slots can be reallocated because it doesn't contain any frames
-        // yet. The frame is dropped at the end of the scope, the nested hierarchy of scopes is
-        // maintained.
-        let res = unsafe {
-            let frame = AsyncGcFrame::base(&stack);
-            let res = task(frame).await;
-            stack.pop_roots(0);
-            res
-        };
-
-        sender.send(res).ok();
-    }
-}

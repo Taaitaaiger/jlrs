@@ -15,8 +15,7 @@ use std::{
 };
 
 use async_channel::{Receiver, Sender, TryRecvError};
-#[cfg(feature = "async-closure")]
-use envelope::Closure;
+use envelope::Task;
 use jl_sys::{jl_gcframe_t, jlrs_gc_unsafe_enter, jlrs_gc_unsafe_leave, jlrs_ppgcstack};
 use tokio::sync::oneshot::channel as oneshot_channel;
 
@@ -26,15 +25,13 @@ use self::{
     cancellation_token::CancellationToken,
     dispatch::Dispatch,
     envelope::{
-        BlockingTask, IncludeTask, PendingTask, Persistent, RegisterTask, SetErrorColorTask, Task,
+        BlockingTask, IncludeTask, PendingTask, Persistent, RegisterTask, SetErrorColorTask,
     },
     message::{Message, MessageInner},
     persistent::PersistentHandle,
 };
 #[cfg(feature = "multi-rt")]
 use super::mt_handle::manager::{get_manager, PoolId};
-#[cfg(feature = "async-closure")]
-use crate::prelude::AsyncGcFrame;
 use crate::{
     async_util::{
         future::{wake_task, GcUnsafeFuture},
@@ -77,21 +74,6 @@ impl AsyncHandle {
     {
         let (sender, receiver) = oneshot_channel();
         let pending_task = PendingTask::<_, _, Task>::new(task, sender);
-        let boxed = Box::new(pending_task);
-        let msg = MessageInner::Task(boxed).wrap();
-
-        Dispatch::new(msg, &self.sender, receiver)
-    }
-
-    #[cfg(feature = "async-closure")]
-    /// Prepare to send a new async closure.
-    pub fn closure<U, A>(&self, task: A) -> Dispatch<Message, U>
-    where
-        for<'scope> A: AsyncFnOnce(AsyncGcFrame<'scope>) -> U + Send + 'static,
-        U: Send + 'static,
-    {
-        let (sender, receiver) = oneshot_channel();
-        let pending_task = PendingTask::<_, _, Closure>::new(task, sender);
         let boxed = Box::new(pending_task);
         let msg = MessageInner::Task(boxed).wrap();
 
