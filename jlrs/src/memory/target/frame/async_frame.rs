@@ -29,6 +29,10 @@ impl<'scope> AsyncGcFrame<'scope> {
     /// The closure `func` must return an async block. Note that the returned value is
     /// required to live at least as long the current frame.
     ///
+    /// If you can target at least Rust 1.85, it's recommended to enable the `async-closure`
+    /// feature and use `AsyncGcFrame::async_scope_closure` instead. This method will be removed
+    /// in the future.
+    ///
     /// [`Scope::scope`]: crate::memory::scope::Scope::scope
 
     #[inline]
@@ -49,7 +53,11 @@ impl<'scope> AsyncGcFrame<'scope> {
         }
     }
 
-    /// `AsyncGcFrame::async_scope` with less strict lifeitme bounds on the return value.
+    /// `AsyncGcFrame::async_scope` with less strict lifetime bounds on the return value.
+    ///
+    /// If you can target at least Rust 1.85, it's recommended to enable the `async-closure`
+    /// feature and use `AsyncGcFrame::async_scope_closure` instead. This method will be removed
+    /// in the future.
     ///
     /// Safety: because this method only requires that the returned data lives at least as
     /// long as the borrow of `self`, it's possible to return data rooted in that scope
@@ -72,6 +80,25 @@ impl<'scope> AsyncGcFrame<'scope> {
             stack.pop_roots(offset);
         }
         ret
+    }
+
+    /// An async version of [`Scope::scope`] that takes an async closure.
+    ///
+    /// This method is only available when the `async-closures` feature is enabled and requires
+    /// using at least Rust 1.85.
+    #[cfg(feature = "async-closure")]
+    #[inline]
+    pub async fn async_scope_closure<T, F>(&mut self, func: F) -> T
+    where
+        for<'nested> F: AsyncFnOnce(AsyncGcFrame<'nested>) -> T,
+    {
+        unsafe {
+            let stack = self.stack;
+            let (offset, nested) = self.nest_async();
+            let ret = func(nested).await;
+            stack.pop_roots(offset);
+            ret
+        }
     }
 
     // Safety: only one base frame may exist per `Stack`

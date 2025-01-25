@@ -924,3 +924,36 @@ impl AsyncTask for BorrowArrayData {
         Ok(v)
     }
 }
+
+// TODO: Rust 1.85
+// #[cfg(feature = "async-closure")]
+// pub struct BorrowArrayDataClosure;
+
+// TODO: Rust 1.85
+// #[cfg(feature = "async-closure")]
+// #[async_trait(?Send)]
+// impl AsyncTask for BorrowArrayDataClosure {
+//     type Output = JlrsResult<f64>;
+
+//     async fn run<'base>(&mut self, mut frame: AsyncGcFrame<'base>) -> Self::Output {
+//         // println!("BorrowArrayData {:p}", frame.stack_addr());
+//         let mut data = vec![2.0f64];
+//         let borrowed = &mut data;
+//         let output = frame.output();
+//         let v = frame
+//             .async_scope_closure(async move |_frame| {
+//                 TypedArray::<f64>::from_slice(output, borrowed, 1)
+//             })
+//             .await?
+//             .into_jlrs_result()?;
+
+//         let data2 = unsafe { v.inline_data() };
+
+//         frame.gc_collect(jlrs::memory::gc::GcCollection::Full);
+//         // Uncommenting next line must be compile error
+//         // let _ = data[0];
+//         let v = data2[0];
+//         // println!("BorrowArrayData done");
+//         Ok(v)
+//     }
+// }

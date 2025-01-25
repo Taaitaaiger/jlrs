@@ -1,5 +1,8 @@
 #include "jlrs_cc_windows.h"
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
 #include <julia.h>
+#pragma GCC diagnostic pop
 
 #ifdef __cplusplus
 extern "C"

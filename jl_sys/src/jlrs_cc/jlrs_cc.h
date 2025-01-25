@@ -15,8 +15,10 @@
 #endif
 
 #include "jlrs_cc_windows.h"
-
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
 #include <julia.h>
+#pragma GCC diagnostic pop
 #include <julia_gcext.h>
 
 #include "jlrs_cc_hacks.h"
