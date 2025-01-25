@@ -9,17 +9,14 @@ struct MyTask {
     iters: isize,
 }
 
-// `MyTask` is a task we want to be executed, so we need to implement `AsyncTask`. This requires
-// `async_trait` because traits with async methods are not yet available in Rust. Because the
-// task itself is executed on a single thread, it is marked with `?Send`.
-#[async_trait(?Send)]
+// `MyTask` is a task we want to be executed, so we need to implement `AsyncTask`.
 impl AsyncTask for MyTask {
     // Different tasks can return different results. If successful, this task returns an `f64`.
     type Output = JlrsResult<f64>;
 
     // This is the async variation of the closure you provide `Julia::scope` when using the sync
     // runtime.
-    async fn run<'base>(&mut self, mut frame: AsyncGcFrame<'base>) -> Self::Output {
+    async fn run<'base>(self, mut frame: AsyncGcFrame<'base>) -> Self::Output {
         // Nesting async frames works like nesting on ordinary scope. The main difference is that
         // the closure must return an async block.
         let output = frame.output();
@@ -53,7 +50,6 @@ impl AsyncTask for MyTask {
     }
 }
 
-#[async_trait(?Send)]
 impl Register for MyTask {
     // Include the custom code MyTask needs.
     async fn register<'base>(mut frame: AsyncGcFrame<'base>) -> JlrsResult<()> {

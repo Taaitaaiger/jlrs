@@ -1,7 +1,5 @@
 //! Reexports structs and traits you're likely to need.
 
-#[cfg(feature = "async")]
-pub use async_trait::async_trait;
 #[cfg(feature = "ccall")]
 pub use jlrs_macros::julia_module;
 pub use jlrs_macros::{encode_as_constant_bytes, julia_version};

@@ -2,8 +2,6 @@
 
 use std::{future::Future, time::Duration};
 
-use async_trait::async_trait;
-
 use super::handle::async_handle::{channel::RecvError, message::Message};
 
 /// Indicates that a task has finished running.
@@ -22,7 +20,6 @@ pub trait IsFinished {
 /// An implementation that uses tokio is avaiable: [`Tokio`].
 ///
 /// [`Tokio`]: crate::runtime::executor::tokio_exec::Tokio
-#[async_trait(?Send)]
 pub trait Executor<const N: usize>: Send + Sync + 'static {
     /// Error that is returned when a task can't be joined because it has panicked.
     ///
@@ -55,7 +52,10 @@ pub trait Executor<const N: usize>: Send + Sync + 'static {
 
     /// Wait on `future` until it resolves or `duration` has elapsed. If the future times out it
     /// must return `None`.
-    async fn timeout<F>(duration: Duration, future: F) -> Option<Result<Message, RecvError>>
+    fn timeout<F>(
+        duration: Duration,
+        future: F,
+    ) -> impl Future<Output = Option<Result<Message, RecvError>>>
     where
         F: Future<Output = Result<Message, RecvError>>;
 }
@@ -120,7 +120,6 @@ pub mod tokio_exec {
         }
     }
 
-    #[async_trait(?Send)]
     impl<const N: usize> Executor<N> for Tokio<N> {
         type JoinError = JoinError;
         type JoinHandle = JoinHandle<()>;

@@ -53,7 +53,7 @@ multi-rt = ["jl-sys/fast-tls"]
 # Utilities
 
 # Enable task and channel traits used by the async runtime
-async = ["async-trait", "async-channel"]
+async = ["async-channel"]
 # Enable `ccall` module for use from `ccall`ed Rust functions
 ccall = ["jlrs-macros/ccall"]
 # Enable using `f16` as a layout for `Float16` data
@@ -104,7 +104,6 @@ lock_api = "0.4"
 fnv = "1"
 atomic = "0.6"
 
-async-trait = { version = "0.1", optional = true }
 async-channel = { version = "2", optional = true }
 half = { version = "2.4", optional = true }
 ndarray = { version = "0.16", optional = true }

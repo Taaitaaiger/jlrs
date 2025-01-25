@@ -568,14 +568,13 @@
 //!
 //! // Async tasks must implement the `AsyncTask` trait. Only the runtime thread can call the
 //! // Julia C API, so the `run` method must not return a future that implements `Send` or `Sync`.
-//! #[async_trait(?Send)]
 //! impl AsyncTask for AdditionTask {
 //!     // The type of the result of this task.
 //!     type Output = JlrsResult<u64>;
 //!
 //!     // This async method replaces the closure from the previous examples,
 //!     // an `AsyncGcFrame` can be used the same way as other frame types.
-//!     async fn run<'frame>(&mut self, mut frame: AsyncGcFrame<'frame>) -> Self::Output {
+//!     async fn run<'frame>(self, mut frame: AsyncGcFrame<'frame>) -> Self::Output {
 //!         let a = Value::new(&mut frame, self.a);
 //!         let b = Value::new(&mut frame, self.b);
 //!
@@ -634,7 +633,6 @@
 //! }
 //!
 //! // The same is true for implementations of `PersistentTask`.
-//! #[async_trait(?Send)]
 //! impl PersistentTask for AccumulatorTask {
 //!     type Output = JlrsResult<usize>;
 //!

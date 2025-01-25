@@ -1,7 +1,6 @@
 #[cfg(all(feature = "multi-rt", feature = "async-rt"))]
 mod mt_handle {
 
-    use async_trait::async_trait;
     use jlrs::{
         async_util::task::AsyncTask,
         memory::target::frame::AsyncGcFrame,
@@ -10,11 +9,10 @@ mod mt_handle {
 
     pub struct PanickingTask;
 
-    #[async_trait(?Send)]
     impl AsyncTask for PanickingTask {
         type Output = ();
 
-        async fn run<'base>(&mut self, mut _frame: AsyncGcFrame<'base>) -> Self::Output {
+        async fn run<'base>(self, mut _frame: AsyncGcFrame<'base>) -> Self::Output {
             panic!()
         }
     }

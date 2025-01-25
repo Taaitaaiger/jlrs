@@ -1,6 +1,4 @@
-use std::time::Duration;
-
-use async_trait::async_trait;
+use std::{future::Future, time::Duration};
 
 use crate::{
     call::Call,
@@ -8,28 +6,21 @@ use crate::{
     prelude::{AsyncGcFrame, JlrsResult, Target, Value},
 };
 
-#[async_trait(?Send)]
 pub trait Register: 'static + Send {
-    async fn register<'frame>(frame: AsyncGcFrame<'frame>) -> JlrsResult<()>;
+    fn register<'frame>(frame: AsyncGcFrame<'frame>) -> impl Future<Output = JlrsResult<()>>;
 }
 
 /// Async task
 ///
 /// Any type that implements this trait can be sent to the async runtime where its `run` method
-/// will be called. Note that [`async_trait`] is used, all implementers must be marked with
-/// `#[async_trait(?Send)]`.
-///
-/// When the `async-closure` feature has been enabled, this trait is implemented for all
-/// `A: AsyncFnMut(AsyncGcFrame) -> T`.
-/// 
-/// [`async_trait`]: async_trait::async_trait
-#[async_trait(?Send)]
+/// will be called. If the `async-closure` feature has been enabled, this trait is implemented for
+/// all `AsyncFnOnce(AsyncGcFrame) -> T`.
 pub trait AsyncTask: 'static + Send {
     /// The return type of `run`.
     type Output: 'static + Send;
 
     /// Run this task.
-    async fn run<'frame>(&mut self, frame: AsyncGcFrame<'frame>) -> Self::Output;
+    fn run<'frame>(self, frame: AsyncGcFrame<'frame>) -> impl Future<Output = Self::Output>;
 }
 
 /// Persistent task
@@ -37,7 +28,6 @@ pub trait AsyncTask: 'static + Send {
 /// Unlike an [`AsyncTask`], which is executed once, a persistent task is initialized and then
 /// provides a handle to call `run`. A persistent task has a state, which is returned by `init`,
 /// which is provided every time `run` is called in addition to the input data.
-#[async_trait(?Send)]
 pub trait PersistentTask: 'static + Send {
     /// The type of the result which is returned if `init` completes successfully.
     ///
@@ -58,10 +48,10 @@ pub trait PersistentTask: 'static + Send {
     /// You can interact with Julia inside this method, the frame is not dropped until the task
     /// itself is dropped. This means that `State` can contain arbitrary Julia data rooted in this
     /// frame. This data is provided to every call to `run`.
-    async fn init<'frame>(
+    fn init<'task>(
         &mut self,
-        frame: AsyncGcFrame<'frame>,
-    ) -> JlrsResult<Self::State<'frame>>;
+        frame: AsyncGcFrame<'task>,
+    ) -> impl Future<Output = JlrsResult<Self::State<'task>>>;
 
     /// Run the task.
     ///
@@ -69,21 +59,22 @@ pub trait PersistentTask: 'static + Send {
     /// It's also provided with a mutable reference to its `state` and the `input` provided by the
     /// caller. While the state is mutable, it's not possible to allocate a new Julia value in
     /// `run` and assign it to the state because the frame doesn't live long enough.
-    async fn run<'frame, 'state: 'frame>(
+    fn run<'frame, 'task: 'frame>(
         &mut self,
         frame: AsyncGcFrame<'frame>,
-        state: &mut Self::State<'state>,
+        state: &mut Self::State<'task>,
         input: Self::Input,
-    ) -> Self::Output;
+    ) -> impl Future<Output = Self::Output>;
 
     /// Method that is called when all handles to the task have been dropped.
     ///
     /// This method is called with the same frame as `init`.
-    async fn exit<'frame>(
+    fn exit<'task>(
         &mut self,
-        _frame: AsyncGcFrame<'frame>,
-        _state: &mut Self::State<'frame>,
-    ) {
+        _frame: AsyncGcFrame<'task>,
+        _state: &mut Self::State<'task>,
+    ) -> impl Future<Output = ()> {
+        async {}
     }
 }
 
@@ -111,15 +102,14 @@ pub fn sleep<'scope, 'data, Tgt: Target<'scope>>(target: &Tgt, duration: Duratio
 }
 
 #[cfg(feature = "async-closure")]
-#[async_trait(?Send)]
 impl<A, U> AsyncTask for A
 where
-    for<'scope> A: AsyncFnMut(AsyncGcFrame<'scope>) -> U + Send + 'static,
+    for<'scope> A: AsyncFnOnce(AsyncGcFrame<'scope>) -> U + Send + 'static,
     U: Send + 'static,
 {
     type Output = U;
 
-    async fn run<'frame>(&mut self, frame: AsyncGcFrame<'frame>) -> Self::Output {
-        self(frame).await
+    fn run<'frame>(self, frame: AsyncGcFrame<'frame>) -> impl Future<Output = Self::Output> {
+        self(frame)
     }
 }

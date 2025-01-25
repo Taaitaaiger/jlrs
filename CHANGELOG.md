@@ -12,7 +12,9 @@
 
 - The `julia-1-6`, `julia-1-7`, `julia-1-8`, and `julia-1-9` features have been removed.
 
-- The async runtime supports using async closures when the `async-closure` feature is enabled. This requires using at least Rust 1.85. The `AsyncTask` trait has been implemented for all async closures `AsyncFnMut(AsyncGcFrame) -> T`, `AsyncHandle::closure` additionally accepts any `AsyncFnOnce(AsyncGcFrame) -> T`. Async closures can also be used in combination with nested async scopes by calling `AsyncGcFrame::async_scope_closure`, which doesn't suffer from the same lifetime issues as `AsyncGcFrame::async_scope`. The methods `AsyncGcFrame::async_scope` and `AsyncGcFrame::relaxed_async_scope` and the feature gate itself will be removed in the future when the MSRV is increased.
+- The `Executor`, `AsyncTask`, and `PersistentTask` traits no longer use `async_trait`. To migrate existing `PersistentTask`s, remove the `async_trait`-annotation. `AsyncTask`s now take `self` by value, so to migrate them remove the annotation and change `&mut self` in `run` to `self`.
+
+- The async runtime supports using async closures when the `async-closure` feature is enabled, this requires using at least Rust 1.85. The `AsyncTask` trait has been implemented for all async closures `AsyncFnOnce(AsyncGcFrame) -> T`, so async closures can easily be called with `AsyncHandle::task`. Async closures can also be used in combination with nested async scopes by calling `AsyncGcFrame::async_scope_closure`, which doesn't suffer from the same lifetime issues as `AsyncGcFrame::async_scope`. The methods `AsyncGcFrame::async_scope` and `AsyncGcFrame::relaxed_async_scope` and the feature gate itself will be removed in the future when the MSRV is increased.
 
 #### v0.21
 

@@ -6,7 +6,6 @@ struct AccumulatorTask {
     init_value: f64,
 }
 
-#[async_trait(?Send)]
 impl Register for AccumulatorTask {
     // Register this task. This method can take care of custom initialization work, in this case
     // creating the mutable MutFloat64 type in the Main module.
@@ -19,7 +18,6 @@ impl Register for AccumulatorTask {
     }
 }
 
-#[async_trait(?Send)]
 impl PersistentTask for AccumulatorTask {
     // The capacity of the channel used to communicate with this task
     const CHANNEL_CAPACITY: usize = 2;
