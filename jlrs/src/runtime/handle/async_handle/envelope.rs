@@ -457,5 +457,51 @@ impl SetErrorColorTaskEnvelope for SetErrorColorTask {
 // What follows is a significant amount of indirection to allow different tasks to have a
 // different Output types and be unaware of the used channels.
 pub(crate) enum Task {}
+#[cfg(feature = "async-closure")]
+pub(crate) enum Closure {}
 pub(crate) enum RegisterTask {}
 pub(crate) enum Persistent {}
+
+#[cfg(feature = "async-closure")]
+impl<T, U> PendingTask<T, OneshotSender<U>, Closure>
+where
+    T: AsyncFnOnce(AsyncGcFrame) -> U,
+{
+    #[inline]
+    pub(crate) fn new(task: T, sender: OneshotSender<U>) -> Self {
+        PendingTask {
+            task: Some(task),
+            sender,
+            _kind: PhantomData,
+        }
+    }
+
+    #[inline]
+    fn split(self) -> (T, OneshotSender<U>) {
+        (self.task.unwrap(), self.sender)
+    }
+}
+
+#[cfg(feature = "async-closure")]
+#[async_trait(?Send)]
+impl<A, U> PendingTaskEnvelope for PendingTask<A, OneshotSender<U>, Closure>
+where
+    A: AsyncFnOnce(AsyncGcFrame) -> U + Send,
+    U: Send,
+{
+    async fn call(self: Box<Self>, stack: &'static Stack) {
+        let (task, sender) = self.split();
+
+        // Safety: the stack slots can be reallocated because it doesn't contain any frames
+        // yet. The frame is dropped at the end of the scope, the nested hierarchy of scopes is
+        // maintained.
+        let res = unsafe {
+            let frame = AsyncGcFrame::base(&stack);
+            let res = task(frame).await;
+            stack.pop_roots(0);
+            res
+        };
+
+        sender.send(res).ok();
+    }
+}

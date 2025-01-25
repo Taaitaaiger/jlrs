@@ -69,6 +69,8 @@ lto = ["jl-sys/lto"]
 
 diagnostics = []
 
+async-closure = []
+
 # Target or link a specific Julia build or arch.
 
 # Link debug build of Julia

@@ -142,6 +142,11 @@
 //!   can be used in libraries which provide implementations of tasks that the async runtime can
 //!   handle.
 //!
+//! - `async-closure`
+//!
+//!   Enable support for using async closures in combination with the async runtime. This feature
+//!   requires using at least Rust 1.85.
+//!
 //! - `jlrs-derive`
 //!
 //!   This feature should be used in combination with the code generation provided by the Reflect

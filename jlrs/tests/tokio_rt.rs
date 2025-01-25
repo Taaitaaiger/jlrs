@@ -64,6 +64,42 @@ mod tests {
         );
     }
 
+    // TODO: Rust 1.85
+    // #[cfg(feature = "async-closure")]
+    // #[test]
+    // fn test_closure() {
+    //     let julia = JULIA.get_or_init(init);
+
+    //     let dims = 4isize;
+    //     let iters = 5_000_000isize;
+
+    //     let closure = async move |mut frame: AsyncGcFrame| -> JlrsResult<_> {
+    //         let dims = Value::new(&mut frame, dims);
+    //         let iters = Value::new(&mut frame, iters);
+
+    //         let v = unsafe {
+    //             Module::main(&frame)
+    //                 .submodule(&frame, "AsyncTests")?
+    //                 .as_managed()
+    //                 .function(&frame, "complexfunc")?
+    //                 .as_value()
+    //                 .call_async(&mut frame, [dims, iters])
+    //                 .await
+    //                 .unwrap()
+    //                 .unbox::<f64>()?
+    //         };
+
+    //         Ok(v)
+    //     };
+
+    //     let blocking_recv = julia.task(closure).try_dispatch().ok().unwrap();
+
+    //     assert_eq!(
+    //         blocking_recv.blocking_recv().unwrap().unwrap(),
+    //         20_000_004.0
+    //     );
+    // }
+
     #[test]
     fn test_other_ret_type_task() {
         let julia = JULIA.get_or_init(init);
@@ -432,6 +468,21 @@ mod tests {
 
         assert_eq!(receiver.blocking_recv().unwrap().unwrap(), 2.0);
     }
+
+    // TODO: Rust 1.85
+    // #[cfg(feature = "async-closure")]
+    // #[test]
+    // fn test_borrow_array_data_closure() {
+    //     let julia = JULIA.get_or_init(init);
+
+    //     let receiver = julia
+    //         .task(BorrowArrayDataClosure)
+    //         .try_dispatch()
+    //         .ok()
+    //         .unwrap();
+
+    //     assert_eq!(receiver.blocking_recv().unwrap().unwrap(), 2.0);
+    // }
 
     // #[test]
     // fn test_post_task() {

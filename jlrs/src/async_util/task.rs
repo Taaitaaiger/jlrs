@@ -13,19 +13,30 @@ pub trait Register: 'static + Send {
     async fn register<'frame>(frame: AsyncGcFrame<'frame>) -> JlrsResult<()>;
 }
 
+/// Async task
+///
+/// Any type that implements this trait can be sent to the async runtime where its `run` method
+/// will be called. Note that [`async_trait`] is used, all implementers must be marked with
+/// `#[async_trait(?Send)]`.
+///
+/// When the `async-closure` feature has been enabled, this trait is implemented for all
+/// `A: AsyncFnMut(AsyncGcFrame) -> T`.
+/// 
+/// [`async_trait`]: async_trait::async_trait
 #[async_trait(?Send)]
 pub trait AsyncTask: 'static + Send {
-    /// The type of the result which is returned if `run` completes successfully.
+    /// The return type of `run`.
     type Output: 'static + Send;
 
     /// Run this task.
-    ///
-    /// See the [trait docs] for an example implementation.
-    ///
-    /// [trait docs]: AsyncTask
     async fn run<'frame>(&mut self, frame: AsyncGcFrame<'frame>) -> Self::Output;
 }
 
+/// Persistent task
+///
+/// Unlike an [`AsyncTask`], which is executed once, a persistent task is initialized and then
+/// provides a handle to call `run`. A persistent task has a state, which is returned by `init`,
+/// which is provided every time `run` is called in addition to the input data.
 #[async_trait(?Send)]
 pub trait PersistentTask: 'static + Send {
     /// The type of the result which is returned if `init` completes successfully.
@@ -33,11 +44,10 @@ pub trait PersistentTask: 'static + Send {
     /// This data is provided to every call of `run`.
     type State<'state>;
 
-    /// The type of the data that must be provided when calling this persistent through its
-    /// handle.
+    /// The type of the data that must be provided to call this persistent task.
     type Input: 'static + Send;
 
-    /// The type of the result which is returned by `run`.
+    /// The return type of `run`.
     type Output: 'static + Send;
 
     // The capacity of the channel used to communicate with this task.
@@ -59,10 +69,6 @@ pub trait PersistentTask: 'static + Send {
     /// It's also provided with a mutable reference to its `state` and the `input` provided by the
     /// caller. While the state is mutable, it's not possible to allocate a new Julia value in
     /// `run` and assign it to the state because the frame doesn't live long enough.
-    ///
-    /// See the [trait docs] for an example implementation.
-    ///
-    /// [trait docs]: PersistentTask
     async fn run<'frame, 'state: 'frame>(
         &mut self,
         frame: AsyncGcFrame<'frame>,
@@ -101,5 +107,19 @@ pub fn sleep<'scope, 'data, Tgt: Target<'scope>>(target: &Tgt, duration: Duratio
 
             func.call1(target, secs).expect("sleep threw an exception");
         })
+    }
+}
+
+#[cfg(feature = "async-closure")]
+#[async_trait(?Send)]
+impl<A, U> AsyncTask for A
+where
+    for<'scope> A: AsyncFnMut(AsyncGcFrame<'scope>) -> U + Send + 'static,
+    U: Send + 'static,
+{
+    type Output = U;
+
+    async fn run<'frame>(&mut self, frame: AsyncGcFrame<'frame>) -> Self::Output {
+        self(frame).await
     }
 }
