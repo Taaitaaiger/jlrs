@@ -14,10 +14,10 @@
 //! # fn main() {
 //! let mut julia = Builder::new().start_local().unwrap();
 //!
-//! julia.local_scope::<_, 1>(|mut frame| {
+//! julia.local_scope::<1>(|mut frame| {
 //!     let output = frame.local_output();
 //!
-//!     let _v = frame.local_scope::<_, 0>(|_| {
+//!     let _v = frame.local_scope::<0>(|_| {
 //!         // The output has been allocated in the parent
 //!         // scope's frame, so by using it as a target the
 //!         // result can be returned from this subscope.
@@ -32,10 +32,10 @@
 //! # fn main() {
 //! let mut julia = Builder::new().start_local().unwrap();
 //!
-//! julia.local_scope::<_, 1>(|mut frame| {
+//! julia.local_scope::<1>(|mut frame| {
 //!     let mut output = frame.local_output();
 //!
-//!     let _v = frame.local_scope::<_, 0>(|_| {
+//!     let _v = frame.local_scope::<0>(|_| {
 //!         // _v1 can be used until the output is used again.
 //!         let _v1 = Value::new(&mut output, 2u64);
 //!

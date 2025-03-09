@@ -72,9 +72,8 @@ impl<'scope, 'env> MtHandle<'scope, 'env> {
         }
     }
 
-    pub fn spawn<F, T>(&self, f: F) -> ScopedJoinHandle<'scope, T>
+    pub fn spawn<T>(&self, f: impl FnOnce(Self) -> T + Send + 'scope) -> ScopedJoinHandle<'scope, T>
     where
-        F: FnOnce(Self) -> T + Send + 'scope,
         T: Send + 'scope,
     {
         let s = self.clone();
@@ -151,7 +150,7 @@ impl<'ctx> ActiveHandle<'ctx> {
     /// ```
     pub unsafe fn include<P: AsRef<Path>>(&self, path: P) -> JlrsResult<()> {
         if path.as_ref().exists() {
-            return self.local_scope::<_, 2>(|mut frame| {
+            return self.local_scope::<2>(|mut frame| {
                 let path_jl_str = JuliaString::new(&mut frame, path.as_ref().to_string_lossy());
                 Main::include(&frame)
                     .call1(&mut frame, path_jl_str.as_value())
@@ -180,7 +179,7 @@ impl<'ctx> ActiveHandle<'ctx> {
     /// # }
     /// ```
     pub unsafe fn using<S: AsRef<str>>(&self, module_name: S) -> JlrsResult<()> {
-        return self.local_scope::<_, 1>(|mut frame| {
+        return self.local_scope::<1>(|mut frame| {
             let cmd = format!("using {}", module_name.as_ref());
             Value::eval_string(&mut frame, cmd)
                 .map(|_| ())
@@ -276,7 +275,7 @@ pub(crate) fn wait_loop() {
 
         // Start waiting
         if let Err(err) = wait_main.call0(&weak_handle) {
-            let err = weak_handle.local_scope::<_, 1>(|mut frame| {
+            let err = weak_handle.local_scope::<1>(|mut frame| {
                 err.root(&mut frame).error_string_or(CANNOT_DISPLAY_VALUE)
             });
 
@@ -300,7 +299,7 @@ unsafe fn drop_handle() {
             let notify_main = JlrsCore::notify_main(&weak_handle);
 
             if let Err(err) = notify_main.call0(&weak_handle) {
-                weak_handle.local_scope::<_, 1>(|mut frame| {
+                weak_handle.local_scope::<1>(|mut frame| {
                     panic!(
                         "unexpected error when calling JlrsCore.Threads.notify_main: {:?}",
                         err.root(&mut frame)

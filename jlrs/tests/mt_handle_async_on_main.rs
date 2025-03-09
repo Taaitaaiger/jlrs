@@ -13,7 +13,7 @@ mod mt_handle {
             .async_runtime(tokio)
             .start_mt(|mut julia, async_handle| {
                 let t1 = julia.with(|handle| {
-                    handle.local_scope::<_, 1>(|mut frame| unsafe {
+                    handle.local_scope::<1>(|mut frame| unsafe {
                         Value::eval_string(&mut frame, "1 + 2")
                             .unwrap()
                             .unbox::<isize>()

@@ -27,7 +27,7 @@ use crate::{
         managed::{datatype::DataTypeData, private::ManagedPriv as _},
         types::construct_type::{ArrayTypeConstructor, ConstantIsize, ConstantSize, ConstructType},
     },
-    memory::scope::LocalScope,
+    memory::scope::{LocalScopeExt, LocalScope},
     prelude::{Array, Managed, Target, Value, ValueData},
     private::Private,
 };
@@ -502,7 +502,7 @@ pub unsafe trait DimsExt: Dims {
         T: ConstructType,
         Tgt: Target<'target>,
     {
-        target.with_local_scope::<_, _, 1>(|target, mut frame| {
+        target.with_local_scope::<1>(|target, mut frame| {
             let n = self.rank();
             let elem_ty = T::construct_type(&mut frame);
             unsafe {
@@ -559,7 +559,7 @@ pub unsafe trait DimsExt: Dims {
     where
         Tgt: Target<'target>,
     {
-        target.local_scope::<_, 1>(|mut frame| {
+        target.local_scope::<1>(|mut frame| {
             let tuple = unsized_dim_tuple(&frame, self);
             tuple.root(&mut frame);
             jl_new_array(array_type, tuple.ptr().as_ptr())
@@ -598,7 +598,7 @@ pub unsafe trait DimsExt: Dims {
 
         let arr = match self.rank() {
             1 => jl_ptr_to_array_1d(array_type, data, self.n_elements_unchecked(0), 0),
-            _ => target.local_scope::<_, 1>(|frame| {
+            _ => target.local_scope::<1>(|frame| {
                 let tuple = unsized_dim_tuple(frame, self);
                 jl_ptr_to_array(array_type, data, tuple.unwrap(Private), 0)
             }),
@@ -727,7 +727,7 @@ pub unsafe trait RankedDims: Dims {
         Tgt: Target<'target>,
     {
         let _: () = Self::ASSERT_RANKED;
-        target.local_scope::<_, 1>(|mut frame| {
+        target.local_scope::<1>(|mut frame| {
             let tuple = sized_dim_tuple(&frame, self);
             tuple.root(&mut frame);
             jl_new_array(array_type, tuple.ptr().as_ptr())
@@ -769,7 +769,7 @@ pub unsafe trait RankedDims: Dims {
 
         let arr = match Self::RANK {
             1 => jl_ptr_to_array_1d(array_type, data, self.n_elements_unchecked(0), 0),
-            _ => target.local_scope::<_, 1>(|frame| {
+            _ => target.local_scope::<1>(|frame| {
                 let tuple = sized_dim_tuple(frame, self);
                 jl_ptr_to_array(array_type, data, tuple.unwrap(Private), 0)
             }),

@@ -56,7 +56,7 @@ pub use crate::{
     define_fast_array_key, define_fast_key,
     error::JlrsResult,
     memory::{
-        scope::{LocalScope, Scope},
+        scope::{LocalScope, LocalScopeExt, Scope},
         target::{Target, TargetType},
     },
     named_tuple,

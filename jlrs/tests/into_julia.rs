@@ -34,7 +34,7 @@ mod tests {
                     let mut jlrs = j.borrow_mut();
 
                     jlrs.instance(&mut frame).scope(|frame| unsafe {
-                        frame.local_scope::<_, 0>(|frame| {
+                        frame.local_scope::<0>(|frame| {
                             let val = $val.into_julia(&frame).as_value();
                             assert!(val.is::<$type>());
                         })

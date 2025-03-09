@@ -40,7 +40,10 @@ use crate::{
     },
     error::{InstantiationError, JlrsResult},
     impl_julia_typecheck,
-    memory::target::{unrooted::Unrooted, Target, TargetResult},
+    memory::{
+        scope::LocalScopeExt,
+        target::{unrooted::Unrooted, Target, TargetResult},
+    },
     private::Private,
 };
 
@@ -607,7 +610,7 @@ impl DataType<'_> {
     {
         let svec = env.to_svec();
         let tvars = svec.data();
-        target.with_local_scope::<_, _, 1>(|target, mut frame| {
+        target.with_local_scope::<1>(|target, mut frame| {
             let mut reusable_slot = frame.local_reusable_slot();
             unsafe {
                 let mut out = self.root(&mut reusable_slot).as_value();

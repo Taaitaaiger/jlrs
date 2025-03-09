@@ -481,7 +481,10 @@ pub fn impl_construct_type(ast: &syn::DeriveInput) -> TokenStream {
         let nth_generic = 0..n_names;
 
         let construct_expr = syn::parse_quote! {
-            target.with_local_scope::<_, _, #n_slots>(|target, mut frame| {
+            <Tgt as ::jlrs::memory::scope::LocalScopeExt<
+                'target,
+                ::jlrs::data::managed::value::ValueData<'target, 'static, Tgt>
+            >>::with_local_scope::<#n_slots>(target, |target, mut frame| {
 
                 if #n_names == 0 {
                     return base_type.root(target);
@@ -506,7 +509,10 @@ pub fn impl_construct_type(ast: &syn::DeriveInput) -> TokenStream {
         let nth_generic = 0..n_names;
         let param_names = ast.generics.type_params().map(|p| &p.ident);
         let construct_with_context_expr = syn::parse_quote! {
-            target.with_local_scope::<_, _, #n_slots>(|target, mut frame| {
+            <Tgt as ::jlrs::memory::scope::LocalScopeExt<
+                'target,
+                ::jlrs::data::managed::value::ValueData<'target, 'static, Tgt>
+            >>::with_local_scope::<#n_slots>(target, |target, mut frame| {
                 if #n_names == 0 {
                     return base_type.root(target);
                 }

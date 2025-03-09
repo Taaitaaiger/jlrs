@@ -19,7 +19,10 @@ use crate::{
     catch::{catch_exceptions, unwrap_exc},
     data::managed::{datatype::DataType, private::ManagedPriv, type_var::TypeVar, value::Value},
     impl_julia_typecheck,
-    memory::target::{Target, TargetResult},
+    memory::{
+        scope::LocalScopeExt,
+        target::{Target, TargetResult},
+    },
     private::Private,
 };
 
@@ -164,7 +167,7 @@ impl<'scope> UnionAll<'scope> {
         target: Tgt,
         ty: DataType,
     ) -> ValueData<'target, 'static, Tgt> {
-        target.with_local_scope::<_, _, 1>(|target, mut frame| unsafe {
+        target.with_local_scope::<1>(|target, mut frame| unsafe {
             let params = ty.parameters();
             let params = params.data();
             let mut local_output = frame.local_output();

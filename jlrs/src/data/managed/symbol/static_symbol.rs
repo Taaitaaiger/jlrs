@@ -51,7 +51,7 @@ use crate::{
 /// # fn main() {
 /// # let mut julia = Builder::new().start_local().unwrap();
 /// julia
-///     .local_scope::<_, 0>(|frame| {
+///     .local_scope::<0>(|frame| {
 ///         let where_sym = Bar::get_symbol(&frame);
 ///         let sym = sym::<Bar, _>(&frame);
 ///         assert_eq!(where_sym, sym);

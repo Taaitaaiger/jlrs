@@ -172,7 +172,7 @@ unsafe impl<T: ConstructType, const N: usize> BitsUnionContainer for TypedBitsUn
     fn check_union_type(u: Union) -> bool {
         match weak_handle!() {
             Ok(handle) => {
-                handle.local_scope::<_, 1>(|mut frame| T::construct_type(&mut frame) == u)
+                handle.local_scope::<1>(|mut frame| T::construct_type(&mut frame) == u)
             }
             Err(_e) => {
                 panic!("TypedBitsUnion::check_union_type called outside julia context")

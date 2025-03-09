@@ -14,7 +14,7 @@ mod mt_handle {
             .start_mt(|julia, async_handle| {
                 let t1 = julia.spawn(move |mut julia| {
                     julia.with(|handle| {
-                        handle.local_scope::<_, 1>(|mut frame| unsafe {
+                        handle.local_scope::<1>(|mut frame| unsafe {
                             Value::eval_string(&mut frame, "1 + 2")
                                 .unwrap()
                                 .unbox::<isize>()

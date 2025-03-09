@@ -174,10 +174,7 @@ impl<'scope> GcFrame<'scope> {
 
 impl<'ctx, T> Scope<'ctx, T> for GcFrame<'ctx> {
     #[inline]
-    fn scope<F>(&mut self, func: F) -> T
-    where
-        for<'scope> F: FnOnce(GcFrame<'scope>) -> T,
-    {
+    fn scope(&mut self, func: impl for<'scope> FnOnce(GcFrame<'scope>) -> T) -> T {
         unsafe {
             let (offset, nested) = self.nest();
             let res = func(nested);
@@ -345,7 +342,6 @@ impl<'borrow, 'current> BorrowedFrame<'borrow, 'current, GcFrame<'current>> {
 #[cfg(feature = "async")]
 impl<'borrow, 'current> BorrowedFrame<'borrow, 'current, AsyncGcFrame<'current>> {
     /// Create a temporary scope by calling [`GcFrame::scope`].
-
     #[inline]
     pub fn scope<T, F>(self, func: F) -> JlrsResult<T>
     where
@@ -355,12 +351,11 @@ impl<'borrow, 'current> BorrowedFrame<'borrow, 'current, AsyncGcFrame<'current>>
     }
 
     /// Create a temporary scope by calling [`AsyncGcFrame::async_scope`].
-
     #[inline]
-    pub async fn async_scope<T, F>(&mut self, func: F) -> T
-    where
-        for<'inner> F: AsyncFnOnce(AsyncGcFrame<'inner>) -> T,
-    {
+    pub async fn async_scope<T>(
+        &mut self,
+        func: impl for<'inner> AsyncFnOnce(AsyncGcFrame<'inner>) -> T,
+    ) -> T {
         self.0.async_scope(func).await
     }
 }
@@ -372,7 +367,7 @@ pub(crate) struct LocalFrame<const N: usize> {
 
 impl<const N: usize> LocalFrame<N> {
     #[inline]
-    pub const fn new() -> Self {
+    pub(crate) const fn new() -> Self {
         unsafe {
             LocalFrame {
                 raw: RawGcFrame::new(),

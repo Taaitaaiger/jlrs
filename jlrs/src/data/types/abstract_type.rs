@@ -14,7 +14,7 @@ use crate::{
         Managed,
     },
     inline_static_ref,
-    memory::target::Target,
+    memory::{scope::LocalScopeExt, target::Target},
 };
 
 /// Marker trait that the constructed type is an abstract type.
@@ -197,7 +197,7 @@ unsafe impl<T: ConstructType, N: ConstructType> ConstructType for AbstractArray<
     where
         Tgt: Target<'target>,
     {
-        target.with_local_scope::<_, _, 3>(|target, mut frame| {
+        target.with_local_scope::<3>(|target, mut frame| {
             let ty_param = T::construct_type(&mut frame);
             let rank_param = N::construct_type(&mut frame);
             let params = [ty_param, rank_param];
@@ -226,7 +226,7 @@ unsafe impl<T: ConstructType, N: ConstructType> ConstructType for AbstractArray<
     where
         Tgt: Target<'target>,
     {
-        target.with_local_scope::<_, _, 3>(|target, mut frame| {
+        target.with_local_scope::<3>(|target, mut frame| {
             let ty_param = T::construct_type_with_env(&mut frame, env);
             let rank_param = N::construct_type_with_env(&mut frame, env);
             let params = [ty_param, rank_param];
@@ -256,7 +256,7 @@ unsafe impl<T: ConstructType, N: ConstructType> ConstructType for DenseArray<T, 
     where
         Tgt: Target<'target>,
     {
-        target.with_local_scope::<_, _, 3>(|target, mut frame| {
+        target.with_local_scope::<3>(|target, mut frame| {
             let ty_param = T::construct_type(&mut frame);
             let rank_param = N::construct_type(&mut frame);
             let params = [ty_param, rank_param];
@@ -285,7 +285,7 @@ unsafe impl<T: ConstructType, N: ConstructType> ConstructType for DenseArray<T, 
     where
         Tgt: Target<'target>,
     {
-        target.with_local_scope::<_, _, 3>(|target, mut frame| {
+        target.with_local_scope::<3>(|target, mut frame| {
             let ty_param = T::construct_type_with_env(&mut frame, env);
             let rank_param = N::construct_type_with_env(&mut frame, env);
             let params = [ty_param, rank_param];
@@ -314,7 +314,7 @@ unsafe impl<T: ConstructType> ConstructType for RefTypeConstructor<T> {
     where
         Tgt: Target<'target>,
     {
-        target.with_local_scope::<_, _, 2>(|target, mut frame| {
+        target.with_local_scope::<2>(|target, mut frame| {
             let ty_param = T::construct_type(&mut frame);
             let params = [ty_param];
             unsafe {
@@ -342,7 +342,7 @@ unsafe impl<T: ConstructType> ConstructType for RefTypeConstructor<T> {
     where
         Tgt: Target<'target>,
     {
-        target.with_local_scope::<_, _, 2>(|target, mut frame| {
+        target.with_local_scope::<2>(|target, mut frame| {
             let ty_param = T::construct_type_with_env(&mut frame, env);
             let params = [ty_param];
             unsafe {
@@ -370,7 +370,7 @@ unsafe impl<T: ConstructType> ConstructType for TypeTypeConstructor<T> {
     where
         Tgt: Target<'target>,
     {
-        target.with_local_scope::<_, _, 2>(|target, mut frame| {
+        target.with_local_scope::<2>(|target, mut frame| {
             let ty_param = T::construct_type(&mut frame);
             let params = [ty_param];
             unsafe {
@@ -398,7 +398,7 @@ unsafe impl<T: ConstructType> ConstructType for TypeTypeConstructor<T> {
     where
         Tgt: Target<'target>,
     {
-        target.with_local_scope::<_, _, 2>(|target, mut frame| {
+        target.with_local_scope::<2>(|target, mut frame| {
             let ty_param = T::construct_type_with_env(&mut frame, env);
             let params = [ty_param];
             unsafe {
@@ -426,7 +426,7 @@ unsafe impl<T: ConstructType> ConstructType for AbstractChannel<T> {
     where
         Tgt: Target<'target>,
     {
-        target.with_local_scope::<_, _, 2>(|target, mut frame| {
+        target.with_local_scope::<2>(|target, mut frame| {
             let ty_param = T::construct_type(&mut frame);
             let params = [ty_param];
             unsafe {
@@ -455,7 +455,7 @@ unsafe impl<T: ConstructType> ConstructType for AbstractChannel<T> {
     where
         Tgt: Target<'target>,
     {
-        target.with_local_scope::<_, _, 2>(|target, mut frame| {
+        target.with_local_scope::<2>(|target, mut frame| {
             let ty_param = T::construct_type_with_env(&mut frame, env);
             let params = [ty_param];
             unsafe {
@@ -484,7 +484,7 @@ unsafe impl<K: ConstructType, V: ConstructType> ConstructType for AbstractDict<K
     where
         Tgt: Target<'target>,
     {
-        target.with_local_scope::<_, _, 3>(|target, mut frame| {
+        target.with_local_scope::<3>(|target, mut frame| {
             let key_param = K::construct_type(&mut frame);
             let value_param = V::construct_type(&mut frame);
             let params = [key_param, value_param];
@@ -514,7 +514,7 @@ unsafe impl<K: ConstructType, V: ConstructType> ConstructType for AbstractDict<K
     where
         Tgt: Target<'target>,
     {
-        target.with_local_scope::<_, _, 3>(|target, mut frame| {
+        target.with_local_scope::<3>(|target, mut frame| {
             let key_param = K::construct_type_with_env(&mut frame, env);
             let value_param = V::construct_type_with_env(&mut frame, env);
             let params = [key_param, value_param];
@@ -543,7 +543,7 @@ unsafe impl<T: ConstructType> ConstructType for AbstractMatrix<T> {
     where
         Tgt: Target<'target>,
     {
-        target.with_local_scope::<_, _, 2>(|target, mut frame| {
+        target.with_local_scope::<2>(|target, mut frame| {
             let ty_param = T::construct_type(&mut frame);
             let params = [ty_param];
             unsafe {
@@ -572,7 +572,7 @@ unsafe impl<T: ConstructType> ConstructType for AbstractMatrix<T> {
     where
         Tgt: Target<'target>,
     {
-        target.with_local_scope::<_, _, 2>(|target, mut frame| {
+        target.with_local_scope::<2>(|target, mut frame| {
             let ty_param = T::construct_type_with_env(&mut frame, env);
             let params = [ty_param];
             unsafe {
@@ -600,7 +600,7 @@ unsafe impl<T: ConstructType> ConstructType for AbstractRange<T> {
     where
         Tgt: Target<'target>,
     {
-        target.with_local_scope::<_, _, 2>(|target, mut frame| {
+        target.with_local_scope::<2>(|target, mut frame| {
             let ty_param = T::construct_type(&mut frame);
             let params = [ty_param];
             unsafe {
@@ -629,7 +629,7 @@ unsafe impl<T: ConstructType> ConstructType for AbstractRange<T> {
     where
         Tgt: Target<'target>,
     {
-        target.with_local_scope::<_, _, 2>(|target, mut frame| {
+        target.with_local_scope::<2>(|target, mut frame| {
             let ty_param = T::construct_type_with_env(&mut frame, env);
             let params = [ty_param];
             unsafe {
@@ -657,7 +657,7 @@ unsafe impl<T: ConstructType> ConstructType for AbstractSet<T> {
     where
         Tgt: Target<'target>,
     {
-        target.with_local_scope::<_, _, 2>(|target, mut frame| {
+        target.with_local_scope::<2>(|target, mut frame| {
             let ty_param = T::construct_type(&mut frame);
             let params = [ty_param];
             unsafe {
@@ -686,7 +686,7 @@ unsafe impl<T: ConstructType> ConstructType for AbstractSet<T> {
     where
         Tgt: Target<'target>,
     {
-        target.with_local_scope::<_, _, 2>(|target, mut frame| {
+        target.with_local_scope::<2>(|target, mut frame| {
             let ty_param = T::construct_type_with_env(&mut frame, env);
             let params = [ty_param];
             unsafe {
@@ -715,7 +715,7 @@ unsafe impl<T: ConstructType, N: ConstructType> ConstructType for AbstractSlices
     where
         Tgt: Target<'target>,
     {
-        target.with_local_scope::<_, _, 3>(|target, mut frame| {
+        target.with_local_scope::<3>(|target, mut frame| {
             let ty_param = T::construct_type(&mut frame);
             let n_param = N::construct_type(&mut frame);
             let params = [ty_param, n_param];
@@ -736,7 +736,7 @@ unsafe impl<T: ConstructType, N: ConstructType> ConstructType for AbstractSlices
     where
         Tgt: Target<'target>,
     {
-        target.with_local_scope::<_, _, 3>(|target, mut frame| {
+        target.with_local_scope::<3>(|target, mut frame| {
             let ty_param = T::construct_type_with_env(&mut frame, env);
             let n_param = N::construct_type_with_env(&mut frame, env);
             let params = [ty_param, n_param];
@@ -772,7 +772,7 @@ unsafe impl<T: ConstructType> ConstructType for AbstractUnitRange<T> {
     where
         Tgt: Target<'target>,
     {
-        target.with_local_scope::<_, _, 2>(|target, mut frame| {
+        target.with_local_scope::<2>(|target, mut frame| {
             let ty_param = T::construct_type(&mut frame);
             let params = [ty_param];
             unsafe {
@@ -792,7 +792,7 @@ unsafe impl<T: ConstructType> ConstructType for AbstractUnitRange<T> {
     where
         Tgt: Target<'target>,
     {
-        target.with_local_scope::<_, _, 2>(|target, mut frame| {
+        target.with_local_scope::<2>(|target, mut frame| {
             let ty_param = T::construct_type_with_env(&mut frame, env);
             let params = [ty_param];
             unsafe {
@@ -831,7 +831,7 @@ unsafe impl<T: ConstructType> ConstructType for AbstractVector<T> {
     where
         Tgt: Target<'target>,
     {
-        target.with_local_scope::<_, _, 2>(|target, mut frame| {
+        target.with_local_scope::<2>(|target, mut frame| {
             let ty_param = T::construct_type(&mut frame);
             let params = [ty_param];
             unsafe {
@@ -851,7 +851,7 @@ unsafe impl<T: ConstructType> ConstructType for AbstractVector<T> {
     where
         Tgt: Target<'target>,
     {
-        target.with_local_scope::<_, _, 2>(|target, mut frame| {
+        target.with_local_scope::<2>(|target, mut frame| {
             let ty_param = T::construct_type_with_env(&mut frame, env);
             let params = [ty_param];
             unsafe {
@@ -888,7 +888,7 @@ unsafe impl<T: ConstructType> ConstructType for DenseMatrix<T> {
     where
         Tgt: Target<'target>,
     {
-        target.with_local_scope::<_, _, 2>(|target, mut frame| {
+        target.with_local_scope::<2>(|target, mut frame| {
             let ty_param = T::construct_type(&mut frame);
             let params = [ty_param];
             unsafe {
@@ -908,7 +908,7 @@ unsafe impl<T: ConstructType> ConstructType for DenseMatrix<T> {
     where
         Tgt: Target<'target>,
     {
-        target.with_local_scope::<_, _, 2>(|target, mut frame| {
+        target.with_local_scope::<2>(|target, mut frame| {
             let ty_param = T::construct_type_with_env(&mut frame, env);
             let params = [ty_param];
             unsafe {
@@ -945,7 +945,7 @@ unsafe impl<T: ConstructType> ConstructType for DenseVector<T> {
     where
         Tgt: Target<'target>,
     {
-        target.with_local_scope::<_, _, 2>(|target, mut frame| {
+        target.with_local_scope::<2>(|target, mut frame| {
             let ty_param = T::construct_type(&mut frame);
             let params = [ty_param];
             unsafe {
@@ -965,7 +965,7 @@ unsafe impl<T: ConstructType> ConstructType for DenseVector<T> {
     where
         Tgt: Target<'target>,
     {
-        target.with_local_scope::<_, _, 2>(|target, mut frame| {
+        target.with_local_scope::<2>(|target, mut frame| {
             let ty_param = T::construct_type_with_env(&mut frame, env);
             let params = [ty_param];
             unsafe {
@@ -1002,7 +1002,7 @@ unsafe impl<T: ConstructType> ConstructType for Enum<T> {
     where
         Tgt: Target<'target>,
     {
-        target.with_local_scope::<_, _, 3>(|target, mut frame| {
+        target.with_local_scope::<3>(|target, mut frame| {
             let ty_param = T::construct_type(&mut frame);
 
             // Validate bound
@@ -1034,7 +1034,7 @@ unsafe impl<T: ConstructType> ConstructType for Enum<T> {
     where
         Tgt: Target<'target>,
     {
-        target.with_local_scope::<_, _, 3>(|target, mut frame| {
+        target.with_local_scope::<3>(|target, mut frame| {
             let ty_param = T::construct_type_with_env(&mut frame, env);
 
             // Validate bound
@@ -1084,7 +1084,7 @@ unsafe impl<T: ConstructType, S: ConstructType> ConstructType for OrdinalRange<T
     where
         Tgt: Target<'target>,
     {
-        target.with_local_scope::<_, _, 3>(|target, mut frame| {
+        target.with_local_scope::<3>(|target, mut frame| {
             let ty_param = T::construct_type(&mut frame);
             let n_param = S::construct_type(&mut frame);
             let params = [ty_param, n_param];
@@ -1105,7 +1105,7 @@ unsafe impl<T: ConstructType, S: ConstructType> ConstructType for OrdinalRange<T
     where
         Tgt: Target<'target>,
     {
-        target.with_local_scope::<_, _, 3>(|target, mut frame| {
+        target.with_local_scope::<3>(|target, mut frame| {
             let ty_param = T::construct_type_with_env(&mut frame, env);
             let n_param = S::construct_type_with_env(&mut frame, env);
             let params = [ty_param, n_param];

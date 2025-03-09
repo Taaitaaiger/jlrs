@@ -12,7 +12,7 @@
 //! # fn main() {
 //! # let mut julia = Builder::new().start_local().unwrap();
 //!
-//! julia.local_scope::<_, 9>(|mut frame| {
+//! julia.local_scope::<9>(|mut frame| {
 //!     // Create a few Julia values
 //!     let i = Value::new(&mut frame, 2u64);
 //!     let j = Value::new(&mut frame, 1u32);
@@ -85,7 +85,7 @@
 //! # fn main() {
 //! # let mut julia = Builder::new().start_local().unwrap();
 //!
-//! julia.local_scope::<_, 4>(|mut frame| {
+//! julia.local_scope::<4>(|mut frame| {
 //!     let i = Value::new(&mut frame, 1isize);
 //!     let j = Value::new(&mut frame, 2isize);
 //!
@@ -121,7 +121,7 @@
 //! # fn main() {
 //! # let mut julia = Builder::new().start_local().unwrap();
 //!
-//! julia.local_scope::<_, 1>(|mut frame| {
+//! julia.local_scope::<1>(|mut frame| {
 //!     let mut lin_alg = Module::package_root_module(&frame, "LinearAlgebra");
 //!     if lin_alg.is_none() {
 //!         unsafe {
@@ -148,7 +148,7 @@
 //! # fn main() {
 //! # let mut julia = Builder::new().start_local().unwrap();
 //!
-//! julia.local_scope::<_, 5>(|mut frame| {
+//! julia.local_scope::<5>(|mut frame| {
 //!     unsafe {
 //!         Value::eval_string(&frame, "my_kw_func(x; kw1=0, kw2=1) = x + kw1 + kw2")
 //!             .expect("unexpected exception");
@@ -182,7 +182,7 @@
 //! # fn main() {
 //! # let mut julia = Builder::new().start_local().unwrap();
 //!
-//! julia.local_scope::<_, 3>(|mut frame| {
+//! julia.local_scope::<3>(|mut frame| {
 //!     unsafe {
 //!         Value::eval_string(&frame, "struct Foo a::Int; b::Int; Foo(a) = new(a, a); end")
 //!             .expect("unexpected exception");
@@ -209,7 +209,7 @@
 //! # fn main() {
 //! # let mut julia = Builder::new().start_local().unwrap();
 //!
-//! julia.local_scope::<_, 3>(|mut frame| {
+//! julia.local_scope::<3>(|mut frame| {
 //!     unsafe {
 //!         Value::eval_string(&frame, "struct Foo{T} a::T; end").expect("unexpected exception");
 //!     }
@@ -237,7 +237,7 @@
 //! # fn main() {
 //! # let mut julia = Builder::new().start_local().unwrap();
 //!
-//! julia.local_scope::<_, 5>(|mut frame| {
+//! julia.local_scope::<5>(|mut frame| {
 //!     unsafe {
 //!         Value::eval_string(&frame, "struct Foo{V,T} a::T; end").expect("unexpected exception");
 //!     }
@@ -431,7 +431,7 @@ pub trait ProvideKeywords<'value, 'data>: Call<'data> {
     /// # fn main() {
     /// # let mut julia = Builder::new().start_local().unwrap();
     /// julia
-    ///     .local_scope::<_, 5>(|mut frame| unsafe {
+    ///     .local_scope::<5>(|mut frame| unsafe {
     ///         // The code we evaluate is a simple function definition, which is safe.
     ///         let func = unsafe {
     ///             Value::eval_string(&mut frame, "func(; a=3, b=4, c=5) = a + b + c") // 1

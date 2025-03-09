@@ -66,7 +66,7 @@ macro_rules! count {
 /// # fn main() {
 /// # let mut julia = Builder::new().start_local().unwrap();
 /// // Three slots; two for the inputs and one for the output.
-/// julia.local_scope::<_, 3>(|mut frame| {
+/// julia.local_scope::<3>(|mut frame| {
 ///     // Create the two arguments, each value requires one slot
 ///     let i = Value::new(&mut frame, 2u64);
 ///     let j = Value::new(&mut frame, 1u32);
@@ -173,6 +173,7 @@ use crate::{
     memory::{
         context::ledger::Ledger,
         get_tls,
+        scope::LocalScopeExt,
         target::{unrooted::Unrooted, Target, TargetException, TargetResult},
     },
     prelude::NTuple,
@@ -322,7 +323,7 @@ impl Value<'_, '_> {
             let _: () = assert!(!L::IS_REF);
         }
 
-        target.with_local_scope::<_, _, 1>(|target, mut frame| {
+        target.with_local_scope::<1>(|target, mut frame| {
             let ty = Ty::construct_type(&mut frame);
             let ty_dt = ty.cast::<DataType>()?;
 
@@ -365,7 +366,7 @@ impl Value<'_, '_> {
     {
         unsafe {
             target
-                .with_local_scope::<_, _, 1>(|target, mut frame| -> JlrsResult<_> {
+                .with_local_scope::<1>(|target, mut frame| -> JlrsResult<_> {
                     // Safety: this method can only be called from a thread known to Julia. The
                     // unchecked methods are used because it can be guaranteed they won't throw
                     // an exception for the given arguments.
@@ -524,7 +525,7 @@ impl Value<'_, '_> {
     /// # use jlrs::prelude::*;
     /// # fn main() {
     /// # let mut julia = Builder::new().start_local().unwrap();
-    /// julia.local_scope::<_, 1>(|mut frame| {
+    /// julia.local_scope::<1>(|mut frame| {
     ///     let i = Value::new(&mut frame, 2u64);
     ///     assert!(i.is::<u64>());
     /// });
@@ -829,7 +830,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
         self,
         target: &Tgt,
     ) -> JlrsResult<TypedValue<'scope, 'data, T>> {
-        target.with_local_scope::<_, _, 1>(|_, mut frame| {
+        target.with_local_scope::<1>(|_, mut frame| {
             let ty = T::construct_type(&mut frame);
             if self.isa(ty) {
                 unsafe { Ok(TypedValue::<T>::from_value_unchecked(self)) }
@@ -1296,7 +1297,7 @@ impl Value<'_, '_> {
         Tgt: Target<'target>,
     {
         if path.as_ref().exists() {
-            return target.with_local_scope::<_, _, 1>(|target, mut frame| {
+            return target.with_local_scope::<1>(|target, mut frame| {
                 let path_jl_str = JuliaString::new(&mut frame, path.as_ref().to_string_lossy());
                 let include_func = Module::main(&frame)
                     .function(&frame, "include")?

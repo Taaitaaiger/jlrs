@@ -37,7 +37,7 @@ use crate::{
         },
     },
     error::{JlrsError, JlrsResult, TypeError, CANNOT_DISPLAY_TYPE},
-    memory::target::unrooted::Unrooted,
+    memory::{scope::LocalScopeExt, target::unrooted::Unrooted},
     prelude::Target,
 };
 
@@ -97,7 +97,7 @@ where
     where
         Tgt: Target<'target>,
     {
-        target.with_local_scope::<_, _, 1>(|_, mut frame| unsafe {
+        target.with_local_scope::<1>(|_, mut frame| unsafe {
             let ty = T::construct_type(&mut frame);
 
             if ty.is::<DataType>() {
@@ -185,7 +185,7 @@ where
         &self,
         target: Tgt,
     ) -> JlrsResult<&U> {
-        target.with_local_scope::<_, _, 1>(|_, mut frame| unsafe {
+        target.with_local_scope::<1>(|_, mut frame| unsafe {
             let ty = T::construct_type(&mut frame);
 
             if ty.is::<DataType>() {
@@ -250,7 +250,7 @@ where
         &self,
         target: &Tgt,
     ) -> JlrsResult<Value<'scope, 'static>> {
-        target.with_local_scope::<_, _, 1>(|_, mut frame| unsafe {
+        target.with_local_scope::<1>(|_, mut frame| unsafe {
             let ty = T::construct_type(&mut frame);
 
             if ty.is::<DataType>() {

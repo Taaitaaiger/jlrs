@@ -30,6 +30,10 @@
 
 - The MSRV has been increased to 1.79.
 
+- The closure in scopes is now taken as an `impl trait` to get rid of the (unnameable) generic, this change should only affect local scopes which now just take their size as a constant generic. To update your code, replace `.local_scope::<_,` with `.local_scope::<`.
+
+- `Target::with_local_scope` has been moved to a new trait, `LocalScopeExt`, and like `LocalScope::local_scope` only takes its size as a constant generic. This trait also provides `LocalScopeExt::with_unsized_local_scope`.
+
 ## v0.21
 
 - Support generating bindings for Julia enums with integer base types in combination with JlrsCore.Reflect and the `Enum` derive macro.

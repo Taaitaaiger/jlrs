@@ -30,7 +30,7 @@ use crate::{
         },
         types::construct_type::ConstructType,
     },
-    memory::target::Target,
+    memory::{scope::LocalScopeExt, target::Target},
     prelude::Managed,
     private::Private,
 };
@@ -156,7 +156,7 @@ unsafe impl<T: IntoJulia + ConstructType> IntoJulia for *mut T {
     where
         Tgt: Target<'scope>,
     {
-        target.with_local_scope::<_, _, 1>(|target, mut frame| {
+        target.with_local_scope::<1>(|target, mut frame| {
             let ptr_ua = UnionAll::pointer_type(&frame);
             let inner_ty = T::construct_type(&mut frame);
 

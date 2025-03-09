@@ -44,7 +44,7 @@ impl LocalHandle {
     /// ```
     pub unsafe fn include<P: AsRef<Path>>(&self, path: P) -> JlrsResult<()> {
         if path.as_ref().exists() {
-            return self.local_scope::<_, 2>(|mut frame| {
+            return self.local_scope::<2>(|mut frame| {
                 let path_jl_str = JuliaString::new(&mut frame, path.as_ref().to_string_lossy());
                 Main::include(&frame)
                     .call1(&mut frame, path_jl_str.as_value())
@@ -62,7 +62,7 @@ impl LocalHandle {
     ///
     /// Safety: `module_name` must be a valid module or package name.
     pub unsafe fn using<S: AsRef<str>>(&self, module_name: S) -> JlrsResult<()> {
-        return self.local_scope::<_, 1>(|mut frame| {
+        return self.local_scope::<1>(|mut frame| {
             let cmd = format!("using {}", module_name.as_ref());
             Value::eval_string(&mut frame, cmd)
                 .map(|_| ())

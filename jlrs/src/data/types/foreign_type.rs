@@ -84,7 +84,7 @@ use crate::{
         types::construct_type::ConstructType,
     },
     gc_safe::{GcSafeOnceLock, GcSafeRwLock},
-    memory::{get_tls, target::Target, PTls},
+    memory::{get_tls, scope::LocalScopeExt, target::Target, PTls},
     private::Private,
 };
 
@@ -201,7 +201,7 @@ where
     where
         Tgt: Target<'target>,
     {
-        target.with_local_scope::<_, _, 2>(|target, mut frame| {
+        target.with_local_scope::<2>(|target, mut frame| {
             let svec = unsafe { SimpleVector::with_capacity_uninit(&mut frame, 1) };
             let tvar = Self::construct_type(&mut frame);
             unsafe {
@@ -229,7 +229,7 @@ where
     where
         Tgt: Target<'target>,
     {
-        target.with_local_scope::<_, _, 3>(|target, mut frame| {
+        target.with_local_scope::<3>(|target, mut frame| {
             let svec = unsafe { SimpleVector::with_capacity_uninit(&mut frame, 2) };
             let tvar_1 = TypeVarConstructor::<N0, U0, L0>::construct_type(&mut frame);
             let tvar_2 = TypeVarConstructor::<N1, U1, L1>::construct_type(&mut frame);
@@ -264,7 +264,7 @@ where
     where
         Tgt: Target<'target>,
     {
-        target.with_local_scope::<_, _, 4>(|target, mut frame| {
+        target.with_local_scope::<4>(|target, mut frame| {
             let svec = unsafe { SimpleVector::with_capacity_uninit(&mut frame, 3) };
             let tvar_1 = TypeVarConstructor::<N0, U0, L0>::construct_type(&mut frame);
             let tvar_2 = TypeVarConstructor::<N1, U1, L1>::construct_type(&mut frame);
@@ -290,7 +290,7 @@ where
     where
         Tgt: Target<'target>,
     {
-        target.with_local_scope::<_, _, 2>(|target, mut frame| {
+        target.with_local_scope::<2>(|target, mut frame| {
             let svec = unsafe { SimpleVector::with_capacity_uninit(&mut frame, 1) };
             let tvar = TypeVarConstructor::<N>::construct_type(&mut frame);
             unsafe {
@@ -309,7 +309,7 @@ where
     where
         Tgt: Target<'target>,
     {
-        target.with_local_scope::<_, _, 2>(|target, mut frame| {
+        target.with_local_scope::<2>(|target, mut frame| {
             let svec = unsafe { SimpleVector::with_capacity_uninit(&mut frame, 1) };
             let tvar = TypeVarConstructor::<N>::construct_type(&mut frame);
             unsafe {
@@ -331,7 +331,7 @@ where
     where
         Tgt: Target<'target>,
     {
-        target.with_local_scope::<_, _, 3>(|target, mut frame| {
+        target.with_local_scope::<3>(|target, mut frame| {
             let svec = unsafe { SimpleVector::with_capacity_uninit(&mut frame, 2) };
             let tvar_1 = TypeVarConstructor::<N0>::construct_type(&mut frame);
             let tvar_2 = TypeVarConstructor::<N1>::construct_type(&mut frame);
@@ -359,7 +359,7 @@ where
     where
         Tgt: Target<'target>,
     {
-        target.with_local_scope::<_, _, 4>(|target, mut frame| {
+        target.with_local_scope::<4>(|target, mut frame| {
             let svec = unsafe { SimpleVector::with_capacity_uninit(&mut frame, 3) };
             let tvar_1 = TypeVarConstructor::<N0>::construct_type(&mut frame);
             let tvar_2 = TypeVarConstructor::<N1>::construct_type(&mut frame);
@@ -571,16 +571,21 @@ macro_rules! impl_type_parameters {
 
             const N: usize = $crate::count_exprs!($($t)+);
             const M: usize = N + 1;
-            target.with_local_scope::<_, _, M>(|target, mut frame| unsafe {
-                let svec = $crate::data::managed::simple_vector::SimpleVector::with_capacity_uninit(&mut frame, N);
+            <Tgt as $crate::memory::scope::LocalScopeExt<
+                'target,
+                $crate::data::managed::simple_vector::SimpleVectorData<'target, Tgt>
+            >>::with_local_scope::<M>(
+                target,
+                |target, mut frame| unsafe {
+                    let svec = $crate::data::managed::simple_vector::SimpleVector::with_capacity_uninit(&mut frame, N);
 
-                {
-                    let mut svec_ref = svec.data();
-                    $crate::expand_type_bound!(0, &mut frame, svec_ref, $($t)+);
-                }
+                    {
+                        let mut svec_ref = svec.data();
+                        $crate::expand_type_bound!(0, &mut frame, svec_ref, $($t)+);
+                    }
 
-                <$crate::data::managed::simple_vector::SimpleVector as $crate::data::managed::Managed>::root(svec, target)
-            })
+                    <$crate::data::managed::simple_vector::SimpleVector as $crate::data::managed::Managed>::root(svec, target)
+                })
         }
     };
 }
@@ -609,16 +614,21 @@ macro_rules! impl_variant_parameters {
             const N: usize = $crate::count_exprs!($($t)+);
             const M: usize = N + 1;
 
-            target.with_local_scope::<_, _, M>(|target, mut frame| unsafe {
-                let svec = $crate::data::managed::simple_vector::SimpleVector::with_capacity_uninit(&mut frame, N);
+            <Tgt as $crate::memory::scope::LocalScopeExt<
+                'target,
+                $crate::data::managed::simple_vector::SimpleVectorData<'target, Tgt>
+            >>::with_local_scope::<M>(
+                target,
+                |target, mut frame| unsafe {
+                    let svec = $crate::data::managed::simple_vector::SimpleVector::with_capacity_uninit(&mut frame, N);
 
-                {
-                    let mut svec_ref = svec.data();
-                    $crate::expand_type_bound!(0, &mut frame, svec_ref, $($t)+);
-                }
+                    {
+                        let mut svec_ref = svec.data();
+                        $crate::expand_type_bound!(0, &mut frame, svec_ref, $($t)+);
+                    }
 
-                <$crate::data::managed::simple_vector::SimpleVector as $crate::data::managed::Managed>::root(svec, target)
-            })
+                    <$crate::data::managed::simple_vector::SimpleVector as $crate::data::managed::Managed>::root(svec, target)
+                })
         }
     };
 }
@@ -903,7 +913,7 @@ where
         return target.data_from_ptr(ty.unwrap_non_null(Private), Private);
     }
 
-    target.with_local_scope::<_, _, 1>(|target, mut frame| {
+    target.with_local_scope::<1>(|target, mut frame| {
         let super_type = U::super_type(&mut frame).unwrap(Private);
 
         let ty = jl_new_datatype(
@@ -945,7 +955,7 @@ where
         panic!("Type {} was not registered", name.as_str().unwrap());
     }
 
-    target.with_local_scope::<_, _, 3>(|target, mut frame| {
+    target.with_local_scope::<3>(|target, mut frame| {
         let params = U::variant_parameters(&mut frame);
         let params = params.data();
         let params_slice = params.as_atomic_slice().assume_immutable_non_null();
@@ -979,7 +989,7 @@ where
         return target.data_from_ptr(ty.unwrap_non_null(Private), Private);
     }
 
-    target.with_local_scope::<_, _, 2>(|target, mut frame| {
+    target.with_local_scope::<2>(|target, mut frame| {
         let super_type = U::super_type(&mut frame);
         let bounds = U::type_parameters(&mut frame);
 

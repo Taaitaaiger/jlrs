@@ -121,7 +121,7 @@ where
     T: ConstructType,
 {
     fn typecheck(t: DataType) -> bool {
-        t.unrooted_target().local_scope::<_, 1>(|mut frame| {
+        t.unrooted_target().local_scope::<1>(|mut frame| {
             let ty = T::construct_type(&mut frame);
             if ty != t {
                 return false;
@@ -138,7 +138,7 @@ where
     T: ConstructType,
 {
     fn valid_layout(t: Value) -> bool {
-        t.unrooted_target().local_scope::<_, 1>(|mut frame| {
+        t.unrooted_target().local_scope::<1>(|mut frame| {
             let ty = T::construct_type(&mut frame);
             if ty != t {
                 return false;
@@ -159,7 +159,7 @@ where
     T: ConstructType,
 {
     fn valid_field(t: Value) -> bool {
-        t.unrooted_target().local_scope::<_, 1>(|mut frame| {
+        t.unrooted_target().local_scope::<1>(|mut frame| {
             let ty = T::construct_type(&mut frame);
             if ty != t {
                 return false;

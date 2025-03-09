@@ -15,7 +15,7 @@ use crate::{
         types::{construct_type::ConstructType, typecheck::Typecheck},
     },
     define_fast_key, define_static_ref,
-    memory::target::Target,
+    memory::{scope::LocalScopeExt, target::Target},
     static_ref,
 };
 
@@ -92,7 +92,7 @@ unsafe impl<T: ConstructType> ConstructType for Complex<T> {
     where
         Tgt: Target<'target>,
     {
-        target.with_local_scope::<_, _, 1>(|target, mut frame| {
+        target.with_local_scope::<1>(|target, mut frame| {
             let t = T::construct_type(&mut frame);
             let complex_ua = static_ref!(COMPLEX_UNION_ALL, &frame);
             let complex_t = unsafe { complex_ua.apply_types_unchecked(target, [t]) };
@@ -108,7 +108,7 @@ unsafe impl<T: ConstructType> ConstructType for Complex<T> {
     where
         Tgt: Target<'target>,
     {
-        target.with_local_scope::<_, _, 1>(|target, mut frame| {
+        target.with_local_scope::<1>(|target, mut frame| {
             let t = T::construct_type_with_env(&mut frame, env);
             let complex_ua = static_ref!(COMPLEX_UNION_ALL, &frame);
             let complex_t = unsafe { complex_ua.apply_types_unchecked(target, [t, t]) };

@@ -50,7 +50,7 @@ pub struct AbstractTypecheck<A: AbstractType>(PhantomData<A>);
 
 unsafe impl<A: AbstractType> Typecheck for AbstractTypecheck<A> {
     fn typecheck(t: DataType) -> bool {
-        t.unrooted_target().local_scope::<_, 1>(|mut frame| {
+        t.unrooted_target().local_scope::<1>(|mut frame| {
             let ty = A::construct_type(&mut frame);
             t.as_value().subtype(ty)
         })
