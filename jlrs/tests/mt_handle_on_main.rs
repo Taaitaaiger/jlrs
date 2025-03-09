@@ -7,7 +7,7 @@ mod mt_handle {
         Builder::new()
             .start_mt(|mut julia| {
                 let t1 = julia.with(|handle| {
-                    handle.local_scope::<_, 1>(|mut frame| unsafe {
+                    handle.local_scope::<1>(|mut frame| unsafe {
                         Value::eval_string(&mut frame, "1 + 2")
                             .unwrap()
                             .unbox::<isize>()
@@ -16,7 +16,7 @@ mod mt_handle {
 
                 let t2 = julia.spawn(move |mut julia| {
                     julia.with(|handle| {
-                        handle.local_scope::<_, 1>(|mut frame| unsafe {
+                        handle.local_scope::<1>(|mut frame| unsafe {
                             Value::eval_string(&mut frame, "2 + 3")
                                 .unwrap()
                                 .unbox::<isize>()

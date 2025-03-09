@@ -513,7 +513,7 @@ unsafe fn set_custom_fns() {
         let handle = weak_handle_unchecked!();
 
         let cmd = CStr::from_bytes_with_nul_unchecked(b"const JlrsThreads = JlrsCore.Threads\0");
-        handle.local_scope::<_, 2>(|mut frame| {
+        handle.local_scope::<2>(|mut frame| {
             Value::eval_cstring(&mut frame, cmd).expect("using JlrsCore threw an exception");
 
             let wake_rust = Value::new(&mut frame, wake_task as *mut c_void);

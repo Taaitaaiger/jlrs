@@ -43,7 +43,7 @@ mod tests {
             let jlrs = j.borrow();
 
             jlrs
-                .local_scope::<_, 3>(|mut frame| -> JlrsResult<_> {
+                .local_scope::<3>(|mut frame| -> JlrsResult<_> {
                     let add_ptr = Value::new(&mut frame, add as *mut std::ffi::c_void);
 
                     unsafe {
@@ -68,7 +68,7 @@ mod tests {
         JULIA.with(|j| {
             let jlrs = j.borrow();
 
-            jlrs.local_scope::<_, 3>(|mut frame| -> JlrsResult<_> {
+            jlrs.local_scope::<3>(|mut frame| -> JlrsResult<_> {
                 // Cast the function to a void pointer
                 let incr_array_ptr = Value::new(&mut frame, incr_array as *mut std::ffi::c_void);
 

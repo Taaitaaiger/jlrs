@@ -29,6 +29,7 @@ use crate::{
     gc_safe::{GcSafeOnceLock, GcSafeRwLock},
     memory::{
         scope::LocalScope,
+        scope::LocalScopeExt,
         target::{unrooted::Unrooted, RootingTarget, Target},
     },
     prelude::{ConstructTypedArray, Symbol, Tuple},
@@ -396,7 +397,7 @@ unsafe impl<T1: ConstructType, T2: ConstructType> ConstructType for IfConcreteEl
 /// # fn main() {
 /// # let mut julia = Builder::new().start_local().unwrap();
 ///
-/// julia.local_scope::<_, 2>(|mut frame| {
+/// julia.local_scope::<2>(|mut frame| {
 ///     let ty = Key::<AbstractSetF64>::construct_type(&mut frame);
 ///     let ty2 = AbstractSet::<f64>::construct_type(&mut frame);
 ///     assert_eq!(ty, ty2);
@@ -431,7 +432,7 @@ pub unsafe trait FastKey: 'static {
 /// # fn main() {
 /// # let mut julia = Builder::new().start_local().unwrap();
 ///
-/// julia.local_scope::<_, 3>(|mut frame| {
+/// julia.local_scope::<3>(|mut frame| {
 ///     let ty = Key::<VecF32>::construct_type(&mut frame);
 ///     let ty2 = TypedRankedArray::<f32, 1>::construct_type(&mut frame);
 ///     assert_eq!(ty, ty2);
@@ -529,7 +530,7 @@ impl<N: TypeVarName, U: ConstructType, L: ConstructType> TypeVars for TypeVarCon
     const SIZE: usize = 1;
 
     fn into_env<'target, Tgt: RootingTarget<'target>>(target: Tgt) -> TypeVarEnv<'target> {
-        target.with_local_scope::<_, _, 1>(|target, mut frame| {
+        target.with_local_scope::<1>(|target, mut frame| {
             let svec = SimpleVector::with_capacity(&mut frame, Self::SIZE);
             let mut env = TypeVarEnv { svec };
 
@@ -545,7 +546,7 @@ impl<N: TypeVarName, U: ConstructType, L: ConstructType> TypeVars for TypeVarCon
         env: &mut TypeVarEnv,
         offset: usize,
     ) {
-        target.local_scope::<_, 1>(|mut frame| {
+        target.local_scope::<1>(|mut frame| {
             let sym = N::symbol(&frame);
             if let Some(_) = env.get(sym) {
                 panic!("Duplicate tvar");
@@ -570,7 +571,7 @@ impl<T1: TypeVars, R: TypeVars> TypeVars for TypeVarFragment<T1, R> {
     const SIZE: usize = T1::SIZE + R::SIZE;
 
     fn into_env<'target, Tgt: RootingTarget<'target>>(target: Tgt) -> TypeVarEnv<'target> {
-        target.with_local_scope::<_, _, 1>(|target, mut frame| {
+        target.with_local_scope::<1>(|target, mut frame| {
             let svec = SimpleVector::with_capacity(&mut frame, Self::SIZE);
             let mut env = TypeVarEnv { svec };
 
@@ -1039,7 +1040,7 @@ impl<N: TypeVarName, U: ConstructType, L: ConstructType> TypeVarConstructor<N, U
     where
         Tgt: Target<'target>,
     {
-        target.with_local_scope::<_, _, 2>(|target, mut frame| {
+        target.with_local_scope::<2>(|target, mut frame| {
             let upper_bound = U::construct_type_with_env(&mut frame, env);
             let lower_bound = L::construct_type_with_env(&mut frame, env);
             unsafe {
@@ -1064,7 +1065,7 @@ unsafe impl<N: TypeVarName, U: ConstructType, L: ConstructType> ConstructType
     where
         Tgt: Target<'target>,
     {
-        target.with_local_scope::<_, _, 2>(|target, mut frame| {
+        target.with_local_scope::<2>(|target, mut frame| {
             let upper_bound = U::construct_type(&mut frame);
             let lower_bound = L::construct_type(&mut frame);
             unsafe {
@@ -1114,7 +1115,7 @@ unsafe impl<T: ConstructType, N: ConstructType> ConstructType for ArrayTypeConst
         Tgt: Target<'target>,
     {
         unsafe {
-            target.with_local_scope::<_, _, 3>(|target, mut frame| {
+            target.with_local_scope::<3>(|target, mut frame| {
                 let ty_param = T::construct_type(&mut frame);
                 let rank_param = N::construct_type(&mut frame);
                 if rank_param.is::<isize>() {
@@ -1149,7 +1150,7 @@ unsafe impl<T: ConstructType, N: ConstructType> ConstructType for ArrayTypeConst
         Tgt: Target<'target>,
     {
         unsafe {
-            target.with_local_scope::<_, _, 3>(|target, mut frame| {
+            target.with_local_scope::<3>(|target, mut frame| {
                 let ty_param = T::construct_type_with_env(&mut frame, env);
                 let rank_param = N::construct_type_with_env(&mut frame, env);
                 if rank_param.is::<isize>() {
@@ -1195,7 +1196,7 @@ unsafe impl<L: ConstructType, R: ConstructType> ConstructType for UnionTypeConst
     where
         Tgt: Target<'target>,
     {
-        target.with_local_scope::<_, _, 2>(|target, mut frame| {
+        target.with_local_scope::<2>(|target, mut frame| {
             let l = L::construct_type(&mut frame);
             let r = R::construct_type(&mut frame);
 
@@ -1226,7 +1227,7 @@ unsafe impl<L: ConstructType, R: ConstructType> ConstructType for UnionTypeConst
     where
         Tgt: Target<'target>,
     {
-        target.with_local_scope::<_, _, 2>(|target, mut frame| {
+        target.with_local_scope::<2>(|target, mut frame| {
             let l = L::construct_type_with_env(&mut frame, env);
             let r = R::construct_type_with_env(&mut frame, env);
 
@@ -1369,7 +1370,7 @@ unsafe impl<U: ConstructType> ConstructType for *mut U {
     where
         Tgt: Target<'target>,
     {
-        target.with_local_scope::<_, _, 1>(|target, mut frame| {
+        target.with_local_scope::<1>(|target, mut frame| {
             let ty = U::construct_type(&mut frame);
             unsafe {
                 UnionAll::pointer_type(&frame)
@@ -1402,7 +1403,7 @@ unsafe impl<U: ConstructType> ConstructType for *mut U {
     where
         Tgt: Target<'target>,
     {
-        target.with_local_scope::<_, _, 1>(|target, mut frame| {
+        target.with_local_scope::<1>(|target, mut frame| {
             let ty = U::construct_type_with_env(&mut frame, env);
             unsafe {
                 UnionAll::pointer_type(&frame)
@@ -1466,7 +1467,7 @@ fn do_construct<'target, T: ConstructType>(
     tid: TypeId,
 ) -> ValueData<'target, 'static, Unrooted<'target>> {
     unsafe {
-        target.with_local_scope::<_, _, 1>(|target, mut frame| {
+        target.with_local_scope::<1>(|target, mut frame| {
             let ty = T::construct_type_uncached(&mut frame);
 
             if ty.is::<DataType>() {
@@ -1492,7 +1493,7 @@ fn do_construct_with_context<'target, T: ConstructType>(
     env: &TypeVarEnv,
 ) -> ValueData<'target, 'static, Unrooted<'target>> {
     unsafe {
-        target.with_local_scope::<_, _, 1>(|target, mut frame| {
+        target.with_local_scope::<1>(|target, mut frame| {
             let ty = T::construct_type_with_env_uncached(&mut frame, env);
 
             if ty.is::<DataType>() {

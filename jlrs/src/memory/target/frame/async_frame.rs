@@ -20,13 +20,13 @@ pub struct AsyncGcFrame<'scope> {
 
 impl<'scope> AsyncGcFrame<'scope> {
     /// An async version of [`Scope::scope`] that takes an async closure.
-    /// 
+    ///
     /// [`Scope::scope`]: crate::memory::scope::Scope::scope
     #[inline]
-    pub async fn async_scope<T, F>(&mut self, func: F) -> T
-    where
-        for<'nested> F: AsyncFnOnce(AsyncGcFrame<'nested>) -> T,
-    {
+    pub async fn async_scope<T>(
+        &mut self,
+        func: impl for<'inner> AsyncFnOnce(AsyncGcFrame<'inner>) -> T,
+    ) -> T {
         unsafe {
             let stack = self.stack;
             let (offset, nested) = self.nest_async();
@@ -49,7 +49,7 @@ impl<'scope> AsyncGcFrame<'scope> {
     }
 
     #[inline]
-    pub(crate) unsafe fn nest_async<'nested>(&'nested mut self) -> (usize, AsyncGcFrame<'nested>) {
+    pub(crate) unsafe fn nest_async<'inner>(&'inner mut self) -> (usize, AsyncGcFrame<'inner>) {
         let (offset, frame) = self.nest();
         (offset, AsyncGcFrame { frame: frame })
     }

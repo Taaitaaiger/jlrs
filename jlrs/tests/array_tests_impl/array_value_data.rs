@@ -116,7 +116,7 @@ pub(crate) mod tests {
 
             jlrs.instance(&mut frame)
                 .returning::<JlrsResult<_>>()
-                .local_scope::<_, 2>(|mut frame| {
+                .local_scope::<2>(|mut frame| {
                     unsafe {
                         let arr = Value::eval_string(&mut frame, "Any[:foo :bar]")
                             .unwrap()

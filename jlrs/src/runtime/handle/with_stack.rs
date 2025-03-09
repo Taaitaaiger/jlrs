@@ -15,7 +15,7 @@ pub trait WithStack: IsActive {
         for<'ctx> F: FnOnce(StackHandle<'ctx>) -> T,
     {
         unsafe {
-            weak_handle_unchecked!().local_scope::<_, 1>(|mut frame| {
+            weak_handle_unchecked!().local_scope::<1>(|mut frame| {
                 let stack = Value::new(&mut frame, Stack::default());
                 func(StackHandle {
                     stack: stack.data_ptr().cast().as_ref(),
@@ -46,10 +46,7 @@ impl<'ctx> IsActive for StackHandle<'ctx> {}
 
 impl<'ctx, T> Scope<'ctx, T> for StackHandle<'ctx> {
     #[inline]
-    fn scope<F>(&mut self, func: F) -> T
-    where
-        for<'scope> F: FnOnce(GcFrame<'scope>) -> T,
-    {
+    fn scope(&mut self, func: impl for<'scope> FnOnce(GcFrame<'scope>) -> T) -> T {
         unsafe {
             let frame = GcFrame::base(&self.stack);
             let ret = func(frame);

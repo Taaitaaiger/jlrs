@@ -105,13 +105,13 @@ use std::{marker::PhantomData, pin::Pin};
 #[cfg(feature = "async")]
 use self::frame::AsyncGcFrame;
 use self::{
-    frame::{BorrowedFrame, GcFrame, LocalFrame, LocalGcFrame, UnsizedLocalGcFrame},
+    frame::{BorrowedFrame, GcFrame, LocalGcFrame, UnsizedLocalGcFrame},
     output::{LocalOutput, Output},
     private::TargetPriv,
     reusable_slot::{LocalReusableSlot, ReusableSlot},
     unrooted::Unrooted,
 };
-use super::scope::LocalScope;
+use super::scope::{LocalScope, LocalScopeExt};
 #[cfg(feature = "multi-rt")]
 use crate::runtime::handle::mt_handle::ActiveHandle;
 use crate::{
@@ -135,25 +135,6 @@ pub trait Target<'target>: TargetPriv<'target> {
     #[inline]
     fn unrooted(&self) -> Unrooted<'target> {
         unsafe { Unrooted::new() }
-    }
-
-    /// Create a new local scope and call `func`.
-    ///
-    /// The `LocalGcFrame` provided to `func` has capacity for `M` roots, `self` is propagated to
-    /// the closure.
-    #[inline]
-    fn with_local_scope<T, F, const M: usize>(self, func: F) -> T
-    where
-        for<'inner> F: FnOnce(Self, LocalGcFrame<'inner, M>) -> T,
-    {
-        unsafe {
-            let mut local_frame = LocalFrame::new();
-
-            let pinned = local_frame.pin();
-            let res = func(self, LocalGcFrame::new(&pinned));
-            pinned.pop();
-            res
-        }
     }
 
     /// Convert `self` into an `ExtendedTarget`.
@@ -185,6 +166,7 @@ pub trait Target<'target>: TargetPriv<'target> {
 }
 
 impl<'target, T, Tgt: Target<'target>> LocalScope<'target, T> for Tgt {}
+impl<'target, T, Tgt: Target<'target>> LocalScopeExt<'target, T> for Tgt {}
 
 /// A `Target` bundled with a [`GcFrame`].
 pub struct ExtendedTarget<'target, 'current, 'borrow, Tgt>

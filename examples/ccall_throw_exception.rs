@@ -42,7 +42,7 @@ mod tests {
         let mut jlrs = Builder::new().start_local().unwrap();
 
         jlrs.returning::<JlrsResult<_>>()
-            .local_scope::<_, 3>(|mut frame|{
+            .local_scope::<3>(|mut frame|{
                 let assert_less_than_ptr =
                     Value::new(&mut frame, assert_less_than as *mut std::ffi::c_void);
 

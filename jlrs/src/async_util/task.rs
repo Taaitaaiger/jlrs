@@ -3,6 +3,7 @@ use std::{future::Future, time::Duration};
 use crate::{
     call::Call,
     inline_static_ref,
+    memory::scope::LocalScopeExt,
     prelude::{AsyncGcFrame, JlrsResult, Target, Value},
 };
 
@@ -89,7 +90,7 @@ pub fn sleep<'scope, 'data, Tgt: Target<'scope>>(target: &Tgt, duration: Duratio
         }
 
         // Is rooted when sleep is called.
-        target.with_local_scope::<_, _, 1>(|target, mut frame| {
+        target.with_local_scope::<1>(|target, mut frame| {
             let secs = duration.as_millis() as usize as f64 / 1000.;
             let secs = Value::new(&mut frame, secs);
 

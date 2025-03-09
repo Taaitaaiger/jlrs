@@ -169,6 +169,7 @@ use crate::{
     error::{AccessError, ArrayLayoutError, InstantiationError, TypeError, CANNOT_DISPLAY_TYPE},
     memory::{
         get_tls,
+        scope::LocalScopeExt,
         target::{unrooted::Unrooted, TargetResult},
     },
     prelude::{DataType, JlrsResult, LocalScope, Managed, Target, TargetType, Value, ValueData},
@@ -224,7 +225,7 @@ pub trait ConstructTypedArray<T: ConstructType, const N: isize> {
     /// # use jlrs::prelude::*;
     /// # fn main() {
     /// # let mut julia = Builder::new().start_local().unwrap();
-    /// julia.local_scope::<_, 2>(|mut frame| {
+    /// julia.local_scope::<2>(|mut frame| {
     ///     // Allocate a 2x2 array of `u32`s with an implicit rank.
     ///     let array = TypedArray::<u32>::new(&mut frame, [2, 2]);
     ///     assert!(array.is_ok());
@@ -308,7 +309,7 @@ pub trait ConstructTypedArray<T: ConstructType, const N: isize> {
     /// # use jlrs::prelude::*;
     /// # fn main() {
     /// # let mut julia = Builder::new().start_local().unwrap();
-    /// julia.local_scope::<_, 3>(|mut frame| {
+    /// julia.local_scope::<3>(|mut frame| {
     ///     let mut data = vec![1u32, 2u32, 3u32, 4u32];
     ///
     ///     {
@@ -434,7 +435,7 @@ pub trait ConstructTypedArray<T: ConstructType, const N: isize> {
     /// # use jlrs::prelude::*;
     /// # fn main() {
     /// # let mut julia = Builder::new().start_local().unwrap();
-    /// julia.local_scope::<_, 3>(|mut frame| {
+    /// julia.local_scope::<3>(|mut frame| {
     ///     {
     ///         // Allocate a 2x2 array of `u32`s with an implicit rank.
     ///         let data = vec![1u32, 2u32, 3u32, 4u32];
@@ -574,7 +575,7 @@ pub trait ConstructTypedArray<T: ConstructType, const N: isize> {
     /// # use jlrs::prelude::*;
     /// # fn main() {
     /// # let mut julia = Builder::new().start_local().unwrap();
-    /// julia.local_scope::<_, 3>(|mut frame| {
+    /// julia.local_scope::<3>(|mut frame| {
     ///     let data = vec![1u32, 2u32, 3u32, 4u32];
     ///
     ///     {
@@ -708,7 +709,7 @@ pub trait ConstructTypedArray<T: ConstructType, const N: isize> {
     /// # use jlrs::prelude::*;
     /// # fn main() {
     /// # let mut julia = Builder::new().start_local().unwrap();
-    /// julia.local_scope::<_, 3>(|mut frame| {
+    /// julia.local_scope::<3>(|mut frame| {
     ///     let data = vec![1u32, 2u32, 3u32, 4u32];
     ///
     ///     {
@@ -848,7 +849,7 @@ impl<const N: isize> ArrayBase<'_, '_, Unknown, N> {
     /// # use jlrs::prelude::*;
     /// # fn main() {
     /// # let mut julia = Builder::new().start_local().unwrap();
-    /// julia.local_scope::<_, 2>(|mut frame| {
+    /// julia.local_scope::<2>(|mut frame| {
     ///     let ty = DataType::uint32_type(&frame).as_value();
     ///
     ///     // Allocate a 2x2 array of `u32`s with an implicit rank.
@@ -945,7 +946,7 @@ impl<const N: isize> ArrayBase<'_, '_, Unknown, N> {
     /// # use jlrs::prelude::*;
     /// # fn main() {
     /// # let mut julia = Builder::new().start_local().unwrap();
-    /// julia.local_scope::<_, 3>(|mut frame| {
+    /// julia.local_scope::<3>(|mut frame| {
     ///     let mut data = vec![1u32, 2u32, 3u32, 4u32];
     ///     let ty = DataType::uint32_type(&frame).as_value();
     ///
@@ -1091,7 +1092,7 @@ impl<const N: isize> ArrayBase<'_, '_, Unknown, N> {
     /// # use jlrs::prelude::*;
     /// # fn main() {
     /// # let mut julia = Builder::new().start_local().unwrap();
-    /// julia.local_scope::<_, 4>(|mut frame| {
+    /// julia.local_scope::<4>(|mut frame| {
     ///     let ty = DataType::uint32_type(&frame).as_value();
     ///
     ///     {
@@ -1250,7 +1251,7 @@ impl<const N: isize> ArrayBase<'_, '_, Unknown, N> {
     /// # use jlrs::prelude::*;
     /// # fn main() {
     /// # let mut julia = Builder::new().start_local().unwrap();
-    /// julia.local_scope::<_, 4>(|mut frame| {
+    /// julia.local_scope::<4>(|mut frame| {
     ///     let data = vec![1u32, 2u32, 3u32, 4u32];
     ///     let ty = DataType::uint32_type(&frame).as_value();
     ///
@@ -1399,7 +1400,7 @@ impl<const N: isize> ArrayBase<'_, '_, Unknown, N> {
     /// # use jlrs::prelude::*;
     /// # fn main() {
     /// # let mut julia = Builder::new().start_local().unwrap();
-    /// julia.local_scope::<_, 4>(|mut frame| {
+    /// julia.local_scope::<4>(|mut frame| {
     ///     let data = vec![1u32, 2u32, 3u32, 4u32];
     ///     let ty = DataType::uint32_type(&frame).as_value();
     ///
@@ -1600,7 +1601,7 @@ impl<'scope, 'data> VectorAny<'_, '_> {
     /// # use jlrs::prelude::*;
     /// # fn main() {
     /// # let mut julia = Builder::new().start_local().unwrap();
-    /// julia.local_scope::<_, 2>(|mut frame| {
+    /// julia.local_scope::<2>(|mut frame| {
     ///     let array = VectorAny::new_any(&mut frame, 2);
     ///     assert!(array.is_ok());
     ///
@@ -2670,7 +2671,7 @@ impl<'scope, 'data, T: ConstructType, const N: isize> ArrayBase<'scope, 'data, T
     pub fn assert_type(self) {
         unsafe {
             let unrooted = Unrooted::new();
-            unrooted.local_scope::<_, 1>(|mut frame| {
+            unrooted.local_scope::<1>(|mut frame| {
                 let ty = T::construct_type(&mut frame);
                 assert_eq!(ty, self.element_type());
             });
@@ -2818,7 +2819,7 @@ unsafe impl<'scope, 'data, T: ConstructType, const N: isize> Typecheck
             }
         }
 
-        unrooted.local_scope::<_, 1>(|mut frame| {
+        unrooted.local_scope::<1>(|mut frame| {
             // Safety: elem_ty is reachable from ty
             let elem_ty = unsafe { ty.parameter_unchecked(0) };
             let constructed_ty = T::construct_type(&mut frame);
@@ -2936,7 +2937,7 @@ unsafe impl<T: ConstructType, const N: isize> ValidField
 
             unsafe {
                 let unrooted = Unrooted::new();
-                unrooted.local_scope::<_, 1>(|mut frame| {
+                unrooted.local_scope::<1>(|mut frame| {
                     let ty = T::construct_type(&mut frame);
                     let elem_ty = parameters.get(unrooted, 0).unwrap_unchecked().as_value();
                     ty == elem_ty
@@ -2962,7 +2963,7 @@ unsafe impl<'scope, 'data, T: ConstructType, const N: isize> ConstructType
         let ty = UnionAll::array_type(&target);
 
         if N == -1 {
-            target.with_local_scope::<_, _, 2>(|target, mut frame| unsafe {
+            target.with_local_scope::<2>(|target, mut frame| unsafe {
                 let elty = T::construct_type(&mut frame);
                 let tn_n = ty.body().cast_unchecked::<UnionAll>().var();
                 let applied = ty.apply_types_unchecked(&mut frame, [elty, tn_n.as_value()]);
@@ -2970,7 +2971,7 @@ unsafe impl<'scope, 'data, T: ConstructType, const N: isize> ConstructType
                 UnionAll::rewrap(target, applied.cast_unchecked::<DataType>())
             })
         } else {
-            target.with_local_scope::<_, _, 3>(|target, mut frame| unsafe {
+            target.with_local_scope::<3>(|target, mut frame| unsafe {
                 let elty = T::construct_type(&mut frame);
                 let n = Value::new(&mut frame, N);
                 let applied = ty.apply_types_unchecked(&mut frame, [elty, n]);
@@ -3003,7 +3004,7 @@ unsafe impl<'scope, 'data, T: ConstructType, const N: isize> ConstructType
                 _ => ty.base_type().parameter(1).unwrap(),
             };
 
-            target.with_local_scope::<_, _, 2>(|target, mut frame| unsafe {
+            target.with_local_scope::<2>(|target, mut frame| unsafe {
                 let t = T::construct_type_with_env(&mut frame, env);
                 let applied = ty.apply_types_unchecked(&mut frame, [t, n_param]);
                 assert!(applied.is::<DataType>());
@@ -3012,7 +3013,7 @@ unsafe impl<'scope, 'data, T: ConstructType, const N: isize> ConstructType
                     .wrap_with_env(target, env)
             })
         } else {
-            target.with_local_scope::<_, _, 3>(|target, mut frame| unsafe {
+            target.with_local_scope::<3>(|target, mut frame| unsafe {
                 let t = T::construct_type_with_env(&mut frame, env);
                 let n = Value::new(&mut frame, N);
                 let applied = ty.apply_types_unchecked(&mut frame, [t, n]);
@@ -3039,7 +3040,7 @@ unsafe impl<'scope, 'data, const N: isize> ConstructType for RankedArray<'scope,
         if N == -1 {
             ty.as_value().root(target)
         } else {
-            target.with_local_scope::<_, _, 3>(|target, mut frame| unsafe {
+            target.with_local_scope::<3>(|target, mut frame| unsafe {
                 let tn_t = TypeVar::new_unchecked(&mut frame, "T", None, None);
                 let n = Value::new(&mut frame, N);
                 let applied = ty.apply_types_unchecked(&mut frame, [tn_t.as_value(), n]);
@@ -3084,7 +3085,7 @@ unsafe impl<'scope, 'data, const N: isize> ConstructType for RankedArray<'scope,
 
             unsafe { ty.apply_types_unchecked(target, [t_param.as_value(), n_param]) }
         } else {
-            target.with_local_scope::<_, _, 1>(|target, mut frame| unsafe {
+            target.with_local_scope::<1>(|target, mut frame| unsafe {
                 let n = Value::new(&mut frame, N);
                 let applied = ty.apply_types_unchecked(target, [t_param.as_value(), n]);
                 applied

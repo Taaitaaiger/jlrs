@@ -44,7 +44,7 @@ fn push_pop_frame_dynamic(c: &mut Criterion) {
 fn push_pop_frame_local(handle: &LocalHandle, c: &mut Criterion) {
     c.bench_function("push_pop_frame_local", |b| {
         b.iter(|| {
-            black_box(handle.local_scope::<_, 0>(|f| {
+            black_box(handle.local_scope::<0>(|f| {
                 black_box(&f);
             }))
         })
@@ -55,7 +55,7 @@ fn push_pop_frame_local(handle: &LocalHandle, c: &mut Criterion) {
 fn push_pop_frame_local_1(handle: &LocalHandle, c: &mut Criterion) {
     c.bench_function("push_pop_frame_local_1", |b| {
         b.iter(|| {
-            black_box(handle.local_scope::<_, 1>(|f| {
+            black_box(handle.local_scope::<1>(|f| {
                 black_box(&f);
             }))
         })
@@ -66,7 +66,7 @@ fn push_pop_frame_local_1(handle: &LocalHandle, c: &mut Criterion) {
 fn push_pop_frame_local_2(handle: &LocalHandle, c: &mut Criterion) {
     c.bench_function("push_pop_frame_local_2", |b| {
         b.iter(|| {
-            black_box(handle.local_scope::<_, 2>(|f| {
+            black_box(handle.local_scope::<2>(|f| {
                 black_box(&f);
             }))
         })

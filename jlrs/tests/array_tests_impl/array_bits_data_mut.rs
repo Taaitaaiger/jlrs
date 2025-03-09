@@ -180,7 +180,7 @@ pub(crate) mod tests {
                             TypedArray::<f32>::from_vec_unchecked(&mut frame, data, (1, 2));
                         let mut accessor = arr.bits_data_mut();
 
-                        frame.local_scope::<_, 3>(|mut frame| {
+                        frame.local_scope::<3>(|mut frame| {
                             let v1 = Value::new(&mut frame, 2.0f32);
                             let v2 = Value::new(&mut frame, 3.0f32);
                             let v3 = Value::new(&mut frame, 3.0f64);
@@ -231,7 +231,7 @@ pub(crate) mod tests {
                             TypedArray::<f32>::from_vec_unchecked(&mut frame, data, (1, 2));
                         let mut accessor = arr.bits_data_mut();
 
-                        frame.local_scope::<_, 2>(|mut frame| {
+                        frame.local_scope::<2>(|mut frame| {
                             let v1 = Value::new(&mut frame, 2.0f32);
                             let v2 = Value::new(&mut frame, 3.0f32);
                             accessor.set_value_unchecked([0, 0], v1);

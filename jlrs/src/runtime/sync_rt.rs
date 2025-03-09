@@ -171,7 +171,7 @@ impl<'a> Julia<'a> {
     ///
     /// Safety: `module_name` must be a valid module or package name.
     pub unsafe fn using<S: AsRef<str>>(&self, module_name: S) -> JlrsResult<()> {
-        return self.local_scope::<_, 1>(|mut frame| {
+        return self.local_scope::<1>(|mut frame| {
             let cmd = format!("using {}", module_name.as_ref());
             Value::eval_string(&mut frame, cmd)
                 .map(|_| ())
@@ -185,10 +185,7 @@ impl<'a> Julia<'a> {
 }
 
 impl<'ctx, T> Scope<'ctx, T> for Julia<'ctx> {
-    fn scope<F>(&mut self, func: F) -> T
-    where
-        for<'scope> F: FnOnce(GcFrame<'scope>) -> T,
-    {
+    fn scope(&mut self, func: impl for<'scope> FnOnce(GcFrame<'scope>) -> T) -> T {
         unsafe {
             let frame = GcFrame::base(&self.stack);
 

@@ -32,7 +32,7 @@ use crate::{
     },
     error::{AccessError, JlrsError},
     inline_static_ref,
-    memory::{gc::gc_safe, get_tls, target::TargetResult},
+    memory::{gc::gc_safe, get_tls, scope::LocalScopeExt, target::TargetResult},
     prelude::{DataType, JlrsResult, LocalScope, Target, TargetType},
     private::Private,
     runtime::handle::{delegated_handle::DelegatedHandle, notify, wait},
@@ -60,7 +60,7 @@ impl<'scope> DelegatedTask<'scope> {
 
     fn new<'target, Tgt: Target<'target>>(target: Tgt) -> DelegatedTaskData<'target, Tgt> {
         unsafe {
-            target.with_local_scope::<_, _, 1>(|target, mut frame| {
+            target.with_local_scope::<1>(|target, mut frame| {
                 let cond =
                     inline_static_ref!(ASYNC_CONDITION, DataType, "Base.AsyncCondition", &frame);
                 let cond = cond.as_value().call_unchecked(&mut frame, []);
@@ -266,7 +266,7 @@ where
     unsafe impl<L> Send for Sendable<L> {}
 
     unsafe {
-        target.with_local_scope::<_, _, 2>(|target, mut frame| {
+        target.with_local_scope::<2>(|target, mut frame| {
             let delegated_data = data.into_simple_vector(&mut frame);
             let delegated_data = Sendable(delegated_data.as_weak().leak());
             let active = Arc::new((Mutex::new(false), Condvar::new()));
@@ -280,7 +280,7 @@ where
                 let delegated_data = delegated_data.inner();
                 let task_ref = task_ref.inner();
 
-                let res = crate::weak_handle_unchecked!().local_scope::<_, 2>(|mut frame| {
+                let res = crate::weak_handle_unchecked!().local_scope::<2>(|mut frame| {
                     let task = task_ref.root(&mut frame);
                     let delegated_data = delegated_data.root(&mut frame);
                     notify(&active_clone);

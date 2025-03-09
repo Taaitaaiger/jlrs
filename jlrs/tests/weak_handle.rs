@@ -4,7 +4,7 @@ mod weak_handle {
     fn uses_weak_handle() {
         match weak_handle!() {
             Ok(handle) => {
-                handle.local_scope::<_, 0>(|_f| ());
+                handle.local_scope::<0>(|_f| ());
             }
             Err(_e) => {
                 panic!()

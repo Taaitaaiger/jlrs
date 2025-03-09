@@ -22,7 +22,7 @@
 //! # use jlrs::prelude::*;
 //! # fn main() {
 //! let mut julia = Builder::new().start_local().unwrap();
-//! julia.local_scope::<_, 1>(|mut frame| {
+//! julia.local_scope::<1>(|mut frame| {
 //!     // This data is guaranteed to live at least until we leave this scope
 //!     let i = Value::new(&mut frame, 1u64);
 //! });
@@ -40,10 +40,10 @@
 //! # use jlrs::prelude::*;
 //! # fn main() {
 //! let mut julia = Builder::new().start_local().unwrap();
-//! julia.local_scope::<_, 1>(|mut frame| {
+//! julia.local_scope::<1>(|mut frame| {
 //!     let i = Value::new(&mut frame, 1u64);
 //!
-//!     frame.local_scope::<_, 1>(|mut frame| {
+//!     frame.local_scope::<1>(|mut frame| {
 //!         let j = Value::new(&mut frame, 2u64);
 //!         // j can't be returned from this scope, but i can.
 //!         i
@@ -61,9 +61,9 @@
 //! # use jlrs::prelude::*;
 //! # fn main() {
 //! let mut julia = Builder::new().start_local().unwrap();
-//! julia.local_scope::<_, 1>(|mut frame| {
+//! julia.local_scope::<1>(|mut frame| {
 //!     let output = frame.local_output();
-//!     frame.local_scope::<_, 0>(|_| Value::new(output, 2u64));
+//!     frame.local_scope::<0>(|_| Value::new(output, 2u64));
 //! });
 //! # }
 //! ```
@@ -140,7 +140,7 @@
 //! where
 //!     Tgt: Target<'target>,
 //! {
-//!     target.with_local_scope::<_, _, 2>(|target, mut frame| {
+//!     target.with_local_scope::<2>(|target, mut frame| {
 //!         let i = Value::new(&mut frame, 1usize);
 //!         let j = Value::new(&mut frame, 2usize);
 //!

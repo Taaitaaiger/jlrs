@@ -108,7 +108,7 @@ impl Stack {
         unsafe {
             let unrooted = Unrooted::new();
 
-            unrooted.local_scope::<_, 1>(|mut frame| {
+            unrooted.local_scope::<1>(|mut frame| {
                 let module = Module::jlrs_core(&unrooted);
 
                 let sym = STACK_TYPE_NAME.as_symbol();

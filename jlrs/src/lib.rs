@@ -321,7 +321,7 @@
 //!
 //! // Local scopes can be created without creating a stack, but you need to provide the exact
 //! // number of slots you need.
-//! julia.local_scope::<_, 1>(|mut frame| {
+//! julia.local_scope::<1>(|mut frame| {
 //!     // We root one value in this frame, so the required capacity of this local scope is 1.
 //!     let _v = Value::new(&mut frame, 1usize);
 //!
@@ -347,7 +347,7 @@
 //! # fn main() {
 //! let mut julia = Builder::new().start_local().unwrap();
 //!
-//! julia.local_scope::<_, 1>(|mut frame| {
+//! julia.local_scope::<1>(|mut frame| {
 //!     // We root one value in this frame, so the required capacity of this local scope is 1.
 //!     let v = Value::new(&mut frame, 1.0f32);
 //!
@@ -371,7 +371,7 @@
 //! // This scope contains a fallible operation. Whenever the return type is a `Result` and the
 //! // `?` operator is used, the closure typically has to be annotated with its return type.
 //! julia
-//!     .local_scope::<_, 4>(|mut frame| -> JlrsResult<()> {
+//!     .local_scope::<4>(|mut frame| -> JlrsResult<()> {
 //!         let v1 = Value::new(&mut frame, 1.0f32); // 1
 //!         let v2 = Value::new(&mut frame, 2.0f32); // 2
 //!
@@ -419,7 +419,7 @@
 //! let mut julia = Builder::new().start_local().unwrap();
 //!
 //! julia
-//!     .local_scope::<_, 5>(|mut frame| -> JlrsResult<()> {
+//!     .local_scope::<5>(|mut frame| -> JlrsResult<()> {
 //!         let v1 = Value::new(&mut frame, 1.0f32); // 1
 //!         let v2 = Value::new(&mut frame, 2.0f32); // 2
 //!         let v3 = Value::new(&mut frame, 3.0f32); // 3
@@ -455,7 +455,7 @@
 //!         .expect("LinearAlgebra package does not exist");
 //! }
 //!
-//! julia.local_scope::<_, 1>(|mut frame| {
+//! julia.local_scope::<1>(|mut frame| {
 //!     let lin_alg = Module::package_root_module(&frame, "LinearAlgebra");
 //!     assert!(lin_alg.is_some());
 //!
@@ -493,7 +493,7 @@
 //!         // use in that closure provides the same functionality as the local runtime's
 //!         // `LocalHandle`.
 //!         mt_handle.with(|handle| {
-//!             handle.local_scope::<_, 1>(|mut frame| unsafe {
+//!             handle.local_scope::<1>(|mut frame| unsafe {
 //!                 let _v = Value::new(&mut frame, 1);
 //!             })
 //!         })
@@ -501,7 +501,7 @@
 //!
 //!     let t2 = mt_handle.spawn(move |mut mt_handle| {
 //!         mt_handle.with(|handle| {
-//!             handle.local_scope::<_, 1>(|mut frame| unsafe {
+//!             handle.local_scope::<1>(|mut frame| unsafe {
 //!                 let _v = Value::new(&mut frame, 2);
 //!             })
 //!         })
@@ -801,7 +801,7 @@
 //! # let mut julia = Builder::new().start_local().unwrap();
 //!
 //! julia
-//!     .local_scope::<_, 3>(|mut frame| -> JlrsResult<_> {
+//!     .local_scope::<3>(|mut frame| -> JlrsResult<_> {
 //!         unsafe {
 //!             // Cast the function to a void pointer
 //!             let call_me_val = Value::new(&mut frame, call_me as *mut std::ffi::c_void);
