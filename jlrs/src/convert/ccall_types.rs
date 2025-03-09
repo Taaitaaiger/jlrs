@@ -26,7 +26,7 @@ use crate::{
 };
 use crate::{
     data::{managed::value::ValueRet, types::construct_type::ConstructType},
-    prelude::{JlrsResult, Nothing},
+    prelude::{JlrsResult, LocalScope as _, Nothing}, weak_handle_unchecked,
 };
 
 /// Trait implemented by types that can be used as argument types of Rust functions exposed by the
@@ -111,7 +111,7 @@ unsafe impl<T: CCallReturn> CCallReturn for Result<T, ValueRet> {
         {
             match self {
                 Ok(t) => t,
-                Err(e) => crate::runtime::handle::ccall::CCall::throw_exception(e),
+                Err(e) => crate::runtime::handle::ccall::throw_exception(e),
             }
         }
 
@@ -145,16 +145,16 @@ unsafe impl<T: CCallReturn> CCallReturn for JlrsResult<T> {
             match self {
                 Ok(t) => t,
                 Err(e) => {
-                    let e = crate::runtime::handle::ccall::CCall::local_scope::<_, _, 1>(
+                    let handle = weak_handle_unchecked!();
+                    let e = handle.local_scope::<1>(
                         |mut frame| {
                             let msg = JuliaString::new(&mut frame, format!("{}", e)).as_value();
                             let err =
                                 JlrsCore::jlrs_error(&frame).instantiate_unchecked(&frame, [msg]);
-                            Ok(err.leak())
+                            err.leak()
                         },
-                    )
-                    .unwrap();
-                    crate::runtime::handle::ccall::CCall::throw_exception(e)
+                    );
+                    crate::runtime::handle::ccall::throw_exception(e)
                 }
             }
         }
