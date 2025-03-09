@@ -196,6 +196,6 @@ impl<'context> CCall<'context> {
     #[inline(never)]
     pub unsafe fn init_jlrs(&mut self, install_jlrs_core: &InstallJlrsCore) {
         set_started_from_julia();
-        init_jlrs(install_jlrs_core);
+        init_jlrs(install_jlrs_core, false);
     }
 }

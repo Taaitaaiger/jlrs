@@ -13,7 +13,7 @@ use jlrs_macros::julia_version;
 use super::{
     erase_scope_lifetime,
     value::{ValueData, ValueResult},
-    Managed, Ref,
+    Managed, Weak,
 };
 use crate::{
     catch::{catch_exceptions, unwrap_exc},
@@ -332,22 +332,22 @@ impl<'scope> ManagedPriv<'scope, '_> for UnionAll<'scope> {
 
 impl_construct_type_managed!(UnionAll, 1, jl_unionall_type);
 
-/// A reference to a [`UnionAll`] that has not been explicitly rooted.
-pub type UnionAllRef<'scope> = Ref<'scope, 'static, UnionAll<'scope>>;
+/// A [`UnionAll`] that has not been explicitly rooted.
+pub type WeakUnionAll<'scope> = Weak<'scope, 'static, UnionAll<'scope>>;
 
-/// A [`UnionAllRef`] with static lifetimes. This is a useful shorthand for signatures of
+/// A [`WeakUnionAll`] with static lifetimes. This is a useful shorthand for signatures of
 /// `ccall`able functions that return a [`UnionAll`].
-pub type UnionAllRet = Ref<'static, 'static, UnionAll<'static>>;
+pub type UnionAllRet = WeakUnionAll<'static>;
 
-impl_valid_layout!(UnionAllRef, UnionAll, jl_unionall_type);
+impl_valid_layout!(WeakUnionAll, UnionAll, jl_unionall_type);
 
 use crate::memory::target::TargetType;
 
-/// `UnionAll` or `UnionAllRef`, depending on the target type `Tgt`.
+/// `UnionAll` or `WeakUnionAll`, depending on the target type `Tgt`.
 pub type UnionAllData<'target, Tgt> =
     <Tgt as TargetType<'target>>::Data<'static, UnionAll<'target>>;
 
-/// `JuliaResult<UnionAll>` or `JuliaResultRef<UnionAllRef>`, depending on the target type `Tgt`.
+/// `JuliaResult<UnionAll>` or `WeakJuliaResult<WeakUnionAll>`, depending on the target type `Tgt`.
 pub type UnionAllResult<'target, Tgt> = TargetResult<'target, 'static, UnionAll<'target>, Tgt>;
 
 impl_ccall_arg_managed!(UnionAll, 1);

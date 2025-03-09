@@ -48,14 +48,11 @@ use crate::data::managed::value::Value;
 ///
 /// [`Value::unbox`]: crate::data::managed::value::Value::unbox
 /// [`ValidLayout`]: crate::data::layout::valid_layout::ValidLayout
-#[cfg_attr(
-    feature = "diagnostics",
-    diagnostic::on_unimplemented(
-        message = "the trait bound `{Self}: Unbox` is not satisfied",
-        label = "the trait `Unbox` is not implemented for `{Self}`",
-        note = "Custom types that implement `Unbox` should be generated with JlrsCore.reflect",
-        note = "Do not implement `ForeignType`, `OpaqueType`, or `ParametricVariant` unless this type is exported to Julia with `julia_module!`"
-    )
+#[diagnostic::on_unimplemented(
+    message = "the trait bound `{Self}: Unbox` is not satisfied",
+    label = "the trait `Unbox` is not implemented for `{Self}`",
+    note = "Custom types that implement `Unbox` should be generated with JlrsCore.reflect",
+    note = "Do not implement `ForeignType`, `OpaqueType`, or `ParametricVariant` unless this type is exported to Julia with `julia_module!`"
 )]
 pub unsafe trait Unbox {
     /// The type of the unboxed data. Must be `#[repr(C)]`.

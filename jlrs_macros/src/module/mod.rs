@@ -349,13 +349,13 @@ impl ExportedFunction {
 
             let ex = parse_quote! {
                 {
-                    let name = Symbol::new(&frame, #rename);
+                    let name = ::jlrs::data::managed::symbol::Symbol::new(&frame, #rename);
                     let type_type = ::jlrs::data::managed::union_all::UnionAll::type_type(&frame).as_value();
                     let any_type = ::jlrs::data::managed::datatype::DataType::any_type(&frame).as_value();
 
                     #invoke_fn
 
-                    let func = Value::new(&mut frame, invoke as *mut ::std::ffi::c_void);
+                    let func = ::jlrs::data::managed::value::Value::new(&mut frame, invoke as *mut ::std::ffi::c_void);
 
                     unsafe {
                         let env = #env_expr;
@@ -538,7 +538,7 @@ impl ExportedMethod {
             let ex = parse_quote! {
                 {
                     let unrooted = frame.unrooted();
-                    let name = Symbol::new(&frame, #rename);
+                    let name = ::jlrs::data::managed::symbol::Symbol::new(&frame, #rename);
                     let type_type = ::jlrs::data::managed::union_all::UnionAll::type_type(&unrooted).as_value();
                     let any_type = ::jlrs::data::managed::datatype::DataType::any_type(&frame).as_value();
 
@@ -1384,13 +1384,13 @@ impl JuliaModule {
                 static IS_INIT: ::std::sync::atomic::AtomicBool = ::std::sync::atomic::AtomicBool::new(false);
                 if IS_INIT.compare_exchange(false, true, ::std::sync::atomic::Ordering::Relaxed, ::std::sync::atomic::Ordering::Relaxed).is_err() {
                     let unrooted = <::jlrs::data::managed::module::Module as ::jlrs::data::managed::Managed>::unrooted_target(module);
-                    return ::jlrs::data::managed::value::Value::nothing(&unrooted).as_ref().leak();
+                    return ::jlrs::data::managed::value::Value::nothing(&unrooted).as_weak().leak();
                 }
 
                 let mut stack_frame = ::jlrs::memory::stack_frame::StackFrame::new();
                 let mut ccall = ::jlrs::runtime::handle::ccall::CCall::new(&mut stack_frame);
 
-                ccall.init_jlrs(&::jlrs::InstallJlrsCore::Default);
+                ccall.init_jlrs(&::jlrs::InstallJlrsCore::No);
 
                 ccall.scope(|mut frame| {
                     let wrap_mod = ::jlrs::data::managed::module::Module::jlrs_core(&frame)
@@ -2160,7 +2160,7 @@ fn function_info_fragment(
     let expr = parse_quote! {
         {
             (&mut frame).scope(|mut frame| {
-                let name = Symbol::new(&frame, #rename);
+                let name = ::jlrs::data::managed::symbol::Symbol::new(&frame, #rename);
                 let type_type = ::jlrs::data::managed::union_all::UnionAll::type_type(&frame).as_value();
                 let any_type = ::jlrs::data::managed::datatype::DataType::any_type(&frame).as_value();
                 // Ensure a compile error happens if the signatures of the function don't match.
@@ -2240,7 +2240,7 @@ fn override_module_fragment(name_override: &Option<RenameFragments>) -> Expr {
 
     let parsed = parse_quote! {
         {
-            let mut module = Module::main(&frame);
+            let mut module = ::jlrs::data::managed::module::Module::main(&frame);
 
             #(
                 module = module
@@ -2451,7 +2451,7 @@ fn method_info_fragment<'a>(
         {
             frame.scope(|mut frame| {
                 let unrooted = frame.unrooted();
-                let name = Symbol::new(&frame, #rename);
+                let name = ::jlrs::data::managed::symbol::Symbol::new(&frame, #rename);
                 let type_type = ::jlrs::data::managed::union_all::UnionAll::type_type(&unrooted).as_value();
                 let any_type = ::jlrs::data::managed::datatype::DataType::any_type(&frame).as_value();
 

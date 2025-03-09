@@ -21,7 +21,7 @@ use jl_sys::{
 };
 use jlrs_macros::julia_version;
 
-use super::{type_name::TypeName, value::ValueData, Ref};
+use super::{type_name::TypeName, value::ValueData, Weak};
 use crate::{
     catch::{catch_exceptions, unwrap_exc},
     convert::to_symbol::ToSymbol,
@@ -1172,22 +1172,22 @@ impl<'scope> ManagedPriv<'scope, '_> for DataType<'scope> {
 
 impl_construct_type_managed!(DataType, 1, jl_datatype_type);
 
-/// A reference to a [`DataType`] that has not been explicitly rooted.
-pub type DataTypeRef<'scope> = Ref<'scope, 'static, DataType<'scope>>;
+/// A [`DataType`] that has not been explicitly rooted.
+pub type WeakDataType<'scope> = Weak<'scope, 'static, DataType<'scope>>;
 
-/// A [`DataTypeRef`] with static lifetimes. This is a useful shorthand for signatures of
+/// A [`WeakDataType`] with static lifetimes. This is a useful shorthand for signatures of
 /// `ccall`able functions that return a [`DataType`].
-pub type DataTypeRet = Ref<'static, 'static, DataType<'static>>;
+pub type DataTypeRet = WeakDataType<'static>;
 
-impl_valid_layout!(DataTypeRef, DataType, jl_datatype_type);
+impl_valid_layout!(WeakDataType, DataType, jl_datatype_type);
 
 use crate::memory::target::TargetType;
 
-/// `DataType` or `DataTypeRef`, depending on the target type `Tgt`.
+/// `DataType` or `WeakDataType`, depending on the target type `Tgt`.
 pub type DataTypeData<'target, Tgt> =
     <Tgt as TargetType<'target>>::Data<'static, DataType<'target>>;
 
-/// `JuliaResult<DataType>` or `JuliaResultRef<DataTypeRef>`, depending on the target type `Tgt`.
+/// `JuliaResult<DataType>` or `WeakJuliaResult<WeakDataType>`, depending on the target type `Tgt`.
 pub type DataTypeResult<'target, Tgt> = TargetResult<'target, 'static, DataType<'target>, Tgt>;
 
 impl_ccall_arg_managed!(DataType, 1);

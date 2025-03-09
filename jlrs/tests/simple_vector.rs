@@ -6,7 +6,7 @@ mod tests {
         data::{
             layout::valid_layout::ValidLayout,
             managed::{
-                simple_vector::{SimpleVector, SimpleVectorRef},
+                simple_vector::{SimpleVector, WeakSimpleVector},
                 union_all::UnionAll,
             },
         },
@@ -167,7 +167,7 @@ mod tests {
             jlrs.instance(&mut frame)
                 .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
-                    let res = unsafe { SimpleVector::emptysvec(&frame).as_ref().root(&mut frame) };
+                    let res = unsafe { SimpleVector::emptysvec(&frame).as_weak().root(&mut frame) };
                     assert_eq!(res.len(), 0);
 
                     Ok(())
@@ -185,13 +185,13 @@ mod tests {
                 .scope(|frame| {
                     let res = SimpleVector::emptysvec(&frame);
                     assert!(res.as_value().is::<SimpleVector>());
-                    assert!(SimpleVectorRef::valid_layout(
+                    assert!(WeakSimpleVector::valid_layout(
                         res.as_value().datatype().as_value()
                     ));
 
                     let value = DataType::unionall_type(&frame).as_value();
                     assert!(!value.is::<SimpleVector>());
-                    assert!(!SimpleVectorRef::valid_layout(
+                    assert!(!WeakSimpleVector::valid_layout(
                         UnionAll::array_type(&frame).as_value()
                     ));
 

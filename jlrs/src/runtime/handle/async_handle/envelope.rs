@@ -47,14 +47,14 @@ where
     A: Register,
 {
     fn call(self: Box<Self>, stack: &'static Stack) -> Pin<Box<dyn Future<Output = ()>>> {
-        let f = async move {
+        let f = async {
             let sender = self.sender();
 
             // Safety: the stack slots can be reallocated because it doesn't contain any frames
             // yet. The frame is dropped at the end of the scope, the nested hierarchy of scopes is
             // maintained.
             let res = unsafe {
-                let frame = AsyncGcFrame::base(&stack);
+                let frame = AsyncGcFrame::base(&*stack);
                 let res = A::register(frame).await;
                 stack.pop_roots(0);
                 res
@@ -91,14 +91,14 @@ where
     A: AsyncTask,
 {
     fn call(self: Box<Self>, stack: &'static Stack) -> Pin<Box<dyn Future<Output = ()>>> {
-        let f = async move {
+        let f = async {
             let (task, sender) = self.split();
 
             // Safety: the stack slots can be reallocated because it doesn't contain any frames
             // yet. The frame is dropped at the end of the scope, the nested hierarchy of scopes is
             // maintained.
             let res = unsafe {
-                let frame = AsyncGcFrame::base(&stack);
+                let frame = AsyncGcFrame::base(&*stack);
                 let res = task.run(frame).await;
                 stack.pop_roots(0);
                 res
@@ -117,7 +117,7 @@ where
     P: PersistentTask,
 {
     fn call(self: Box<Self>, stack: &'static Stack) -> Pin<Box<dyn Future<Output = ()>>> {
-        let f = async move {
+        let f = async {
             let (mut persistent, handle_sender) = self.split();
             let handle_sender = handle_sender;
             let (sender, receiver) = channel(P::CHANNEL_CAPACITY);
@@ -125,7 +125,7 @@ where
             // yet. The frame is dropped at the end of the scope, the nested hierarchy of scopes is
             // maintained.
             unsafe {
-                let frame = AsyncGcFrame::base(&stack);
+                let frame = AsyncGcFrame::base(&*stack);
 
                 match persistent.call_init(frame).await {
                     Ok(mut state) => {
@@ -140,13 +140,13 @@ where
                                 Err(_) => break,
                             };
 
-                            let frame = AsyncGcFrame::base(&stack);
+                            let frame = AsyncGcFrame::base(&*stack);
                             let res = persistent.call_run(frame, &mut state, msg.input()).await;
 
                             msg.respond(res);
                         }
 
-                        let frame = AsyncGcFrame::base(&stack);
+                        let frame = AsyncGcFrame::base(&*stack);
                         persistent.exit(frame, &mut state).await;
                     }
                     Err(e) => {
@@ -400,7 +400,9 @@ impl SetErrorColorTask {
                 Value::false_v(&unrooted)
             };
 
-            JlrsCore::color(&unrooted).set_nth_field_unchecked(0, enable);
+            JlrsCore::set_error_color(&unrooted)
+                .call1(&unrooted, enable)
+                .ok();
         };
         self.sender.send(()).ok();
     }

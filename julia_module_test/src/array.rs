@@ -110,7 +110,7 @@ pub fn takes_generic_typed_ranked_arrays_ctor(
     a: TypedValue<ArrayTypeConstructor<tvar!('T'), ConstantIsize<1>>>,
     _b: TypedValue<ArrayTypeConstructor<tvar!('T'), ConstantIsize<2>>>,
 ) -> ValueRet {
-    a.as_typed_ranked_array().element_type().as_ref().leak()
+    a.as_typed_ranked_array().element_type().as_weak().leak()
 }
 
 pub type TMNEnv = tvars!(tvar!('T'), tvar!('M'), tvar!('N'));
@@ -118,7 +118,7 @@ pub fn takes_generic_typed_arrays_ctor(
     a: TypedValue<ArrayTypeConstructor<tvar!('T'), tvar!('M')>>,
     _b: TypedValue<ArrayTypeConstructor<tvar!('T'), tvar!('N')>>,
 ) -> ValueRet {
-    a.as_typed_array().element_type().as_ref().leak()
+    a.as_typed_array().element_type().as_weak().leak()
 }
 
 pub type UEnv = tvars!(tvar!('U'));
@@ -126,23 +126,23 @@ pub fn takes_generic_typed_ranked_arrays(
     a: TypedRankedArray<tvar!('U'), 1>,
     _b: TypedRankedArray<tvar!('U'), 2>,
 ) -> ValueRet {
-    a.element_type().as_ref().leak()
+    a.element_type().as_weak().leak()
 }
 
 pub fn takes_generic_typed_arrays(
     a: TypedArray<tvar!('U')>,
     _b: TypedArray<tvar!('U')>,
 ) -> ValueRet {
-    a.element_type().as_ref().leak()
+    a.element_type().as_weak().leak()
 }
 
 pub fn takes_and_returns_generic_typed_ranked_array(
     a: TypedRankedArray<'_, 'static, tvar!('U'), 1>,
 ) -> TypedRankedArrayRet<tvar!('U'), 1> {
-    a.as_ref().leak()
+    a.as_weak().leak()
 }
 
 pub type RestrictedEnv = tvars!(tvar!('T'; Integer));
 pub fn takes_restricted_generic_typed_arrays(a: TypedArray<tvar!('T')>) -> ValueRet {
-    a.element_type().as_ref().leak()
+    a.element_type().as_weak().leak()
 }

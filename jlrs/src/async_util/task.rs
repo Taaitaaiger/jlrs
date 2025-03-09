@@ -7,20 +7,19 @@ use crate::{
 };
 
 pub trait Register: 'static + Send {
-    fn register<'frame>(frame: AsyncGcFrame<'frame>) -> impl Future<Output = JlrsResult<()>>;
+    fn register(frame: AsyncGcFrame) -> impl Future<Output = JlrsResult<()>>;
 }
 
 /// Async task
 ///
 /// Any type that implements this trait can be sent to the async runtime where its `run` method
-/// will be called. If the `async-closure` feature has been enabled, this trait is implemented for
-/// all `AsyncFnOnce(AsyncGcFrame) -> T`.
+/// will be called. This trait is implemented for all `AsyncFnOnce(AsyncGcFrame) -> T`.
 pub trait AsyncTask: 'static + Send {
     /// The return type of `run`.
     type Output: 'static + Send;
 
     /// Run this task.
-    fn run<'frame>(self, frame: AsyncGcFrame<'frame>) -> impl Future<Output = Self::Output>;
+    fn run(self, frame: AsyncGcFrame) -> impl Future<Output = Self::Output>;
 }
 
 /// Persistent task
@@ -80,7 +79,7 @@ pub trait PersistentTask: 'static + Send {
 
 /// Sleep for `duration`.
 ///
-/// The function calls `Base.sleep`. If `duration` is less than 1ms this function returns
+/// This function calls `Base.sleep`. If `duration` is less than 1ms this function returns
 /// immediately.
 pub fn sleep<'scope, 'data, Tgt: Target<'scope>>(target: &Tgt, duration: Duration) {
     unsafe {
@@ -89,19 +88,18 @@ pub fn sleep<'scope, 'data, Tgt: Target<'scope>>(target: &Tgt, duration: Duratio
             return;
         }
 
-        let func = inline_static_ref!(FOO, Value<'static, 'static>, "Base.sleep", target);
-
         // Is rooted when sleep is called.
         target.with_local_scope::<_, _, 1>(|target, mut frame| {
             let secs = duration.as_millis() as usize as f64 / 1000.;
             let secs = Value::new(&mut frame, secs);
 
+            let func: Value<'_, '_> =
+                inline_static_ref!(SLEEP, Value<'static, 'static>, "Base.sleep", target);
             func.call1(target, secs).expect("sleep threw an exception");
         })
     }
 }
 
-#[cfg(feature = "async-closure")]
 impl<A, U> AsyncTask for A
 where
     for<'scope> A: AsyncFnOnce(AsyncGcFrame<'scope>) -> U + Send + 'static,

@@ -58,7 +58,7 @@
 //! inline if they are immutable, concrete types. Unions of `isbits` types, i.e. immutable,
 //! concrete types which contain no references to other Julia data, are also stored inline. In
 //! this last case a type tag is stored for each element after the elements themselves. In all
-//!  other cases, the elements are stored as references, i.e. as `Option<ValueRef>`.
+//!  other cases, the elements are stored as references, i.e. as `Option<WeakValue>`.
 //!
 //! For several reasons, some more technical than others, it's useful to distinguish between
 //! `isbits` and "non-bits" immutable types. Similarly, for elements that are stored as references
@@ -158,7 +158,7 @@ use crate::{
             valid_layout::{ValidField, ValidLayout},
         },
         managed::{
-            private::ManagedPriv, type_name::TypeName, type_var::TypeVar, union_all::UnionAll, Ref,
+            private::ManagedPriv, type_name::TypeName, type_var::TypeVar, union_all::UnionAll, Weak,
         },
         types::{
             abstract_type::AnyType,
@@ -1757,7 +1757,7 @@ impl<'scope, 'data, T, const N: isize> ArrayBase<'scope, 'data, T, N> {
         N
     }
 
-    /// Returns `true` if the elements are stored as pointers, i.e. `Option<ValueRef>`.
+    /// Returns `true` if the elements are stored as pointers, i.e. `Option<WeakValue>`.
     #[inline]
     pub fn ptr_array(self) -> bool {
         unsafe { jlrs_array_is_pointer_array(self.unwrap(Private)) != 0 }
@@ -2326,7 +2326,7 @@ impl<'scope, 'data, T, const N: isize> ArrayBase<'scope, 'data, T, N> {
     /// Create an accessor for managed data.
     ///
     /// Thanks to the restrictions on `T` the data is guaranteed to be as an array of
-    /// `Option<Ref<T>>`s.
+    /// `Option<Weak<T>>`s.
     ///
     /// Safety:
     ///
@@ -2384,7 +2384,7 @@ impl<'scope, 'data, T, const N: isize> ArrayBase<'scope, 'data, T, N> {
     /// Create a mutable accessor for managed data.
     ///
     /// Thanks to the restrictions on `T` the data is guaranteed to be as an array of
-    /// `Option<Ref<T>>`s.
+    /// `Option<Weak<T>>`s.
     ///
     /// Safety:
     ///
@@ -2442,7 +2442,7 @@ impl<'scope, 'data, T, const N: isize> ArrayBase<'scope, 'data, T, N> {
     /// Create an accessor for value data.
     ///
     /// Thanks to the restrictions on `T` the data is guaranteed to be as an array of
-    /// `Option<Ref<Value>>`s.
+    /// `Option<Weak<Value>>`s.
     ///
     /// Safety:
     ///
@@ -2490,7 +2490,7 @@ impl<'scope, 'data, T, const N: isize> ArrayBase<'scope, 'data, T, N> {
     /// Create a mutable accessor for value data.
     ///
     /// Thanks to the restrictions on `T` the data is guaranteed to be as an array of
-    /// `Option<Ref<Value>>`s.
+    /// `Option<Weak<Value>>`s.
     ///
     /// Safety:
     ///
@@ -2681,18 +2681,18 @@ impl<'scope, 'data, T: ConstructType, const N: isize> ArrayBase<'scope, 'data, T
 /// Marker type used to indicate the element type of an array is unknown.
 pub enum Unknown {}
 
-/// `Array` or `ArrayRef`, depending on the target type `T`.
+/// `Array` or `WeakArray`, depending on the target type `T`.
 pub type ArrayBaseData<'target, 'data, Tgt, T, const N: isize> =
     <Tgt as TargetType<'target>>::Data<'data, ArrayBase<'target, 'data, T, N>>;
 
-/// `JuliaResult<Array>` or `JuliaResultRef<ArrayRef>`, depending on the target type `T`.
+/// `JuliaResult<Array>` or `WeakJuliaResult<WeakArray>`, depending on the target type `T`.
 pub type ArrayBaseResult<'target, 'data, Tgt, T, const N: isize> =
     TargetResult<'target, 'data, ArrayBase<'target, 'data, T, N>, Tgt>;
 
 /// An array with an unknown element type and unknown rank.
 pub type Array<'scope, 'data> = ArrayBase<'scope, 'data, Unknown, -1>;
-pub type ArrayRef<'scope, 'data> = Ref<'scope, 'data, Array<'scope, 'data>>;
-pub type ArrayRet = ArrayRef<'static, 'static>;
+pub type WeakArray<'scope, 'data> = Weak<'scope, 'data, Array<'scope, 'data>>;
+pub type ArrayRet = WeakArray<'static, 'static>;
 pub type ArrayData<'target, 'data, Tgt> =
     <Tgt as TargetType<'target>>::Data<'data, Array<'target, 'data>>;
 pub type ArrayResult<'target, 'data, Tgt> =
@@ -2700,8 +2700,8 @@ pub type ArrayResult<'target, 'data, Tgt> =
 
 /// An array with an unknown element type of rank 1.
 pub type Vector<'scope, 'data> = ArrayBase<'scope, 'data, Unknown, 1>;
-pub type VectorRef<'scope, 'data> = Ref<'scope, 'data, Vector<'scope, 'data>>;
-pub type VectorRet = VectorRef<'static, 'static>;
+pub type WeakVector<'scope, 'data> = Weak<'scope, 'data, Vector<'scope, 'data>>;
+pub type VectorRet = WeakVector<'static, 'static>;
 pub type VectorData<'target, 'data, Tgt> =
     <Tgt as TargetType<'target>>::Data<'data, Vector<'target, 'data>>;
 pub type VectorResult<'target, 'data, Tgt> =
@@ -2709,8 +2709,8 @@ pub type VectorResult<'target, 'data, Tgt> =
 
 /// An array with an unknown element type of rank 1.
 pub type VectorAny<'scope, 'data> = ArrayBase<'scope, 'data, Value<'scope, 'data>, 1>;
-pub type VectorAnyRef<'scope, 'data> = Ref<'scope, 'data, VectorAny<'scope, 'data>>;
-pub type VectorAnyRet = VectorAnyRef<'static, 'static>;
+pub type WeakVectorAny<'scope, 'data> = Weak<'scope, 'data, VectorAny<'scope, 'data>>;
+pub type VectorAnyRet = WeakVectorAny<'static, 'static>;
 pub type VectorAnyData<'target, 'data, Tgt> =
     <Tgt as TargetType<'target>>::Data<'data, VectorAny<'target, 'data>>;
 pub type VectorAnyResult<'target, 'data, Tgt> =
@@ -2718,8 +2718,8 @@ pub type VectorAnyResult<'target, 'data, Tgt> =
 
 /// An array with an unknown element type of rank 2.
 pub type Matrix<'scope, 'data> = ArrayBase<'scope, 'data, Unknown, 2>;
-pub type MatrixRef<'scope, 'data> = Ref<'scope, 'data, Matrix<'scope, 'data>>;
-pub type MatrixRet = MatrixRef<'static, 'static>;
+pub type WeakMatrix<'scope, 'data> = Weak<'scope, 'data, Matrix<'scope, 'data>>;
+pub type MatrixRet = WeakMatrix<'static, 'static>;
 pub type MatrixData<'target, 'data, Tgt> =
     <Tgt as TargetType<'target>>::Data<'data, Matrix<'target, 'data>>;
 pub type MatrixResult<'target, 'data, Tgt> =
@@ -2727,8 +2727,8 @@ pub type MatrixResult<'target, 'data, Tgt> =
 
 /// An array with a known element type and unknown rank.
 pub type TypedArray<'scope, 'data, T> = ArrayBase<'scope, 'data, T, -1>;
-pub type TypedArrayRef<'scope, 'data, T> = Ref<'scope, 'data, TypedArray<'scope, 'data, T>>;
-pub type TypedArrayRet<T> = TypedArrayRef<'static, 'static, T>;
+pub type WeakTypedArray<'scope, 'data, T> = Weak<'scope, 'data, TypedArray<'scope, 'data, T>>;
+pub type TypedArrayRet<T> = WeakTypedArray<'static, 'static, T>;
 pub type TypedArrayData<'target, 'data, Tgt, T> =
     <Tgt as TargetType<'target>>::Data<'data, TypedArray<'target, 'data, T>>;
 pub type TypedArrayResult<'target, 'data, Tgt, T> =
@@ -2736,8 +2736,8 @@ pub type TypedArrayResult<'target, 'data, Tgt, T> =
 
 /// An array with a known element type of rank 1.
 pub type TypedVector<'scope, 'data, T> = ArrayBase<'scope, 'data, T, 1>;
-pub type TypedVectorRef<'scope, 'data, T> = Ref<'scope, 'data, TypedVector<'scope, 'data, T>>;
-pub type TypedVectorRet<T> = TypedVectorRef<'static, 'static, T>;
+pub type WeakTypedVector<'scope, 'data, T> = Weak<'scope, 'data, TypedVector<'scope, 'data, T>>;
+pub type TypedVectorRet<T> = WeakTypedVector<'static, 'static, T>;
 pub type TypedVectorData<'target, 'data, Tgt, T> =
     <Tgt as TargetType<'target>>::Data<'data, TypedVector<'target, 'data, T>>;
 pub type TypedVectorResult<'target, 'data, Tgt, T> =
@@ -2745,8 +2745,8 @@ pub type TypedVectorResult<'target, 'data, Tgt, T> =
 
 /// An array with a known element type of rank 2.
 pub type TypedMatrix<'scope, 'data, T> = ArrayBase<'scope, 'data, T, 2>;
-pub type TypedMatrixRef<'scope, 'data, T> = Ref<'scope, 'data, TypedMatrix<'scope, 'data, T>>;
-pub type TypedMatrixRet<T> = TypedMatrixRef<'static, 'static, T>;
+pub type WeakTypedMatrix<'scope, 'data, T> = Weak<'scope, 'data, TypedMatrix<'scope, 'data, T>>;
+pub type TypedMatrixRet<T> = WeakTypedMatrix<'static, 'static, T>;
 pub type TypedMatrixData<'target, 'data, Tgt, T> =
     <Tgt as TargetType<'target>>::Data<'data, TypedMatrix<'target, 'data, T>>;
 pub type TypedMatrixResult<'target, 'data, Tgt, T> =
@@ -2754,9 +2754,9 @@ pub type TypedMatrixResult<'target, 'data, Tgt, T> =
 
 /// An array with an unknown element type and known rank.
 pub type RankedArray<'scope, 'data, const N: isize> = ArrayBase<'scope, 'data, Unknown, N>;
-pub type RankedArrayRef<'scope, 'data, const N: isize> =
-    Ref<'scope, 'data, RankedArray<'scope, 'data, N>>;
-pub type RankedArrayRet<const N: isize> = RankedArrayRef<'static, 'static, N>;
+pub type WeakRankedArray<'scope, 'data, const N: isize> =
+    Weak<'scope, 'data, RankedArray<'scope, 'data, N>>;
+pub type RankedArrayRet<const N: isize> = WeakRankedArray<'static, 'static, N>;
 pub type RankedArrayData<'target, 'data, Tgt, const N: isize> =
     <Tgt as TargetType<'target>>::Data<'data, RankedArray<'target, 'data, N>>;
 pub type RankedArrayResult<'target, 'data, Tgt, const N: isize> =
@@ -2764,9 +2764,9 @@ pub type RankedArrayResult<'target, 'data, Tgt, const N: isize> =
 
 /// An array with a known element type and known rank.
 pub type TypedRankedArray<'scope, 'data, T, const N: isize> = ArrayBase<'scope, 'data, T, N>;
-pub type TypedRankedArrayRef<'scope, 'data, T, const N: isize> =
-    Ref<'scope, 'data, TypedRankedArray<'scope, 'data, T, N>>;
-pub type TypedRankedArrayRet<T, const N: isize> = TypedRankedArrayRef<'static, 'static, T, N>;
+pub type WeakTypedRankedArray<'scope, 'data, T, const N: isize> =
+    Weak<'scope, 'data, TypedRankedArray<'scope, 'data, T, N>>;
+pub type TypedRankedArrayRet<T, const N: isize> = WeakTypedRankedArray<'static, 'static, T, N>;
 pub type TypedRankedArrayData<'target, 'data, Tgt, T, const N: isize> =
     <Tgt as TargetType<'target>>::Data<'data, TypedRankedArray<'target, 'data, T, N>>;
 pub type TypedRankedArrayResult<'target, 'data, Tgt, T, const N: isize> =
@@ -2863,7 +2863,7 @@ impl<'scope, 'data, T, const N: isize> ManagedPriv<'scope, 'data>
     }
 }
 
-unsafe impl<const N: isize> ValidField for Option<RankedArrayRef<'_, '_, N>> {
+unsafe impl<const N: isize> ValidField for Option<WeakRankedArray<'_, '_, N>> {
     fn valid_field(v: Value) -> bool {
         if v.is::<DataType>() {
             let dt = unsafe { v.cast_unchecked::<DataType>() };
@@ -2913,7 +2913,7 @@ unsafe impl<const N: isize> ValidField for Option<RankedArrayRef<'_, '_, N>> {
 }
 
 unsafe impl<T: ConstructType, const N: isize> ValidField
-    for Option<TypedRankedArrayRef<'_, '_, T, N>>
+    for Option<WeakTypedRankedArray<'_, '_, T, N>>
 {
     fn valid_field(v: Value) -> bool {
         if v.is::<DataType>() {

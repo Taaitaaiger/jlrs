@@ -19,7 +19,7 @@ use super::{
     erase_scope_lifetime,
     function::FunctionData,
     value::{ValueData, ValueResult, ValueUnbound},
-    Managed, Ref,
+    Managed, Weak,
 };
 use crate::{
     call::Call,
@@ -357,7 +357,7 @@ impl<'scope> Module<'scope> {
 
     /// Set a constant in this module. If Julia throws an exception it's caught and rooted in the
     /// current frame, if the exception can't be rooted a `JlrsError::AllocError` is returned. If
-    /// no exception is thrown an unrooted reference to the constant is returned.
+    /// no exception is thrown a weak reference to the constant is returned.
     pub fn set_const<'target, N, Tgt>(
         self,
         target: Tgt,
@@ -395,7 +395,7 @@ impl<'scope> Module<'scope> {
     }
 
     /// Set a constant in this module. If the constant already exists the process aborts,
-    /// otherwise an unrooted reference to the constant is returned.
+    /// otherwise a weak reference to the constant is returned.
     ///
     /// Safety: This method must not throw an error if called from a `ccall`ed function.
     #[inline]
@@ -536,21 +536,21 @@ impl<'scope> ManagedPriv<'scope, '_> for Module<'scope> {
 
 impl_construct_type_managed!(Module, 1, jl_module_type);
 
-/// A reference to a [`Module`] that has not been explicitly rooted.
-pub type ModuleRef<'scope> = Ref<'scope, 'static, Module<'scope>>;
+/// A [`Module`] that has not been explicitly rooted.
+pub type WeakModule<'scope> = Weak<'scope, 'static, Module<'scope>>;
 
-/// A [`ModuleRef`] with static lifetimes. This is a useful shorthand for signatures of
+/// A [`WeakModule`] with static lifetimes. This is a useful shorthand for signatures of
 /// `ccall`able functions that return a [`Module`].
-pub type ModuleRet = Ref<'static, 'static, Module<'static>>;
+pub type ModuleRet = WeakModule<'static>;
 
-impl_valid_layout!(ModuleRef, Module, jl_module_type);
+impl_valid_layout!(WeakModule, Module, jl_module_type);
 
 use crate::memory::target::TargetType;
 
-/// `Module` or `ModuleRef`, depending on the target type `Tgt`.
+/// `Module` or `WeakModule`, depending on the target type `Tgt`.
 pub type ModuleData<'target, Tgt> = <Tgt as TargetType<'target>>::Data<'static, Module<'target>>;
 
-/// `JuliaResult<Module>` or `JuliaResultRef<ModuleRef>`, depending on the target type `Tgt`.
+/// `JuliaResult<Module>` or `WeakJuliaResult<WeakModule>`, depending on the target type `Tgt`.
 pub type ModuleResult<'target, Tgt> = TargetResult<'target, 'static, Module<'target>, Tgt>;
 
 impl_ccall_arg_managed!(Module, 1);
@@ -600,11 +600,16 @@ impl JlrsCore {
     }
 
     #[inline]
-    pub fn color<'target, Tgt>(target: &Tgt) -> Value<'target, 'static>
+    pub fn set_error_color<'target, Tgt>(target: &Tgt) -> Function<'target, 'static>
     where
         Tgt: Target<'target>,
     {
-        inline_static_ref!(COLOR, Value, "JlrsCore.color", target)
+        inline_static_ref!(
+            SET_ERROR_COLOR,
+            Function,
+            "JlrsCore.set_error_color",
+            target
+        )
     }
 
     #[inline]
@@ -629,19 +634,6 @@ impl JlrsCore {
             SET_POOL_SIZE,
             Function,
             "JlrsCore.Threads.notify_main",
-            target
-        )
-    }
-
-    #[inline]
-    pub fn call_catch_wrapper<'target, Tgt>(target: &Tgt) -> Function<'target, 'static>
-    where
-        Tgt: Target<'target>,
-    {
-        inline_static_ref!(
-            CALL_CATCH_WRAPPER,
-            Function,
-            "JlrsCore.call_catch_wrapper",
             target
         )
     }
@@ -681,34 +673,6 @@ impl JlrsCore {
             INTERACTIVE_CALL,
             Function,
             "JlrsCore.Threads.interactivecall",
-            target
-        )
-    }
-
-    #[cfg(feature = "async")]
-    #[inline]
-    pub(crate) fn schedule_async<'target, Tgt>(target: &Tgt) -> Function<'target, 'static>
-    where
-        Tgt: Target<'target>,
-    {
-        inline_static_ref!(
-            SCHEDULE_ASYNC,
-            Function,
-            "JlrsCore.Threads.scheduleasync",
-            target
-        )
-    }
-
-    #[cfg(feature = "async")]
-    #[inline]
-    pub(crate) fn schedule_async_local<'target, Tgt>(target: &Tgt) -> Function<'target, 'static>
-    where
-        Tgt: Target<'target>,
-    {
-        inline_static_ref!(
-            SCHEDULE_ASYNC_LOCAL,
-            Function,
-            "JlrsCore.Threads.scheduleasynclocal",
             target
         )
     }

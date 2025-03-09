@@ -14,7 +14,7 @@ use jl_sys::{
 };
 use jlrs_macros::julia_version;
 
-use super::{simple_vector::SimpleVector, value::Value, Ref};
+use super::{simple_vector::SimpleVector, value::Value, Weak};
 use crate::{
     data::managed::{module::Module, private::ManagedPriv, symbol::Symbol},
     impl_julia_typecheck,
@@ -232,22 +232,22 @@ impl<'scope> ManagedPriv<'scope, '_> for TypeName<'scope> {
 
 impl_construct_type_managed!(TypeName, 1, jl_typename_type);
 
-/// A reference to a [`TypeName`] that has not been explicitly rooted.
-pub type TypeNameRef<'scope> = Ref<'scope, 'static, TypeName<'scope>>;
+/// A [`TypeName`] that has not been explicitly rooted.
+pub type WeakTypeName<'scope> = Weak<'scope, 'static, TypeName<'scope>>;
 
-/// A [`TypeNameRef`] with static lifetimes. This is a useful shorthand for signatures of
+/// A [`WeakTypeName`] with static lifetimes. This is a useful shorthand for signatures of
 /// `ccall`able functions that return a [`TypeName`].
-pub type TypeNameRet = Ref<'static, 'static, TypeName<'static>>;
+pub type TypeNameRet = WeakTypeName<'static>;
 
-impl_valid_layout!(TypeNameRef, TypeName, jl_typename_type);
+impl_valid_layout!(WeakTypeName, TypeName, jl_typename_type);
 
 use crate::memory::target::TargetType;
 
-/// `TypeName` or `TypeNameRef`, depending on the target type `Tgt`.
+/// `TypeName` or `WeakTypeName`, depending on the target type `Tgt`.
 pub type TypeNameData<'target, Tgt> =
     <Tgt as TargetType<'target>>::Data<'static, TypeName<'target>>;
 
-/// `JuliaResult<TypeName>` or `JuliaResultRef<TypeNameRef>`, depending on the target type `Tgt`.
+/// `JuliaResult<TypeName>` or `WeakJuliaResult<WeakTypeName>`, depending on the target type `Tgt`.
 pub type TypeNameResult<'target, Tgt> = TargetResult<'target, 'static, TypeName<'target>, Tgt>;
 
 impl_ccall_arg_managed!(TypeName, 1);

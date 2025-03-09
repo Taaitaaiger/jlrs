@@ -82,12 +82,12 @@
 //!
 //! Rooting targets can be used as a non-rooting target by using a reference to the target.
 //! Rooting and non-rooting targets return different types when they're used: `Value::new`
-//! returns a [`Value`] when a rooting target is used, but a [`ValueRef`] when a non-rooting one
+//! returns a [`Value`] when a rooting target is used, but a [`WeakValue`] when a non-rooting one
 //! is used instead. Every type that represents managed Julia data has a rooted and an unrooted
-//! variant, which are named similarly to `Value` and `ValueRef`. There are two type aliases for
+//! variant, which are named similarly to `Value` and `WeakValue`. There are two type aliases for
 //! each managed type that can be used as the return type of functions that take a target
 //! generically. For `Value` they are [`ValueData`] and [`ValueResult`]. `ValueData` is a `Value`
-//! if a rooting target is used and a `ValueRef` otherwise. `ValueResult` is a `Result` that
+//! if a rooting target is used and a `WeakValue` otherwise. `ValueResult` is a `Result` that
 //! contains `ValueData` in both its `Ok` and `Err` variants, if an `Err` is returned the
 //! operation failed and an exception was caught.
 //!
@@ -168,7 +168,7 @@
 //! [`Target`]: crate::memory::target::Target
 //! [`Target::into_extended_target`]: crate::memory::target::Target::into_extended_target
 //! [`Value`]: crate::data::managed::value::Value
-//! [`ValueRef`]: crate::data::managed::value::ValueRef
+//! [`WeakValue`]: crate::data::managed::value::WeakValue
 //! [`ValueData`]: crate::data::managed::value::ValueData
 //! [`ValueResult`]: crate::data::managed::value::ValueResult
 //! [`Managed`]: crate::data::managed::Managed

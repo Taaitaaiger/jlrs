@@ -283,8 +283,8 @@ use crate::{
         private::ManagedPriv,
         value::{Value, ValueResult},
     },
-    error::{AccessError, JlrsResult},
-    memory::{context::ledger::Ledger, target::Target},
+    error::JlrsResult,
+    memory::target::Target,
     prelude::ValueData,
     private::Private,
 };
@@ -401,44 +401,6 @@ pub trait Call<'data>: private::CallPriv {
     where
         V: Values<'value, 'data, N>,
         Tgt: Target<'target>;
-
-    /// Call a function with an arbitrary number arguments.
-    ///
-    /// Unlike the other methods of this trait, this method checks if any of the arguments is
-    /// currently borrowed from Rust, and returns an `AccessError::BorrowError` if any of the
-    /// arguments is.
-    ///
-    /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
-    /// correctness. More information can be found in the [`safety`] module.
-    ///
-    /// [`safety`]: crate::safety
-    unsafe fn call_tracked<'target, 'value, V, Tgt>(
-        self,
-        target: Tgt,
-        args: V,
-    ) -> JlrsResult<ValueResult<'target, 'data, Tgt>>
-    where
-        V: AsRef<[Value<'value, 'data>]>,
-        Tgt: Target<'target>,
-    {
-        let args = args.as_ref();
-        let res = args
-            .iter()
-            .copied()
-            .map(|arg| -> JlrsResult<()> {
-                if Ledger::is_borrowed(arg)? {
-                    Err(AccessError::BorrowError)?
-                }
-                Ok(())
-            })
-            .find(|f| f.is_err())
-            .map_or_else(
-                || Ok(self.call(target, args)),
-                |_: _| Err(AccessError::BorrowError),
-            )?;
-
-        Ok(res)
-    }
 
     /// Call a function with any number of arguments. Exceptions are not caught.
     ///
@@ -643,48 +605,6 @@ cfg_if::cfg_if! {
             where
                 V: Values<'value, 'data, N>;
 
-            /// Creates and schedules a new task with `Base.Threads.@spawn`, and returns a future
-            /// that resolves when this task is finished.
-            ///
-            /// This task is spawned on the `:default` thread pool.
-            ///
-            /// This method checks if any of the arguments is currently borrowed from Rust, and
-            /// returns an `AccessError::BorrowError` if any of the arguments is.
-            ///
-            /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
-            /// correctness. More information can be found in the [`safety`] module.
-            ///
-            /// [`safety`]: crate::safety
-            unsafe fn call_async_tracked<'target, 'value, V, const N: usize>(
-                self,
-                frame: &mut AsyncGcFrame<'target>,
-                args: V,
-            ) -> impl Future<Output = JlrsResult<JuliaResult<'target, 'data>>>
-            where
-                V: Values<'value, 'data, N>
-            {
-                async move {
-                    let args = args.as_slice(Private);
-                    let res = args
-                    .iter()
-                    .copied()
-                    .map(|arg| -> JlrsResult<()> {
-
-                        if Ledger::is_borrowed(arg)? {
-                            Err(AccessError::BorrowError)?
-                        }
-                        Ok(())
-                    })
-                    .find(|f| f.is_err())
-                    .map_or_else(
-                        || Ok(async { self.call_async(frame, args).await }),
-                        |_: _| Err(AccessError::BorrowError),
-                    )?.await;
-
-                    Ok(res)
-                }
-            }
-
             /// Does the same thing as [`CallAsync::call_async`], but the task is returned rather than an
             /// awaitable `Future`. This method should only be called in [`PersistentTask::init`],
             /// otherwise it's not guaranteed this task can make progress.
@@ -704,48 +624,6 @@ cfg_if::cfg_if! {
             ) -> JuliaResult<'target, 'data, Value<'target, 'data>>
             where
                 V: Values<'value, 'data, N>;
-
-            /// Does the same thing as [`CallAsync::call_async`], but the task is returned rather than an
-            /// awaitable `Future`. This method should only be called in [`PersistentTask::init`],
-            /// otherwise it's not guaranteed this task can make progress.
-            ///
-            /// This task is spawned on the `:default` thread pool.
-            ///
-            /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
-            /// correctness. More information can be found in the [`safety`] module.
-            ///
-            /// This method checks if any of the arguments is currently borrowed from Rust, and
-            /// returns an `AccessError::BorrowError` if any of the arguments is.
-            ///
-            /// [`safety`]: crate::safety
-            /// [`PersistentTask::init`]: crate::async_util::task::PersistentTask::init
-            unsafe fn schedule_async_tracked<'target, 'value, V, Tgt, const N: usize>(
-                self,
-                frame: &mut AsyncGcFrame<'target>,
-                args: V,
-            ) -> JlrsResult<JuliaResult<'target, 'data, Value<'target, 'data>>>
-            where
-                V: Values<'value, 'data, N>,
-                Tgt: Target<'target>,
-            {
-                let args = args.as_slice(Private);
-                let res = args
-                    .iter()
-                    .copied()
-                    .map(|arg| -> JlrsResult<()> {
-                         if Ledger::is_borrowed(arg)? {
-                             Err(AccessError::BorrowError)?
-                         }
-                         Ok(())
-                    })
-                    .find(|f| f.is_err())
-                    .map_or_else(
-                        || Ok(self.schedule_async(frame, args)),
-                       |_: _| Err(AccessError::BorrowError),
-                   )?;
-
-                Ok(res)
-            }
 
             /// Call a function on another thread with the given arguments. This method uses
             /// `Base.Threads.@spawn` to call the given function on another thread but return immediately.
@@ -767,49 +645,6 @@ cfg_if::cfg_if! {
             where
                 V: Values<'value, 'data, N>;
 
-            /// Call a function on another thread with the given arguments. This method uses
-            /// `Base.Threads.@spawn` to call the given function on another thread but return immediately.
-            /// While `await`ing the result the async runtime can work on other tasks, the current task
-            /// resumes after the function call on the other thread completes.
-            ///
-            /// This task is spawned on the `:interactive` thread pool.
-            ///
-            /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
-            /// correctness. More information can be found in the [`safety`] module.
-            ///
-            /// This method checks if any of the arguments is currently borrowed from Rust, and
-            /// returns an `AccessError::BorrowError` if any of the arguments is.
-            ///
-            /// [`safety`]: crate::safety
-            unsafe fn call_async_interactive_tracked<'target, 'value, V, const N: usize>(
-                self,
-                frame: &mut AsyncGcFrame<'target>,
-                args: V,
-            ) -> impl Future<Output = JlrsResult<JuliaResult<'target, 'data>>>
-            where
-                V: Values<'value, 'data, N>
-            {
-                async move {
-                    let args = args.as_slice(Private);
-                    let res = args
-                    .iter()
-                    .copied()
-                    .map(|arg| -> JlrsResult<()> {
-                        if Ledger::is_borrowed(arg)? {
-                            Err(AccessError::BorrowError)?
-                        }
-                        Ok(())
-                    })
-                    .find(|f| f.is_err())
-                    .map_or_else(
-                        || Ok(async { self.call_async_interactive(frame, args).await }),
-                        |_: _| Err(AccessError::BorrowError),
-                    )?.await;
-
-                    Ok(res)
-                }
-            }
-
             /// Does the same thing as [`CallAsync::call_async`], but the task is returned rather than an
             /// awaitable `Future`. This method should only be called in [`PersistentTask::init`],
             /// otherwise it's not guaranteed this task can make progress.
@@ -829,299 +664,6 @@ cfg_if::cfg_if! {
             ) -> JuliaResult<'target, 'data, Value<'target, 'data>>
             where
                 V: Values<'value, 'data, N>;
-
-
-                /// Does the same thing as [`CallAsync::call_async`], but the task is returned rather than an
-            /// awaitable `Future`. This method should only be called in [`PersistentTask::init`],
-            /// otherwise it's not guaranteed this task can make progress.
-            ///
-            /// This task is spawned on the `:interactive` thread pool.
-            ///
-            /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
-            /// correctness. More information can be found in the [`safety`] module.
-            ///
-            /// This method checks if any of the arguments is currently borrowed from Rust, and
-            /// returns an `AccessError::BorrowError` if any of the arguments is.
-            ///
-            /// [`safety`]: crate::safety
-            /// [`PersistentTask::init`]: crate::async_util::task::PersistentTask::init
-            unsafe fn schedule_async_interactive_tracked<'target, 'value, V, Tgt, const N: usize>(
-                self,
-                frame: &mut AsyncGcFrame<'target>,
-                args: V,
-            ) -> JlrsResult<JuliaResult<'target, 'data, Value<'target, 'data>>>
-            where
-                V: Values<'value, 'data, N>,
-                Tgt: Target<'target>,
-            {
-                let args = args.as_slice(Private);
-                let res = args
-                    .iter()
-                    .copied()
-                    .map(|arg| -> JlrsResult<()> {
-                        if Ledger::is_borrowed(arg)? {
-                            Err(AccessError::BorrowError)?
-                        }
-                        Ok(())
-                    })
-                    .find(|f| f.is_err())
-                    .map_or_else(
-                        || Ok(self.schedule_async_interactive(frame, args)),
-                        |_: _| Err(AccessError::BorrowError),
-                    )?;
-
-                Ok(res)
-            }
-
-            /// Call a function with the given arguments in an `@async` block. Like `call_async`, the
-            /// function is not called on the main thread, but on a separate thread that handles all
-            /// tasks created by this method. This method should only be used with functions that do very
-            /// little computational work but mostly spend their time waiting on IO.
-            ///
-            /// This task is spawned on the `:interactive` thread pool.
-            ///
-            /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
-            /// correctness. More information can be found in the [`safety`] module. This method doesn't
-            /// check if any of the arguments is currently borrowed from Rust.
-            ///
-            /// [`safety`]: crate::safety
-            unsafe fn call_async_local<'target, 'value, V, const N: usize>(
-                self,
-                frame: &mut AsyncGcFrame<'target>,
-                args: V,
-            ) -> impl Future<Output = JuliaResult<'target, 'data>>
-            where
-                V: Values<'value, 'data, N>;
-
-            /// Call a function with the given arguments in an `@async` block. Like `call_async`, the
-            /// function is not called on the main thread, but on a separate thread that handles all
-            /// tasks created by this method. This method should only be used with functions that do very
-            /// little computational work but mostly spend their time waiting on IO.
-            ///
-            /// This task is spawned on the `:interactive` thread pool.
-            ///
-            /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
-            /// correctness. More information can be found in the [`safety`] module.
-            ///
-            /// This method checks if any of the arguments is currently borrowed from Rust, and
-            /// returns an `AccessError::BorrowError` if any of the arguments is.
-            ///
-            /// [`safety`]: crate::safety
-            unsafe fn call_async_local_tracked<'target, 'value, V, const N: usize>(
-                self,
-                frame: &mut AsyncGcFrame<'target>,
-                args: V,
-            ) -> impl Future<Output = JlrsResult<JuliaResult<'target, 'data>>>
-            where
-                V: Values<'value, 'data, N>
-            {
-                async move {
-                    let args = args.as_slice(Private);
-                    let res = args
-                        .iter()
-                        .copied()
-                        .map(|arg| -> JlrsResult<()> {
-                            if Ledger::is_borrowed(arg)? {
-                                Err(AccessError::BorrowError)?
-                            }
-                            Ok(())
-                        })
-                        .find(|f| f.is_err())
-                        .map_or_else(
-                            || Ok(async { self.call_async_local(frame, args).await }),
-                            |_: _| Err(AccessError::BorrowError),
-                            )?.await;
-
-                    Ok(res)
-                }
-            }
-
-            /// Does the same thing as [`CallAsync::call_async_local`], but the task is returned rather
-            /// than an awaitable `Future`. This method should only be called in [`PersistentTask::init`],
-            /// otherwise it's not guaranteed this task can make progress.
-            ///
-            /// This task is spawned on the `:interactive` thread pool.
-            ///
-            /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
-            /// correctness. More information can be found in the [`safety`] module. This method doesn't
-            /// check if any of the arguments is currently borrowed from Rust.
-            ///
-            /// [`safety`]: crate::safety
-            /// [`PersistentTask::init`]: crate::async_util::task::PersistentTask::init
-            unsafe fn schedule_async_local<'target, 'value, V, const N: usize>(
-                self,
-                frame: &mut AsyncGcFrame<'target>,
-                args: V,
-            ) -> JuliaResult<'target, 'data, Value<'target, 'data>>
-            where
-                V: Values<'value, 'data, N>;
-
-
-            /// Does the same thing as [`CallAsync::call_async_local`], but the task is returned rather
-            /// than an awaitable `Future`. This method should only be called in [`PersistentTask::init`],
-            /// otherwise it's not guaranteed this task can make progress.
-            ///
-            /// This task is spawned on the `:interactive` thread pool.
-            ///
-            /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
-            /// correctness. More information can be found in the [`safety`] module.
-            ///
-            /// This method checks if any of the arguments is currently borrowed from Rust, and
-            /// returns an `AccessError::BorrowError` if any of the arguments is.
-            ///
-            /// [`safety`]: crate::safety
-            /// [`PersistentTask::init`]: crate::async_util::task::PersistentTask::init
-            unsafe fn schedule_async_local_tracked<'target, 'value, V, Tgt, const N: usize>(
-                self,
-                frame: &mut AsyncGcFrame<'target>,
-                args: V,
-            ) -> JlrsResult<JuliaResult<'target, 'data, Value<'target, 'data>>>
-            where
-                V: Values<'value, 'data, N>,
-                Tgt: Target<'target>,
-            {
-                let args = args.as_slice(Private);
-                let res = args
-                    .iter()
-                    .copied()
-                    .map(|arg| -> JlrsResult<()> {
-                        if Ledger::is_borrowed(arg)? {
-                            Err(AccessError::BorrowError)?
-                        }
-                        Ok(())
-                    })
-                    .find(|f| f.is_err())
-                    .map_or_else(
-                        || Ok(self.schedule_async_local(frame, args)),
-                        |_: _| Err(AccessError::BorrowError),
-                    )?;
-
-                Ok(res)
-            }
-
-            /// Call a function with the given arguments in an `@async` block. The task is scheduled on
-            /// the main thread. This method should only be used with functions that must run on the main
-            /// thread. The runtime is blocked while this task is active.
-            ///
-            /// This task is spawned on the `:interactive` thread pool.
-            ///
-            /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
-            /// correctness. More information can be found in the [`safety`] module. This method doesn't
-            /// check if any of the arguments is currently borrowed from Rust.
-            ///
-            /// [`safety`]: crate::safety
-            unsafe fn call_async_main<'target, 'value, V, const N: usize>(
-                self,
-                frame: &mut AsyncGcFrame<'target>,
-                args: V,
-            ) -> impl Future<Output = JuliaResult<'target, 'data>>
-            where
-                V: Values<'value, 'data, N>;
-
-
-            /// Call a function with the given arguments in an `@async` block. The task is scheduled on
-            /// the main thread. This method should only be used with functions that must run on the main
-            /// thread. The runtime is blocked while this task is active.
-            ///
-            /// This task is spawned on the `:interactive` thread pool.
-            ///
-            /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
-            /// correctness. More information can be found in the [`safety`] module.
-            ///
-            /// This method checks if any of the arguments is currently borrowed from Rust, and
-            /// returns an `AccessError::BorrowError` if any of the arguments is.
-            ///
-            /// [`safety`]: crate::safety
-            unsafe fn call_async_main_tracked<'target, 'value, V, const N: usize>(
-                self,
-                frame: &mut AsyncGcFrame<'target>,
-                args: V,
-            ) -> impl Future<Output = JlrsResult<JuliaResult<'target, 'data>>>
-            where
-                V: Values<'value, 'data, N>
-            {
-                async move {
-                    let args = args.as_slice(Private);
-                    let res = args
-                        .iter()
-                        .copied()
-                        .map(|arg| -> JlrsResult<()> {
-                            if Ledger::is_borrowed(arg)? {
-                                Err(AccessError::BorrowError)?
-                            }
-                            Ok(())
-                        })
-                        .find(|f| f.is_err())
-                        .map_or_else(
-                            || Ok(async { self.call_async_main(frame, args).await }),
-                            |_: _| Err(AccessError::BorrowError),
-                        )?.await;
-
-                    Ok(res)
-                }
-            }
-
-            /// Does the same thing as [`CallAsync::call_async_main`], but the task is returned rather
-            /// than an awaitable `Future`. This method should only be called in [`PersistentTask::init`],
-            /// otherwise it's not guaranteed this task can make progress.
-            ///
-            /// This task is spawned on the `:interactive` thread pool.
-            ///
-            /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
-            /// correctness. More information can be found in the [`safety`] module. This method doesn't
-            /// check if any of the arguments is currently borrowed from Rust.
-            ///
-            /// [`safety`]: crate::safety
-            /// [`PersistentTask::init`]: crate::async_util::task::PersistentTask::init
-            unsafe fn schedule_async_main<'target, 'value, V, const N: usize>(
-                self,
-                frame: &mut AsyncGcFrame<'target>,
-                args: V,
-            ) ->JuliaResult<'target, 'data, Value<'target, 'data>>
-            where
-                V: Values<'value, 'data, N>;
-
-            /// Does the same thing as [`CallAsync::call_async_main`], but the task is returned rather
-            /// than an awaitable `Future`. This method should only be called in [`PersistentTask::init`],
-            /// otherwise it's not guaranteed this task can make progress.
-            ///
-            /// This task is spawned on the `:interactive` thread pool.
-            ///
-            /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
-            /// correctness. More information can be found in the [`safety`] module.
-            ///
-            /// This method checks if any of the arguments is currently borrowed from Rust, and
-            /// returns an `AccessError::BorrowError` if any of the arguments is.
-            ///
-            /// [`safety`]: crate::safety
-            /// [`PersistentTask::init`]: crate::async_util::task::PersistentTask::init
-            unsafe fn schedule_async_main_tracked<'target, 'value, V, Tgt, const N: usize>(
-                self,
-                frame: &mut AsyncGcFrame<'target>,
-                args: V,
-            ) -> JlrsResult<JuliaResult<'target, 'data, Value<'target, 'data>>>
-            where
-                V: Values<'value, 'data, N>,
-                Tgt: Target<'target>,
-            {
-                let args = args.as_slice(Private);
-                let res = args
-                    .iter()
-                    .copied()
-                    .map(|arg| -> JlrsResult<()> {
-                        if Ledger::is_borrowed(arg)? {
-                            Err(AccessError::BorrowError)?
-                        }
-                        Ok(())
-                    })
-                    .find(|f| f.is_err())
-                    .map_or_else(
-                        || Ok(self.schedule_async_main(frame, args)),
-                        |_: _| Err(AccessError::BorrowError),
-                    )?;
-
-                Ok(res)
-            }
         }
 
         impl<'data> CallAsync<'data> for Value<'_, 'data> {
@@ -1160,13 +702,8 @@ cfg_if::cfg_if! {
             {
                 let args = args.into_extended_with_start([erase_scope_lifetime(self)], Private);
 
-                let task = JlrsCore::interactive_call(&frame)
-                    .call(&mut *frame, args.as_ref());
-
-                match task {
-                    Ok(t) => Ok(t),
-                    Err(e) => Err(e),
-                }
+                JlrsCore::interactive_call(&frame)
+                    .call(&mut *frame, args.as_ref())
             }
 
             #[inline]
@@ -1181,70 +718,6 @@ cfg_if::cfg_if! {
                 let args = args.into_extended_with_start([erase_scope_lifetime(self)], Private);
 
                 let task = JlrsCore::async_call(&frame)
-                    .call(&mut *frame, args.as_ref());
-
-                match task {
-                    Ok(t) => Ok(t),
-                    Err(e) => Err(e),
-                }
-            }
-
-            #[inline]
-            async unsafe fn call_async_local<'target, 'value, V, const N: usize>(
-                self,
-                frame: &mut AsyncGcFrame<'target>,
-                args: V,
-            ) -> JuliaResult<'target, 'data>
-            where
-                V: Values<'value, 'data, N>,
-            {
-                JuliaFuture::new_local(frame, erase_scope_lifetime(self), args).await
-            }
-
-            #[inline]
-            unsafe fn schedule_async_local<'target, 'value, V, const N: usize>(
-                self,
-                frame: &mut AsyncGcFrame<'target>,
-                args: V,
-            ) -> JuliaResult<'target, 'data, Value<'target, 'data>>
-            where
-                V: Values<'value, 'data, N>,
-            {
-                let args = args.into_extended_with_start([erase_scope_lifetime(self)], Private);
-
-                let task = JlrsCore::schedule_async_local(&frame)
-                    .call(&mut *frame, args.as_ref());
-
-                match task {
-                    Ok(t) => Ok(t),
-                    Err(e) => Err(e),
-                }
-            }
-
-            #[inline]
-            async unsafe fn call_async_main<'target, 'value, V, const N: usize>(
-                self,
-                frame: &mut AsyncGcFrame<'target>,
-                args: V,
-            ) -> JuliaResult<'target, 'data>
-            where
-                V: Values<'value, 'data, N>,
-            {
-                JuliaFuture::new_main(frame, erase_scope_lifetime(self), args).await
-            }
-
-            #[inline]
-            unsafe fn schedule_async_main<'target, 'value, V, const N: usize>(
-                self,
-                frame: &mut AsyncGcFrame<'target>,
-                args: V,
-            ) -> JuliaResult<'target, 'data, Value<'target, 'data>>
-            where
-                V: Values<'value, 'data, N>,
-            {
-                let args = args.into_extended_with_start([erase_scope_lifetime(self)], Private);
-
-                let task = JlrsCore::schedule_async(&frame)
                     .call(&mut *frame, args.as_ref());
 
                 match task {
@@ -1301,54 +774,6 @@ cfg_if::cfg_if! {
                 V: Values<'value, 'data, N>,
             {
                 self.as_value().schedule_async(frame, args)
-            }
-
-            #[inline]
-            async unsafe fn call_async_local<'target, 'value, V, const N: usize>(
-                self,
-                frame: &mut AsyncGcFrame<'target>,
-                args: V,
-            ) -> JuliaResult<'target, 'data>
-            where
-                V: Values<'value, 'data, N>,
-            {
-                JuliaFuture::new_local(frame, erase_scope_lifetime(self.as_value()), args).await
-            }
-
-            #[inline]
-            unsafe fn schedule_async_local<'target, 'value, V, const N: usize>(
-                self,
-                frame: &mut AsyncGcFrame<'target>,
-                args: V,
-            ) -> JuliaResult<'target, 'data, Value<'target, 'data>>
-            where
-                V: Values<'value, 'data, N>,
-            {
-                self.as_value().schedule_async_local(frame, args)
-            }
-
-            #[inline]
-            async unsafe fn call_async_main<'target, 'value, V, const N: usize>(
-                self,
-                frame: &mut AsyncGcFrame<'target>,
-                args: V,
-            ) -> JuliaResult<'target, 'data>
-            where
-                V: Values<'value, 'data, N>,
-            {
-                JuliaFuture::new_main(frame, erase_scope_lifetime(self.as_value()), args).await
-            }
-
-            #[inline]
-            unsafe fn schedule_async_main<'target, 'value, V, const N: usize>(
-                self,
-                frame: &mut AsyncGcFrame<'target>,
-                args: V,
-            ) -> JuliaResult<'target, 'data, Value<'target, 'data>>
-            where
-                V: Values<'value, 'data, N>,
-            {
-                self.as_value().schedule_async_main(frame, args)
             }
         }
 
@@ -1410,75 +835,7 @@ cfg_if::cfg_if! {
             {
                 let args = args.into_extended_with_start([erase_scope_lifetime(self.function())], Private);
 
-                let task = JlrsCore::schedule_async(&frame)
-                    .provide_keywords(self.keywords())
-                    .expect("Keywords invalid")
-                    .call(&mut *frame, args.as_ref());
-
-                match task {
-                    Ok(t) => Ok(t),
-                    Err(e) => Err(e),
-                }
-            }
-
-            #[inline]
-            async unsafe fn call_async_local<'target, 'value, V, const N: usize>(
-                self,
-                frame: &mut AsyncGcFrame<'target>,
-                args: V,
-            ) -> JuliaResult<'target, 'data>
-            where
-                V: Values<'value, 'data, N>,
-            {
-                JuliaFuture::new_local_with_keywords(frame, self, args).await
-            }
-
-            #[inline]
-            unsafe fn schedule_async_local<'target, 'value, V, const N: usize>(
-                self,
-                frame: &mut AsyncGcFrame<'target>,
-                args: V,
-            ) -> JuliaResult<'target, 'data, Value<'target, 'data>>
-            where
-                V: Values<'value, 'data, N>,
-            {
-                let args = args.into_extended_with_start([erase_scope_lifetime(self.function())], Private);
-
-                let task = JlrsCore::schedule_async_local(&frame)
-                    .provide_keywords(self.keywords())
-                    .expect("Keywords invalid")
-                    .call(&mut *frame, args.as_ref());
-
-                match task {
-                    Ok(t) => Ok(t),
-                    Err(e) => Err(e),
-                }
-            }
-
-            #[inline]
-            async unsafe fn call_async_main<'target, 'value, V, const N: usize>(
-                self,
-                frame: &mut AsyncGcFrame<'target>,
-                args: V,
-            ) -> JuliaResult<'target, 'data>
-            where
-                V: Values<'value, 'data, N>,
-            {
-                JuliaFuture::new_main_with_keywords(frame, self, args).await
-            }
-
-            #[inline]
-            unsafe fn schedule_async_main<'target, 'value, V, const N: usize>(
-                self,
-                frame: &mut AsyncGcFrame<'target>,
-                args: V,
-            ) -> JuliaResult<'target, 'data, Value<'target, 'data>>
-            where
-                V: Values<'value, 'data, N>,
-            {
-                let args = args.into_extended_with_start([erase_scope_lifetime(self.function())], Private);
-
-                let task = JlrsCore::schedule_async(&frame)
+                let task = JlrsCore::async_call(&frame)
                     .provide_keywords(self.keywords())
                     .expect("Keywords invalid")
                     .call(&mut *frame, args.as_ref());

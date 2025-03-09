@@ -17,8 +17,8 @@ use parking_lot::{Condvar, Mutex};
 use super::{
     module::JlrsCore,
     private::ManagedPriv,
-    value::{Value, ValueData, ValueRef, ValueRet},
-    Atomic, Managed, Ref,
+    value::{Value, ValueData, ValueRet, WeakValue},
+    Atomic, Managed, Weak,
 };
 use crate::{
     call::Call,
@@ -169,20 +169,20 @@ unsafe impl<'scope, 'data> HasLayout<'scope, 'data> for DelegatedTask<'scope> {
     type Layout = DelegatedTaskLayout<'scope>;
 }
 
-/// A reference to a [`DelegatedTask`] that has not been explicitly rooted.
-pub type DelegatedTaskRef<'scope> = Ref<'scope, 'static, DelegatedTask<'scope>>;
+/// A [`DelegatedTask`] that has not been explicitly rooted.
+pub type WeakDelegatedTask<'scope> = Weak<'scope, 'static, DelegatedTask<'scope>>;
 
-/// A [`DelegatedTaskRef`] with static lifetimes.
+/// A [`WeakDelegatedTask`] with static lifetimes.
 ///
 /// This is a useful shorthand for signatures of `ccall`able functions that return a
-/// [`DelegatedTaskRef`].
-pub type DelegatedTaskRet = DelegatedTaskRef<'static>;
+/// [`WeakDelegatedTask`].
+pub type DelegatedTaskRet = WeakDelegatedTask<'static>;
 
-/// [`DelegatedTask`] or [`DelegatedTaskRef`], depending on the target type `Tgt`.
+/// [`DelegatedTask`] or [`WeakDelegatedTask`], depending on the target type `Tgt`.
 pub type DelegatedTaskData<'target, Tgt> =
     <Tgt as TargetType<'target>>::Data<'static, DelegatedTask<'target>>;
 
-/// `JuliaResult<DelegatedTask>` or `JuliaResultRef<DelegatedTaskRef>`, depending on the target
+/// `JuliaResult<DelegatedTask>` or `WeakJuliaResult<WeakDelegatedTask>`, depending on the target
 /// type `Tgt`.
 pub type DelegatedTaskResult<'target, Tgt> =
     TargetResult<'target, 'static, DelegatedTask<'target>, Tgt>;
@@ -192,7 +192,7 @@ pub type DelegatedTaskResult<'target, Tgt> =
 pub struct DelegatedTaskLayout<'scope> {
     fetch_fn: unsafe extern "C" fn(DelegatedTask) -> ValueRet,
     thread_handle: Box<Mutex<Option<JoinHandle<JlrsResult<()>>>>>,
-    cond: ValueRef<'scope, 'static>,
+    cond: WeakValue<'scope, 'static>,
     atomic: Atomic<'scope, 'static, Value<'scope, 'static>>,
     _pinned: PhantomPinned,
 }
@@ -211,7 +211,7 @@ unsafe impl<'scope> ValidLayout for DelegatedTaskLayout<'scope> {
 impl<'scope> DelegatedTaskLayout<'scope> {
     fn new(cond: Value<'_, 'static>) -> Self {
         let ptr = cond.unwrap_non_null(Private);
-        let cond = ValueRef::wrap(ptr);
+        let cond = WeakValue::wrap(ptr);
 
         DelegatedTaskLayout {
             fetch_fn: delegated_task_fetch,
@@ -268,12 +268,12 @@ where
     unsafe {
         target.with_local_scope::<_, _, 2>(|target, mut frame| {
             let delegated_data = data.into_simple_vector(&mut frame);
-            let delegated_data = Sendable(delegated_data.as_ref().leak());
+            let delegated_data = Sendable(delegated_data.as_weak().leak());
             let active = Arc::new((Mutex::new(false), Condvar::new()));
             let active_clone = active.clone();
             let task = DelegatedTask::new(&mut frame);
 
-            let task_ref = Sendable(task.as_ref().leak());
+            let task_ref = Sendable(task.as_weak().leak());
             let handle = thread::spawn(move || {
                 let _pgcstack = jl_adopt_thread();
 

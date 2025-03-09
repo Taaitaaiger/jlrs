@@ -262,6 +262,14 @@ end
 
 @enum StandardEnum se_a=1 se_b=2 se_c=3
 
+struct Elided{A, B}
+    a::B
+end
+
+struct WithElidedInUnion
+    a::Union{Int16, Elided{true, Elided{1, Int64}}, Float64}
+end
+
 #reflect([
 #    BitsCharBitsIntChar,
 #    BitsCharFloat32Float64,

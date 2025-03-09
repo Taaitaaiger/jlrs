@@ -17,7 +17,6 @@ extern "C"
     {
         jlrs_catch_t res = {JLRS_CATCH_OK, 0};
 
-#ifndef JLRS_WINDOWS_LTS
         JL_TRY
         {
             res = trampoline(callback, result);
@@ -32,9 +31,7 @@ extern "C"
             jlrs_catch_t the_exc = {JLRS_CATCH_EXCEPTION, exc};
             return the_exc;
         }
-#else
-    res = trampoline(callback, result);
-#endif
+
         return res;
     }
 
@@ -105,7 +102,6 @@ extern "C"
 
     jl_datatype_t *jlrs_dimtuple_type(size_t rank)
     {
-        // printf("Rank %zu\n", rank);
         jl_value_t **params = (jl_value_t **)alloca(rank * sizeof(void *));
         if (sizeof(void *) == 4)
         {

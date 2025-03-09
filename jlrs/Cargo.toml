@@ -13,7 +13,7 @@ keywords = ["Julia", "math", "mathematics", "bindings", "ffi"]
 categories = ["api-bindings", "mathematics"]
 license = "MIT"
 edition = "2021"
-rust-version = "1.77"
+rust-version = "1.79"
 
 [features]
 default = []
@@ -67,10 +67,6 @@ jlrs-derive = ["jlrs-macros/derive"]
 # Compile the support library with support for cross-language LTO.
 lto = ["jl-sys/lto"]
 
-diagnostics = []
-
-async-closure = []
-
 # Target or link a specific Julia build or arch.
 
 # Link debug build of Julia
@@ -103,6 +99,7 @@ rustc-hash = "2"
 lock_api = "0.4"
 fnv = "1"
 atomic = "0.6"
+semver = "1"
 
 async-channel = { version = "2", optional = true }
 half = { version = "2.4", optional = true }

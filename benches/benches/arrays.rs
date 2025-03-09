@@ -24,7 +24,7 @@ fn construct_array_1d_unrooted2(frame: &mut GcFrame, c: &mut Criterion) {
 
     c.bench_function("Array<f64,1>_unrooted2", |b| {
         b.iter(|| {
-            let x: Result<TypedRankedArrayRef<f32, 1>, _> = Foo::new(&frame, 16);
+            let x: Result<WeakTypedRankedArray<f32, 1>, _> = Foo::new(&frame, 16);
             x
         })
     });

@@ -11,7 +11,7 @@ use super::{
     Managed,
 };
 use crate::{
-    data::managed::{private::ManagedPriv, symbol::Symbol, Ref},
+    data::managed::{private::ManagedPriv, symbol::Symbol, Weak},
     impl_julia_typecheck,
     memory::target::{TargetResult, TargetType},
     prelude::Target,
@@ -90,19 +90,19 @@ impl<'scope> ManagedPriv<'scope, '_> for Expr<'scope> {
 
 impl_construct_type_managed!(Expr, 1, jl_expr_type);
 
-/// A reference to an [`Expr`] that has not been explicitly rooted.
-pub type ExprRef<'scope> = Ref<'scope, 'static, Expr<'scope>>;
+/// An [`Expr`] that has not been explicitly rooted.
+pub type WeakExpr<'scope> = Weak<'scope, 'static, Expr<'scope>>;
 
-/// An [`ExprRef`] with static lifetimes. This is a useful shorthand for signatures of
+/// A [`WeakExpr`] with static lifetimes. This is a useful shorthand for signatures of
 /// `ccall`able functions that return a [`Expr`].
-pub type ExprRet = Ref<'static, 'static, Expr<'static>>;
+pub type ExprRet = WeakExpr<'static>;
 
-impl_valid_layout!(ExprRef, Expr, jl_expr_type);
+impl_valid_layout!(WeakExpr, Expr, jl_expr_type);
 
-/// `Expr` or `ExprRef`, depending on the target type `Tgt`.
+/// `Expr` or `WeakExpr`, depending on the target type `Tgt`.
 pub type ExprData<'target, Tgt> = <Tgt as TargetType<'target>>::Data<'static, Expr<'target>>;
 
-/// `JuliaResult<Expr>` or `JuliaResultRef<ExprRef>`, depending on the target type `Tgt`.
+/// `JuliaResult<Expr>` or `WeakJuliaResult<WeakExpr>`, depending on the target type `Tgt`.
 pub type ExprResult<'target, Tgt> = TargetResult<'target, 'static, Expr<'target>, Tgt>;
 
 impl_ccall_arg_managed!(Expr, 1);

@@ -17,7 +17,12 @@ use jl_sys::{jl_atexit_hook, jl_init, jl_init_with_image, jl_is_initialized};
 use crate::{
     call::Call,
     convert::into_jlrs_result::IntoJlrsResult,
-    data::managed::{module::Module, string::JuliaString, value::Value, Managed},
+    data::managed::{
+        module::{JlrsCore, Module},
+        string::JuliaString,
+        value::Value,
+        Managed,
+    },
     error::{IOError, JlrsResult, RuntimeError},
     init_jlrs,
     memory::{
@@ -47,7 +52,7 @@ impl PendingJulia {
             let mut pinned = frame.pin();
 
             let install_method = INSTALL_METHOD.get().unwrap();
-            init_jlrs(install_method);
+            init_jlrs(install_method, true);
 
             let frame = pinned.stack_frame();
             let context = frame.sync_stack();
@@ -108,7 +113,7 @@ impl<'a> Julia<'a> {
     /// disabled by default.
     ///
     /// [`JlrsError::Exception`]: crate::error::JlrsError::Exception
-    pub fn error_color(&mut self, enable: bool) -> JlrsResult<()> {
+    pub fn error_color(&mut self, enable: bool) {
         unsafe {
             let unrooted = Unrooted::new();
             let enable = if enable {
@@ -117,14 +122,10 @@ impl<'a> Julia<'a> {
                 Value::false_v(&unrooted)
             };
 
-            // FIXME: make atomic
-            Module::jlrs_core(&unrooted)
-                .global(&unrooted, "color")?
-                .as_value()
-                .set_field_unchecked("x", enable)?;
+            JlrsCore::set_error_color(&unrooted)
+                .call1(&unrooted, enable)
+                .ok();
         };
-
-        Ok(())
     }
 
     /// Calls `include` in the `Main` module in Julia, which executes the file's contents in that

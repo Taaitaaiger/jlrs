@@ -17,7 +17,7 @@ use crate::{
     private::Private,
 };
 
-const API_VERSION: usize = 2;
+const API_VERSION: usize = 3;
 
 #[derive(PartialEq, Eq, Debug)]
 #[repr(u8)]
@@ -35,14 +35,13 @@ pub(crate) struct Ledger {
     is_borrowed_shared: unsafe extern "C" fn(*const c_void) -> LedgerResult,
     is_borrowed_exclusive: unsafe extern "C" fn(*const c_void) -> LedgerResult,
     is_borrowed: unsafe extern "C" fn(*const c_void) -> LedgerResult,
-    borrow_shared_unchecked: unsafe extern "C" fn(ptr: *const c_void) -> LedgerResult,
     unborrow_shared: unsafe extern "C" fn(ptr: *const c_void) -> LedgerResult,
     unborrow_exclusive: unsafe extern "C" fn(ptr: *const c_void) -> LedgerResult,
     try_borrow_shared: unsafe extern "C" fn(ptr: *const c_void) -> LedgerResult,
     try_borrow_exclusive: unsafe extern "C" fn(ptr: *const c_void) -> LedgerResult,
 }
 
-pub(crate) unsafe extern "C" fn init_ledger() {
+pub(crate) unsafe fn init_ledger() {
     LEDGER.get_or_init(|| {
         let unrooted = Unrooted::new();
         let module = Module::jlrs_core(&unrooted);
@@ -109,16 +108,6 @@ pub(crate) unsafe extern "C" fn init_ledger() {
             .as_ref()
             .unwrap();
 
-        let borrow_shared_unchecked = *module
-            .global(unrooted, "BORROW_SHARED_UNCHECKED")
-            .unwrap()
-            .as_value()
-            .data_ptr()
-            .cast::<Option<unsafe extern "C" fn(ptr: *const c_void) -> LedgerResult>>()
-            .as_ref()
-            .as_ref()
-            .unwrap();
-
         let unborrow_shared = *module
             .global(unrooted, "UNBORROW_SHARED")
             .unwrap()
@@ -146,7 +135,6 @@ pub(crate) unsafe extern "C" fn init_ledger() {
             is_borrowed,
             try_borrow_shared,
             try_borrow_exclusive,
-            borrow_shared_unchecked,
             unborrow_shared,
             unborrow_exclusive,
         }
@@ -198,7 +186,7 @@ impl Ledger {
     pub(crate) fn try_borrow_shared(data: Value) -> JlrsResult<bool> {
         unsafe {
             match (LEDGER.get_unchecked().try_borrow_shared)(data.data_ptr().as_ptr()) {
-                LedgerResult::OkFalse => Ok(false),
+                LedgerResult::OkFalse => Err(JlrsError::exception("already exclusively borrowed"))?,
                 LedgerResult::OkTrue => Ok(true),
                 LedgerResult::Err => Err(JlrsError::exception("already exclusively borrowed"))?,
             }
@@ -209,18 +197,7 @@ impl Ledger {
     pub(crate) fn try_borrow_exclusive(data: Value) -> JlrsResult<bool> {
         unsafe {
             match (LEDGER.get_unchecked().try_borrow_exclusive)(data.data_ptr().as_ptr()) {
-                LedgerResult::OkFalse => Ok(false),
-                LedgerResult::OkTrue => Ok(true),
-                LedgerResult::Err => Err(JlrsError::exception("already exclusively borrowed"))?,
-            }
-        }
-    }
-
-    #[inline]
-    pub(crate) unsafe fn borrow_shared_unchecked(data: Value) -> JlrsResult<bool> {
-        unsafe {
-            match (LEDGER.get_unchecked().borrow_shared_unchecked)(data.data_ptr().as_ptr()) {
-                LedgerResult::OkFalse => Ok(false),
+                LedgerResult::OkFalse => Err(JlrsError::exception("already exclusively borrowed"))?,
                 LedgerResult::OkTrue => Ok(true),
                 LedgerResult::Err => Err(JlrsError::exception("already exclusively borrowed"))?,
             }

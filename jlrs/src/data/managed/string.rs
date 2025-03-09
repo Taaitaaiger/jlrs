@@ -10,7 +10,7 @@ use std::{
 
 use jl_sys::{jl_pchar_to_string, jl_string_ptr, jl_string_type, jlrs_string_len};
 
-use super::Ref;
+use super::Weak;
 use crate::{
     convert::unbox::Unbox,
     data::managed::{private::ManagedPriv, value::Value},
@@ -144,22 +144,22 @@ impl<'scope> ManagedPriv<'scope, '_> for JuliaString<'scope> {
     }
 }
 
-/// A reference to a [`JuliaString`] that has not been explicitly rooted.
-pub type StringRef<'scope> = Ref<'scope, 'static, JuliaString<'scope>>;
+/// A [`JuliaString`] that has not been explicitly rooted.
+pub type WeakString<'scope> = Weak<'scope, 'static, JuliaString<'scope>>;
 
-/// A [`StringRef`] with static lifetimes. This is a useful shorthand for signatures of
+/// A [`WeakString`] with static lifetimes. This is a useful shorthand for signatures of
 /// `ccall`able functions that return a [`JuliaString`].
-pub type StringRet = Ref<'static, 'static, JuliaString<'static>>;
+pub type StringRet = WeakString<'static>;
 
-impl_valid_layout!(StringRef, JuliaString, jl_string_type);
+impl_valid_layout!(WeakString, JuliaString, jl_string_type);
 
 use crate::memory::target::TargetType;
 
-/// `JuliaString` or `StringRef`, depending on the target type `Tgt`.
+/// `JuliaString` or `WeakString`, depending on the target type `Tgt`.
 pub type StringData<'target, Tgt> =
     <Tgt as TargetType<'target>>::Data<'static, JuliaString<'target>>;
 
-/// `JuliaResult<JuliaString>` or `JuliaResultRef<StringRef>`, depending on the target type `Tgt`.
+/// `JuliaResult<JuliaString>` or `WeakJuliaResult<WeakString>`, depending on the target type `Tgt`.
 pub type StringResult<'target, Tgt> = TargetResult<'target, 'static, JuliaString<'target>, Tgt>;
 
 impl_ccall_arg_managed!(JuliaString, 1);

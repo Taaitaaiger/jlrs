@@ -141,7 +141,7 @@ use jl_sys::{
 use jlrs_macros::julia_version;
 
 use self::{field_accessor::FieldAccessor, typed::TypedValue};
-use super::{type_var::TypeVar, Ref};
+use super::{type_var::TypeVar, Weak};
 use crate::{
     args::Values,
     call::{Call, ProvideKeywords, WithKeywords},
@@ -318,7 +318,9 @@ impl Value<'_, '_> {
         L: ValidLayout,
         Tgt: Target<'target>,
     {
-        let _: () = L::ASSERT_NOT_REF;
+        const {
+            let _: () = assert!(!L::IS_REF);
+        }
 
         target.with_local_scope::<_, _, 1>(|target, mut frame| {
             let ty = Ty::construct_type(&mut frame);
@@ -870,7 +872,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
 ///
 /// it will have two fields, `fielda` and `fieldb`. The first field is a pointer field, the second
 /// is stored inline as a `u32`. It's possible to safely access the raw contents of these fields
-/// with the method [`Value::field_accessor`]. The first field can be accessed as a [`ValueRef`],
+/// with the method [`Value::field_accessor`]. The first field can be accessed as a [`WeakValue`],
 /// the second as a `u32`.
 impl<'scope, 'data> Value<'scope, 'data> {
     /// Returns the field names of this value as a slice of `Symbol`s.
@@ -939,7 +941,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
     ///
     /// If the field doesn't exist or if the field can't be referenced because its data is stored
     /// inline, a `JlrsError::AccessError` is returned.
-    pub fn get_nth_field_ref(self, idx: usize) -> JlrsResult<ValueRef<'scope, 'data>> {
+    pub fn get_nth_field_ref(self, idx: usize) -> JlrsResult<WeakValue<'scope, 'data>> {
         let ty = self.datatype();
         if idx >= ty.n_fields().unwrap() as _ {
             Err(AccessError::OutOfBoundsField {
@@ -974,7 +976,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
                 })?
             }
 
-            Ok(ValueRef::wrap(NonNull::new_unchecked(
+            Ok(WeakValue::wrap(NonNull::new_unchecked(
                 jl_get_nth_field_noalloc(self.unwrap(Private), idx),
             )))
         }
@@ -1021,7 +1023,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
     ///
     /// If the field doesn't exist or if the field can't be referenced because its data is stored
     /// inline, a `JlrsError::AccessError` is returned.
-    pub fn get_field_ref<N>(self, field_name: N) -> JlrsResult<Option<ValueRef<'scope, 'data>>>
+    pub fn get_field_ref<N>(self, field_name: N) -> JlrsResult<Option<WeakValue<'scope, 'data>>>
     where
         N: ToSymbol,
     {
@@ -1063,7 +1065,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
             if ptr.is_null() {
                 Ok(None)
             } else {
-                Ok(Some(ValueRef::wrap(NonNull::new_unchecked(ptr))))
+                Ok(Some(WeakValue::wrap(NonNull::new_unchecked(ptr))))
             }
         }
     }
@@ -1777,12 +1779,12 @@ impl<'scope, 'data> ManagedPriv<'scope, 'data> for Value<'scope, 'data> {
     }
 }
 
-/// A reference to a [`Value`] that has not been explicitly rooted.
-pub type ValueRef<'scope, 'data> = Ref<'scope, 'data, Value<'scope, 'data>>;
+/// A [`Value`] that has not been explicitly rooted.
+pub type WeakValue<'scope, 'data> = Weak<'scope, 'data, Value<'scope, 'data>>;
 
-/// A [`ValueRef`] with static lifetimes. This is a useful shorthand for signatures of
+/// A [`WeakValue`] with static lifetimes. This is a useful shorthand for signatures of
 /// `ccall`able functions that return a [`Value`].
-pub type ValueRet = Ref<'static, 'static, Value<'static, 'static>>;
+pub type ValueRet = WeakValue<'static, 'static>;
 
 /// A [`Value`] with static lifetimes.
 ///
@@ -1790,7 +1792,7 @@ pub type ValueRet = Ref<'static, 'static, Value<'static, 'static>>;
 /// operate on its contents in another thread.
 pub type ValueUnbound = Value<'static, 'static>;
 
-unsafe impl ValidLayout for ValueRef<'_, '_> {
+unsafe impl ValidLayout for WeakValue<'_, '_> {
     #[inline]
     fn valid_layout(v: Value) -> bool {
         if v.is::<DataType>() {
@@ -1838,7 +1840,7 @@ unsafe impl ValidLayout for Value<'static, 'static> {
     const IS_REF: bool = true;
 }
 
-unsafe impl ValidField for Option<ValueRef<'_, '_>> {
+unsafe impl ValidField for Option<WeakValue<'_, '_>> {
     #[inline]
     fn valid_field(v: Value) -> bool {
         if v.is::<DataType>() {
@@ -1857,11 +1859,11 @@ unsafe impl ValidField for Option<ValueRef<'_, '_>> {
 
 use crate::memory::target::TargetType;
 
-/// `Value` or `ValueRef`, depending on the target type `Tgt`.
+/// `Value` or `WeakValue`, depending on the target type `Tgt`.
 pub type ValueData<'target, 'data, Tgt> =
     <Tgt as TargetType<'target>>::Data<'data, Value<'target, 'data>>;
 
-/// `JuliaResult<Value>` or `JuliaResultRef<ValueRef>`, depending on the target type `Tgt`.
+/// `JuliaResult<Value>` or `WeakJuliaResult<WeakValue>`, depending on the target type `Tgt`.
 pub type ValueResult<'target, 'data, Tgt> =
     TargetResult<'target, 'data, Value<'target, 'data>, Tgt>;
 
@@ -1906,14 +1908,10 @@ unsafe fn check_union_equivalent<'target, L: ValidLayout, Tgt: Target<'target>>(
     Ok(())
 }
 
-unsafe fn check_field_isa<L: ValidLayout>(
-    ft: Value,
-    l_ptr: *const L,
-    offset: usize,
-) -> JlrsResult<()> {
+unsafe fn check_field_isa<L: ValidLayout>(ft: Value, data: &L, offset: usize) -> JlrsResult<()> {
     // Field is a pointer field, check if the provided value in that position is a valid instance
     // of the field type.
-    if let Some(field) = l_ptr
+    if let Some(field) = (data as *const L)
         .cast::<MaybeUninit<u8>>()
         .add(offset)
         .cast::<Value>()

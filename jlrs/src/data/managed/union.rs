@@ -9,7 +9,7 @@ use jl_sys::{
 
 use super::{
     value::{ValueData, ValueResult},
-    Ref,
+    Weak,
 };
 use crate::{
     catch::{catch_exceptions, unwrap_exc},
@@ -220,21 +220,21 @@ pub(crate) fn find_union_component(haystack: Value, needle: Value, nth: &mut u32
 
 impl_construct_type_managed!(Union, 1, jl_uniontype_type);
 
-/// A reference to a [`Union`] that has not been explicitly rooted.
-pub type UnionRef<'scope> = Ref<'scope, 'static, Union<'scope>>;
+/// A [`Union`] that has not been explicitly rooted.
+pub type WeakUnion<'scope> = Weak<'scope, 'static, Union<'scope>>;
 
-/// A [`UnionRef`] with static lifetimes. This is a useful shorthand for signatures of
+/// A [`WeakUnion`] with static lifetimes. This is a useful shorthand for signatures of
 /// `ccall`able functions that return a [`Union`].
-pub type UnionRet = Ref<'static, 'static, Union<'static>>;
+pub type UnionRet = WeakUnion<'static>;
 
-impl_valid_layout!(UnionRef, Union, jl_uniontype_type);
+impl_valid_layout!(WeakUnion, Union, jl_uniontype_type);
 
 use crate::memory::target::TargetType;
 
-/// `Union` or `UnionRef`, depending on the target type `Tgt`.
+/// `Union` or `WeakUnion`, depending on the target type `Tgt`.
 pub type UnionData<'target, Tgt> = <Tgt as TargetType<'target>>::Data<'static, Union<'target>>;
 
-/// `JuliaResult<Union>` or `JuliaResultRef<UnionRef>`, depending on the target type `Tgt`.
+/// `JuliaResult<Union>` or `WeakJuliaResult<WeakUnion>`, depending on the target type `Tgt`.
 pub type UnionResult<'target, Tgt> = TargetResult<'target, 'static, Union<'target>, Tgt>;
 
 impl_ccall_arg_managed!(Union, 1);

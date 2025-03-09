@@ -11,7 +11,7 @@ use jl_sys::{
     jl_svec_t, jlrs_svec_data, jlrs_svec_len, jlrs_svecref, jlrs_svecset,
 };
 
-use super::{datatype::DataType, private::ManagedPriv, AtomicSlice, Managed, ManagedData, Ref};
+use super::{datatype::DataType, private::ManagedPriv, AtomicSlice, Managed, ManagedData, Weak};
 use crate::{
     data::{
         layout::valid_layout::{ValidField, ValidLayout},
@@ -107,7 +107,7 @@ where
     }
 }
 
-/// A `SimpleVector` is a fixed-size array that contains `ValueRef`s.
+/// A `SimpleVector` is a fixed-size array that contains `WeakValue`s.
 #[derive(Copy, Clone)]
 #[repr(transparent)]
 pub struct SimpleVector<'scope>(NonNull<jl_svec_t>, PhantomData<&'scope ()>);
@@ -226,14 +226,14 @@ impl<'scope> ManagedPriv<'scope, '_> for SimpleVector<'scope> {
 
 impl_construct_type_managed!(SimpleVector, 1, jl_simplevector_type);
 
-/// A reference to a [`SimpleVector`] that has not been explicitly rooted.
-pub type SimpleVectorRef<'scope> = Ref<'scope, 'static, SimpleVector<'scope>>;
+/// A [`SimpleVector`] that has not been explicitly rooted.
+pub type WeakSimpleVector<'scope> = Weak<'scope, 'static, SimpleVector<'scope>>;
 
-/// A [`SimpleVectorRef`] with static lifetimes. This is a useful shorthand for signatures of
+/// A [`WeakSimpleVector`] with static lifetimes. This is a useful shorthand for signatures of
 /// `ccall`able functions that return a [`SimpleVector`].
-pub type SimpleVectorRet = Ref<'static, 'static, SimpleVector<'static>>;
+pub type SimpleVectorRet = WeakSimpleVector<'static>;
 
-unsafe impl<'scope> ValidLayout for SimpleVectorRef<'scope> {
+unsafe impl<'scope> ValidLayout for WeakSimpleVector<'scope> {
     #[inline]
     fn valid_layout(v: Value) -> bool {
         if v.is::<DataType>() {
@@ -252,7 +252,7 @@ unsafe impl<'scope> ValidLayout for SimpleVectorRef<'scope> {
     const IS_REF: bool = true;
 }
 
-unsafe impl<'scope> ValidField for Option<SimpleVectorRef<'scope>> {
+unsafe impl<'scope> ValidField for Option<WeakSimpleVector<'scope>> {
     #[inline]
     fn valid_field(v: Value) -> bool {
         if v.is::<DataType>() {
@@ -266,11 +266,11 @@ unsafe impl<'scope> ValidField for Option<SimpleVectorRef<'scope>> {
 
 use crate::memory::target::TargetType;
 
-/// `SimpleVector` or `SimpleVectorRef`, depending on the target type `Tgt`.
+/// `SimpleVector` or `WeakSimpleVector`, depending on the target type `Tgt`.
 pub type SimpleVectorData<'target, Tgt> =
     <Tgt as TargetType<'target>>::Data<'static, SimpleVector<'target>>;
 
-/// `JuliaResult<SimpleVector>` or `JuliaResultRef<SimpleVectorRef>`, depending on the target type
+/// `JuliaResult<SimpleVector>` or `WeakJuliaResult<WeakSimpleVector>`, depending on the target type
 /// `Tgt`.
 pub type SimpleVectorResult<'target, Tgt> =
     TargetResult<'target, 'static, SimpleVector<'target>, Tgt>;

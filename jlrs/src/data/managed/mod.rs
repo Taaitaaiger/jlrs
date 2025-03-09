@@ -12,7 +12,7 @@
 //!
 //! One useful guarantee provided by managed types is that they point to existing data which won't
 //! be freed until its lifetime has expired. If data is returned that isn't rooted, jlrs returns a
-//! [`Ref`] instead of the managed type. Because the data isn't rooted it's not guaranteed to
+//! [`Weak`] instead of the managed type. Because the data isn't rooted it's not guaranteed to
 //! remain valid while it can be used. For more information about rooting see the documentation of
 //! the [`memory`] module.
 //!
@@ -131,7 +131,7 @@ macro_rules! impl_ccall_arg_managed {
         }
 
         unsafe impl $crate::convert::ccall_types::CCallReturn
-            for $crate::data::managed::Ref<'static, 'static, $ty<'static>>
+            for $crate::data::managed::Weak<'static, 'static, $ty<'static>>
         {
             type CCallReturnType = $crate::data::managed::value::Value<'static, 'static>;
             type FunctionReturnType = $ty<'static>;
@@ -151,7 +151,7 @@ macro_rules! impl_ccall_arg_managed {
         }
 
         unsafe impl $crate::convert::ccall_types::CCallReturn
-            for $crate::data::managed::Ref<'static, 'static, $ty<'static, 'static>>
+            for $crate::data::managed::Weak<'static, 'static, $ty<'static, 'static>>
         {
             type CCallReturnType = $crate::data::managed::value::Value<'static, 'static>;
             type FunctionReturnType = $ty<'static, 'static>;
@@ -326,18 +326,18 @@ use crate::{
     private::Private,
 };
 
-/// Trait implemented by `Ref`.
-pub trait ManagedRef<'scope, 'data>:
-    private::ManagedRef<'scope, 'data> + Copy + Debug + ValidLayout
+/// Trait implemented by `Weak`.
+pub trait ManagedWeak<'scope, 'data>:
+    private::ManagedWeak<'scope, 'data> + Copy + Debug + ValidLayout
 {
-    /// The managed type associated with this `Ref`.
+    /// The managed type wrapped by `Weak`.
     type Managed: Managed<'scope, 'data>;
 
-    // Convert `self` to an explicit `Ref` type.
-    fn into_ref(self) -> Ref<'scope, 'data, Self::Managed>;
+    // Convert `self` to an explicit `Weak` type.
+    fn into_weak(self) -> Weak<'scope, 'data, Self::Managed>;
 }
 
-impl<'scope, 'data, T> ManagedRef<'scope, 'data> for Ref<'scope, 'data, T>
+impl<'scope, 'data, T> ManagedWeak<'scope, 'data> for Weak<'scope, 'data, T>
 where
     T: ManagedPriv<'scope, 'data>,
     Self: Copy + ValidLayout,
@@ -345,7 +345,7 @@ where
 {
     type Managed = T;
 
-    fn into_ref(self) -> Ref<'scope, 'data, Self::Managed> {
+    fn into_weak(self) -> Weak<'scope, 'data, Self::Managed> {
         self
     }
 }
@@ -358,10 +358,17 @@ pub trait Managed<'scope, 'data>: private::ManagedPriv<'scope, 'data> {
     /// `Self`, but with an arbitrary `'da` lifetime instead of `'data`.
     type WithData<'da>: Managed<'scope, 'da>;
 
-    /// Convert `self` to a `Ref`.
+    /// Convert `self` to a `Weak`. Deprecated, use `Managed::as_weak` instead of this method.
     #[inline]
-    fn as_ref(self) -> Ref<'scope, 'data, Self> {
-        Ref::wrap(self.unwrap_non_null(Private))
+    #[deprecated = "use Managed::as_weak instead"]
+    fn as_ref(self) -> Weak<'scope, 'data, Self> {
+        Weak::wrap(self.unwrap_non_null(Private))
+    }
+
+    /// Convert `self` to a `Weak`.
+    #[inline]
+    fn as_weak(self) -> Weak<'scope, 'data, Self> {
+        Weak::wrap(self.unwrap_non_null(Private))
     }
 
     /// Convert `self` to a `Value`.
@@ -421,8 +428,12 @@ pub trait Managed<'scope, 'data>: private::ManagedPriv<'scope, 'data> {
         let s = unsafe {
             JlrsCore::error_string(&global)
                 .call1(&global, self.as_value())
-                .map_err(|e| e.as_value().error_string_or(CANNOT_DISPLAY_VALUE))
-                .map_err(|e| JlrsError::exception(format!("JlrsCore.errorstring failed: {}", e)))?
+                .map_err(|e| {
+                    JlrsError::exception(format!(
+                        "JlrsCore.errorstring failed, {:?}",
+                        e.as_managed()
+                    ))
+                })?
                 .as_value()
                 .cast::<JuliaString>()?
                 .as_str()?
@@ -455,15 +466,15 @@ pub trait Managed<'scope, 'data>: private::ManagedPriv<'scope, 'data> {
         self.error_string().unwrap_or(default.into())
     }
 
-    /// Extends the `'scope` lifetime to `'static` and converts it to a `Ref`, which allows this
+    /// Extends the `'scope` lifetime to `'static` and converts it to a `Weak`, which allows this
     /// managed data to be leaked from a scope.
     ///
     /// This method only extends the `'scope` lifetime. This method should only be used to return
     /// managed data from a `ccall`ed function, and in combination with the `ForeignType` trait to
     /// store references to managed data in types that that implement that trait.
     #[inline]
-    fn leak(self) -> Ref<'static, 'data, Self::InScope<'static>> {
-        self.as_ref().leak()
+    fn leak(self) -> Weak<'static, 'data, Self::InScope<'static>> {
+        self.as_weak().leak()
     }
 }
 
@@ -482,34 +493,34 @@ pub type ManagedData<'target, 'data, Tgt, T> = <Tgt as TargetType<'target>>::Dat
 /// Managed types are generally guaranteed to wrap valid, rooted data. In some cases this
 /// guarantee is too strong. The garbage collector uses the roots as a starting point to
 /// determine what values can be reached, as long as you can guarantee a value is reachable it's
-/// safe to use. Whenever data is not rooted jlrs returns a `Ref`. Because it's not rooted it's
+/// safe to use. Whenever data is not rooted jlrs returns a `Weak`. Because it's not rooted it's
 /// unsafe to use.
 #[repr(transparent)]
-pub struct Ref<'scope, 'data, T: ManagedPriv<'scope, 'data>>(
+pub struct Weak<'scope, 'data, T: ManagedPriv<'scope, 'data>>(
     NonNull<T::Wraps>,
     PhantomData<&'scope ()>,
     PhantomData<&'data ()>,
 );
 
-impl<'scope, 'data, T> Clone for Ref<'scope, 'data, T>
+impl<'scope, 'data, T> Clone for Weak<'scope, 'data, T>
 where
     T: ManagedPriv<'scope, 'data>,
 {
     #[inline]
     fn clone(&self) -> Self {
-        Ref(self.0, PhantomData, PhantomData)
+        Weak(self.0, PhantomData, PhantomData)
     }
 }
 
-impl<'scope, 'data, T> Copy for Ref<'scope, 'data, T> where T: ManagedPriv<'scope, 'data> {}
+impl<'scope, 'data, T> Copy for Weak<'scope, 'data, T> where T: ManagedPriv<'scope, 'data> {}
 
-impl<'scope, 'data, T: Managed<'scope, 'data>> Debug for Ref<'scope, 'data, T> {
+impl<'scope, 'data, T: Managed<'scope, 'data>> Debug for Weak<'scope, 'data, T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(f, "Ref<{}>", T::NAME)
+        write!(f, "Weak<{}>", T::NAME)
     }
 }
 
-impl<'scope, 'data, W: Managed<'scope, 'data>> Ref<'scope, 'data, W> {
+impl<'scope, 'data, W: Managed<'scope, 'data>> Weak<'scope, 'data, W> {
     /// Use `target` to root `self`.
     ///
     /// Safety: The data pointed to by `self` must not have been freed by the GC yet.
@@ -523,7 +534,7 @@ impl<'scope, 'data, W: Managed<'scope, 'data>> Ref<'scope, 'data, W> {
 
     #[inline]
     pub(crate) fn wrap(ptr: NonNull<W::Wraps>) -> Self {
-        Ref(ptr, PhantomData, PhantomData)
+        Weak(ptr, PhantomData, PhantomData)
     }
 
     /// Assume the reference still points to valid managed data and convert it to its managed type.
@@ -551,8 +562,8 @@ impl<'scope, 'data, W: Managed<'scope, 'data>> Ref<'scope, 'data, W> {
     /// Safety: this method should only be used when no data borrowed from Rust is referenced by
     /// this Julia data.
     #[inline]
-    pub unsafe fn assume_owned(self) -> Ref<'scope, 'static, W::WithData<'static>> {
-        Ref::wrap(self.ptr().cast())
+    pub unsafe fn assume_owned(self) -> Weak<'scope, 'static, W::WithData<'static>> {
+        Weak::wrap(self.ptr().cast())
     }
 
     /// Extends the `'scope` lifetime to `'static`, which allows this reference to Julia data to
@@ -561,8 +572,8 @@ impl<'scope, 'data, W: Managed<'scope, 'data>> Ref<'scope, 'data, W> {
     /// Safety: this method should only be called to return Julia data from a `ccall`ed function
     /// or when storing Julia data in a foreign type.
     #[inline]
-    pub fn leak(self) -> Ref<'static, 'data, W::InScope<'static>> {
-        Ref::wrap(self.ptr().cast())
+    pub fn leak(self) -> Weak<'static, 'data, W::InScope<'static>> {
+        Weak::wrap(self.ptr().cast())
     }
 
     /// Returns a pointer to the data.
@@ -578,13 +589,13 @@ impl<'scope, 'data, W: Managed<'scope, 'data>> Ref<'scope, 'data, W> {
 }
 
 /// Alias to convert a managed type `V` to its `Ret`-alias.
-pub type Ret<'scope, V> = Ref<'static, 'static, <V as Managed<'scope, 'static>>::InScope<'static>>;
+pub type Ret<'scope, V> = Weak<'static, 'static, <V as Managed<'scope, 'static>>::InScope<'static>>;
 
-/// Alias to convert a `Ref`-type `V` to its `Ret`-alias.
-pub type RefRet<'scope, V> = Ref<
+/// Alias to convert a `Weak`-type `V` to its `Ret`-alias.
+pub type RefRet<'scope, V> = Weak<
     'static,
     'static,
-    <<V as ManagedRef<'scope, 'static>>::Managed as Managed<'scope, 'static>>::InScope<'static>,
+    <<V as ManagedWeak<'scope, 'static>>::Managed as Managed<'scope, 'static>>::InScope<'static>,
 >;
 
 /// Atomic pointer field.
@@ -703,7 +714,7 @@ pub(crate) mod private {
     use std::{fmt::Debug, ptr::NonNull};
 
     use crate::{
-        data::managed::{value::Value, Ref},
+        data::managed::{value::Value, Weak},
         private::Private,
     };
 
@@ -730,9 +741,9 @@ pub(crate) mod private {
         }
     }
 
-    pub trait ManagedRef<'scope, 'data> {}
+    pub trait ManagedWeak<'scope, 'data> {}
 
-    impl<'scope, 'data, T> ManagedRef<'scope, 'data> for Ref<'scope, 'data, T> where
+    impl<'scope, 'data, T> ManagedWeak<'scope, 'data> for Weak<'scope, 'data, T> where
         T: ManagedPriv<'scope, 'data>
     {
     }

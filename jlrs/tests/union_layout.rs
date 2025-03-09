@@ -19,7 +19,7 @@ mod tests {
                         .as_value()
                         .field_accessor()
                         .field("a")?
-                        .access::<ValueRef>()?;
+                        .access::<WeakValue>()?;
 
                     assert!(field.as_value().is::<Module>());
 

@@ -74,7 +74,7 @@ mod tests {
                 .instance(&mut frame)
                 .returning::<JlrsResult<_>>()
                 .scope(|mut frame| {
-                    let main_mod = Module::main(&frame).as_ref();
+                    let main_mod = Module::main(&frame).as_weak();
                     let a = HasElidedParam { a: Some(main_mod) };
                     type ElidedParam<T, const U: bool> =
                         HasElidedParamTypeConstructor<T, ConstantBool<U>>;
@@ -82,8 +82,8 @@ mod tests {
                         Value::try_new_with::<ElidedParam<Module, true>, _, _>(&mut frame, a)?
                     };
 
-                    assert!(v.is::<HasElidedParam<Option<ModuleRef>>>());
-                    assert!(v.unbox::<HasElidedParam<Option<ModuleRef>>>().is_ok());
+                    assert!(v.is::<HasElidedParam<Option<WeakModule>>>());
+                    assert!(v.unbox::<HasElidedParam<Option<WeakModule>>>().is_ok());
 
                     Ok(())
                 })
@@ -978,7 +978,7 @@ mod tests {
                         .is::<WithPropagatedLifetime>());
 
                     let first = jl_val.get_nth_field(&mut frame, 0).unwrap();
-                    assert!(first.unbox::<WithGenericT<Option<ModuleRef>>>().is_ok());
+                    assert!(first.unbox::<WithGenericT<Option<WeakModule>>>().is_ok());
 
                     assert!(jl_val.is::<WithPropagatedLifetime>());
                     assert!(jl_val.unbox::<WithPropagatedLifetime>().is_ok());
@@ -1027,7 +1027,7 @@ mod tests {
 
                     let first = jl_val.get_nth_field(&mut frame, 0).unwrap();
                     assert!(first
-                        .unbox::<WithGenericT<Tuple2<i32, WithGenericT<Option<ArrayRef>>>>>()
+                        .unbox::<WithGenericT<Tuple2<i32, WithGenericT<Option<WeakArray>>>>>()
                         .is_ok());
 
                     assert!(jl_val.is::<WithPropagatedLifetimes>());
@@ -1289,6 +1289,46 @@ mod tests {
         })
     }
 
+    fn derive_complex_bits_union() {
+        JULIA_DERIVE.with(|j| {
+            let mut julia = j.borrow_mut();
+            let mut frame = StackFrame::new();
+
+            julia
+                .instance(&mut frame)
+                .returning::<JlrsResult<_>>()
+                .scope(|mut frame| unsafe {
+                    let elided_ua = Module::main(&frame).global(&frame, "Elided")?.as_managed();
+
+                    let true_v = Value::true_v(&frame);
+                    let one = Value::new(&mut frame, 1i64);
+
+                    let i64_ty = i64::construct_type(&frame).as_managed();
+                    let inner_ctor = elided_ua.apply_type(&mut frame, [one, i64_ty]).unwrap();
+
+                    let outer_ctor = elided_ua
+                        .apply_type(&mut frame, [true_v, inner_ctor])
+                        .unwrap();
+                    let inner = inner_ctor.call1(&mut frame, one).unwrap();
+                    let outer = outer_ctor.call1(&mut frame, inner).unwrap();
+
+                    let constr = Module::main(&frame)
+                        .global(&frame, "WithElidedInUnion")?
+                        .as_managed();
+
+                    let data = constr.call1(&mut frame, outer).unwrap();
+                    let content = data.get_nth_field(&mut frame, 0).unwrap();
+                    assert_eq!(content.unbox::<Elided<Elided<i64>>>().unwrap().a.a, 1);
+
+                    assert!(data.is::<WithElidedInUnion>());
+                    assert!(data.unbox::<WithElidedInUnion>().is_ok());
+
+                    Ok(())
+                })
+                .unwrap();
+        })
+    }
+
     #[test]
     fn derive_tests() {
         derive_bits_type_bool();
@@ -1334,5 +1374,6 @@ mod tests {
         trivial_isbits_into_julia();
         test_enums();
         test_enums_ccall();
+        derive_complex_bits_union();
     }
 }
