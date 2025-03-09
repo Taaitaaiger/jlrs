@@ -1,33 +1,38 @@
 //! This example shows how to throw a Julia exception from a `ccall`ed function.
 
-use jlrs::prelude::*;
+use jlrs::{prelude::*, runtime::handle::ccall::throw_exception, weak_handle};
 
 // This function returns `nothing` if a < b, throws an `AssertionError` otherwise.
 #[no_mangle]
 pub unsafe extern "C" fn assert_less_than(a: i32, b: i32) {
-    let res = CCall::local_scope::<_, _, 2>(|mut frame| {
-        if a >= b {
-            let msg = JuliaString::new(&mut frame, "a is larger than b").as_value();
+    match weak_handle!() {
+        Ok(handle) => {
+            let res = handle
+                .local_scope::<2>(|mut frame| {
+                    if a >= b {
+                        let msg = JuliaString::new(&mut frame, "a is larger than b").as_value();
 
-            let leaked = Module::core(&frame)
-                .global(&frame, "AssertionError")
-                .expect("AssertionError does not exist in Core")
-                .as_value()
-                .cast::<DataType>()
-                .expect("AssertionError is not a DataType")
-                .instantiate_unchecked(&mut frame, [msg])
-                .leak();
+                        let leaked = Module::core(&frame)
+                            .global(&frame, "AssertionError")
+                            .expect("AssertionError does not exist in Core")
+                            .as_value()
+                            .cast::<DataType>()
+                            .expect("AssertionError is not a DataType")
+                            .instantiate_unchecked(&mut frame, [msg])
+                            .leak();
 
-            return Ok(Err(leaked));
+                        return Err(leaked);
+                    }
+
+                    Ok(())
+                });
+
+            // Safe: there are no pendings drops.
+            if let Err(exc) = res {
+                throw_exception(exc)
+            }
         }
-
-        Ok(Ok(()))
-    })
-    .unwrap();
-
-    // Safe: there are no pendings drops.
-    if let Err(exc) = res {
-        CCall::throw_exception(exc)
+        Err(_) => panic!("Not called from Julia"),
     }
 }
 

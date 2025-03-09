@@ -38,26 +38,20 @@ pub trait Executor<const N: usize>: Send + Sync + 'static {
     ///
     /// Implementations of this method should start a new local runtime. `loop_fn` may block for
     /// extended periods of time.
-    fn block_on<T, F>(&self, loop_fn: F) -> T
-    where
-        F: Future<Output = T>;
+    fn block_on<T>(&self, loop_fn: impl Future<Output = T>) -> T;
 
     /// Spawn `future` as a task on the current executor.
-    fn spawn_local<F>(future: F) -> Self::JoinHandle
-    where
-        F: Future<Output = ()> + 'static;
+    fn spawn_local(future: impl Future<Output = ()> + 'static) -> Self::JoinHandle;
 
     /// Yield the current task.
     fn yield_now() -> impl Future<Output = ()>;
 
     /// Wait on `future` until it resolves or `duration` has elapsed. If the future times out it
     /// must return `None`.
-    fn timeout<F>(
+    fn timeout(
         duration: Duration,
-        future: F,
-    ) -> impl Future<Output = Option<Result<Message, RecvError>>>
-    where
-        F: Future<Output = Result<Message, RecvError>>;
+        future: impl Future<Output = Result<Message, RecvError>>,
+    ) -> impl Future<Output = Option<Result<Message, RecvError>>>;
 }
 
 #[cfg(feature = "tokio-rt")]
@@ -96,18 +90,18 @@ pub mod tokio_exec {
         }
 
         /// See [`tokio::runtime::Builder::on_thread_park`]
-        pub fn on_thread_park<F: Fn() + Send + Sync + 'static>(
+        pub fn on_thread_park(
             &mut self,
-            on_thread_park: F,
+            on_thread_park: impl Fn() + Send + Sync + 'static,
         ) -> &mut Self {
             self.on_thread_park = Some(Arc::new(on_thread_park));
             self
         }
 
         /// See [`tokio::runtime::Builder::on_thread_unpark`]
-        pub fn on_thread_unpark<F: Fn() + Send + Sync + 'static>(
+        pub fn on_thread_unpark(
             &mut self,
-            on_thread_unpark: F,
+            on_thread_unpark: impl Fn() + Send + Sync + 'static,
         ) -> &mut Self {
             self.on_thread_unpark = Some(Arc::new(on_thread_unpark));
             self
@@ -125,10 +119,7 @@ pub mod tokio_exec {
         type JoinHandle = JoinHandle<()>;
 
         #[inline]
-        fn block_on<T, F>(&self, loop_fn: F) -> T
-        where
-            F: Future<Output = T>,
-        {
+        fn block_on<T>(&self, loop_fn: impl Future<Output = T>) -> T {
             let mut builder = Builder::new_current_thread();
             builder.enable_time();
 
@@ -154,10 +145,7 @@ pub mod tokio_exec {
         }
 
         #[inline]
-        fn spawn_local<F>(future: F) -> Self::JoinHandle
-        where
-            F: Future<Output = ()> + 'static,
-        {
+        fn spawn_local(future: impl Future<Output = ()> + 'static) -> Self::JoinHandle {
             tokio::task::spawn_local(future)
         }
 
@@ -166,10 +154,10 @@ pub mod tokio_exec {
             tokio::task::yield_now()
         }
 
-        async fn timeout<F>(duration: Duration, future: F) -> Option<Result<Message, RecvError>>
-        where
-            F: Future<Output = Result<Message, RecvError>>,
-        {
+        async fn timeout(
+            duration: Duration,
+            future: impl Future<Output = Result<Message, RecvError>>,
+        ) -> Option<Result<Message, RecvError>> {
             timeout(duration, future).await.ok()
         }
     }

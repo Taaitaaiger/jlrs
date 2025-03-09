@@ -1387,53 +1387,57 @@ impl JuliaModule {
                     return ::jlrs::data::managed::value::Value::nothing(&unrooted).as_weak().leak();
                 }
 
-                let mut stack_frame = ::jlrs::memory::stack_frame::StackFrame::new();
-                let mut ccall = ::jlrs::runtime::handle::ccall::CCall::new(&mut stack_frame);
+                ::jlrs::runtime::handle::ccall::init_jlrs_wrapped(&::jlrs::InstallJlrsCore::No);
 
-                ccall.init_jlrs(&::jlrs::InstallJlrsCore::No);
+                match ::jlrs::weak_handle!() {
+                    Ok(mut handle) => {
+                        handle.with_stack(|mut handle| {
+                            handle.scope(|mut frame| {
+                                let wrap_mod = ::jlrs::data::managed::module::Module::jlrs_core(&frame)
+                                .submodule(&frame, "Wrap")
+                                .unwrap()
+                                .as_managed();
 
-                ccall.scope(|mut frame| {
-                    let wrap_mod = ::jlrs::data::managed::module::Module::jlrs_core(&frame)
-                        .submodule(&frame, "Wrap")
-                        .unwrap()
-                        .as_managed();
+                            let function_info_ty = wrap_mod
+                                .global(&frame, "JlrsFunctionInfo")
+                                .unwrap()
+                                .as_value()
+                                .cast_unchecked::<::jlrs::data::managed::datatype::DataType>();
 
-                    let function_info_ty = wrap_mod
-                        .global(&frame, "JlrsFunctionInfo")
-                        .unwrap()
-                        .as_value()
-                        .cast_unchecked::<::jlrs::data::managed::datatype::DataType>();
+                            let doc_item_ty = wrap_mod
+                                .global(&frame, "DocItem")
+                                .unwrap()
+                                .as_value()
+                                .cast_unchecked::<::jlrs::data::managed::datatype::DataType>();
 
-                    let doc_item_ty = wrap_mod
-                        .global(&frame, "DocItem")
-                        .unwrap()
-                        .as_value()
-                        .cast_unchecked::<::jlrs::data::managed::datatype::DataType>();
+                            let module_info_ty = wrap_mod
+                                .global(&frame, "JlrsModuleInfo")
+                                .unwrap()
+                                .as_value()
+                                .cast_unchecked::<::jlrs::data::managed::datatype::DataType>();
 
-                    let module_info_ty = wrap_mod
-                        .global(&frame, "JlrsModuleInfo")
-                        .unwrap()
-                        .as_value()
-                        .cast_unchecked::<::jlrs::data::managed::datatype::DataType>();
+                            #invoke_type_init;
+                            #invoke_generic_type_init;
+                            #invoke_const_init;
+                            #invoke_global_init;
+                            #invoke_alias_init;
 
-                    #invoke_type_init;
-                    #invoke_generic_type_init;
-                    #invoke_const_init;
-                    #invoke_global_init;
-                    #invoke_alias_init;
+                            let mut arr = ::jlrs::data::managed::array::Vector::new_for_unchecked(&mut frame, function_info_ty.as_value(), 0);
+                            #function_init_fn_ident(&mut frame, &mut arr, module, function_info_ty);
+                            #generic_function_init_fn_ident(&mut frame, &mut arr, module, function_info_ty);
+                            #method_init_fn_ident(&mut frame, &mut arr, module, function_info_ty);
+                            #generic_method_init_fn_ident(&mut frame, &mut arr, module, function_info_ty);
 
-                    let mut arr = ::jlrs::data::managed::array::Vector::new_for_unchecked(&mut frame, function_info_ty.as_value(), 0);
-                    #function_init_fn_ident(&mut frame, &mut arr, module, function_info_ty);
-                    #generic_function_init_fn_ident(&mut frame, &mut arr, module, function_info_ty);
-                    #method_init_fn_ident(&mut frame, &mut arr, module, function_info_ty);
-                    #generic_method_init_fn_ident(&mut frame, &mut arr, module, function_info_ty);
-
-                    let mut doc_items = ::jlrs::data::managed::array::Vector::new_for_unchecked(&mut frame, doc_item_ty.as_value(), 0);
-                    if precompiling == 1 {
-                        #doc_init_fn_ident(&mut frame, &mut doc_items, module, doc_item_ty);
-                    }
-                    Ok(module_info_ty.instantiate_unchecked(&frame, [arr.as_value(), doc_items.as_value()]).leak())
-                }).unwrap()
+                            let mut doc_items = ::jlrs::data::managed::array::Vector::new_for_unchecked(&mut frame, doc_item_ty.as_value(), 0);
+                            if precompiling == 1 {
+                                #doc_init_fn_ident(&mut frame, &mut doc_items, module, doc_item_ty);
+                            }
+                            module_info_ty.instantiate_unchecked(&frame, [arr.as_value(), doc_items.as_value()]).leak()
+                            })
+                        })
+                    },
+                    Err(_) => panic!("Not called from Julia"),
+                }
             }
         };
 
@@ -2870,7 +2874,7 @@ fn invoke_fn_ref_self_method_fragment(
                     let res = #call_expr;
                     <#ret_ty as ::jlrs::convert::ccall_types::CCallReturn>::return_or_throw(res)
                 },
-                Err(_) => ::jlrs::runtime::handle::ccall::CCall::throw_borrow_exception()
+                Err(_) => ::jlrs::runtime::handle::ccall::throw_borrow_exception()
             }
         }
     }
@@ -2929,7 +2933,7 @@ fn invoke_fn_ref_self_method_fragment_in_env(
                     let res = #call_expr;
                     <#ret_ty as ::jlrs::convert::ccall_types::CCallReturn>::return_or_throw(res)
                 },
-                Err(_) => ::jlrs::runtime::handle::ccall::CCall::throw_borrow_exception()
+                Err(_) => ::jlrs::runtime::handle::ccall::throw_borrow_exception()
             }
         }
     }
@@ -2987,7 +2991,7 @@ fn invoke_fn_move_self_method_fragment(
                     let res = #call_expr;
                     <#ret_ty as ::jlrs::convert::ccall_types::CCallReturn>::return_or_throw(res)
                 },
-                Err(_) => ::jlrs::runtime::handle::ccall::CCall::throw_borrow_exception()
+                Err(_) => ::jlrs::runtime::handle::ccall::throw_borrow_exception()
             }
         }
     }
@@ -3046,7 +3050,7 @@ fn invoke_fn_move_self_method_fragment_in_env(
                     let res = #call_expr;
                     <#ret_ty as ::jlrs::convert::ccall_types::CCallReturn>::return_or_throw(res)
                 },
-                Err(_) => ::jlrs::runtime::handle::ccall::CCall::throw_borrow_exception()
+                Err(_) => ::jlrs::runtime::handle::ccall::throw_borrow_exception()
             }
         }
     }
@@ -3104,7 +3108,7 @@ fn invoke_fn_mut_self_method_fragment(
                     let res = #call_expr;
                     <#ret_ty as ::jlrs::convert::ccall_types::CCallReturn>::return_or_throw(res)
                 },
-                Err(_) => ::jlrs::runtime::handle::ccall::CCall::throw_borrow_exception()
+                Err(_) => ::jlrs::runtime::handle::ccall::throw_borrow_exception()
             }
         }
     }
@@ -3163,7 +3167,7 @@ fn invoke_fn_mut_self_method_fragment_in_env(
                     let res = #call_expr;
                     <#ret_ty as ::jlrs::convert::ccall_types::CCallReturn>::return_or_throw(res)
                 },
-                Err(_) => ::jlrs::runtime::handle::ccall::CCall::throw_borrow_exception()
+                Err(_) => ::jlrs::runtime::handle::ccall::throw_borrow_exception()
             }
         }
     }

@@ -34,6 +34,8 @@
 
 - `Target::with_local_scope` has been moved to a new trait, `LocalScopeExt`, and like `LocalScope::local_scope` only takes its size as a constant generic. This trait also provides `LocalScopeExt::with_unsized_local_scope`.
 
+- Many functions from `CCall` have been removed or turned into free-standing functions, the remainder has been deprecated. Use the `weak_handle` macro instead.
+
 ## v0.21
 
 - Support generating bindings for Julia enums with integer base types in combination with JlrsCore.Reflect and the `Enum` derive macro.

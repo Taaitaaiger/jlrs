@@ -15,8 +15,6 @@ pub use crate::memory::stack_frame::StackFrame;
 pub use crate::runtime::builder::Builder;
 #[cfg(feature = "tokio-rt")]
 pub use crate::runtime::executor::tokio_exec::*;
-#[cfg(feature = "ccall")]
-pub use crate::runtime::handle::ccall::CCall;
 #[cfg(feature = "local-rt")]
 pub use crate::runtime::sync_rt::{Julia, PendingJulia};
 #[cfg(feature = "async")]
