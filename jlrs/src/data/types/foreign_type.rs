@@ -78,7 +78,7 @@ use crate::{
             private::ManagedPriv,
             simple_vector::{SimpleVector, SimpleVectorData},
             symbol::Symbol,
-            value::{Value, ValueData, ValueRef},
+            value::{Value, ValueData, WeakValue},
             Managed,
         },
         types::construct_type::ConstructType,
@@ -665,7 +665,7 @@ pub unsafe trait ParametricVariant: ParametricBase {
 ///
 /// Because this trait has a `'static` lifetime bound, it's necessary to erase the lifetimes of
 /// referenced Julia data present in the implementor. This can be done by using the `Ret`-aliases
-/// that all managed types provide, lifetimes can be erased by calling either [`Ref::leak`] or
+/// that all managed types provide, lifetimes can be erased by calling either [`Weak::leak`] or
 /// [`Managed::leak`].
 ///
 /// Safety:
@@ -683,20 +683,17 @@ pub unsafe trait ParametricVariant: ParametricBase {
 /// Julia data is changed while it's managed by Julia, [`write_barrier`] must be called to
 /// ensure GC invariants are maintained.
 ///
-/// [`Ref::leak`]: crate::data::managed::Ref::leak
+/// [`Weak::leak`]: crate::data::managed::Weak::leak
 /// [`write_barrier`]: crate::memory::gc::write_barrier
 
-#[cfg_attr(
-    feature = "diagnostics",
-    diagnostic::on_unimplemented(
-        message = "the trait bound `{Self}: ForeignLayout` is not satisfied",
-        label = "the trait `ForeignLayout` is not implemented for `{Self}`",
-        note = "Unless you are calling a function that explicitly takes an implementation of \
+#[diagnostic::on_unimplemented(
+    message = "the trait bound `{Self}: ForeignLayout` is not satisfied",
+    label = "the trait `ForeignLayout` is not implemented for `{Self}`",
+    note = "Unless you are calling a function that explicitly takes an implementation of \
     `ForeignType`, this diagnostic is likely incorrect",
-        note = "It is more likely that the issue lies with not implementing `ValidLayout`, `IntoJulia`, `Typecheck`, `Unbox` or `ConstructType`",
-        note = "Custom types that implement the traits mentioned in the previous note should be generated with JlrsCore.reflect",
-        note = "Do not implement `ForeignType`, `OpaqueType`, or `ParametricVariant` unless this type is exported to Julia with `julia_module!`"
-    )
+    note = "It is more likely that the issue lies with not implementing `ValidLayout`, `IntoJulia`, `Typecheck`, `Unbox` or `ConstructType`",
+    note = "Custom types that implement the traits mentioned in the previous note should be generated with JlrsCore.reflect",
+    note = "Do not implement `ForeignType`, `OpaqueType`, or `ParametricVariant` unless this type is exported to Julia with `julia_module!`"
 )]
 pub unsafe trait ForeignType: Sized + Send + 'static {
     #[doc(hidden)]
@@ -724,10 +721,10 @@ pub unsafe trait ForeignType: Sized + Send + 'static {
         DataType::any_type(&target).root(target)
     }
 
-    /// Convert a reference to this foreign type to a `ValueRef`.
+    /// Convert a reference to this foreign type to a `WeakValue`.
     #[inline]
-    fn as_value_ref<'scope>(&'scope self) -> ValueRef<'scope, 'static> {
-        unsafe { ValueRef::wrap(NonNull::new_unchecked(self as *const _ as *mut jl_value_t)) }
+    fn as_value_ref<'scope>(&'scope self) -> WeakValue<'scope, 'static> {
+        unsafe { WeakValue::wrap(NonNull::new_unchecked(self as *const _ as *mut jl_value_t)) }
     }
 
     /// Mark all references to Julia data.

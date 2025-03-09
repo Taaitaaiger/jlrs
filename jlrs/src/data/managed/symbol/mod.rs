@@ -14,7 +14,7 @@ use jl_sys::{
 use rustc_hash::FxHashMap;
 
 use self::static_symbol::{StaticSymbol, Sym};
-use super::Ref;
+use super::Weak;
 use crate::{
     catch::{catch_exceptions, unwrap_exc},
     data::managed::private::ManagedPriv,
@@ -306,21 +306,21 @@ impl<'scope> ManagedPriv<'scope, '_> for Symbol<'scope> {
 
 impl_construct_type_managed!(Symbol, 1, jl_symbol_type);
 
-/// A reference to a [`Symbol`] that has not been explicitly rooted.
-pub type SymbolRef<'scope> = Ref<'scope, 'static, Symbol<'scope>>;
+/// A [`Symbol`] that has not been explicitly rooted.
+pub type WeakSymbol<'scope> = Weak<'scope, 'static, Symbol<'scope>>;
 
-/// A [`SymbolRef`] with static lifetimes. This is a useful shorthand for signatures of
+/// A [`WeakSymbol`] with static lifetimes. This is a useful shorthand for signatures of
 /// `ccall`able functions that return a [`Symbol`].
-pub type SymbolRet = Ref<'static, 'static, Symbol<'static>>;
+pub type SymbolRet = WeakSymbol<'static>;
 
-impl_valid_layout!(SymbolRef, Symbol, jl_symbol_type);
+impl_valid_layout!(WeakSymbol, Symbol, jl_symbol_type);
 
 use crate::memory::target::TargetType;
 
-/// `Task` or `TaskRef`, depending on the target type `Tgt`.
+/// `Task` or `WeakTask`, depending on the target type `Tgt`.
 pub type SymbolData<'target, Tgt> = <Tgt as TargetType<'target>>::Data<'static, Symbol<'target>>;
 
-/// `JuliaResult<Task>` or `JuliaResultRef<TaskRef>`, depending on the target type `Tgt`.
+/// `JuliaResult<Symbol>` or `WeakJuliaResult<WeakSymbol>`, depending on the target type `Tgt`.
 pub type SymbolResult<'target, Tgt> = TargetResult<'target, 'static, Symbol<'target>, Tgt>;
 
 pub type SymbolUnbound = Symbol<'static>;

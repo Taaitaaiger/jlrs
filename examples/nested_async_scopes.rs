@@ -21,7 +21,7 @@ impl AsyncTask for MyTask {
         // the closure must return an async block.
         let output = frame.output();
         frame
-            .async_scope(|mut frame| async move {
+            .async_scope(async move |mut frame| -> JlrsResult<_> {
                 // Convert the two arguments to values Julia can work with.
                 let dims = Value::new(&mut frame, self.dims);
                 let iters = Value::new(&mut frame, self.iters);

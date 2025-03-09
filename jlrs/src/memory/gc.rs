@@ -19,7 +19,7 @@ use crate::{
     data::managed::{
         module::Module,
         private::ManagedPriv,
-        value::{Value, ValueRef},
+        value::{Value, WeakValue},
     },
     private::Private,
 };
@@ -175,7 +175,7 @@ pub trait Gc: private::GcPriv {
 ///
 /// This method must only be called from `ForeignType::mark`.
 #[inline]
-pub unsafe fn mark_queue_obj(ptls: PTls, obj: ValueRef) -> bool {
+pub unsafe fn mark_queue_obj(ptls: PTls, obj: WeakValue) -> bool {
     jl_gc_mark_queue_obj(ptls, obj.ptr().as_ptr()) != 0
 }
 
@@ -190,7 +190,7 @@ pub unsafe fn mark_queue_obj(ptls: PTls, obj: ValueRef) -> bool {
 ///
 /// This method must only be called from `ForeignType::mark`.
 #[inline]
-pub unsafe fn mark_queue_objarray(ptls: PTls, parent: ValueRef, objs: &[Option<ValueRef>]) {
+pub unsafe fn mark_queue_objarray(ptls: PTls, parent: WeakValue, objs: &[Option<WeakValue>]) {
     jl_gc_mark_queue_objarray(ptls, parent.ptr().as_ptr(), objs.as_ptr() as _, objs.len())
 }
 

@@ -227,7 +227,7 @@ impl<'scope, 'data, T, const N: isize> TrackedArrayBase<'scope, 'data, T, N> {
     /// Create an accessor for managed data.
     ///
     /// Thanks to the restrictions on `T` the data is guaranteed to be as an array of
-    /// `Option<Ref<T>>`s.
+    /// `Option<Weak<T>>`s.
     pub fn managed_data<'borrow>(&'borrow self) -> ManagedAccessor<'borrow, 'scope, 'data, T, T, N>
     where
         T: Managed<'scope, 'data> + ConstructType,
@@ -272,7 +272,7 @@ impl<'scope, 'data, T, const N: isize> TrackedArrayBase<'scope, 'data, T, N> {
     /// Create an accessor for value data.
     ///
     /// Thanks to the restrictions on `T` the data is guaranteed to be as an array of
-    /// `Option<Ref<Value>>`s.
+    /// `Option<Weak<Value>>`s.
     pub fn value_data<'borrow>(&'borrow self) -> ValueAccessor<'borrow, 'scope, 'data, T, N>
     where
         T: Managed<'scope, 'data> + ConstructType,
@@ -342,7 +342,7 @@ impl<'scope, 'data, T, const N: isize> Clone for TrackedArrayBase<'scope, 'data,
                 array_v = Value::wrap_non_null(NonNull::new_unchecked(owner), Private);
             }
 
-            Ledger::borrow_shared_unchecked(array_v).unwrap();
+            Ledger::try_borrow_shared(array_v).unwrap();
         }
         Self { data: self.data }
     }
@@ -611,7 +611,7 @@ impl<'scope, 'data, T, const N: isize> TrackedArrayBaseMut<'scope, 'data, T, N> 
     /// Create a mutable accessor for managed data.
     ///
     /// Thanks to the restrictions on `T` the data is guaranteed to be as an array of
-    /// `Option<Ref<T>>`s.
+    /// `Option<Weak<T>>`s.
     ///
     /// Safety:
     ///
@@ -670,7 +670,7 @@ impl<'scope, 'data, T, const N: isize> TrackedArrayBaseMut<'scope, 'data, T, N> 
     /// Create a mutable accessor for value data.
     ///
     /// Thanks to the restrictions on `T` the data is guaranteed to be as an array of
-    /// `Option<Ref<Value>>`s.
+    /// `Option<Weak<Value>>`s.
     ///
     /// Safety:
     ///

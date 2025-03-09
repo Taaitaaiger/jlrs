@@ -12,7 +12,7 @@ pub(crate) mod tests {
     #[repr(C)]
     struct IWRL<'scope, 'data> {
         pub(crate) a: i8,
-        pub(crate) b: Option<ValueRef<'scope, 'data>>,
+        pub(crate) b: Option<WeakValue<'scope, 'data>>,
     }
 
     #[derive(ValidField, ValidLayout, Debug, Clone, Typecheck, Unbox)]
@@ -20,7 +20,7 @@ pub(crate) mod tests {
     #[repr(C)]
     struct AIDE<'scope, 'data> {
         pub(crate) a: u8,
-        pub(crate) b: Option<ValueRef<'scope, 'data>>,
+        pub(crate) b: Option<WeakValue<'scope, 'data>>,
     }
 
     #[derive(ConstructType, HasLayout)]

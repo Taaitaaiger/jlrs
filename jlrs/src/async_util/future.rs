@@ -193,8 +193,6 @@ pub(crate) struct TaskState<'frame, 'data> {
 enum AsyncMethod {
     AsyncCall,
     InteractiveCall,
-    ScheduleAsync,
-    ScheduleAsyncLocal,
 }
 
 impl Display for AsyncMethod {
@@ -202,8 +200,6 @@ impl Display for AsyncMethod {
         match self {
             AsyncMethod::AsyncCall => f.write_str("asynccall"),
             AsyncMethod::InteractiveCall => f.write_str("interactivecall"),
-            AsyncMethod::ScheduleAsync => f.write_str("scheduleasync"),
-            AsyncMethod::ScheduleAsyncLocal => f.write_str("scheduleasynclocal"),
         }
     }
 }
@@ -238,30 +234,6 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
     }
 
     #[inline]
-    pub(crate) fn new_local<'value, V, const N: usize>(
-        frame: &mut AsyncGcFrame<'frame>,
-        func: Value<'value, 'data>,
-        values: V,
-    ) -> Self
-    where
-        V: Values<'value, 'data, N>,
-    {
-        Self::new_future(frame, func, values, AsyncMethod::ScheduleAsyncLocal)
-    }
-
-    #[inline]
-    pub(crate) fn new_main<'value, V, const N: usize>(
-        frame: &mut AsyncGcFrame<'frame>,
-        func: Value<'value, 'data>,
-        values: V,
-    ) -> Self
-    where
-        V: Values<'value, 'data, N>,
-    {
-        Self::new_future(frame, func, values, AsyncMethod::ScheduleAsync)
-    }
-
-    #[inline]
     pub(crate) fn new_with_keywords<'kw, 'value, V, const N: usize>(
         frame: &mut AsyncGcFrame<'frame>,
         func: WithKeywords<'kw, 'data>,
@@ -283,30 +255,6 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
         V: Values<'value, 'data, N>,
     {
         Self::new_future_with_keywords(frame, func, values, AsyncMethod::InteractiveCall)
-    }
-
-    #[inline]
-    pub(crate) fn new_local_with_keywords<'kw, 'value, V, const N: usize>(
-        frame: &mut AsyncGcFrame<'frame>,
-        func: WithKeywords<'kw, 'data>,
-        values: V,
-    ) -> Self
-    where
-        V: Values<'value, 'data, N>,
-    {
-        Self::new_future_with_keywords(frame, func, values, AsyncMethod::ScheduleAsyncLocal)
-    }
-
-    #[inline]
-    pub(crate) fn new_main_with_keywords<'kw, 'value, V, const N: usize>(
-        frame: &mut AsyncGcFrame<'frame>,
-        func: WithKeywords<'kw, 'data>,
-        values: V,
-    ) -> Self
-    where
-        V: Values<'value, 'data, N>,
-    {
-        Self::new_future_with_keywords(frame, func, values, AsyncMethod::ScheduleAsync)
     }
 
     fn new_future<'value, V, const N: usize>(
@@ -340,8 +288,6 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
             let f = match method {
                 AsyncMethod::AsyncCall => JlrsCore::async_call(&frame),
                 AsyncMethod::InteractiveCall => JlrsCore::interactive_call(&frame),
-                AsyncMethod::ScheduleAsync => JlrsCore::schedule_async(&frame),
-                AsyncMethod::ScheduleAsyncLocal => JlrsCore::schedule_async_local(&frame),
             };
 
             f.call(&mut *frame, values.as_ref()).unwrap_or_else(|e| {
@@ -382,8 +328,6 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
             let f = match method {
                 AsyncMethod::AsyncCall => JlrsCore::async_call(&frame),
                 AsyncMethod::InteractiveCall => JlrsCore::interactive_call(&frame),
-                AsyncMethod::ScheduleAsync => JlrsCore::schedule_async(&frame),
-                AsyncMethod::ScheduleAsyncLocal => JlrsCore::schedule_async_local(&frame),
             };
 
             let kw_call = jl_sys::jl_kwcall_func;

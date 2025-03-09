@@ -15,8 +15,8 @@ use parking_lot::Mutex;
 use super::{
     module::JlrsCore,
     private::ManagedPriv,
-    value::{Value, ValueData, ValueRef, ValueRet},
-    Managed, Ref,
+    value::{Value, ValueData, ValueRet, WeakValue},
+    Managed, Weak,
 };
 use crate::{
     call::Call,
@@ -208,20 +208,20 @@ where
     type Layout = BackgroundTaskLayout<'scope, T>;
 }
 
-/// A reference to a [`BackgroundTask`] that has not been explicitly rooted.
-pub type BackgroundTaskRef<'scope, T> = Ref<'scope, 'static, BackgroundTask<'scope, T>>;
+/// A [`BackgroundTask`] that has not been explicitly rooted.
+pub type WeakBackgroundTask<'scope, T> = Weak<'scope, 'static, BackgroundTask<'scope, T>>;
 
-/// A [`BackgroundTaskRef`] with static lifetimes.
+/// A [`WeakBackgroundTask`] with static lifetimes.
 ///
 /// This is a useful shorthand for signatures of `ccall`able functions that return a
-/// [`BackgroundTaskRef`].
-pub type BackgroundTaskRet<T> = BackgroundTaskRef<'static, T>;
+/// [`WeakBackgroundTask`].
+pub type BackgroundTaskRet<T> = WeakBackgroundTask<'static, T>;
 
-/// [`BackgroundTask`] or [`BackgroundTaskRef`], depending on the target type `Tgt`.
+/// [`BackgroundTask`] or [`WeakBackgroundTask`], depending on the target type `Tgt`.
 pub type BackgroundTaskData<'target, T, Tgt> =
     <Tgt as TargetType<'target>>::Data<'static, BackgroundTask<'target, T>>;
 
-/// `JuliaResult<BackgroundTask>` or `JuliaResultRef<BackgroundTaskRef>`, depending on the target
+/// `JuliaResult<BackgroundTask>` or `WeakJuliaResult<WeakBackgroundTask>`, depending on the target
 /// type `Tgt`.
 pub type BackgroundTaskResult<'target, T, Tgt> =
     TargetResult<'target, 'static, BackgroundTask<'target, T>, Tgt>;
@@ -235,7 +235,7 @@ where
 {
     fetch_fn: unsafe extern "C" fn(handle: BackgroundTask<T>) -> ValueRet,
     thread_handle: Box<Mutex<Option<JoinHandle<JlrsResult<()>>>>>,
-    cond: ValueRef<'scope, 'static>,
+    cond: WeakValue<'scope, 'static>,
     atomic: T::Layout,
     _pinned: PhantomPinned,
 }
@@ -270,7 +270,7 @@ where
 {
     fn new(cond: Value<'_, 'static>) -> Self {
         let ptr = cond.unwrap_non_null(Private);
-        let cond = ValueRef::wrap(ptr);
+        let cond = WeakValue::wrap(ptr);
 
         unsafe {
             BackgroundTaskLayout {
@@ -320,7 +320,7 @@ where
     unsafe {
         target.with_local_scope::<_, _, 1>(|target, mut frame| {
             let task = BackgroundTask::new(&mut frame);
-            let task_ref = Sendable(task.as_ref().leak());
+            let task_ref = Sendable(task.as_weak().leak());
 
             let handle = thread::spawn(move || {
                 let task_ref = task_ref.inner();

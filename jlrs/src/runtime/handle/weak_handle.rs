@@ -84,7 +84,7 @@ impl WeakHandle {
     /// `MtHandle::with`. The current thread must be known to Julia, and must be in an inactive
     ///  state (i.e. the GC-state must be `GC_UNSAFE`).
     #[inline(always)]
-    pub const unsafe fn new_unchecked<'a>() -> Self {
+    pub const unsafe fn new_unchecked() -> Self {
         WeakHandle {
             _marker: PhantomData,
             _ph: PhantomPinned,

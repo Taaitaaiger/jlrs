@@ -12,8 +12,6 @@
 #[cfg(feature = "async")]
 pub mod async_frame;
 
-#[cfg(feature = "async")]
-use std::future::Future;
 use std::{marker::PhantomData, pin::Pin, ptr::NonNull};
 
 use jl_sys::{pop_frame, RawGcFrame, UnsizedGcFrame};
@@ -359,26 +357,11 @@ impl<'borrow, 'current> BorrowedFrame<'borrow, 'current, AsyncGcFrame<'current>>
     /// Create a temporary scope by calling [`AsyncGcFrame::async_scope`].
 
     #[inline]
-    pub async fn async_scope<'nested, T, F, G>(self, func: F) -> JlrsResult<T>
+    pub async fn async_scope<T, F>(&mut self, func: F) -> T
     where
-        'borrow: 'nested,
-        T: 'current,
-        G: Future<Output = JlrsResult<T>>,
-        F: FnOnce(AsyncGcFrame<'nested>) -> G,
+        for<'inner> F: AsyncFnOnce(AsyncGcFrame<'inner>) -> T,
     {
         self.0.async_scope(func).await
-    }
-
-    /// Create a temporary scope by calling [`AsyncGcFrame::relaxed_async_scope`].
-    #[inline]
-    pub async unsafe fn relaxed_async_scope<'nested, T, F, G>(self, func: F) -> JlrsResult<T>
-    where
-        'borrow: 'nested,
-        T: 'nested,
-        G: Future<Output = JlrsResult<T>>,
-        F: FnOnce(AsyncGcFrame<'nested>) -> G,
-    {
-        self.0.relaxed_async_scope(func).await
     }
 }
 

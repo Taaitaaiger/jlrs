@@ -36,7 +36,7 @@ struct MyTask;
 impl AsyncTask for MyTask {
     type Output = ();
 
-    async fn run<'base>(&mut self, _frame: AsyncGcFrame<'base>) -> Self::Output {}
+    async fn run<'base>(self, _frame: AsyncGcFrame<'base>) -> Self::Output {}
 }
 
 #[inline(never)]

@@ -6,7 +6,7 @@
 //!
 //! When a reusable slot is taken by mutable reference it can be reused, the lifetime that is
 //! considered the `'target` lifetime is the lifetime of the reusable slot. Because this means
-//! that the data can become while it is in use, a `Ref` is returned as if an unrooting target
+//! that the data can become while it is in use, a `Weak` is returned as if an unrooting target
 //! has been used.
 //!
 //! Examples:
@@ -49,7 +49,7 @@
 use std::{cell::Cell, ffi::c_void, ptr::NonNull};
 
 use crate::{
-    data::managed::{Managed, Ref},
+    data::managed::{Managed, Weak},
     memory::context::stack::Stack,
     private::Private,
 };
@@ -80,9 +80,9 @@ impl<'scope> ReusableSlot<'scope> {
     pub(crate) unsafe fn temporary<'data, T: Managed<'scope, 'data>>(
         &mut self,
         ptr: NonNull<T::Wraps>,
-    ) -> Ref<'scope, 'data, T> {
+    ) -> Weak<'scope, 'data, T> {
         self.stack.set_root(self.offset, ptr.cast());
-        Ref::<T>::wrap(ptr)
+        Weak::<T>::wrap(ptr)
     }
 }
 
@@ -115,8 +115,8 @@ impl<'target> LocalReusableSlot<'target> {
     pub(crate) unsafe fn temporary<'t, 'data, T: Managed<'target, 'data>>(
         &'t mut self,
         ptr: NonNull<T::Wraps>,
-    ) -> Ref<'target, 'data, T> {
+    ) -> Weak<'target, 'data, T> {
         self.slot.set(ptr.as_ptr().cast());
-        Ref::<T>::wrap(ptr)
+        Weak::<T>::wrap(ptr)
     }
 }

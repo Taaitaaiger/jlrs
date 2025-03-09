@@ -4,7 +4,7 @@ use std::{marker::PhantomData, ptr::NonNull};
 
 use jl_sys::{jl_new_typevar, jl_tvar_t, jl_tvar_type, jlrs_tvar_lb, jlrs_tvar_name, jlrs_tvar_ub};
 
-use super::{value::ValueData, Ref};
+use super::{value::ValueData, Weak};
 use crate::{
     catch::{catch_exceptions, unwrap_exc},
     convert::to_symbol::ToSymbol,
@@ -12,7 +12,7 @@ use crate::{
         datatype::DataType,
         private::ManagedPriv,
         symbol::Symbol,
-        value::{Value, ValueRef},
+        value::{Value, WeakValue},
         Managed,
     },
     impl_julia_typecheck,
@@ -134,7 +134,7 @@ impl<'scope> TypeVar<'scope> {
         unsafe {
             let lb = jlrs_tvar_lb(self.unwrap(Private));
             debug_assert!(!lb.is_null());
-            ValueRef::wrap(NonNull::new_unchecked(lb)).root(target)
+            WeakValue::wrap(NonNull::new_unchecked(lb)).root(target)
         }
     }
 
@@ -148,7 +148,7 @@ impl<'scope> TypeVar<'scope> {
         unsafe {
             let ub = jlrs_tvar_ub(self.unwrap(Private));
             debug_assert!(!ub.is_null());
-            ValueRef::wrap(NonNull::new_unchecked(ub)).root(target)
+            WeakValue::wrap(NonNull::new_unchecked(ub)).root(target)
         }
     }
 }
@@ -176,21 +176,21 @@ impl<'scope> ManagedPriv<'scope, '_> for TypeVar<'scope> {
 
 impl_construct_type_managed!(TypeVar, 1, jl_tvar_type);
 
-/// A reference to a [`TypeVar`] that has not been explicitly rooted.
-pub type TypeVarRef<'scope> = Ref<'scope, 'static, TypeVar<'scope>>;
+/// A [`TypeVar`] that has not been explicitly rooted.
+pub type WeakTypeVar<'scope> = Weak<'scope, 'static, TypeVar<'scope>>;
 
-/// A [`TypeVarRef`] with static lifetimes. This is a useful shorthand for signatures of
+/// A [`WeakTypeVar`] with static lifetimes. This is a useful shorthand for signatures of
 /// `ccall`able functions that return a [`TypeVar`].
-pub type TypeVarRet = Ref<'static, 'static, TypeVar<'static>>;
+pub type TypeVarRet = WeakTypeVar<'static>;
 
-impl_valid_layout!(TypeVarRef, TypeVar, jl_tvar_type);
+impl_valid_layout!(WeakTypeVar, TypeVar, jl_tvar_type);
 
 use crate::memory::target::TargetType;
 
-/// `TypeVar` or `TypeVarRef`, depending on the target type `Tgt`.
+/// `TypeVar` or `WeakTypeVar`, depending on the target type `Tgt`.
 pub type TypeVarData<'target, Tgt> = <Tgt as TargetType<'target>>::Data<'static, TypeVar<'target>>;
 
-/// `JuliaResult<TypeVar>` or `JuliaResultRef<TypeVarRef>`, depending on the target type `Tgt`.
+/// `JuliaResult<TypeVar>` or `WeakJuliaResult<WeakTypeVar>`, depending on the target type `Tgt`.
 pub type TypeVarResult<'target, Tgt> = TargetResult<'target, 'static, TypeVar<'target>, Tgt>;
 
 impl_ccall_arg_managed!(TypeVar, 1);

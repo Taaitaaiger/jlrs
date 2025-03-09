@@ -298,8 +298,11 @@ mod tests {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
-            jlrs.instance(&mut frame)
-                .returning::<JlrsResult<_>>()
+            let mut jlrs = jlrs.instance(&mut frame);
+
+            jlrs.error_color(true);
+
+            jlrs.returning::<JlrsResult<_>>()
                 .scope(|mut frame| unsafe {
                     let main = Module::main(&frame);
                     let value = Value::new(&mut frame, 2usize);
@@ -320,8 +323,6 @@ mod tests {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
             let mut jlrs = jlrs.instance(&mut frame);
-            jlrs.error_color(true).unwrap();
-            jlrs.error_color(false).unwrap();
             let err = jlrs.returning::<JlrsResult<_>>().scope(|mut frame| {
                 let main = Module::main(&frame);
                 let value1 = Value::new(&mut frame, 3usize);

@@ -41,7 +41,7 @@ mod tests {
                         let is_bool = value
                             .field_accessor()
                             .field("a")?
-                            .access::<DataTypeRef>()?
+                            .access::<WeakDataType>()?
                             .as_managed()
                             .is::<Bool>();
 
@@ -74,7 +74,7 @@ mod tests {
                         let is_bool = value
                             .field_accessor()
                             .field("a")?
-                            .access::<DataTypeRef>()?
+                            .access::<WeakDataType>()?
                             .as_managed()
                             .is::<Bool>();
 
@@ -114,7 +114,7 @@ mod tests {
                         let is_i16 = value
                             .field_accessor()
                             .field("a")?
-                            .access::<DataTypeRef>()?
+                            .access::<WeakDataType>()?
                             .as_managed()
                             .is::<i16>();
 
@@ -156,7 +156,7 @@ mod tests {
                         let is_i64 = value
                             .field_accessor()
                             .field("a")?
-                            .access::<DataTypeRef>()?
+                            .access::<WeakDataType>()?
                             .as_managed()
                             .is::<i64>();
 

@@ -1,4 +1,4 @@
-//! Build a runtime.
+//! Runtime configuration.
 //!
 //! Before Julia can be used it must be initialized. The builders provided by this module must be
 //! used to initialize Julia and set custom parameters. The [`Builder`] only lets you
@@ -153,7 +153,24 @@ impl Builder {
     /// Enable or disable automatically installing JlrsCore.
     ///
     /// jlrs requires that the JlrsCore package is installed. By default, this package is
-    /// installed automatically if it is unavailable
+    /// installed automatically if it is unavailable. The configured behavior can be overridden
+    /// with the following environment variables:
+    ///
+    /// - `JLRS_CORE_VERSION=major.minor.patch`
+    /// Installs the set version of JlrsCore before loading it.
+    ///
+    /// - `JLRS_CORE_REVISION=rev`
+    /// Installs the set revision of JlrsCore before loading it.
+    ///
+    /// - `JLRS_CORE_REPO=repo-url`
+    /// Can be used with `JLRS_CORE_REVISION` to set the repository JlrsCore will be downloaded
+    /// from.
+    ///
+    /// - `JLRS_CORE_NO_INSTALL=...`
+    /// Don't install JlrsCore, its value is ignored.
+    ///
+    /// `JLRS_CORE_NO_INSTALL` takes priority over `JLRS_CORE_REVISION`, which takes priority over
+    ///  `JLRS_CORE_VERSION`.
     #[inline]
     pub fn install_jlrs(mut self, install: InstallJlrsCore) -> Self {
         self.install_jlrs_core = install;
@@ -254,7 +271,7 @@ mod mt_impl {
 unsafe fn init_runtime(options: &Builder) {
     set_n_threads(options);
     init_julia(options);
-    init_jlrs(&options.install_jlrs_core);
+    init_jlrs(&options.install_jlrs_core, true);
 }
 
 unsafe fn init_julia(options: &Builder) {

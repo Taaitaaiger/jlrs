@@ -8,21 +8,21 @@
 //! guarantees the returned data is rooted while it can can be used, a non-rooting target doesn't
 //! root the returned data at all. jlrs distinguishes between data that has been explicitly rooted
 //! or not at the type level: rooted data is represented by types that implement the [`Managed`]
-//! trait, while non-rooted data is represented as a [`Ref`].
+//! trait, while non-rooted data is represented as a [`Weak`].
 //!
 //! All targets define whether they are rooting or non-rooting targets by implementing
 //! [`TargetType`]. This trait has a generic associated type: [`TargetType::Data`]. This type
-//! is a [`Managed`] type if the target is a rooting target, and a [`Ref`] if it's non-rooting.
+//! is a [`Managed`] type if the target is a rooting target, and a [`Weak`] if it's non-rooting.
 //! There are also the [`TargetResult`] and [`TargetException`] type aliases, which are `Result`s
 //! that contain [`TargetType::Data`] in at least on of their variants.
 //!
 //! `Target::Data` is returned by functions that don't catch any exceptions. An example of such a
 //! function is [`Value::new`], if you call that function with a rooting target it returns a
-//! [`Value`], otherwise it returns a [`ValueRef`].
+//! [`Value`], otherwise it returns a [`WeakValue`].
 //!
 //! `TargetResult` is used when exceptions are caught. An example is calling Julia functions
 //! with the methods of the [`Call`] trait. These methods return a `Result`, the `Ok` variant
-//! contains the same type as `Target::Data`, the `Err` variant is a `Value` or `ValueRef`
+//! contains the same type as `Target::Data`, the `Err` variant is a `Value` or `WeakValue`
 //! depending on the target.
 //!
 //! `TargetException` is used when exceptions are caught but the function doesn't need to return
@@ -57,7 +57,7 @@
 //! they act differently. When a mutable reference to an output is used as a target, it returns
 //! rooted data that inherits the lifetime of the reference. A reusable slot though returns data
 //! that inherits the lifetime of the slot, to account for the fact that this data can become
-//! unrooted while it is usable the data is returned as a `Ref` as if this target were an
+//! unrooted while it is usable the data is returned as a `Weak` as if this target were an
 //! unrooting target instead.
 //!
 //! A `LocalGcFrame` lets you create [`LocalOutput`]s and [`LocalReusableSlot`]s which behave
@@ -90,13 +90,13 @@
 //! | `Unrooted<'scope>`                  | No        | No    | No    |
 //! | `&Target<'scope>`                   | No        | No    | No    |
 //!
-//! [`Ref`]: crate::data::managed::Ref
+//! [`Weak`]: crate::data::managed::Weak
 //! [`Managed`]: crate::data::managed::Managed
 //! [`memory`]: crate::memory
 //! [`Call`]: crate::call::Call
 //! [`Value`]: crate::data::managed::value::Value
 //! [`Value::new`]: crate::data::managed::value::Value::new
-//! [`ValueRef`]: crate::data::managed::value::ValueRef
+//! [`WeakValue`]: crate::data::managed::value::WeakValue
 //! [`ValueData`]: crate::data::managed::value::ValueData
 //! [`ValueResult`]: crate::data::managed::value::ValueResult
 
@@ -115,7 +115,7 @@ use super::scope::LocalScope;
 #[cfg(feature = "multi-rt")]
 use crate::runtime::handle::mt_handle::ActiveHandle;
 use crate::{
-    data::managed::Ref,
+    data::managed::Weak,
     prelude::{Managed, ValueData},
     runtime::handle::{weak_handle::WeakHandle, with_stack::StackHandle},
 };
@@ -257,7 +257,9 @@ impl<'target> Target<'target> for Unrooted<'target> {}
 
 #[cfg(feature = "multi-rt")]
 impl<'target> Target<'target> for ActiveHandle<'target> {}
+
 impl<'target> Target<'target> for Pin<&'target mut WeakHandle> {}
+
 impl<'target> Target<'target> for StackHandle<'target> {}
 
 impl<'target> Target<'target> for Output<'target> {}
@@ -283,7 +285,7 @@ pub trait TargetType<'target>: Sized {
     /// Type returned by functions that don't catch Julia exceptions.
     ///
     /// For rooting targets, this type is `T`.
-    /// For non-rooting targets, this type is [`Ref<'target, 'data, T>`].
+    /// For non-rooting targets, this type is [`Weak<'target, 'data, T>`].
     type Data<'data, T: Managed<'target, 'data>>;
 }
 
@@ -396,32 +398,32 @@ impl<'target> TargetType<'target> for LocalReusableSlot<'target> {
 impl<'target> RootingTarget<'target> for LocalReusableSlot<'target> {}
 
 impl<'target> TargetType<'target> for &mut ReusableSlot<'target> {
-    type Data<'data, T: Managed<'target, 'data>> = Ref<'target, 'data, T>;
+    type Data<'data, T: Managed<'target, 'data>> = Weak<'target, 'data, T>;
 }
 
 impl<'target> TargetType<'target> for &mut LocalReusableSlot<'target> {
-    type Data<'data, T: Managed<'target, 'data>> = Ref<'target, 'data, T>;
+    type Data<'data, T: Managed<'target, 'data>> = Weak<'target, 'data, T>;
 }
 
 impl<'target> TargetType<'target> for Unrooted<'target> {
-    type Data<'data, T: Managed<'target, 'data>> = Ref<'target, 'data, T>;
+    type Data<'data, T: Managed<'target, 'data>> = Weak<'target, 'data, T>;
 }
 
 #[cfg(feature = "multi-rt")]
 impl<'target> TargetType<'target> for ActiveHandle<'target> {
-    type Data<'data, T: Managed<'target, 'data>> = Ref<'target, 'data, T>;
+    type Data<'data, T: Managed<'target, 'data>> = Weak<'target, 'data, T>;
 }
 
 impl<'target> TargetType<'target> for Pin<&'target mut WeakHandle> {
-    type Data<'data, T: Managed<'target, 'data>> = Ref<'target, 'data, T>;
+    type Data<'data, T: Managed<'target, 'data>> = Weak<'target, 'data, T>;
 }
 
 impl<'target> TargetType<'target> for StackHandle<'target> {
-    type Data<'data, T: Managed<'target, 'data>> = Ref<'target, 'data, T>;
+    type Data<'data, T: Managed<'target, 'data>> = Weak<'target, 'data, T>;
 }
 
 impl<'target, U: TargetType<'target>> TargetType<'target> for &U {
-    type Data<'data, T: Managed<'target, 'data>> = Ref<'target, 'data, T>;
+    type Data<'data, T: Managed<'target, 'data>> = Weak<'target, 'data, T>;
 }
 
 pub(crate) mod private {
@@ -443,8 +445,8 @@ pub(crate) mod private {
     use crate::{
         data::managed::{
             private::ManagedPriv,
-            value::{Value, ValueRef},
-            Managed, Ref,
+            value::{Value, WeakValue},
+            Managed, Weak,
         },
         private::Private,
         runtime::handle::{weak_handle::WeakHandle, with_stack::StackHandle},
@@ -469,7 +471,7 @@ pub(crate) mod private {
         #[inline]
         unsafe fn result_from_unrooted<'data, T: Managed<'target, 'data>>(
             self,
-            result: Result<Ref<'target, 'data, T>, ValueRef<'target, 'data>>,
+            result: Result<Weak<'target, 'data, T>, WeakValue<'target, 'data>>,
             _: Private,
         ) -> TargetResult<'target, 'data, T, Self> {
             let result = match result {
@@ -1121,7 +1123,7 @@ pub(crate) mod private {
             value: NonNull<T::Wraps>,
             _: Private,
         ) -> Self::Data<'data, T> {
-            Ref::wrap(value)
+            Weak::wrap(value)
         }
 
         // Safety: the pointer must point to valid data.
@@ -1132,8 +1134,8 @@ pub(crate) mod private {
             _: Private,
         ) -> TargetResult<'target, 'data, T, Self> {
             match result {
-                Ok(t) => Ok(Ref::wrap(t)),
-                Err(e) => Err(Ref::wrap(e)),
+                Ok(t) => Ok(Weak::wrap(t)),
+                Err(e) => Err(Weak::wrap(e)),
             }
         }
 
@@ -1146,7 +1148,7 @@ pub(crate) mod private {
         ) -> TargetException<'target, 'data, T, Self> {
             match result {
                 Ok(t) => Ok(t),
-                Err(e) => Err(Ref::wrap(e)),
+                Err(e) => Err(Weak::wrap(e)),
             }
         }
     }
@@ -1160,7 +1162,7 @@ pub(crate) mod private {
             value: NonNull<T::Wraps>,
             _: Private,
         ) -> Self::Data<'data, T> {
-            Ref::wrap(value)
+            Weak::wrap(value)
         }
 
         // Safety: the pointer must point to valid data.
@@ -1171,8 +1173,8 @@ pub(crate) mod private {
             _: Private,
         ) -> TargetResult<'target, 'data, T, Self> {
             match result {
-                Ok(t) => Ok(Ref::wrap(t)),
-                Err(e) => Err(Ref::wrap(e)),
+                Ok(t) => Ok(Weak::wrap(t)),
+                Err(e) => Err(Weak::wrap(e)),
             }
         }
 
@@ -1185,7 +1187,7 @@ pub(crate) mod private {
         ) -> TargetException<'target, 'data, T, Self> {
             match result {
                 Ok(t) => Ok(t),
-                Err(e) => Err(Ref::wrap(e)),
+                Err(e) => Err(Weak::wrap(e)),
             }
         }
     }
@@ -1198,7 +1200,7 @@ pub(crate) mod private {
             value: NonNull<T::Wraps>,
             _: Private,
         ) -> Self::Data<'data, T> {
-            Ref::wrap(value)
+            Weak::wrap(value)
         }
 
         // Safety: the pointer must point to valid data.
@@ -1209,8 +1211,8 @@ pub(crate) mod private {
             _: Private,
         ) -> TargetResult<'target, 'data, T, Self> {
             match result {
-                Ok(t) => Ok(Ref::wrap(t)),
-                Err(e) => Err(Ref::wrap(e)),
+                Ok(t) => Ok(Weak::wrap(t)),
+                Err(e) => Err(Weak::wrap(e)),
             }
         }
 
@@ -1223,7 +1225,7 @@ pub(crate) mod private {
         ) -> TargetException<'target, 'data, T, Self> {
             match result {
                 Ok(t) => Ok(t),
-                Err(e) => Err(Ref::wrap(e)),
+                Err(e) => Err(Weak::wrap(e)),
             }
         }
     }
@@ -1236,7 +1238,7 @@ pub(crate) mod private {
             value: NonNull<T::Wraps>,
             _: Private,
         ) -> Self::Data<'data, T> {
-            Ref::wrap(value)
+            Weak::wrap(value)
         }
 
         // Safety: the pointer must point to valid data.
@@ -1247,8 +1249,8 @@ pub(crate) mod private {
             _: Private,
         ) -> TargetResult<'target, 'data, T, Self> {
             match result {
-                Ok(t) => Ok(Ref::wrap(t)),
-                Err(e) => Err(Ref::wrap(e)),
+                Ok(t) => Ok(Weak::wrap(t)),
+                Err(e) => Err(Weak::wrap(e)),
             }
         }
 
@@ -1261,7 +1263,7 @@ pub(crate) mod private {
         ) -> TargetException<'target, 'data, T, Self> {
             match result {
                 Ok(t) => Ok(t),
-                Err(e) => Err(Ref::wrap(e)),
+                Err(e) => Err(Weak::wrap(e)),
             }
         }
     }
@@ -1274,7 +1276,7 @@ pub(crate) mod private {
             value: NonNull<T::Wraps>,
             _: Private,
         ) -> Self::Data<'data, T> {
-            Ref::wrap(value)
+            Weak::wrap(value)
         }
 
         // Safety: the pointer must point to valid data.
@@ -1285,8 +1287,8 @@ pub(crate) mod private {
             _: Private,
         ) -> TargetResult<'target, 'data, T, Self> {
             match result {
-                Ok(t) => Ok(Ref::wrap(t)),
-                Err(e) => Err(Ref::wrap(e)),
+                Ok(t) => Ok(Weak::wrap(t)),
+                Err(e) => Err(Weak::wrap(e)),
             }
         }
 
@@ -1299,7 +1301,7 @@ pub(crate) mod private {
         ) -> TargetException<'target, 'data, T, Self> {
             match result {
                 Ok(t) => Ok(t),
-                Err(e) => Err(Ref::wrap(e)),
+                Err(e) => Err(Weak::wrap(e)),
             }
         }
     }

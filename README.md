@@ -9,7 +9,7 @@ applications and to write interop libraries to Rust crates that can be used by J
 Julia versions 1.10 and 1.11 are currently supported. In general jlrs aims to support all versions
 starting at the current LTS version, but only the LTS and stable versions are actively tested.
 Using the current stable version of Julia is highly recommended. The minimum supported Rust
-version is currently 1.77.
+version is currently 1.79.
 
 This readme only contains information about what features are supported by jlrs, what
 prerequisites must be met, and how to meet them. A complete tutorial is available
@@ -40,9 +40,10 @@ An incomplete list of features that are currently supported by jlrs:
 
 ## Prerequisites
 
-Julia must be installed before jlrs can be used, jlrs is compatible with Julia 1.10 and 1.11. If
-the JlrsCore package has not been installed, it will automatically be installed when jlrs is
-initialized by default. jlrs has not been tested with juliaup yet on Linux and macOS.
+To use jlrs, supported versions of Rust and Julia must have been installed. Currently, Julia 1.10
+and 1.11 are supported, the minimum supported Rust version is 1.79. Some features may require a
+more recent version of Rust. jlrs uses the JlrsCore package for Julia, if this package has not been
+installed, the latest version will be installed automatically by default.
 
 ### Linux
 
@@ -71,16 +72,15 @@ Follow the instructions for Linux, but replace `LD_LIBRARY_PATH` with `DYLD_LIBR
 
 Julia can be installed using juliaup, or with the installer or portable installation
 downloaded from the official website. In the first case, Julia has been likely installed in
-`%USERPROFILE%\.julia\juliaup\julia-x.y.z+0~x64`, while using the installer or extracting
-allows you to pick the destination. After installation or extraction a folder called
-`Julia-x.y.z` exists, which contains several folders including a `bin` folder containing
-`julia.exe`. The path to the `bin` folder must be added to the `Path` environment variable.
+`%USERPROFILE%\.julia\juliaup\julia-x.y.z+0~x64`, using the installer or extracting allows you to
+pick the destination. After installation or extraction a folder called `Julia-x.y.z` exists, which
+contains several folders including a `bin` folder containing `julia.exe`. The path to the `bin`
+folder must be added to the `Path` environment variable.
 
 Julia is automatically detected by executing the command `where julia`. If this returns
 multiple locations the first one is used. The default can be overridden by setting the
 `JULIA_DIR` environment variable. This doesn't work correctly with juliaup, in this case
 the environment variable must be set.
-
 
 ## Features
 
@@ -91,10 +91,10 @@ features generally belong to one of three categories: versions, runtimes and uti
 
 The Julia C API is unstable and there are minor incompatibilities between different versions of
 Julia. To ensure the correct bindings are used for a particular version of Julia you must enable a
-version feature. The following version features currently exist:
+version feature. The following version features are currently supported:
 
- - `julia-1-10`
- - `julia-1-11`
+- `julia-1-10`
+- `julia-1-11`
 
 Exactly one version feature must be enabled. Otherwise, jlrs will fail to compile.
 
@@ -118,11 +118,12 @@ A runtime lets initialize Julia from Rust application, the following features en
 - `async-rt`
 
   Enables the async runtime. The async runtime runs on a separate thread and can be used from
-  multiple threads.
+  multiple threads. This feature requires using at least Rust 1.85.
 
 - `tokio-rt`
 
-  The async runtime requires an executor. This feature provides a tokio-based executor.
+  The async runtime requires an executor. This feature provides a tokio-based executor. This
+  feature requires using at least Rust 1.85.
 
 - `multi-rt`
 
@@ -132,8 +133,8 @@ A runtime lets initialize Julia from Rust application, the following features en
 **WARNING**: Runtime features must only be enabled by applications that embed Julia. Libraries
 must never enable a runtime feature.
 
-**WARNING**: When a runtime feature is enabled on Linux, set `RUSTFLAGS="-Clink-args=-rdynamic"`
-if you want fast code.
+**WARNING**: When building an application that embeds Julia, set
+`RUSTFLAGS="-Clink-args=-rdynamic"` if you want fast code.
 
 ### Utilities
 
@@ -143,12 +144,7 @@ All other features are called utility features. The following are available:
 
   Enable the features of the async runtime which don't depend on the executor. This
   can be used in libraries which provide implementations of tasks that the async runtime can
-  handle.
-
-- `async-closure`
-
-  Enable support for using async closures in combination with the async runtime. This feature
-  requires using at least Rust 1.85.
+  handle. This feature requires using at least Rust 1.85.
 
 - `jlrs-derive`
 
@@ -194,11 +190,6 @@ All other features are called utility features. The following are available:
   The last one is particularly important for embedders, forgetting it is guaranteed to kill
   performance.
 
-- `diagnostics`
-
-  Enable custom diagnostics for several traits because the default lint is unhelpful. This feature
-  requires Rust 1.78.
-
 - `i686`
 
   Link with a 32-bit build of Julia on Linux, only used for cross-compilation.
@@ -222,3 +213,27 @@ All other features are called utility features. The following are available:
 You can enable all features except `debug`, `i686`, `windows`, `no-link` and `yggdrasil` by
 enabling the `full` feature. If you don't want to enable any runtimes either, you can use
 `full-no-rt`.
+
+## Environment variables
+
+It's possible to override certain defaults of jlrs and Julia by setting environment variables.
+Many of the environment variables mentioned
+[here](https://docs.julialang.org/en/v1/manual/environment-variables/) should apply to applications
+that use jlrs as well, but this is mostly untested.
+
+Several additional environment variables can be set which only affect applications that use jlrs.
+
+- `JLRS_CORE_VERSION=major.minor.patch`
+Installs the set version of JlrsCore before loading it.
+
+- `JLRS_CORE_REVISION=rev`
+Installs the set revision of JlrsCore before loading it.
+
+- `JLRS_CORE_REPO=repo-url`
+Can be used with `JLRS_CORE_REVISION` to set the repository JlrsCore will be downloaded from.
+
+- `JLRS_CORE_NO_INSTALL=...`
+Don't install JlrsCore, its value is ignored.
+
+`JLRS_CORE_NO_INSTALL` takes priority over `JLRS_CORE_REVISION`, which takes priority over
+`JLRS_CORE_VERSION`.

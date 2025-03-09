@@ -211,14 +211,11 @@ macro_rules! bytes {
 ///
 /// `ConstructType::construct_type` must either return a valid type object, or an instance of an
 /// isbits type which is immediately used as a type parameter of another constructed type.
-#[cfg_attr(
-    feature = "diagnostics",
-    diagnostic::on_unimplemented(
-        message = "the trait bound `{Self}: ConstructType` is not satisfied",
-        label = "the trait `ConstructType` is not implemented for `{Self}`",
-        note = "Custom types that implement `ConstructType` should be generated with JlrsCore.reflect",
-        note = "Do not implement `ForeignType`, `OpaqueType`, or `ParametricVariant` unless this type is exported to Julia with `julia_module!`"
-    )
+#[diagnostic::on_unimplemented(
+    message = "the trait bound `{Self}: ConstructType` is not satisfied",
+    label = "the trait `ConstructType` is not implemented for `{Self}`",
+    note = "Custom types that implement `ConstructType` should be generated with JlrsCore.reflect",
+    note = "Do not implement `ForeignType`, `OpaqueType`, or `ParametricVariant` unless this type is exported to Julia with `julia_module!`"
 )]
 
 pub unsafe trait ConstructType: Sized {
@@ -611,7 +608,7 @@ impl<'scope> TypeVarEnv<'scope> {
             .filter_map(|idx| svec.get(unrooted, idx))
             .map(|elem| unsafe { elem.as_value().cast_unchecked::<TypeVar>() })
             .find(|elem| elem.name() == sym)
-            .map(|elem| unsafe { elem.as_ref().leak().as_managed() })
+            .map(|elem| unsafe { elem.as_weak().leak().as_managed() })
     }
 
     /// Returns `true` if the environment is empty.
@@ -1172,6 +1169,17 @@ unsafe impl<T: ConstructType, N: ConstructType> ConstructType for ArrayTypeConst
 }
 
 pub type RankedArrayType<T, const N: isize> = ArrayTypeConstructor<T, ConstantIsize<N>>;
+
+/// Converts two or more types into a nested `BitsUnionConstructor` type.
+#[macro_export]
+macro_rules! UnionOf {
+    [$l:ty, $r:ty] => {
+        $crate::data::types::construct_type::UnionTypeConstructor<$l, $r>
+    };
+    [$l:ty, $($rest:ty),+] => {
+        $crate::UnionOf![$l, $crate::UnionOf![$($rest),+]]
+    };
+}
 
 /// Construct a new `Union` type from the provided type parameters. Larger unions can be built
 /// by nesting `UnionTypeConstructor`.

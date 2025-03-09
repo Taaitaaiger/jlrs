@@ -381,7 +381,7 @@ mod tests {
                             .field("mutabl")?
                             .field("immutable_unions")?
                             .field("normal_union")?
-                            .access::<ModuleRef>()?;
+                            .access::<WeakModule>()?;
 
                         assert_eq!(field.as_managed(), Module::main(&frame));
                     }
@@ -451,7 +451,7 @@ mod tests {
                                 .field("mutabl")?
                                 .field("atomics")?
                                 .field("ptr")?
-                                .access::<ModuleRef>()?;
+                                .access::<WeakModule>()?;
 
                             assert_eq!(field.as_managed(), Module::main(&frame));
                         }
@@ -463,7 +463,7 @@ mod tests {
                                 .field("atomics")?
                                 .field("wrapped_ptr")?
                                 .field((0,))?
-                                .access::<ModuleRef>()?;
+                                .access::<WeakModule>()?;
 
                             assert_eq!(field.as_managed(), Module::base(&frame));
                         }
@@ -507,7 +507,7 @@ mod tests {
                             .field("immutabl")?
                             .field("mutable_unions")?
                             .field("normal_union")?
-                            .access::<ModuleRef>()?;
+                            .access::<WeakModule>()?;
 
                         assert_eq!(field.as_managed(), Module::main(&frame));
                     }
@@ -599,7 +599,7 @@ mod tests {
                                 .field("immutabl")?
                                 .field("atomics")?
                                 .field("ptr")?
-                                .access::<ModuleRef>()?;
+                                .access::<WeakModule>()?;
 
                             assert_eq!(field.as_managed(), Module::main(&frame));
                         }
@@ -611,7 +611,7 @@ mod tests {
                                 .field("atomics")?
                                 .field("wrapped_ptr")?
                                 .field((0,))?
-                                .access::<ModuleRef>()?;
+                                .access::<WeakModule>()?;
 
                             assert_eq!(field.as_managed(), Module::base(&frame));
                         }
@@ -730,7 +730,7 @@ mod tests {
                             .field("arrays")?
                             .field("wrappervec")?
                             .field(1)?
-                            .access::<ModuleRef>()?;
+                            .access::<WeakModule>()?;
 
                         assert_eq!(field.as_managed(), Module::base(&frame));
                     }
@@ -819,7 +819,7 @@ mod tests {
                         let field = value
                             .field_accessor()
                             .field("nonexistent")?
-                            .access::<ValueRef>();
+                            .access::<WeakValue>();
 
                         assert!(field.is_err());
                     }

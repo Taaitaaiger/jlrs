@@ -82,7 +82,7 @@ mod tests {
                     let v = JuliaString::new(&mut frame, "Foo bar");
                     assert!(v.as_value().is::<JuliaString>());
                     let string = v.as_value().cast::<JuliaString>()?;
-                    assert!(StringRef::valid_layout(v.as_value().datatype().as_value()));
+                    assert!(WeakString::valid_layout(v.as_value().datatype().as_value()));
                     assert_eq!(string.len(), 7);
                     assert_eq!(string.as_c_str().to_str().unwrap(), "Foo bar");
                     assert_eq!(string.as_str().unwrap(), "Foo bar");
@@ -105,7 +105,7 @@ mod tests {
                 .scope(|mut frame| {
                     let string = JuliaString::new_bytes(&mut frame, &[129, 2, 0, 0]);
                     assert!(string.as_value().is::<JuliaString>());
-                    assert!(StringRef::valid_layout(
+                    assert!(WeakString::valid_layout(
                         string.as_value().datatype().as_value()
                     ));
                     assert_eq!(string.len(), 4);

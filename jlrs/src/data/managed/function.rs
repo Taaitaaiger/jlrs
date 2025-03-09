@@ -10,7 +10,7 @@ use std::{marker::PhantomData, ptr::NonNull};
 
 use jl_sys::jl_value_t;
 
-use super::{value::ValueResult, Ref};
+use super::{value::ValueResult, Weak};
 use crate::{
     args::Values,
     call::{Call, ProvideKeywords, WithKeywords},
@@ -44,11 +44,11 @@ impl<'scope, 'data> Function<'scope, 'data> {
 }
 
 // Safety: The trait is implemented correctly by using the implementation
-// of ValidLayout for FunctionRef
+// of ValidLayout for WeakFunction
 unsafe impl Typecheck for Function<'_, '_> {
     #[inline]
     fn typecheck(ty: DataType) -> bool {
-        <FunctionRef as ValidLayout>::valid_layout(ty.as_value())
+        <WeakFunction as ValidLayout>::valid_layout(ty.as_value())
     }
 }
 
@@ -161,15 +161,15 @@ impl<'value, 'data> ProvideKeywords<'value, 'data> for Function<'value, 'data> {
     }
 }
 
-/// A reference to an [`Function`] that has not been explicitly rooted.
-pub type FunctionRef<'scope, 'data> = Ref<'scope, 'data, Function<'scope, 'data>>;
+/// An [`Function`] that has not been explicitly rooted.
+pub type WeakFunction<'scope, 'data> = Weak<'scope, 'data, Function<'scope, 'data>>;
 
-/// A [`FunctionRef`] with static lifetimes. This is a useful shorthand for signatures of
+/// A [`WeakFunction`] with static lifetimes. This is a useful shorthand for signatures of
 /// `ccall`able functions that return a [`Function`].
-pub type FunctionRet = Ref<'static, 'static, Function<'static, 'static>>;
+pub type FunctionRet = WeakFunction<'static, 'static>;
 
-// Safety: FunctionRef is valid for ty if ty is a subtype of Function
-unsafe impl ValidLayout for FunctionRef<'_, '_> {
+// Safety: WeakFunction is valid for ty if ty is a subtype of Function
+unsafe impl ValidLayout for WeakFunction<'_, '_> {
     #[inline]
     fn valid_layout(ty: Value) -> bool {
         let global = unsafe { Unrooted::new() };
@@ -185,7 +185,7 @@ unsafe impl ValidLayout for FunctionRef<'_, '_> {
     const IS_REF: bool = true;
 }
 
-unsafe impl ValidField for Option<FunctionRef<'_, '_>> {
+unsafe impl ValidField for Option<WeakFunction<'_, '_>> {
     #[inline]
     fn valid_field(ty: Value) -> bool {
         let global = unsafe { Unrooted::new() };
@@ -196,11 +196,11 @@ unsafe impl ValidField for Option<FunctionRef<'_, '_>> {
 
 use crate::memory::target::TargetType;
 
-/// `Function` or `FunctionRef`, depending on the target type `Tgt`.
+/// `Function` or `WeakFunction`, depending on the target type `Tgt`.
 pub type FunctionData<'target, 'data, Tgt> =
     <Tgt as TargetType<'target>>::Data<'data, Function<'target, 'data>>;
 
-/// `JuliaResult<Function>` or `JuliaResultRef<FunctionRef>`, depending on the target type `Tgt`.
+/// `JuliaResult<Function>` or `WeakJuliaResult<WeakFunction>`, depending on the target type `Tgt`.
 pub type FunctionResult<'target, 'data, Tgt> =
     TargetResult<'target, 'data, Function<'target, 'data>, Tgt>;
 

@@ -44,14 +44,14 @@ use crate::{
             },
             private::ManagedPriv,
             union::{find_union_component, nth_union_component},
-            Ref,
+            Weak,
         },
         types::construct_type::ConstructType,
     },
     error::{AccessError, JlrsError, TypeError, CANNOT_DISPLAY_TYPE},
     memory::target::{unrooted::Unrooted, TargetException},
     prelude::{
-        DataType, JlrsResult, Managed, Target, Value, ValueData, ValueRef, ValueResult, VectorAny,
+        DataType, JlrsResult, Managed, Target, Value, ValueData, ValueResult, VectorAny, WeakValue,
     },
     private::Private,
 };
@@ -97,7 +97,7 @@ pub trait Accessor<'scope, 'data, T, const N: isize> {
         unsafe {
             let idx = self.array().dimensions().index_of_unchecked(&index);
             let v = jlrs_arrayref(self.array().unwrap(Private), idx);
-            ValueRef::wrap(NonNull::new_unchecked(v)).root(target)
+            WeakValue::wrap(NonNull::new_unchecked(v)).root(target)
         }
     }
 }
@@ -127,7 +127,7 @@ pub trait AccessorMut<'scope, 'data, T, const N: isize>: Accessor<'scope, 'data,
 
             match catch_exceptions(callback, unwrap_exc) {
                 Ok(_) => Ok(Ok(())),
-                Err(e) => Ok(Err(ValueRef::wrap(e).root(target))),
+                Err(e) => Ok(Err(WeakValue::wrap(e).root(target))),
             }
         }
     }
@@ -861,7 +861,7 @@ impl<'scope, 'data, T, L, const N: isize> AccessorMut<'scope, 'data, T, N>
 #[repr(transparent)]
 pub struct ValueAccessor<'borrow, 'scope, 'data, T, const N: isize> {
     array: ArrayBase<'scope, 'data, T, N>,
-    _data: PhantomData<&'borrow [Option<ValueRef<'scope, 'data>>]>,
+    _data: PhantomData<&'borrow [Option<WeakValue<'scope, 'data>>]>,
 }
 
 /// An atomic reference to a `Value`.
@@ -872,13 +872,13 @@ pub struct AtomicValueRef<M> {
 }
 
 impl<'scope, 'data, M: Managed<'scope, 'data>> AtomicValueRef<M> {
-    pub fn load(&self, order: Ordering) -> Option<Ref<'scope, 'data, M>> {
+    pub fn load(&self, order: Ordering) -> Option<Weak<'scope, 'data, M>> {
         let ptr = self.ptr.load(order);
         if ptr.is_null() {
             return None;
         }
 
-        unsafe { Some(Ref::wrap(NonNull::new_unchecked(ptr.cast()))) }
+        unsafe { Some(Weak::wrap(NonNull::new_unchecked(ptr.cast()))) }
     }
 }
 
@@ -986,7 +986,7 @@ impl<'scope, 'data, T, const N: isize> Accessor<'scope, 'data, T, N>
 #[repr(transparent)]
 pub struct ValueAccessorMut<'borrow, 'scope, 'data, T, const N: isize> {
     array: ArrayBase<'scope, 'data, T, N>,
-    _data: PhantomData<&'borrow mut [Option<ValueRef<'scope, 'data>>]>,
+    _data: PhantomData<&'borrow mut [Option<WeakValue<'scope, 'data>>]>,
 }
 
 impl<'borrow, 'scope, 'data, T, const N: isize> Deref
@@ -1044,7 +1044,7 @@ impl<'scope, 'data, T, const N: isize> AccessorMut<'scope, 'data, T, N>
 #[repr(transparent)]
 pub struct ManagedAccessor<'borrow, 'scope, 'data, T, M: Managed<'scope, 'data>, const N: isize> {
     array: ArrayBase<'scope, 'data, T, N>,
-    _data: PhantomData<&'borrow [Option<Ref<'scope, 'data, M>>]>,
+    _data: PhantomData<&'borrow [Option<Weak<'scope, 'data, M>>]>,
 }
 
 impl<'borrow, 'scope, 'data, T, M, const N: isize> ManagedAccessor<'borrow, 'scope, 'data, T, M, N>
@@ -1154,7 +1154,7 @@ impl<'scope, 'data, T, M: Managed<'scope, 'data>, const N: isize> Accessor<'scop
 pub struct ManagedAccessorMut<'borrow, 'scope, 'data, T, M: Managed<'scope, 'data>, const N: isize>
 {
     array: ArrayBase<'scope, 'data, T, N>,
-    _data: PhantomData<&'borrow mut [Option<Ref<'scope, 'data, M>>]>,
+    _data: PhantomData<&'borrow mut [Option<Weak<'scope, 'data, M>>]>,
 }
 
 impl<'borrow, 'scope, 'data, T, M: Managed<'scope, 'data>, const N: isize> Deref

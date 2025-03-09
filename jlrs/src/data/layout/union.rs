@@ -19,6 +19,7 @@
 use std::{
     ffi::c_void,
     fmt::{Debug, Formatter, Result as FmtResult},
+    marker::PhantomData,
     mem::MaybeUninit,
     ptr::NonNull,
 };
@@ -31,9 +32,11 @@ use crate::{
         managed::{
             datatype::DataType, private::ManagedPriv as _, union::Union, value::Value, Managed,
         },
-        types::typecheck::Typecheck,
+        types::{construct_type::ConstructType, typecheck::Typecheck},
     },
+    prelude::LocalScope,
     private::Private,
+    weak_handle,
 };
 
 /// Ensures the next field is aligned to 1 byte.
@@ -139,20 +142,53 @@ pub struct BitsUnion<const N: usize>([MaybeUninit<u8>; N]);
 
 impl<const N: usize> Debug for BitsUnion<N> {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        if N == 1 {
-            f.write_str("BitsUnion<1 byte>")
-        } else {
-            f.write_fmt(format_args!("BitsUnion<{} bytes>", N))
-        }
+        f.write_fmt(format_args!("BitsUnion<{}>", N))
     }
 }
 
-unsafe impl<const N: usize> BitsUnionContainer for BitsUnion<N> {}
+unsafe impl<const N: usize> BitsUnionContainer for BitsUnion<N> {
+    fn check_union_type(_: Union) -> bool {
+        true
+    }
+}
+
+pub struct TypedBitsUnion<U, const N: usize>(BitsUnion<N>, PhantomData<U>);
+
+impl<T: ConstructType, const N: usize> Debug for TypedBitsUnion<T, N> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        f.write_fmt(format_args!("TypedBitsUnion<{}>", N))
+    }
+}
+
+impl<U, const N: usize> Clone for TypedBitsUnion<U, N> {
+    fn clone(&self) -> Self {
+        Self(self.0, PhantomData)
+    }
+}
+
+impl<U, const N: usize> Copy for TypedBitsUnion<U, N> {}
+
+unsafe impl<T: ConstructType, const N: usize> BitsUnionContainer for TypedBitsUnion<T, N> {
+    fn check_union_type(u: Union) -> bool {
+        match weak_handle!() {
+            Ok(handle) => {
+                handle.local_scope::<_, 1>(|mut frame| T::construct_type(&mut frame) == u)
+            }
+            Err(_e) => {
+                panic!("TypedBitsUnion::check_union_type called outside julia context")
+            }
+        }
+    }
+}
 
 #[doc(hidden)]
 pub unsafe fn correct_layout_for<A: Align, B: BitsUnionContainer, F: Flag>(u: Union) -> bool {
     let mut bu_sz = 0;
     let mut bu_align = 0;
+    if !B::check_union_type(u) {
+        return false;
+    }
+
     if !u.isbits_size_align(&mut bu_sz, &mut bu_align) {
         return false;
     }
@@ -209,7 +245,9 @@ pub unsafe trait Align: private::AlignPriv {
 
 /// Trait implemented by structs that can contain the data of a bits union. Used in combination
 /// with `Align` and `Flag` to ensure bits unions are inserted correctly.
-pub unsafe trait BitsUnionContainer: private::BitsUnionContainerPriv {}
+pub unsafe trait BitsUnionContainer: private::BitsUnionContainerPriv {
+    fn check_union_type(u: Union) -> bool;
+}
 
 /// Trait implemented by structs that can contain the flag of a bits union. Used in combination
 /// with `Align` and `BitsUnionContainer` to ensure bits unions are inserted correctly.
@@ -219,7 +257,8 @@ unsafe impl Flag for u8 {}
 mod private {
     use std::fmt::Debug;
 
-    use super::{Align1, Align16, Align2, Align4, Align8, BitsUnion};
+    use super::{Align1, Align16, Align2, Align4, Align8, BitsUnion, TypedBitsUnion};
+    use crate::data::types::construct_type::ConstructType;
 
     pub trait AlignPriv: Copy + Debug {}
     impl AlignPriv for Align1 {}
@@ -230,6 +269,7 @@ mod private {
 
     pub trait BitsUnionContainerPriv: Copy + Debug {}
     impl<const N: usize> BitsUnionContainerPriv for BitsUnion<N> {}
+    impl<T: ConstructType, const N: usize> BitsUnionContainerPriv for TypedBitsUnion<T, N> {}
 
     pub trait FlagPriv: Copy + Debug {}
     impl FlagPriv for u8 {}

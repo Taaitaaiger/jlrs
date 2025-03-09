@@ -49,9 +49,9 @@
 //! without rooting them.
 //!
 //! Methods that return Julia data without rooting it are available, rather than a pointer wrapper
-//! they return a `Ref` instead. A `Ref` can be converted to its associated wrapper type by
-//! calling either `Ref::wrapper` or `Ref::root`. It's your responsibility to ensure that the
-//! `Ref` points to valid data.
+//! they return a `Weak` instead. A `Weak` can be converted to its associated wrapper type by
+//! calling either `Weak::as_managed` or `Weak::root`. It's your responsibility to ensure that the
+//! `Weak` points to valid data.
 //!
 //! Some other examples of data that doesn't need to be rooted are singletons like `nothing`,
 //! `Bool` and `UInt8` values, concrete `DataType`s (types with no free type parameters that can

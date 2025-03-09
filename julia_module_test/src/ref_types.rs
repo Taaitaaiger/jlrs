@@ -32,7 +32,7 @@ pub fn returns_ref_bool() -> CCallRefRet<bool> {
     let v = Value::true_v(&weak_handle)
         .as_typed::<bool, _>(&weak_handle)
         .unwrap()
-        .as_ref()
+        .as_weak()
         .leak();
 
     CCallRefRet::new(v)

@@ -13,7 +13,7 @@ use jlrs::{
     },
     impl_type_parameters, impl_variant_parameters,
     memory::gc::{mark_queue_obj, write_barrier},
-    prelude::{Managed, Value, ValueRef},
+    prelude::{Managed, Value, WeakValue},
     weak_handle_unchecked,
 };
 
@@ -127,7 +127,7 @@ where
 }
 
 pub struct ForeignThing {
-    a: ValueRef<'static, 'static>,
+    a: WeakValue<'static, 'static>,
 }
 
 unsafe impl Send for ForeignThing {}

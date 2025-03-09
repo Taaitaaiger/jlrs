@@ -27,7 +27,7 @@ use jl_sys::jl_value_t;
 
 use super::{
     tracked::{Tracked, TrackedMut},
-    Value, ValueData, ValueRef,
+    Value, ValueData, WeakValue,
 };
 use crate::{
     convert::{
@@ -36,7 +36,7 @@ use crate::{
     },
     data::{
         layout::valid_layout::{ValidField, ValidLayout},
-        managed::{datatype::DataType, private::ManagedPriv, Managed, Ref},
+        managed::{datatype::DataType, private::ManagedPriv, Managed, Weak},
         types::{
             abstract_type::AnyType,
             construct_type::{ArrayTypeConstructor, ConstantIsize, ConstructType},
@@ -289,7 +289,7 @@ where
 {
     #[inline]
     fn valid_layout(v: Value) -> bool {
-        ValueRef::valid_layout(v)
+        WeakValue::valid_layout(v)
     }
 
     #[inline]
@@ -308,7 +308,7 @@ where
 {
     #[inline]
     fn valid_field(v: Value) -> bool {
-        Option::<ValueRef>::valid_field(v)
+        Option::<WeakValue>::valid_field(v)
     }
 }
 
@@ -378,24 +378,24 @@ where
 
 use crate::memory::target::TargetType;
 
-pub type TypedValueRef<'scope, 'data, T> = Ref<'scope, 'data, TypedValue<'scope, 'data, T>>;
+pub type WeakTypedValue<'scope, 'data, T> = Weak<'scope, 'data, TypedValue<'scope, 'data, T>>;
 
-impl<'scope, 'data> TypedValueRef<'scope, 'data, AnyType> {
+impl<'scope, 'data> WeakTypedValue<'scope, 'data, AnyType> {
     #[inline]
-    pub fn from_value_ref(value_ref: ValueRef<'scope, 'data>) -> Self {
-        TypedValueRef::wrap(value_ref.ptr())
+    pub fn from_value_ref(value_ref: WeakValue<'scope, 'data>) -> Self {
+        WeakTypedValue::wrap(value_ref.ptr())
     }
 }
 
-/// A [`TypedValueRef`] with static lifetimes. This is a useful shorthand for signatures of
+/// A [`WeakTypedValue`] with static lifetimes. This is a useful shorthand for signatures of
 /// `ccall`able functions that return a [`TypedValue`].
-pub type TypedValueRet<T> = Ref<'static, 'static, TypedValue<'static, 'static, T>>;
+pub type TypedValueRet<T> = Weak<'static, 'static, TypedValue<'static, 'static, T>>;
 
-/// `TypedValue` or `TypedValueRef`, depending on the target type `Tgt`.
+/// `TypedValue` or `WeakTypedValue`, depending on the target type `Tgt`.
 pub type TypedValueData<'target, 'data, U, Tgt> =
     <Tgt as TargetType<'target>>::Data<'data, TypedValue<'target, 'data, U>>;
 
-/// `JuliaResult<TypedValue>` or `JuliaResultRef<TypedValueRef>`, depending on the target type
+/// `JuliaResult<TypedValue>` or `WeakJuliaResult<WeakTypedValue>`, depending on the target type
 /// `Tgt`.
 pub type TypedValueResult<'target, 'data, U, T> =
     TargetResult<'target, 'data, TypedValue<'target, 'data, U>, T>;
@@ -407,7 +407,7 @@ unsafe impl<'scope, 'data, T: ConstructType> CCallArg for TypedValue<'scope, 'da
     type FunctionArgType = T;
 }
 
-unsafe impl<T: ConstructType> CCallReturn for TypedValueRef<'static, 'static, T> {
+unsafe impl<T: ConstructType> CCallReturn for WeakTypedValue<'static, 'static, T> {
     type CCallReturnType = Value<'static, 'static>;
     type FunctionReturnType = T;
     type ReturnAs = Self;

@@ -4,7 +4,7 @@
 //! Julia versions 1.10 and 1.11 are currently supported. In general jlrs aims to support all
 //! versions starting at the current LTS version, but only the LTS and stable versions are
 //! actively tested. Using the current stable version of Julia is highly recommended. The minimum
-//! supported Rust version is currently 1.77.
+//! supported Rust version is currently 1.79.
 //!
 //! A tutorial is available [here](https://taaitaaiger.github.io/jlrs-tutorial/).
 //!
@@ -33,9 +33,10 @@
 //!
 //! # Prerequisites
 //!
-//! Julia must be installed before jlrs can be used, jlrs is compatible with Julia 1.10 and 1.11.
-//! If the JlrsCore package has not been installed, it will automatically be installed when jlrs
-//! is initialized by default. jlrs has not been tested with juliaup yet on Linux and macOS.
+//! To use jlrs, supported versions of Rust and Julia must have been installed. Currently, Julia
+//! 1.10 and 1.11 are supported, the minimum supported Rust version is 1.79. Some features may
+//! require a more recent version of Rust. jlrs uses the JlrsCore package for Julia, if this
+//! package has not been installed, the latest version will be installed automatically by default.
 //!
 //! ## Linux
 //!
@@ -64,10 +65,10 @@
 //!
 //! Julia can be installed using juliaup, or with the installer or portable installation
 //! downloaded from the official website. In the first case, Julia has been likely installed in
-//! `%USERPROFILE%\.julia\juliaup\julia-x.y.z+0~x64`, while using the installer or extracting
-//! allows you to pick the destination. After installation or extraction a folder called
-//! `Julia-x.y.z` exists, which contains several folders including a `bin` folder containing
-//! `julia.exe`. The path to the `bin` folder must be added to the `Path` environment variable.
+//! `%USERPROFILE%\.julia\juliaup\julia-x.y.z+0~x64`, using the installer or extracting allows you
+//! to pick the destination. After installation or extraction a folder called `Julia-x.y.z`
+//! exists, which contains several folders including a `bin` folder containing `julia.exe`. The
+//! path to the `bin` folder must be added to the `Path` environment variable.
 //!
 //! Julia is automatically detected by executing the command `where julia`. If this returns
 //! multiple locations the first one is used. The default can be overridden by setting the
@@ -84,7 +85,7 @@
 //!
 //! The Julia C API is unstable and there are minor incompatibilities between different versions
 //! of Julia. To ensure the correct bindings are used for a particular version of Julia you must
-//! enable a version feature. The following version features currently exist:
+//! enable a version feature. The following version features are currently supported:
 //!
 //!  - `julia-1-10`
 //!  - `julia-1-11`
@@ -113,11 +114,12 @@
 //!  - `async-rt`
 //!
 //!    Enables the async runtime. The async runtime runs on a separate thread and can be used from
-//!    multiple threads.
+//!    multiple threads. This feature requires using at least Rust 1.85.
 //!
 //!  - `tokio-rt`
 //!
-//!    The async runtime requires an executor. This feature provides a tokio-based executor.
+//!    The async runtime requires an executor. This feature provides a tokio-based executor. This
+//!    feature requires using at least Rust 1.85.
 //!
 //!  - `multi-rt`
 //!
@@ -129,7 +131,7 @@
 //! <div class="warning"><strong>WARNING</strong>: Runtime features must only be enabled by applications that embed Julia.
 //! Libraries must never enable a runtime feature.</div>
 //!
-//! <div class="warning"><strong>WARNING</strong>: When a runtime feature is enabled on Linux, set
+//! <div class="warning"><strong>WARNING</strong>: When building an application that embeds Julia, set
 //! <code>RUSTFLAGS="-Clink-args=-rdynamic"</code> if you want fast code.</div>
 //!
 //! ## Utilities
@@ -140,12 +142,7 @@
 //!
 //!   Enable the features of the async runtime which don't depend on the executor. This
 //!   can be used in libraries which provide implementations of tasks that the async runtime can
-//!   handle.
-//!
-//! - `async-closure`
-//!
-//!   Enable support for using async closures in combination with the async runtime. This feature
-//!   requires using at least Rust 1.85.
+//!   handle. This feature requires using at least Rust 1.85.
 //!
 //! - `jlrs-derive`
 //!
@@ -191,11 +188,6 @@
 //!   you must set at least the following flags:
 //!   `RUSTFLAGS="-Clinker-plugin-lto -Clinker=clang-XX -Clink-arg=-fuse-ld=lld -Clink-args=-rdynamic"`.
 //!
-//! - `diagnostics`
-//!
-//!   Enable custom diagnostics for several traits because the default lint is unhelpful. This feature
-//!   requires Rust 1.78.
-//!
 //! - `i686`
 //!
 //!   Link with a 32-bit build of Julia on Linux, only used for cross-compilation.
@@ -219,6 +211,32 @@
 //! You can enable all features except `debug`, `i686`, `windows`, `no-link`, `lto` and
 //! `yggdrasil` by enabling the `full` feature. If you don't want to enable any runtimes either,
 //! you can use `full-no-rt`.
+//!
+//!
+//! ## Environment variables
+//!
+//! It's possible to override certain defaults of jlrs and Julia by setting environment variables.
+//! Many of the environment variables mentioned
+//! [here](https://docs.julialang.org/en/v1/manual/environment-variables/) should apply to
+//! applications that use jlrs as well, but this is mostly untested.
+//!
+//! Several additional environment variables can be set which only affect applications that use
+//! jlrs.
+//!
+//! - `JLRS_CORE_VERSION=major.minor.patch`
+//! Installs the set version of JlrsCore before loading it.
+//!
+//! - `JLRS_CORE_REVISION=rev`
+//! Installs the set revision of JlrsCore before loading it.
+//!
+//! - `JLRS_CORE_REPO=repo-url`
+//! Can be used with `JLRS_CORE_REVISION` to set the repository JlrsCore will be downloaded from.
+//!
+//! - `JLRS_CORE_NO_INSTALL=...`
+//! Don't install JlrsCore, its value is ignored.
+//!
+//! `JLRS_CORE_NO_INSTALL` takes priority over `JLRS_CORE_REVISION`, which takes priority over
+//! `JLRS_CORE_VERSION`.
 //!
 //!
 //! # Using jlrs
@@ -977,12 +995,16 @@
 
 #![forbid(rustdoc::broken_intra_doc_links)]
 
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::{
+    env,
+    sync::atomic::{AtomicBool, Ordering},
+};
 
 use jl_sys::jlrs_init_missing_functions;
 #[cfg(feature = "local-rt")]
 use once_cell::sync::OnceCell;
 use prelude::Managed;
+use semver::Version;
 
 use crate::{
     data::{
@@ -1021,7 +1043,7 @@ pub mod util;
 /// The version of the jlrs API this version of jlrs is compatible with.
 ///
 /// If this version number doesn't match `JLRS_API_VERSION` in JlrsCore.jl, initialization fails.
-pub const JLRS_API_VERSION: isize = 3;
+pub const JLRS_API_VERSION: isize = 4;
 
 /// Installation method for the JlrsCore package. If JlrsCore is already installed the installed version
 /// is used.
@@ -1059,63 +1081,31 @@ impl InstallJlrsCore {
         )),
         allow(unused)
     )]
-    pub(crate) unsafe fn use_or_install(&self) {
+    unsafe fn use_or_install(&self) {
         let unrooted = Unrooted::new();
-        let res = match self {
+        let cmd = match self {
             InstallJlrsCore::Default => {
-                Value::eval_string(
-                    unrooted,
-                    "if !haskey(Base.loaded_modules, Base.PkgId(Base.UUID(\"29be08bc-e5fd-4da2-bbc1-72011c6ea2c9\"), \"JlrsCore\"))
-                         try
-                             using JlrsCore
-                         catch e
-                             import Pkg; Pkg.add(\"JlrsCore\")
-                             using JlrsCore
-                         end
-                     end",
-                )
-            },
+                "try; using JlrsCore; catch; import Pkg; Pkg.add(\"JlrsCore\"); using JlrsCore; end"
+                    .to_string()
+            }
             InstallJlrsCore::Git { repo, revision } => {
-                Value::eval_string(
-                    unrooted,
-                    format!(
-                        "if !haskey(Base.loaded_modules, Base.PkgId(Base.UUID(\"29be08bc-e5fd-4da2-bbc1-72011c6ea2c9\"), \"JlrsCore\"))
-                             try
-                                 using JlrsCore
-                             catch e
-                                 import Pkg; Pkg.add(url=\"{repo}#{revision}\")
-                                 using JlrsCore
-                             end
-                         end"
-                    ),
+                format!("import Pkg; Pkg.add(url=\"{repo}\", rev=\"{revision}\"); using JlrsCore")
+            }
+            InstallJlrsCore::Version {
+                major,
+                minor,
+                patch,
+            } => {
+                format!(
+                    "import Pkg; Pkg.add(name=\"JlrsCore\", version=\"{major}.{minor}.{patch}\"); using JlrsCore"
                 )
-            },
-            InstallJlrsCore::Version { major, minor, patch } => {
-                Value::eval_string(
-                    unrooted,
-                    format!(
-                        "if !haskey(Base.loaded_modules, Base.PkgId(Base.UUID(\"29be08bc-e5fd-4da2-bbc1-72011c6ea2c9\"), \"JlrsCore\"))
-                             try
-                                 using JlrsCore
-                             catch e
-                                 import Pkg; Pkg.add(name=\"JlrsCore\", version=\"{major}.{minor}.{patch}\")
-                                 using JlrsCore
-                             end
-                         end"
-                    ),
-                )
-            },
-            InstallJlrsCore::No => {
-                Value::eval_string(
-                    unrooted,
-                    "if !haskey(Base.loaded_modules, Base.PkgId(Base.UUID(\"29be08bc-e5fd-4da2-bbc1-72011c6ea2c9\"), \"JlrsCore\"))
-                         using JlrsCore
-                     end",
-                )
-            },
+            }
+            InstallJlrsCore::No => "using JlrsCore".to_string(),
         };
 
-        if let Err(err) = res {
+        let cmd = format!("if !haskey(Base.loaded_modules, Base.PkgId(Base.UUID(\"29be08bc-e5fd-4da2-bbc1-72011c6ea2c9\"), \"JlrsCore\")); {cmd}; end");
+
+        if let Err(err) = Value::eval_string(unrooted, cmd) {
             eprintln!("Failed to load or install JlrsCore package");
             // JlrsCore failed to load, print the error message to stderr without using
             // `Managed::error_string_or`.
@@ -1123,6 +1113,30 @@ impl InstallJlrsCore {
             panic!();
         }
     }
+}
+
+fn preferred_jlrs_core_version() -> Option<InstallJlrsCore> {
+    if let Some(_) = env::var("JLRS_CORE_NO_INSTALL").ok() {
+        return Some(InstallJlrsCore::No);
+    }
+
+    if let Some(version) = env::var("JLRS_CORE_VERSION").ok() {
+        if let Ok(version) = Version::parse(version.as_str()) {
+            return Some(InstallJlrsCore::Version {
+                major: version.major as _,
+                minor: version.minor as _,
+                patch: version.patch as _,
+            });
+        }
+    }
+
+    if let Some(revision) = env::var("JLRS_CORE_REVISION").ok() {
+        let repo = env::var("JLRS_CORE_REPO")
+            .unwrap_or("https://github.com/Taaitaaiger/JlrsCore.jl".into());
+        return Some(InstallJlrsCore::Git { repo, revision });
+    }
+
+    None
 }
 
 // The chosen install method is stored in a OnceCell when the local runtime is used to
@@ -1139,7 +1153,7 @@ pub(crate) static INSTALL_METHOD: OnceCell<InstallJlrsCore> = OnceCell::new();
     )),
     allow(unused)
 )]
-pub(crate) unsafe fn init_jlrs(install_jlrs_core: &InstallJlrsCore) {
+pub(crate) unsafe fn init_jlrs(install_jlrs_core: &InstallJlrsCore, allow_override: bool) {
     static IS_INIT: AtomicBool = AtomicBool::new(false);
 
     if IS_INIT.swap(true, Ordering::Relaxed) {
@@ -1152,11 +1166,20 @@ pub(crate) unsafe fn init_jlrs(install_jlrs_core: &InstallJlrsCore) {
     init_symbol_cache();
     init_global_cache();
 
-    install_jlrs_core.use_or_install();
+    if let Some(preferred_version) = preferred_jlrs_core_version() {
+        if allow_override {
+            preferred_version.use_or_install();
+        } else {
+            install_jlrs_core.use_or_install();
+        }
+    } else {
+        install_jlrs_core.use_or_install();
+    }
+
     let unrooted = Unrooted::new();
     let api_version = JlrsCore::api_version(&unrooted);
     if api_version != JLRS_API_VERSION {
-        panic!("Incompatible version of JlrsCore detected. Expected API version{JLRS_API_VERSION}, found {api_version}");
+        panic!("Incompatible version of JlrsCore detected. Expected API version {JLRS_API_VERSION}, found {api_version}");
     }
 
     init_ledger();

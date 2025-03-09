@@ -1,10 +1,10 @@
-#### v0.22
+# Changelog
 
-- Add several aliases for `JuliaResult` so they can be more easily returned from an exported funtion.
+## v0.22
 
-- Add `JuliaResultExt` and `JuliaResultExt` extension traits to expose methods to leak or root a result.
+- Several aliases for `JuliaResult` have been added so they can be more easily returned from an exported funtion.
 
-- Add `into_ref` method to `ManagedRef` that converts an arbitrary `ManagedRef` to a specific `Ref` type.
+- The `JuliaResultExt` and `JuliaResultExt` extension traits have been added to expose methods to leak or root a result.
 
 - It's no longer possible to spawn a multithreaded runtime, it must be started. Spawning has been removed to avoid issues due to adopting threads that live longer than the runtime thread.
 
@@ -14,9 +14,23 @@
 
 - The `Executor`, `AsyncTask`, and `PersistentTask` traits no longer use `async_trait`. To migrate existing `PersistentTask`s, remove the `async_trait`-annotation. `AsyncTask`s now take `self` by value, so to migrate them remove the annotation and change `&mut self` in `run` to `self`.
 
-- The async runtime supports using async closures when the `async-closure` feature is enabled, this requires using at least Rust 1.85. The `AsyncTask` trait has been implemented for all async closures `AsyncFnOnce(AsyncGcFrame) -> T`, so async closures can easily be called with `AsyncHandle::task`. Async closures can also be used in combination with nested async scopes by calling `AsyncGcFrame::async_scope_closure`, which doesn't suffer from the same lifetime issues as `AsyncGcFrame::async_scope`. The methods `AsyncGcFrame::async_scope` and `AsyncGcFrame::relaxed_async_scope` and the feature gate itself will be removed in the future when the MSRV is increased.
+- The async runtime uses async closures for async scopes, and requires using at least Rust 1.85. The `AsyncTask` trait is implemented for all async closures `AsyncFnOnce(AsyncGcFrame) -> T`, so async closures can be used instead of implementing `AsyncTask`. The method `AsyncGcFrame::relaxed_async_scope` has been removed, async closures correctly handle the lifetime requirements.
 
-#### v0.21
+- `ManagedRef` has been renamed to `ManagedWeak`. `Managed::as_ref` has been deprecated in favor of `Managed::as_weak`. `<Managed>Ref` types have been renamed to `Weak<Managed>`.
+
+- The `into_weak` method has been added to `WeakManaged` which converts an arbitrary `WeakManaged` to a specific `Weak` type.
+
+- The diagnostics feature has been removed, custom diagnostics are enabled by default.
+
+- The environment variables `JLRS_CORE_REVISION`, `JLRS_CORE_REPO`, `JLRS_CORE_VERSION`, and `JLRS_CORE_DONT_INSTALL` can be used to override the version of JlrsCore that is used.
+
+- If a custom version of JlrsCore is requested, the requested version is installed before it is loaded.
+
+- Methods that call a Julia function and track the arguments have been removed.
+
+- The MSRV has been increased to 1.79.
+
+## v0.21
 
 - Support generating bindings for Julia enums with integer base types in combination with JlrsCore.Reflect and the `Enum` derive macro.
 
@@ -24,7 +38,7 @@
 
 - `TypedValue::as_typed_ranked_array` and `TypedValue::as_typed_array` have been added, these methods convert a type value with an array type constructor to the corresponding `Typed(Ranked)Array` type.
 
-#### v0.20
+## v0.20
 
 - Add support for Julia 1.11. Bump MSRV to 1.77.
 
@@ -76,11 +90,11 @@
 
 - Scopes can return arbitrary types, the return type is no longer required to be a `JlrsResult`.
 
-- Custom diagnostics are emitted when `ValidLayout`, `Unbox`, `IntoJulia`, `ConstructType`, `Typecheck` or `ForeignType` has not been implemented to explicitly warn you probably don't want `ForeignType`'s blanket impementations for these traits. This requires enabling the `diagnostics` feature and Rust 1.78.
+- Custom diagnostics are emitted when `ValidLayout`, `Unbox`, `IntoJulia`, `ConstructType`, `Typecheck` or `ForeignType` has not been implemented to explicitly warn you probably don't want `ForeignType`'s blanket impementations for these traits.
 
 - Initializing Julia is considered safe as long as no custom system image is used.
 
-#### v0.19
+## v0.19
 
 - A GC-safe `GcSafeRwLock`, `GcSafeMutex`, `GcSafeFairMutex`, and `GcSafeOnceLock` have been added. These synchronization primitives allow for garbage to be collected while waiting for access to be granted.
 
@@ -128,7 +142,7 @@
 
 - The `full-no-rt` feature has been added to allow selecting all features except runtimes.
 
-#### v0.18
+## v0.18
 
 - jlrs is compatible with Julia 1.7 again, but this version isn't actively tested or supported. Version features have been added to select a particular version of Julia, picking a specific version is required.
 
@@ -172,7 +186,7 @@
 
 - Methods that can catch a thrown exception are now available on Windows in combination with Julia 1.6.
 
-#### v0.17
+## v0.17
 
 - Atomic struct fields are now atomic in the generated bindings.
 
@@ -232,11 +246,11 @@
 
 - `Global` has been renamed to `Unrooted`.
 
-#### v0.16
+## v0.16
 
 - Support for Julia 1.7 has been dropped, by default Julia 1.8 is targeted.
 
-#### v0.15
+## v0.15
 
 - jlrs can be used with 32-bits versions of Julia on Linux by enabling the `i686` feature.
 
@@ -250,7 +264,7 @@
 
 - The number of threads can be set with `AsyncRuntimeBuilder::n_threads` when the `lts` feature is enabled.
 
-#### v0.14
+## v0.14
 
 - `TemporarySymbol` has been renamed to `ToSymbol`. The method `ToSymbol::to_symbol` has been added to this trait.
 

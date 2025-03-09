@@ -73,7 +73,7 @@ function funcwithabstractkw(a::Float32; b::Real=1.0f0)
 end
 
 function throws_exception(args...; kwargs...)
-    throw("This should happen")
+    throw(ErrorException("This should happen"))
 end
 
 struct ModuleOrNothing

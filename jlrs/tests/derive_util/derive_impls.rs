@@ -391,7 +391,7 @@ pub struct BitsUInt8TupleInt32TupleInt16UInt16 {
 #[derive(Clone, Debug, Unbox, ValidLayout, Typecheck)]
 #[jlrs(julia_type = "Main.DoubleHasGeneric")]
 pub struct DoubleHasGeneric<'scope, 'data> {
-    pub a: ::std::option::Option<::jlrs::data::managed::value::ValueRef<'scope, 'data>>,
+    pub a: ::std::option::Option<::jlrs::data::managed::value::WeakValue<'scope, 'data>>,
 }
 
 #[derive(ConstructType, HasLayout)]
@@ -418,7 +418,7 @@ pub struct DoubleUVariant {
     #[jlrs(bits_union_align)]
     _a_align: ::jlrs::data::layout::union::Align4,
     #[jlrs(bits_union)]
-    pub a: ::jlrs::data::layout::union::BitsUnion<4>,
+    pub a: ::jlrs::data::layout::union::TypedBitsUnion<::jlrs::UnionOf![u16, u32], 4>,
     #[jlrs(bits_union_flag)]
     pub a_flag: u8,
 }
@@ -432,7 +432,7 @@ pub struct DoubleVariant {
     #[jlrs(bits_union_align)]
     _a_align: ::jlrs::data::layout::union::Align4,
     #[jlrs(bits_union)]
-    pub a: ::jlrs::data::layout::union::BitsUnion<4>,
+    pub a: ::jlrs::data::layout::union::TypedBitsUnion<::jlrs::UnionOf![i16, i32], 4>,
     #[jlrs(bits_union_flag)]
     pub a_flag: u8,
 }
@@ -448,7 +448,7 @@ pub struct Empty {}
 #[derive(Clone, Debug, Unbox, ValidLayout, Typecheck, ValidField)]
 #[jlrs(julia_type = "Main.HasGenericImmut")]
 pub struct HasGenericImmut<'scope, 'data> {
-    pub a: ::std::option::Option<::jlrs::data::managed::value::ValueRef<'scope, 'data>>,
+    pub a: ::std::option::Option<::jlrs::data::managed::value::WeakValue<'scope, 'data>>,
 }
 
 #[derive(ConstructType, HasLayout)]
@@ -477,7 +477,7 @@ pub struct HasImmut<'scope, 'data> {
 )]
 #[jlrs(julia_type = "Main.Immut")]
 pub struct Immut<'scope, 'data> {
-    pub a: ::std::option::Option<::jlrs::data::managed::value::ValueRef<'scope, 'data>>,
+    pub a: ::std::option::Option<::jlrs::data::managed::value::WeakValue<'scope, 'data>>,
 }
 
 #[repr(C)]
@@ -491,7 +491,7 @@ pub struct MutF32 {
 #[derive(Clone, Debug, Unbox, ValidLayout, Typecheck, ConstructType)]
 #[jlrs(julia_type = "Main.MutNested")]
 pub struct MutNested<'scope, 'data> {
-    pub a: ::std::option::Option<::jlrs::data::managed::value::ValueRef<'scope, 'data>>,
+    pub a: ::std::option::Option<::jlrs::data::managed::value::WeakValue<'scope, 'data>>,
 }
 
 #[repr(C)]
@@ -500,7 +500,7 @@ pub struct MutNested<'scope, 'data> {
 )]
 #[jlrs(julia_type = "Main.NonBitsUnion")]
 pub struct NonBitsUnion<'scope, 'data> {
-    pub a: ::std::option::Option<::jlrs::data::managed::value::ValueRef<'scope, 'data>>,
+    pub a: ::std::option::Option<::jlrs::data::managed::value::WeakValue<'scope, 'data>>,
 }
 
 #[repr(C)]
@@ -553,7 +553,7 @@ pub struct TypedEmptyTypeConstructor<T> {
 )]
 #[jlrs(julia_type = "Main.UnionInTuple")]
 pub struct UnionInTuple<'scope, 'data> {
-    pub a: ::std::option::Option<::jlrs::data::managed::value::ValueRef<'scope, 'data>>,
+    pub a: ::std::option::Option<::jlrs::data::managed::value::WeakValue<'scope, 'data>>,
 }
 
 #[repr(C)]
@@ -562,7 +562,7 @@ pub struct UnionInTuple<'scope, 'data> {
 )]
 #[jlrs(julia_type = "Main.WithArray")]
 pub struct WithArray<'scope, 'data> {
-    pub a: ::std::option::Option<::jlrs::data::managed::array::ArrayRef<'scope, 'data>>,
+    pub a: ::std::option::Option<::jlrs::data::managed::array::WeakArray<'scope, 'data>>,
 }
 
 #[repr(C)]
@@ -571,7 +571,7 @@ pub struct WithArray<'scope, 'data> {
 )]
 #[jlrs(julia_type = "Main.WithCodeInstance")]
 pub struct WithCodeInstance<'scope, 'data> {
-    pub a: ::std::option::Option<::jlrs::data::managed::value::ValueRef<'scope, 'data>>,
+    pub a: ::std::option::Option<::jlrs::data::managed::value::WeakValue<'scope, 'data>>,
 }
 
 #[repr(C)]
@@ -580,7 +580,7 @@ pub struct WithCodeInstance<'scope, 'data> {
 )]
 #[jlrs(julia_type = "Main.WithDataType")]
 pub struct WithDataType<'scope> {
-    pub a: ::std::option::Option<::jlrs::data::managed::datatype::DataTypeRef<'scope>>,
+    pub a: ::std::option::Option<::jlrs::data::managed::datatype::WeakDataType<'scope>>,
 }
 
 #[repr(C)]
@@ -589,7 +589,7 @@ pub struct WithDataType<'scope> {
 )]
 #[jlrs(julia_type = "Main.WithExpr")]
 pub struct WithExpr<'scope, 'data> {
-    pub a: ::std::option::Option<::jlrs::data::managed::value::ValueRef<'scope, 'data>>,
+    pub a: ::std::option::Option<::jlrs::data::managed::value::WeakValue<'scope, 'data>>,
 }
 
 #[repr(C)]
@@ -616,7 +616,7 @@ pub struct WithGenericT<T> {
 )]
 #[jlrs(julia_type = "Main.WithGenericUnionAll")]
 pub struct WithGenericUnionAll<'scope, 'data> {
-    pub a: ::std::option::Option<::jlrs::data::managed::value::ValueRef<'scope, 'data>>,
+    pub a: ::std::option::Option<::jlrs::data::managed::value::WeakValue<'scope, 'data>>,
 }
 
 #[repr(C)]
@@ -625,7 +625,7 @@ pub struct WithGenericUnionAll<'scope, 'data> {
 )]
 #[jlrs(julia_type = "Main.WithMethod")]
 pub struct WithMethod<'scope, 'data> {
-    pub a: ::std::option::Option<::jlrs::data::managed::value::ValueRef<'scope, 'data>>,
+    pub a: ::std::option::Option<::jlrs::data::managed::value::WeakValue<'scope, 'data>>,
 }
 
 #[repr(C)]
@@ -634,7 +634,7 @@ pub struct WithMethod<'scope, 'data> {
 )]
 #[jlrs(julia_type = "Main.WithMethodInstance")]
 pub struct WithMethodInstance<'scope, 'data> {
-    pub a: ::std::option::Option<::jlrs::data::managed::value::ValueRef<'scope, 'data>>,
+    pub a: ::std::option::Option<::jlrs::data::managed::value::WeakValue<'scope, 'data>>,
 }
 
 #[repr(C)]
@@ -643,7 +643,7 @@ pub struct WithMethodInstance<'scope, 'data> {
 )]
 #[jlrs(julia_type = "Main.WithMethodTable")]
 pub struct WithMethodTable<'scope, 'data> {
-    pub a: ::std::option::Option<::jlrs::data::managed::value::ValueRef<'scope, 'data>>,
+    pub a: ::std::option::Option<::jlrs::data::managed::value::WeakValue<'scope, 'data>>,
 }
 
 #[repr(C)]
@@ -652,7 +652,7 @@ pub struct WithMethodTable<'scope, 'data> {
 )]
 #[jlrs(julia_type = "Main.WithModule")]
 pub struct WithModule<'scope> {
-    pub a: ::std::option::Option<::jlrs::data::managed::module::ModuleRef<'scope>>,
+    pub a: ::std::option::Option<::jlrs::data::managed::module::WeakModule<'scope>>,
 }
 
 #[repr(C)]
@@ -679,7 +679,7 @@ pub struct WithNestedGenericT<T> {
 )]
 #[jlrs(julia_type = "Main.WithPropagatedLifetime")]
 pub struct WithPropagatedLifetime<'scope> {
-    pub a: WithGenericT<::std::option::Option<::jlrs::data::managed::module::ModuleRef<'scope>>>,
+    pub a: WithGenericT<::std::option::Option<::jlrs::data::managed::module::WeakModule<'scope>>>,
 }
 
 #[repr(C)]
@@ -692,7 +692,7 @@ pub struct WithPropagatedLifetimes<'scope, 'data> {
         ::jlrs::data::layout::tuple::Tuple2<
             i32,
             WithGenericT<
-                ::std::option::Option<::jlrs::data::managed::array::ArrayRef<'scope, 'data>>,
+                ::std::option::Option<::jlrs::data::managed::array::WeakArray<'scope, 'data>>,
             >,
         >,
     >,
@@ -742,7 +742,7 @@ pub struct WithSetGenericTuple {
 )]
 #[jlrs(julia_type = "Main.WithSimpleVector")]
 pub struct WithSimpleVector<'scope> {
-    pub a: ::std::option::Option<::jlrs::data::managed::simple_vector::SimpleVectorRef<'scope>>,
+    pub a: ::std::option::Option<::jlrs::data::managed::simple_vector::WeakSimpleVector<'scope>>,
 }
 
 #[repr(C)]
@@ -751,7 +751,7 @@ pub struct WithSimpleVector<'scope> {
 )]
 #[jlrs(julia_type = "Main.WithString")]
 pub struct WithString<'scope> {
-    pub a: ::std::option::Option<::jlrs::data::managed::string::StringRef<'scope>>,
+    pub a: ::std::option::Option<::jlrs::data::managed::string::WeakString<'scope>>,
 }
 
 #[repr(C)]
@@ -760,7 +760,7 @@ pub struct WithString<'scope> {
 )]
 #[jlrs(julia_type = "Main.WithSymbol")]
 pub struct WithSymbol<'scope> {
-    pub a: ::std::option::Option<::jlrs::data::managed::symbol::SymbolRef<'scope>>,
+    pub a: ::std::option::Option<::jlrs::data::managed::symbol::WeakSymbol<'scope>>,
 }
 
 #[repr(C)]
@@ -769,7 +769,7 @@ pub struct WithSymbol<'scope> {
 )]
 #[jlrs(julia_type = "Main.WithTask")]
 pub struct WithTask<'scope, 'data> {
-    pub a: ::std::option::Option<::jlrs::data::managed::value::ValueRef<'scope, 'data>>,
+    pub a: ::std::option::Option<::jlrs::data::managed::value::WeakValue<'scope, 'data>>,
 }
 
 #[repr(C)]
@@ -778,7 +778,7 @@ pub struct WithTask<'scope, 'data> {
 )]
 #[jlrs(julia_type = "Main.WithTypeMapEntry")]
 pub struct WithTypeMapEntry<'scope, 'data> {
-    pub a: ::std::option::Option<::jlrs::data::managed::value::ValueRef<'scope, 'data>>,
+    pub a: ::std::option::Option<::jlrs::data::managed::value::WeakValue<'scope, 'data>>,
 }
 
 #[repr(C)]
@@ -787,7 +787,7 @@ pub struct WithTypeMapEntry<'scope, 'data> {
 )]
 #[jlrs(julia_type = "Main.WithTypeMapLevel")]
 pub struct WithTypeMapLevel<'scope, 'data> {
-    pub a: ::std::option::Option<::jlrs::data::managed::value::ValueRef<'scope, 'data>>,
+    pub a: ::std::option::Option<::jlrs::data::managed::value::WeakValue<'scope, 'data>>,
 }
 
 #[repr(C)]
@@ -796,7 +796,7 @@ pub struct WithTypeMapLevel<'scope, 'data> {
 )]
 #[jlrs(julia_type = "Main.WithTypeName")]
 pub struct WithTypeName<'scope> {
-    pub a: ::std::option::Option<::jlrs::data::managed::type_name::TypeNameRef<'scope>>,
+    pub a: ::std::option::Option<::jlrs::data::managed::type_name::WeakTypeName<'scope>>,
 }
 
 #[repr(C)]
@@ -805,7 +805,7 @@ pub struct WithTypeName<'scope> {
 )]
 #[jlrs(julia_type = "Main.WithTypeVar")]
 pub struct WithTypeVar<'scope> {
-    pub a: ::std::option::Option<::jlrs::data::managed::type_var::TypeVarRef<'scope>>,
+    pub a: ::std::option::Option<::jlrs::data::managed::type_var::WeakTypeVar<'scope>>,
 }
 
 #[repr(C)]
@@ -814,7 +814,7 @@ pub struct WithTypeVar<'scope> {
 )]
 #[jlrs(julia_type = "Main.WithUnion")]
 pub struct WithUnion<'scope> {
-    pub a: ::std::option::Option<::jlrs::data::managed::union::UnionRef<'scope>>,
+    pub a: ::std::option::Option<::jlrs::data::managed::union::WeakUnion<'scope>>,
 }
 
 #[repr(C)]
@@ -823,7 +823,7 @@ pub struct WithUnion<'scope> {
 )]
 #[jlrs(julia_type = "Main.WithUnionAll")]
 pub struct WithUnionAll<'scope> {
-    pub a: ::std::option::Option<::jlrs::data::managed::union_all::UnionAllRef<'scope>>,
+    pub a: ::std::option::Option<::jlrs::data::managed::union_all::WeakUnionAll<'scope>>,
 }
 
 #[repr(C)]
@@ -855,7 +855,7 @@ pub struct AnAbstractUnionAll<T> {
 )]
 #[jlrs(julia_type = "Main.HasAbstractField")]
 pub struct HasAbstractField<'scope, 'data> {
-    pub a: ::std::option::Option<::jlrs::data::managed::value::ValueRef<'scope, 'data>>,
+    pub a: ::std::option::Option<::jlrs::data::managed::value::WeakValue<'scope, 'data>>,
 }
 
 #[repr(C)]
@@ -864,7 +864,7 @@ pub struct HasAbstractField<'scope, 'data> {
 )]
 #[jlrs(julia_type = "Main.HasAbstractUnionAllField")]
 pub struct HasAbstractUnionAllField<'scope, 'data> {
-    pub a: ::std::option::Option<::jlrs::data::managed::value::ValueRef<'scope, 'data>>,
+    pub a: ::std::option::Option<::jlrs::data::managed::value::WeakValue<'scope, 'data>>,
 }
 
 #[derive(ConstructType)]
@@ -988,4 +988,40 @@ pub enum StandardEnum {
     #[allow(non_camel_case_types)]
     #[jlrs(julia_enum_variant = "Main.se_c")]
     SeC = 3,
+}
+
+#[repr(C)]
+#[derive(Clone, Debug, Unbox, ValidLayout, Typecheck, ValidField, IsBits)]
+#[jlrs(julia_type = "Main.Elided")]
+pub struct Elided<B> {
+    pub a: B,
+}
+
+#[derive(ConstructType, HasLayout)]
+#[jlrs(julia_type = "Main.Elided", constructor_for = "Elided", scope_lifetime = false, data_lifetime = false, layout_params = ["B"], elided_params = ["A"], all_params = ["A", "B"])]
+pub struct ElidedTypeConstructor<A, B> {
+    _a: ::std::marker::PhantomData<A>,
+    _b: ::std::marker::PhantomData<B>,
+}
+
+#[repr(C)]
+#[derive(Clone, Debug, Unbox, ValidLayout, Typecheck, ValidField, ConstructType, CCallArg)]
+#[jlrs(julia_type = "Main.WithElidedInUnion")]
+pub struct WithElidedInUnion {
+    #[jlrs(bits_union_align)]
+    _a_align: ::jlrs::data::layout::union::Align8,
+    #[jlrs(bits_union)]
+    pub a: ::jlrs::data::layout::union::TypedBitsUnion<
+        ::jlrs::UnionOf![
+            f64,
+            i16,
+            ElidedTypeConstructor<
+                ::jlrs::data::types::construct_type::ConstantBool<true>,
+                ElidedTypeConstructor<::jlrs::data::types::construct_type::ConstantI64<1>, i64>,
+            >
+        ],
+        8,
+    >,
+    #[jlrs(bits_union_flag)]
+    pub a_flag: u8,
 }

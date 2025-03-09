@@ -7,13 +7,13 @@ use std::{
 
 use jl_sys::{jl_value_t, jlrs_array_typetagdata, jlrs_lock_value, jlrs_unlock_value};
 
-use super::{Value, ValueRef};
+use super::{Value, WeakValue};
 use crate::{
     data::{
         layout::valid_layout::ValidLayout,
         managed::{
             array::Array,
-            datatype::{DataType, DataTypeRef},
+            datatype::{DataType, WeakDataType},
             private::ManagedPriv,
             union::{nth_union_component, Union},
             Managed,
@@ -55,8 +55,8 @@ enum ViewState {
 /// used with types that have named fields, the second must be used with tuples, and the last one
 /// with arrays.
 pub struct FieldAccessor<'scope, 'data> {
-    value: Option<ValueRef<'scope, 'data>>,
-    current_field_type: Option<DataTypeRef<'scope>>,
+    value: Option<WeakValue<'scope, 'data>>,
+    current_field_type: Option<WeakDataType<'scope>>,
     buffer: AtomicBuffer,
     offset: u32,
     state: ViewState,
@@ -66,8 +66,8 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
     #[inline]
     pub(crate) fn new(value: Value<'scope, 'data>) -> Self {
         FieldAccessor {
-            value: Some(value.as_ref()),
-            current_field_type: Some(value.datatype().as_ref()),
+            value: Some(value.as_weak()),
+            current_field_type: Some(value.datatype().as_weak()),
             offset: 0,
             buffer: AtomicBuffer::new(),
             state: ViewState::Unlocked,
@@ -76,7 +76,7 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
     /// Access the field the accessor is currenty pointing to as a value of type `T`.
     ///
     /// This method accesses the field using its concrete type. If the concrete type of the field
-    /// has a matching managed type it can be accessed as a `ValueRef` or a `Ref` of that managed
+    /// has a matching managed type it can be accessed as a `WeakValue` or a `Weak` of that managed
     /// type. For example, a field that contains a `Module` can be accessed as a `ModuleRef`. In
     /// all other cases a layout type must be used. For example, an untyped field that currently
     /// holds a `Float64` must be accessed as `f64`.
@@ -91,7 +91,7 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
 
         // Safety: in this block, the first check ensures that T is correct
         // for the data that is accessed. If the data is in the atomic buffer
-        // it's read from there. If T is as Ref, the pointer is converted. If
+        // it's read from there. If T is Weak, the pointer is converted. If
         // it's an array, the element at the desired position is read.
         // Otherwise, the field is read at the offset where it has been determined
         // to be stored.
@@ -314,13 +314,13 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
 
     /// Returns the type of the field the accessor is currently pointing at.
     #[inline]
-    pub fn current_field_type(&self) -> Option<DataTypeRef<'scope>> {
+    pub fn current_field_type(&self) -> Option<WeakDataType<'scope>> {
         self.current_field_type
     }
 
     /// Returns the value the accessor is currently inspecting.
     #[inline]
-    pub fn value(&self) -> Option<ValueRef<'scope, 'data>> {
+    pub fn value(&self) -> Option<WeakValue<'scope, 'data>> {
         self.value
     }
 
@@ -336,14 +336,14 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
             if ptr.is_null() {
                 self.value = None;
             } else {
-                self.value = Some(ValueRef::wrap(NonNull::new_unchecked(ptr)));
+                self.value = Some(WeakValue::wrap(NonNull::new_unchecked(ptr)));
             }
 
             self.state = ViewState::Unlocked;
             if self.value.is_none() {
                 if let Ok(ty) = next_field_type.cast::<DataType>() {
                     if ty.is_concrete_type() {
-                        self.current_field_type = Some(ty.as_ref());
+                        self.current_field_type = Some(ty.as_weak());
                     } else {
                         self.current_field_type = None;
                     }
@@ -352,11 +352,11 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
                 }
             } else {
                 self.current_field_type =
-                    Some(self.value.unwrap().as_managed().datatype().as_ref());
+                    Some(self.value.unwrap().as_managed().datatype().as_weak());
             }
         } else {
             debug_assert!(next_field_type.is::<DataType>());
-            self.current_field_type = Some(next_field_type.cast_unchecked::<DataType>().as_ref());
+            self.current_field_type = Some(next_field_type.cast_unchecked::<DataType>().as_weak());
         }
     }
 
@@ -381,7 +381,7 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
             self.get_bits_union_field(un);
         } else {
             debug_assert!(next_field_type.is::<DataType>());
-            self.current_field_type = Some(next_field_type.cast_unchecked::<DataType>().as_ref());
+            self.current_field_type = Some(next_field_type.cast_unchecked::<DataType>().as_weak());
 
             if is_atomic_field {
                 self.lock_or_copy_atomic(inline_ordering);
@@ -401,7 +401,7 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
             self.get_bits_union_field(un);
         } else {
             debug_assert!(next_field_type.is::<DataType>());
-            self.current_field_type = Some(next_field_type.cast_unchecked::<DataType>().as_ref());
+            self.current_field_type = Some(next_field_type.cast_unchecked::<DataType>().as_weak());
         }
     }
 
@@ -421,7 +421,7 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
                 .data_ptr()
                 .cast::<MaybeUninit<u8>>()
                 .add(self.offset as usize)
-                .cast::<Option<ValueRef>>()
+                .cast::<Option<WeakValue>>()
                 .read();
 
             self.offset = 0;
@@ -430,7 +430,7 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
             if self.value.is_none() {
                 if let Ok(ty) = next_field_type.cast::<DataType>() {
                     if ty.is_concrete_type() {
-                        self.current_field_type = Some(ty.as_ref());
+                        self.current_field_type = Some(ty.as_weak());
                     } else {
                         self.current_field_type = None;
                     }
@@ -438,10 +438,10 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
                     self.current_field_type = None;
                 }
             } else {
-                self.current_field_type = Some(self.value.unwrap().as_value().datatype().as_ref());
+                self.current_field_type = Some(self.value.unwrap().as_value().datatype().as_weak());
             }
         } else {
-            self.current_field_type = Some(next_field_type.cast::<DataType>()?.as_ref());
+            self.current_field_type = Some(next_field_type.cast::<DataType>()?.as_weak());
         }
 
         Ok(())
@@ -532,12 +532,12 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
         self.offset = (index * el_size) as u32;
 
         if arr.has_value_layout() {
-            self.value = arr.data_ptr().cast::<Option<ValueRef>>().add(index).read();
+            self.value = arr.data_ptr().cast::<Option<WeakValue>>().add(index).read();
             self.offset = 0;
             if self.value.is_none() {
                 if let Ok(ty) = arr.element_type().cast::<DataType>() {
                     if ty.is_concrete_type() {
-                        self.current_field_type = Some(ty.as_ref());
+                        self.current_field_type = Some(ty.as_weak());
                     } else {
                         self.current_field_type = None;
                     }
@@ -551,7 +551,7 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
                 }
             } else {
                 let ty = self.value.unwrap().as_value().datatype();
-                self.current_field_type = Some(ty.as_ref());
+                self.current_field_type = Some(ty.as_weak());
                 if !ty.is::<Array>() {
                     self.state = ViewState::Unlocked;
                 }
@@ -564,11 +564,11 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
             debug_assert!(ty.is::<DataType>());
             let ty = ty.cast_unchecked::<DataType>();
             debug_assert!(ty.is_concrete_type());
-            self.current_field_type = Some(ty.as_ref());
+            self.current_field_type = Some(ty.as_weak());
         } else {
             let ty = arr.element_type();
             debug_assert!(ty.is::<DataType>());
-            self.current_field_type = Some(ty.cast_unchecked::<DataType>().as_ref());
+            self.current_field_type = Some(ty.cast_unchecked::<DataType>().as_weak());
         }
     }
 
@@ -581,7 +581,7 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
             .cast::<u8>()
             .as_ptr()
             .add(self.offset as usize)
-            .cast::<Option<ValueRef>>()
+            .cast::<Option<WeakValue>>()
             .read();
 
         if locked {
@@ -595,7 +595,7 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
         if self.value.is_none() {
             if let Ok(ty) = next_field_type.cast::<DataType>() {
                 if ty.is_concrete_type() {
-                    self.current_field_type = Some(ty.as_ref());
+                    self.current_field_type = Some(ty.as_weak());
                 } else {
                     self.current_field_type = None;
                 }
@@ -604,7 +604,7 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
             }
         } else {
             let value = self.value.unwrap().as_value();
-            self.current_field_type = Some(value.datatype().as_ref());
+            self.current_field_type = Some(value.datatype().as_weak());
             if value.is::<Array>() {
                 self.state = ViewState::Array;
             }
@@ -630,7 +630,7 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
         if ptr.is_null() {
             self.value = None;
         } else {
-            self.value = Some(ValueRef::wrap(NonNull::new_unchecked(ptr)));
+            self.value = Some(WeakValue::wrap(NonNull::new_unchecked(ptr)));
         }
 
         self.offset = 0;
@@ -638,7 +638,7 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
         if self.value.is_none() {
             if let Ok(ty) = next_field_type.cast::<DataType>() {
                 if ty.is_concrete_type() {
-                    self.current_field_type = Some(ty.as_ref());
+                    self.current_field_type = Some(ty.as_weak());
                 } else {
                     self.current_field_type = None;
                 }
@@ -647,7 +647,7 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
             }
         } else {
             let value = self.value.unwrap().as_value();
-            self.current_field_type = Some(value.datatype().as_ref());
+            self.current_field_type = Some(value.datatype().as_weak());
             if value.is::<Array>() {
                 self.state = ViewState::Array;
             }
@@ -676,7 +676,7 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
 
         let ty = active_ty.cast_unchecked::<DataType>();
         debug_assert!(ty.is_concrete_type());
-        self.current_field_type = Some(ty.as_ref());
+        self.current_field_type = Some(ty.as_weak());
     }
 }
 

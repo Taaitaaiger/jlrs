@@ -143,21 +143,19 @@ impl AsyncTask for NestingTaskAsyncFrame {
         frame.gc_collect_n(jlrs::memory::gc::GcCollection::Full, 3);
 
         let v = frame
-            .async_scope(|mut frame| async move {
-                unsafe {
-                    frame.gc_collect_n(jlrs::memory::gc::GcCollection::Full, 3);
+            .async_scope(async |mut frame| unsafe {
+                frame.gc_collect_n(jlrs::memory::gc::GcCollection::Full, 3);
 
-                    Module::main(&frame)
-                        .submodule(&frame, "AsyncTests")?
-                        .as_managed()
-                        .function(&frame, "complexfunc")?
-                        .as_managed()
-                        .as_value()
-                        .call_async(&mut frame, [dims, iters])
-                        .await
-                        .unwrap()
-                        .unbox::<f64>()
-                }
+                Module::main(&frame)
+                    .submodule(&frame, "AsyncTests")?
+                    .as_managed()
+                    .function(&frame, "complexfunc")?
+                    .as_managed()
+                    .as_value()
+                    .call_async(&mut frame, [dims, iters])
+                    .await
+                    .unwrap()
+                    .unbox::<f64>()
             })
             .await?;
 
@@ -181,7 +179,7 @@ impl AsyncTask for NestingTaskAsyncValueFrame {
         frame.gc_collect_n(jlrs::memory::gc::GcCollection::Full, 3);
 
         let v = (&mut frame)
-            .async_scope(|mut frame| async move {
+            .async_scope(async |mut frame| -> JlrsResult<_> {
                 let iters = Value::new(&mut frame, self.iters);
 
                 frame.gc_collect_n(jlrs::memory::gc::GcCollection::Full, 3);
@@ -225,7 +223,7 @@ impl AsyncTask for NestingTaskAsyncCallFrame {
         frame.gc_collect_n(jlrs::memory::gc::GcCollection::Full, 3);
 
         let v = frame
-            .async_scope(|mut frame| async move {
+            .async_scope(async |mut frame| -> JlrsResult<_> {
                 let iters = Value::new(&mut frame, self.iters);
                 frame.gc_collect_n(jlrs::memory::gc::GcCollection::Full, 3);
                 let dims = Value::new(&mut frame, self.dims);
@@ -277,7 +275,7 @@ impl AsyncTask for NestingTaskAsyncGcFrame {
         frame.gc_collect_n(jlrs::memory::gc::GcCollection::Full, 3);
 
         let v = frame
-            .async_scope(|mut frame| async move {
+            .async_scope(async |mut frame| -> JlrsResult<_> {
                 unsafe {
                     frame.gc_collect_n(jlrs::memory::gc::GcCollection::Full, 3);
 
@@ -310,7 +308,7 @@ impl AsyncTask for NestingTaskAsyncDynamicValueFrame {
     async fn run<'base>(self, mut frame: AsyncGcFrame<'base>) -> Self::Output {
         let output = frame.output();
         let v = frame
-            .async_scope(|mut frame| async move {
+            .async_scope(async |mut frame| -> JlrsResult<_> {
                 frame.gc_collect(jlrs::memory::gc::GcCollection::Full);
                 frame.gc_collect(jlrs::memory::gc::GcCollection::Full);
                 frame.gc_collect(jlrs::memory::gc::GcCollection::Full);
@@ -351,7 +349,7 @@ impl AsyncTask for NestingTaskAsyncDynamicCallFrame {
     async fn run<'base>(self, mut frame: AsyncGcFrame<'base>) -> Self::Output {
         let output = frame.output();
         let v = frame
-            .async_scope(|mut frame| async move {
+            .async_scope(async |mut frame| -> JlrsResult<_> {
                 frame.gc_collect(jlrs::memory::gc::GcCollection::Full);
                 frame.gc_collect(jlrs::memory::gc::GcCollection::Full);
                 frame.gc_collect(jlrs::memory::gc::GcCollection::Full);
@@ -380,8 +378,8 @@ impl AsyncTask for NestingTaskAsyncDynamicCallFrame {
 
                 let out = unsafe {
                     match out {
-                        Ok(v) => Ok(v.as_ref().root(output)),
-                        Err(e) => Err(e.as_ref().root(output)),
+                        Ok(v) => Ok(v.as_weak().root(output)),
+                        Err(e) => Err(e.as_weak().root(output)),
                     }
                 };
                 frame.gc_collect(jlrs::memory::gc::GcCollection::Full);
@@ -427,19 +425,17 @@ impl PersistentTask for AccumulatorTask {
             let output = frame.output();
             let init_value = self.init_value;
             let res = frame
-                .async_scope(|mut frame| {
-                    async move {
-                        // A nested scope is used to only root a single value in the frame provided to
-                        // init, rather than two.
-                        let func = Module::main(&frame)
-                            .global(&frame, "MutFloat64")?
-                            .as_value();
-                        let init_v = Value::new(&mut frame, init_value);
+                .async_scope(async |mut frame| -> JlrsResult<_> {
+                    // A nested scope is used to only root a single value in the frame provided to
+                    // init, rather than two.
+                    let func = Module::main(&frame)
+                        .global(&frame, "MutFloat64")?
+                        .as_value();
+                    let init_v = Value::new(&mut frame, init_value);
 
-                        frame.gc_collect(jlrs::memory::gc::GcCollection::Full);
+                    frame.gc_collect(jlrs::memory::gc::GcCollection::Full);
 
-                        Ok(func.call1(output, init_v))
-                    }
+                    Ok(func.call1(output, init_v))
                 })
                 .await?
                 .into_jlrs_result();
@@ -489,7 +485,7 @@ impl AsyncTask for LocalTask {
                 .as_managed()
                 .function(&frame, "complexfunc")?
                 .as_managed()
-                .call_async_local(&mut frame, [dims, iters])
+                .call_async(&mut frame, [dims, iters])
                 .await
                 .unwrap()
                 .unbox::<f64>()? as f32
@@ -521,7 +517,7 @@ impl AsyncTask for LocalSchedulingTask {
                 .as_managed()
                 .function(&frame, "complexfunc")?
                 .as_managed()
-                .schedule_async_local(&mut frame, [dims, iters])
+                .schedule_async(&mut frame, [dims, iters])
                 .unwrap();
 
             frame.gc_collect(jlrs::memory::gc::GcCollection::Full);
@@ -557,7 +553,7 @@ impl AsyncTask for MainTask {
                 .as_managed()
                 .function(&frame, "complexfunc")?
                 .as_managed()
-                .call_async_main(&mut frame, [dims, iters])
+                .call_async(&mut frame, [dims, iters])
                 .await
                 .unwrap()
                 .unbox::<f64>()? as f32
@@ -589,7 +585,7 @@ impl AsyncTask for MainSchedulingTask {
                 .as_managed()
                 .function(&frame, "complexfunc")?
                 .as_managed()
-                .schedule_async_main(&mut frame, [dims, iters])
+                .schedule_async(&mut frame, [dims, iters])
                 .unwrap();
 
             frame.gc_collect(jlrs::memory::gc::GcCollection::Full);
@@ -665,7 +661,7 @@ impl AsyncTask for LocalKwSchedulingTask {
                 .function(&frame, "kwfunc")?
                 .as_managed()
                 .provide_keywords(nt)?
-                .schedule_async_local(&mut frame, [dims, iters])
+                .schedule_async(&mut frame, [dims, iters])
                 .unwrap();
 
             frame.gc_collect(jlrs::memory::gc::GcCollection::Full);
@@ -745,7 +741,7 @@ impl AsyncTask for MainKwSchedulingTask {
                 .function(&frame, "kwfunc")?
                 .as_managed()
                 .provide_keywords(nt)?
-                .schedule_async_main(&mut frame, [dims, iters])
+                .schedule_async(&mut frame, [dims, iters])
                 .unwrap();
 
             frame.gc_collect(jlrs::memory::gc::GcCollection::Full);
@@ -788,7 +784,7 @@ impl AsyncTask for LocalKwTask {
                 .function(&frame, "kwfunc")?
                 .as_managed()
                 .provide_keywords(nt)?
-                .call_async_local(&mut frame, [dims, iters])
+                .call_async(&mut frame, [dims, iters])
                 .await
                 .unwrap()
                 .unbox::<f64>()? as f32
@@ -823,7 +819,7 @@ impl AsyncTask for MainKwTask {
                 .function(&frame, "kwfunc")?
                 .as_managed()
                 .provide_keywords(nt)?
-                .call_async_main(&mut frame, [dims, iters])
+                .call_async(&mut frame, [dims, iters])
                 .await
                 .unwrap()
                 .unbox::<f64>()? as f32
@@ -833,23 +829,19 @@ impl AsyncTask for MainKwTask {
     }
 }
 
-pub struct BorrowArrayData;
+pub struct BorrowArrayDataClosure;
 
-impl AsyncTask for BorrowArrayData {
+impl AsyncTask for BorrowArrayDataClosure {
     type Output = JlrsResult<f64>;
 
     async fn run<'base>(self, mut frame: AsyncGcFrame<'base>) -> Self::Output {
         let mut data = vec![2.0f64];
         let borrowed = &mut data;
         let output = frame.output();
-        let v = unsafe {
-            frame
-                .relaxed_async_scope(|_frame| async move {
-                    TypedArray::<f64>::from_slice(output, borrowed, 1)
-                })
-                .await?
-                .into_jlrs_result()?
-        };
+        let v = frame
+            .async_scope(async |_frame| TypedArray::<f64>::from_slice(output, borrowed, 1))
+            .await?
+            .into_jlrs_result()?;
 
         let data2 = unsafe { v.inline_data() };
 
@@ -860,33 +852,3 @@ impl AsyncTask for BorrowArrayData {
         Ok(v)
     }
 }
-
-// TODO: Rust 1.85
-// #[cfg(feature = "async-closure")]
-// pub struct BorrowArrayDataClosure;
-
-// TODO: Rust 1.85
-// #[cfg(feature = "async-closure")]
-// impl AsyncTask for BorrowArrayDataClosure {
-//     type Output = JlrsResult<f64>;
-
-//     async fn run<'base>(self, mut frame: AsyncGcFrame<'base>) -> Self::Output {
-//         let mut data = vec![2.0f64];
-//         let borrowed = &mut data;
-//         let output = frame.output();
-//         let v = frame
-//             .async_scope_closure(async move |_frame| {
-//                 TypedArray::<f64>::from_slice(output, borrowed, 1)
-//             })
-//             .await?
-//             .into_jlrs_result()?;
-
-//         let data2 = unsafe { v.inline_data() };
-
-//         frame.gc_collect(jlrs::memory::gc::GcCollection::Full);
-//         // Uncommenting next line must be compile error
-//         // let _ = data[0];
-//         let v = data2[0];
-//         Ok(v)
-//     }
-// }
