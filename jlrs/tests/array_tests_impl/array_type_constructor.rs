@@ -20,43 +20,41 @@ pub(crate) mod tests {
     use crate::util::JULIA;
 
     fn fully_qualified_ctor() {
-        JULIA.with(|j| {
-            let mut frame = StackFrame::new();
-            let mut jlrs = j.borrow_mut();
+        JULIA.with(|handle| {
+            handle.borrow_mut().with_stack(|mut stack| {
+                stack
+                    .returning::<JlrsResult<_>>()
+                    .scope(|mut frame| {
+                        let ty = ArrayTypeConstructor::<f32, ConstantIsize<1>>::construct_type(
+                            &mut frame,
+                        );
+                        let ty2 = TypedRankedArray::<f32, 1>::construct_type(&mut frame);
+                        assert_eq!(ty, ty2);
+                        assert!(ty.is::<DataType>());
 
-            jlrs.instance(&mut frame)
-                .returning::<JlrsResult<_>>()
-                .scope(|mut frame| {
-                    let ty =
-                        ArrayTypeConstructor::<f32, ConstantIsize<1>>::construct_type(&mut frame);
-                    let ty2 = TypedRankedArray::<f32, 1>::construct_type(&mut frame);
-                    assert_eq!(ty, ty2);
-                    assert!(ty.is::<DataType>());
+                        let ty = unsafe { ty.cast_unchecked::<DataType>() };
+                        assert!(ty.is::<Array>());
+                        assert!(ty.is::<TypedArray<f32>>());
+                        assert!(!ty.is::<TypedArray<f64>>());
+                        assert!(ty.is::<RankedArray<1>>());
+                        assert!(ty.is::<RankedArray<-1>>());
+                        assert!(!ty.is::<RankedArray<2>>());
+                        assert!(ty.is::<TypedRankedArray<f32, 1>>());
+                        assert!(ty.is::<TypedRankedArray<f32, -1>>());
+                        assert!(!ty.is::<TypedRankedArray<f32, 2>>());
+                        assert!(!ty.is::<TypedRankedArray<f64, 1>>());
 
-                    let ty = unsafe { ty.cast_unchecked::<DataType>() };
-                    assert!(ty.is::<Array>());
-                    assert!(ty.is::<TypedArray<f32>>());
-                    assert!(!ty.is::<TypedArray<f64>>());
-                    assert!(ty.is::<RankedArray<1>>());
-                    assert!(ty.is::<RankedArray<-1>>());
-                    assert!(!ty.is::<RankedArray<2>>());
-                    assert!(ty.is::<TypedRankedArray<f32, 1>>());
-                    assert!(ty.is::<TypedRankedArray<f32, -1>>());
-                    assert!(!ty.is::<TypedRankedArray<f32, 2>>());
-                    assert!(!ty.is::<TypedRankedArray<f64, 1>>());
-
-                    Ok(())
-                })
-                .unwrap();
+                        Ok(())
+                    })
+                    .unwrap();
+            });
         });
     }
 
     fn no_rank_ctor() {
-        JULIA.with(|j| {
-            let mut frame = StackFrame::new();
-            let mut jlrs = j.borrow_mut();
-
-            jlrs.instance(&mut frame)
+        JULIA.with(|handle| {
+            handle.borrow_mut().with_stack(|mut stack| {
+                stack
                 .returning::<JlrsResult<_>>().scope(|mut frame| {
                     let ty =
                         ArrayTypeConstructor::<f32, TypeVarConstructor<ConstantChar<'N'>>>::construct_type(&mut frame);
@@ -78,103 +76,99 @@ pub(crate) mod tests {
                 })
                 .unwrap();
         });
+        });
     }
 
     fn no_type_ctor() {
-        JULIA.with(|j| {
-            let mut frame = StackFrame::new();
-            let mut jlrs = j.borrow_mut();
+        JULIA.with(|handle| {
+            handle.borrow_mut().with_stack(|mut stack| {
+                stack
+                    .returning::<JlrsResult<_>>()
+                    .scope(|mut frame| {
+                        let ty = ArrayTypeConstructor::<
+                            TypeVarConstructor<ConstantChar<'T'>>,
+                            ConstantIsize<1>,
+                        >::construct_type(&mut frame);
+                        let ty2 = RankedArray::<1>::construct_type(&mut frame);
+                        assert_eq!(ty, ty2);
+                        assert!(ty.is::<UnionAll>());
 
-            jlrs.instance(&mut frame)
-                .returning::<JlrsResult<_>>()
-                .scope(|mut frame| {
-                    let ty = ArrayTypeConstructor::<
-                        TypeVarConstructor<ConstantChar<'T'>>,
-                        ConstantIsize<1>,
-                    >::construct_type(&mut frame);
-                    let ty2 = RankedArray::<1>::construct_type(&mut frame);
-                    assert_eq!(ty, ty2);
-                    assert!(ty.is::<UnionAll>());
+                        let base = unsafe { ty.cast_unchecked::<UnionAll>().base_type() };
+                        assert!(base.is::<Array>());
+                        assert!(!base.is::<TypedArray<f32>>());
+                        assert!(base.is::<RankedArray<-1>>());
+                        assert!(base.is::<RankedArray<1>>());
+                        assert!(!base.is::<TypedRankedArray<f32, -1>>());
+                        assert!(!base.is::<TypedRankedArray<f32, 1>>());
+                        assert!(!base.is::<TypedRankedArray<f64, -1>>());
 
-                    let base = unsafe { ty.cast_unchecked::<UnionAll>().base_type() };
-                    assert!(base.is::<Array>());
-                    assert!(!base.is::<TypedArray<f32>>());
-                    assert!(base.is::<RankedArray<-1>>());
-                    assert!(base.is::<RankedArray<1>>());
-                    assert!(!base.is::<TypedRankedArray<f32, -1>>());
-                    assert!(!base.is::<TypedRankedArray<f32, 1>>());
-                    assert!(!base.is::<TypedRankedArray<f64, -1>>());
-
-                    Ok(())
-                })
-                .unwrap();
+                        Ok(())
+                    })
+                    .unwrap();
+            });
         });
     }
 
     fn generic_ctor() {
-        JULIA.with(|j| {
-            let mut frame = StackFrame::new();
-            let mut jlrs = j.borrow_mut();
+        JULIA.with(|handle| {
+            handle.borrow_mut().with_stack(|mut stack| {
+                stack
+                    .returning::<JlrsResult<_>>()
+                    .scope(|mut frame| {
+                        let ty = ArrayTypeConstructor::<
+                            TypeVarConstructor<ConstantChar<'T'>>,
+                            TypeVarConstructor<ConstantChar<'N'>>,
+                        >::construct_type(&mut frame);
+                        let ty2 = Array::construct_type(&mut frame);
+                        assert_eq!(ty, ty2);
+                        assert!(ty.is::<UnionAll>());
 
-            jlrs.instance(&mut frame)
-                .returning::<JlrsResult<_>>()
-                .scope(|mut frame| {
-                    let ty = ArrayTypeConstructor::<
-                        TypeVarConstructor<ConstantChar<'T'>>,
-                        TypeVarConstructor<ConstantChar<'N'>>,
-                    >::construct_type(&mut frame);
-                    let ty2 = Array::construct_type(&mut frame);
-                    assert_eq!(ty, ty2);
-                    assert!(ty.is::<UnionAll>());
+                        let base = unsafe { ty.cast_unchecked::<UnionAll>().base_type() };
+                        assert!(base.is::<Array>());
+                        assert!(!base.is::<TypedArray<f32>>());
+                        assert!(base.is::<RankedArray<-1>>());
+                        assert!(!base.is::<RankedArray<1>>());
+                        assert!(!base.is::<TypedRankedArray<f32, -1>>());
+                        assert!(!base.is::<TypedRankedArray<f32, 1>>());
+                        assert!(!base.is::<TypedRankedArray<f64, -1>>());
 
-                    let base = unsafe { ty.cast_unchecked::<UnionAll>().base_type() };
-                    assert!(base.is::<Array>());
-                    assert!(!base.is::<TypedArray<f32>>());
-                    assert!(base.is::<RankedArray<-1>>());
-                    assert!(!base.is::<RankedArray<1>>());
-                    assert!(!base.is::<TypedRankedArray<f32, -1>>());
-                    assert!(!base.is::<TypedRankedArray<f32, 1>>());
-                    assert!(!base.is::<TypedRankedArray<f64, -1>>());
-
-                    Ok(())
-                })
-                .unwrap();
+                        Ok(())
+                    })
+                    .unwrap();
+            });
         });
     }
 
     fn ua_type_ctor() {
-        JULIA.with(|j| {
-            let mut frame = StackFrame::new();
-            let mut jlrs = j.borrow_mut();
+        JULIA.with(|handle| {
+            handle.borrow_mut().with_stack(|mut stack| {
+                stack
+                    .returning::<JlrsResult<_>>()
+                    .scope(|mut frame| {
+                        let ty = ArrayTypeConstructor::<
+                            RankedArray<1>,
+                            TypeVarConstructor<ConstantChar<'N'>>,
+                        >::construct_type(&mut frame);
+                        let ty2 = TypedArray::<RankedArray<1>>::construct_type(&mut frame);
+                        assert_eq!(ty, ty2);
+                        assert!(ty.is::<UnionAll>());
 
-            jlrs.instance(&mut frame)
-                .returning::<JlrsResult<_>>()
-                .scope(|mut frame| {
-                    let ty = ArrayTypeConstructor::<
-                        RankedArray<1>,
-                        TypeVarConstructor<ConstantChar<'N'>>,
-                    >::construct_type(&mut frame);
-                    let ty2 = TypedArray::<RankedArray<1>>::construct_type(&mut frame);
-                    assert_eq!(ty, ty2);
-                    assert!(ty.is::<UnionAll>());
+                        let base = unsafe { ty.cast_unchecked::<UnionAll>().base_type() };
+                        assert!(base.is::<Array>());
+                        assert!(base.is::<TypedArray<RankedArray<1>>>());
+                        assert!(!base.is::<TypedArray<RankedArray<-1>>>());
 
-                    let base = unsafe { ty.cast_unchecked::<UnionAll>().base_type() };
-                    assert!(base.is::<Array>());
-                    assert!(base.is::<TypedArray<RankedArray<1>>>());
-                    assert!(!base.is::<TypedArray<RankedArray<-1>>>());
-
-                    Ok(())
-                })
-                .unwrap();
+                        Ok(())
+                    })
+                    .unwrap();
+            });
         });
     }
 
     fn restricted_tvar_type_ctor() {
-        JULIA.with(|j| {
-            let mut frame = StackFrame::new();
-            let mut jlrs = j.borrow_mut();
-
-            jlrs.instance(&mut frame)
+        JULIA.with(|handle| {
+            handle.borrow_mut().with_stack(|mut stack| {
+                stack
                 .returning::<JlrsResult<_>>().scope(|mut frame| {
                     let ty =
                         ArrayTypeConstructor::<TypeVarConstructor<ConstantChar<'T'>, Number>, ConstantSize<1>>::construct_type(&mut frame);
@@ -190,6 +184,7 @@ pub(crate) mod tests {
                     Ok(())
                 })
                 .unwrap();
+        });
         });
     }
 

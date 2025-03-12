@@ -7,47 +7,48 @@ mod tests {
     use crate::util::JULIA;
 
     fn extend_lifetime() {
-        JULIA.with(|j| {
-            let mut frame = StackFrame::new();
-            let mut jlrs = j.borrow_mut();
-            jlrs.instance(&mut frame)
-                .returning::<JlrsResult<_>>()
-                .scope(|mut frame| {
-                    let output = frame.output();
+        JULIA.with(|handle| {
+            handle.borrow_mut().with_stack(|mut stack| {
+                stack
+                    .returning::<JlrsResult<_>>()
+                    .scope(|mut frame| {
+                        let output = frame.output();
 
-                    frame
-                        .scope(|frame| {
-                            let func =
-                                unsafe { Module::base(&frame).function(&frame, "+")?.as_managed() };
-                            JlrsResult::Ok(func.root(output))
-                        })
-                        .unwrap();
+                        frame
+                            .scope(|frame| {
+                                let func = unsafe {
+                                    Module::base(&frame).function(&frame, "+")?.as_managed()
+                                };
+                                JlrsResult::Ok(func.root(output))
+                            })
+                            .unwrap();
 
-                    Ok(())
-                })
-                .unwrap();
+                        Ok(())
+                    })
+                    .unwrap();
+            })
         })
     }
 
     fn has_datatype() {
-        JULIA.with(|j| {
-            let mut frame = StackFrame::new();
-            let mut jlrs = j.borrow_mut();
-            jlrs.instance(&mut frame)
-                .returning::<JlrsResult<_>>()
-                .scope(|frame| {
-                    let func_ty = unsafe {
-                        Module::base(&frame)
-                            .function(&frame, "+")?
-                            .as_managed()
-                            .datatype()
-                    };
+        JULIA.with(|handle| {
+            handle.borrow_mut().with_stack(|mut stack| {
+                stack
+                    .returning::<JlrsResult<_>>()
+                    .scope(|frame| {
+                        let func_ty = unsafe {
+                            Module::base(&frame)
+                                .function(&frame, "+")?
+                                .as_managed()
+                                .datatype()
+                        };
 
-                    assert_eq!(func_ty.name(), "#+");
+                        assert_eq!(func_ty.name(), "#+");
 
-                    Ok(())
-                })
-                .unwrap();
+                        Ok(())
+                    })
+                    .unwrap();
+            })
         })
     }
 

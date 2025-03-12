@@ -27,7 +27,7 @@ use crate::{
         managed::{datatype::DataTypeData, private::ManagedPriv as _},
         types::construct_type::{ArrayTypeConstructor, ConstantIsize, ConstantSize, ConstructType},
     },
-    memory::scope::{LocalScopeExt, LocalScope},
+    memory::scope::{LocalScope, LocalScopeExt},
     prelude::{Array, Managed, Target, Value, ValueData},
     private::Private,
 };

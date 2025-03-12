@@ -20,8 +20,8 @@ fn bench_background_task(c: &mut Criterion) {
         };
 
         handle.local_scope::<2>(|mut frame| {
-            let mut output1 = frame.local_output();
-            let mut output2 = frame.local_output();
+            let mut output1 = frame.output();
+            let mut output2 = frame.output();
 
             b.iter(|| {
                 let task = spawn_background_task::<usize, _, _>(&mut output1, || Ok(1usize));

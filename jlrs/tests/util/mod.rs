@@ -2,12 +2,7 @@
 use std::cell::RefCell;
 
 #[cfg(feature = "local-rt")]
-use jlrs::{
-    data::managed::value::Value,
-    error::JlrsResult,
-    memory::{scope::Scope, stack_frame::StackFrame},
-    runtime::{builder::Builder, sync_rt::PendingJulia},
-};
+use jlrs::{prelude::*, runtime::handle::local_handle::LocalHandle};
 
 #[cfg(feature = "local-rt")]
 #[allow(dead_code)]
@@ -22,17 +17,12 @@ static JLRS_STABLE_TESTS_JL: &'static str = include_str!("JlrsStableTests.jl");
 pub static MIXED_BAG_JL: &'static str = include_str!("MixedBagStable.jl");
 
 thread_local! {
-    #[cfg(feature = "local-rt")]
-    #[doc(hidden)]
-    #[allow(deprecated)]
-    pub static JULIA: RefCell<PendingJulia> = {
-        let mut frame = StackFrame::new();
-        let r = RefCell::new(unsafe {Builder::new().start().unwrap() });
-        r.borrow_mut().instance(&mut frame).returning::<JlrsResult<_>>().scope(|mut frame| unsafe {
+    pub static JULIA: RefCell<LocalHandle> = {
+        let r = RefCell::new(Builder::new().start_local().unwrap() );
+        r.borrow_mut().local_scope::<2>(|mut frame| unsafe {
             Value::eval_string(&mut frame, JLRS_TESTS_JL).expect("failed to evaluate contents of JlrsTests.jl");
             Value::eval_string(&mut frame, JLRS_STABLE_TESTS_JL).expect("failed to evaluate contents of JlrsTests.jl");
-            Ok(())
-        }).unwrap();
+        });
         r
-    };
+    }
 }

@@ -5,7 +5,6 @@ use std::num::NonZeroUsize;
 use std::{
     cell::Cell,
     marker::PhantomData,
-    path::Path,
     pin::Pin,
     sync::atomic::AtomicUsize,
     thread::{Scope, ScopedJoinHandle},
@@ -24,11 +23,10 @@ use super::{notify, weak_handle::WeakHandle, IsActive};
 use crate::runtime::executor::Executor;
 use crate::{
     call::Call,
-    convert::into_jlrs_result::IntoJlrsResult,
-    data::managed::module::{JlrsCore, Main},
-    error::{IOError, CANNOT_DISPLAY_VALUE},
+    data::managed::module::JlrsCore,
+    error::CANNOT_DISPLAY_VALUE,
     memory::{gc::gc_unsafe, get_tls, scope::LocalReturning},
-    prelude::{JlrsResult, JuliaString, LocalScope, Managed, Value},
+    prelude::{LocalScope, Managed},
     runtime::state::{set_exit, set_pending_exit},
     weak_handle_unchecked,
 };
@@ -129,62 +127,6 @@ pub struct ActiveHandle<'ctx> {
 impl<'ctx> ActiveHandle<'ctx> {
     unsafe fn new(_weak: &'ctx mut Pin<&'ctx mut WeakHandle>) -> Self {
         ActiveHandle { _weak: PhantomData }
-    }
-
-    /// Calls `include` in the `Main` module in Julia, which executes the file's contents in that
-    /// module. This has the same effect as calling `include` in the Julia REPL.
-    ///
-    /// This is unsafe because the content of the file is evaluated.
-    ///
-    /// Example:
-    ///
-    /// ```no_run
-    /// # use jlrs::prelude::*;
-    /// # fn main() {
-    /// # Builder::new().start_mt(|mut julia| {
-    ///     julia.with(|handle| unsafe {
-    ///         handle.include("Path/To/MyJuliaCode.jl").unwrap();
-    ///     });
-    /// }).unwrap();
-    /// # }
-    /// ```
-    pub unsafe fn include<P: AsRef<Path>>(&self, path: P) -> JlrsResult<()> {
-        if path.as_ref().exists() {
-            return self.local_scope::<2>(|mut frame| {
-                let path_jl_str = JuliaString::new(&mut frame, path.as_ref().to_string_lossy());
-                Main::include(&frame)
-                    .call1(&mut frame, path_jl_str.as_value())
-                    .into_jlrs_result()
-                    .map(|_| ())
-            });
-        }
-
-        Err(IOError::NotFound {
-            path: path.as_ref().to_string_lossy().into(),
-        })?
-    }
-
-    /// Evaluate `using {module_name}`.
-    ///
-    /// Safety: `module_name` must be a valid module or package name.
-    ///
-    /// ```
-    /// # use jlrs::prelude::*;
-    /// # fn main() {
-    /// # Builder::new().start_mt(|mut julia| {
-    ///     julia.with(|handle| unsafe {
-    ///         handle.using("LinearAlgebra").unwrap();
-    ///     });
-    /// }).unwrap();
-    /// # }
-    /// ```
-    pub unsafe fn using<S: AsRef<str>>(&self, module_name: S) -> JlrsResult<()> {
-        return self.local_scope::<1>(|mut frame| {
-            let cmd = format!("using {}", module_name.as_ref());
-            Value::eval_string(&mut frame, cmd)
-                .map(|_| ())
-                .into_jlrs_result()
-        });
     }
 }
 

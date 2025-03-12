@@ -14,21 +14,20 @@ mod tests {
     macro_rules! impl_test {
         ($type:ty, $test_name:ident, $failing_test_name:ident, $val:expr) => {
             fn $test_name() {
-                JULIA.with(|j| {
-                    let mut frame = StackFrame::new();
-                    let mut jlrs = j.borrow_mut();
-
-                    jlrs.instance(&mut frame)
-                        .returning::<JlrsResult<_>>()
-                        .scope(|frame| unsafe {
-                            let val: $type = $val;
-                            assert_eq!(
-                                <$type as Unbox>::unbox(val.into_julia(&frame).as_value()),
-                                $val
-                            );
-                            Ok(())
-                        })
-                        .unwrap();
+                JULIA.with(|handle| {
+                    handle.borrow_mut().with_stack(|mut stack| {
+                        stack
+                            .returning::<JlrsResult<_>>()
+                            .scope(|frame| unsafe {
+                                let val: $type = $val;
+                                assert_eq!(
+                                    <$type as Unbox>::unbox(val.into_julia(&frame).as_value()),
+                                    $val
+                                );
+                                Ok(())
+                            })
+                            .unwrap();
+                    });
                 });
             }
         };

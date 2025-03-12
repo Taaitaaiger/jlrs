@@ -6,7 +6,7 @@ mod mt_handle {
     fn create_pool() {
         Builder::new()
             .async_runtime(Tokio::<3>::new(false))
-            .start_mt(|julia, a_h: AsyncHandle| {
+            .start_mt(|julia, a_h| {
                 let handle = julia
                     .pool_builder(Tokio::<1>::new(false))
                     .n_workers(2.try_into().unwrap())

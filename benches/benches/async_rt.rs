@@ -1,5 +1,5 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use jlrs::prelude::*;
+use jlrs::{prelude::*, runtime::handle::async_handle::AsyncHandle};
 #[cfg(not(target_os = "windows"))]
 use pprof::{
     criterion::{Output, PProfProfiler},

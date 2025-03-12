@@ -2,6 +2,8 @@
 
 use parking_lot::{Condvar, Mutex};
 
+use crate::memory::gc::GcInterface;
+
 #[cfg(feature = "async-rt")]
 pub mod async_handle;
 #[cfg(feature = "ccall")]
@@ -15,7 +17,13 @@ pub mod weak_handle;
 pub mod with_stack;
 
 /// Implemented by active handles. Only active handles allow calling into Julia.
-pub trait IsActive: Sized {}
+pub trait IsActive: Sized {
+    /// Provides access to the GC interface.
+    #[inline(always)]
+    fn gc_interface(&self) -> GcInterface<&Self> {
+        GcInterface::new(self)
+    }
+}
 
 pub(crate) fn notify(pair: &(Mutex<bool>, Condvar)) {
     let (ref lock, ref cvar) = &pair;

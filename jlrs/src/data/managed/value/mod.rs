@@ -121,7 +121,6 @@ use std::{
     ffi::{c_void, CStr, CString},
     marker::PhantomData,
     mem::MaybeUninit,
-    path::Path,
     ptr::NonNull,
     usize,
 };
@@ -150,6 +149,7 @@ use crate::{
     data::{
         layout::{
             is_bits::IsBits,
+            tuple::NTuple,
             typed_layout::HasLayout,
             valid_layout::{ValidField, ValidLayout},
         },
@@ -157,7 +157,6 @@ use crate::{
             datatype::DataType,
             module::Module,
             private::ManagedPriv,
-            string::JuliaString,
             symbol::Symbol,
             union::Union,
             union_all::UnionAll,
@@ -169,14 +168,13 @@ use crate::{
             typecheck::{NamedTuple, Typecheck},
         },
     },
-    error::{AccessError, IOError, JlrsError, JlrsResult, TypeError, CANNOT_DISPLAY_TYPE},
+    error::{AccessError, JlrsError, JlrsResult, TypeError, CANNOT_DISPLAY_TYPE},
     memory::{
         context::ledger::Ledger,
         get_tls,
         scope::LocalScopeExt,
         target::{unrooted::Unrooted, Target, TargetException, TargetResult},
     },
-    prelude::NTuple,
     private::Private,
 };
 
@@ -1281,35 +1279,6 @@ impl Value<'_, '_> {
             Err(NonNull::new_unchecked(exc))
         };
         target.result_from_ptr(output, Private)
-    }
-
-    /// Calls `include` in the `Main` module in Julia, which evaluates the file's contents in that
-    /// module. This has the same effect as calling `include` in the Julia REPL.
-    ///
-    /// Safety: The content of the file can't be checked for correctness, nothing prevents you
-    /// from causing a segmentation fault with code like `unsafe_load(Ptr{Float64}(C_NULL))`.
-    pub unsafe fn include<'target, 'current, 'borrow, P, Tgt>(
-        target: Tgt,
-        path: P,
-    ) -> JlrsResult<ValueResult<'target, 'static, Tgt>>
-    where
-        P: AsRef<Path>,
-        Tgt: Target<'target>,
-    {
-        if path.as_ref().exists() {
-            return target.with_local_scope::<1>(|target, mut frame| {
-                let path_jl_str = JuliaString::new(&mut frame, path.as_ref().to_string_lossy());
-                let include_func = Module::main(&frame)
-                    .function(&frame, "include")?
-                    .as_managed();
-
-                Ok(include_func.call1(target, path_jl_str.as_value()))
-            });
-        }
-
-        Err(IOError::NotFound {
-            path: path.as_ref().to_string_lossy().into(),
-        })?
     }
 }
 

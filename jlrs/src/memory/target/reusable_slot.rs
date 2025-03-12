@@ -1,8 +1,6 @@
 //! Reusable slots
 //!
-//! Reusable slots target a reserved slot in some frame. There are two variations,
-//! [`ReusableSlot`] and  [`LocalReusableSlot`], both behave the same way, they only only target
-//! different kinds of frame.
+//! Reusable slots target a reserved slot in some frame.
 //!
 //! When a reusable slot is taken by mutable reference it can be reused, the lifetime that is
 //! considered the `'target` lifetime is the lifetime of the reusable slot. Because this means
@@ -17,7 +15,7 @@
 //! let mut julia = Builder::new().start_local().unwrap();
 //!
 //! julia.local_scope::<1>(|mut frame| {
-//!     let reusable_slot = frame.local_reusable_slot();
+//!     let reusable_slot = frame.reusable_slot();
 //!
 //!     let _v = frame.local_scope::<0>(|_| {
 //!         // The reusable slot has been allocated in the parent
@@ -35,7 +33,7 @@
 //! let mut julia = Builder::new().start_local().unwrap();
 //!
 //! julia.local_scope::<1>(|mut frame| {
-//!     let mut reusable_slot = frame.local_reusable_slot();
+//!     let mut reusable_slot = frame.reusable_slot();
 //!
 //!     let _v = frame.local_scope::<0>(|_| {
 //!         // This data can be used until you leave the parent scope,
@@ -46,68 +44,41 @@
 //! # }
 //! ```
 
-use std::{cell::Cell, ffi::c_void, ptr::NonNull};
+use std::{marker::PhantomData, ptr::NonNull};
 
+use super::slot_ref::SlotRef;
 use crate::{
     data::managed::{Managed, Weak},
-    memory::context::stack::Stack,
     private::Private,
 };
 
-/// An reusable slot that targets a [`GcFrame`].
+/// A reusable slot.
 ///
 /// See the [module-level docs] for more information.
 ///
 /// [module-level docs]: crate::memory::target::output
-/// [`GcFrame`]: crate::memory::target::frame::GcFrame
 
-pub struct ReusableSlot<'target> {
-    pub(crate) stack: &'target Stack,
-    pub(crate) offset: usize,
+pub struct ReusableSlot<'target, S> {
+    slot: S,
+    _marker: PhantomData<&'target ()>,
 }
 
-impl<'scope> ReusableSlot<'scope> {
-    #[inline]
-    pub(crate) unsafe fn consume<'data, T: Managed<'scope, 'data>>(
-        self,
-        ptr: NonNull<T::Wraps>,
-    ) -> T {
-        self.stack.set_root(self.offset, ptr.cast());
-        T::wrap_non_null(ptr, Private)
-    }
-
-    #[inline]
-    pub(crate) unsafe fn temporary<'data, T: Managed<'scope, 'data>>(
-        &mut self,
-        ptr: NonNull<T::Wraps>,
-    ) -> Weak<'scope, 'data, T> {
-        self.stack.set_root(self.offset, ptr.cast());
-        Weak::<T>::wrap(ptr)
+impl<'target, S: SlotRef> ReusableSlot<'target, S> {
+    pub(crate) unsafe fn new(slot: S) -> Self {
+        ReusableSlot {
+            slot,
+            _marker: PhantomData,
+        }
     }
 }
 
-/// An reusable slot that targets a [`LocalGcFrame`].
-///
-/// See the [module-level docs] for more information.
-///
-/// [module-level docs]: crate::memory::target::output
-/// [`LocalGcFrame`]: crate::memory::target::frame::LocalGcFrame
-pub struct LocalReusableSlot<'target> {
-    slot: &'target Cell<*mut c_void>,
-}
-
-impl<'target> LocalReusableSlot<'target> {
-    #[inline]
-    pub(crate) fn new(slot: &'target Cell<*mut c_void>) -> Self {
-        LocalReusableSlot { slot }
-    }
-
+impl<'target, S: SlotRef> ReusableSlot<'target, S> {
     #[inline]
     pub(crate) unsafe fn consume<'data, T: Managed<'target, 'data>>(
         self,
         ptr: NonNull<T::Wraps>,
     ) -> T {
-        self.slot.set(ptr.as_ptr().cast());
+        self.slot.set(ptr.cast(), Private);
         T::wrap_non_null(ptr, Private)
     }
 
@@ -116,7 +87,7 @@ impl<'target> LocalReusableSlot<'target> {
         &'t mut self,
         ptr: NonNull<T::Wraps>,
     ) -> Weak<'target, 'data, T> {
-        self.slot.set(ptr.as_ptr().cast());
+        self.slot.set(ptr.cast(), Private);
         Weak::<T>::wrap(ptr)
     }
 }

@@ -19,14 +19,14 @@ use jl_sys::{pop_frame, RawGcFrame, UnsizedGcFrame};
 #[cfg(feature = "async")]
 pub use self::async_frame::*;
 use super::{
-    output::{LocalOutput, Output},
-    reusable_slot::{LocalReusableSlot, ReusableSlot},
+    output::Output,
+    reusable_slot::ReusableSlot,
+    slot_ref::{LocalSlotRef, StackRef},
     unrooted::Unrooted,
     ExtendedTarget, Target,
 };
 use crate::{
-    data::managed::Managed, error::JlrsResult, memory::context::stack::Stack, prelude::Scope,
-    private::Private,
+    data::managed::Managed, memory::context::stack::Stack, prelude::Scope, private::Private,
 };
 
 /// A dynamically-sized frame that can hold an arbitrary number of roots.
@@ -75,7 +75,7 @@ impl<'scope> GcFrame<'scope> {
     #[inline]
     pub fn as_extended_target<'borrow>(
         &'borrow mut self,
-    ) -> ExtendedTarget<'scope, 'scope, 'borrow, Output<'scope>> {
+    ) -> ExtendedTarget<'scope, 'scope, 'borrow, Output<'scope, StackRef<'scope>>> {
         let target = self.output();
         ExtendedTarget {
             target,
@@ -98,25 +98,20 @@ impl<'scope> GcFrame<'scope> {
 
     /// Returns an `Output` that targets the current frame.
     #[inline]
-    pub fn output(&mut self) -> Output<'scope> {
+    pub fn output(&mut self) -> Output<'scope, StackRef<'scope>> {
         unsafe {
             let offset = self.stack.reserve_slot();
-            Output {
-                stack: self.stack,
-                offset,
-            }
+            Output::new(StackRef::new(self.stack, offset))
         }
     }
 
     /// Returns a `ReusableSlot` that targets the current frame.
     #[inline]
-    pub fn reusable_slot(&mut self) -> ReusableSlot<'scope> {
+    pub fn reusable_slot(&mut self) -> ReusableSlot<'scope, StackRef<'scope>> {
         unsafe {
             let offset = self.stack.reserve_slot();
-            ReusableSlot {
-                stack: self.stack,
-                offset,
-            }
+            let slot = StackRef::new(self.stack, offset);
+            ReusableSlot::new(slot)
         }
     }
 
@@ -209,23 +204,24 @@ impl<'scope, const N: usize> LocalGcFrame<'scope, N> {
         N
     }
 
-    /// Returns a `LocalOutput` that targets the current frame.
+    /// Returns an `Output` that targets the current frame.
     #[inline]
-    pub fn local_output(&mut self) -> LocalOutput<'scope> {
+    pub fn output(&mut self) -> Output<'scope, LocalSlotRef<'scope>> {
         unsafe {
             let slot = self.frame.frame.raw.get_root(self.offset);
             self.offset += 1;
-            LocalOutput::new(slot)
+            Output::new(LocalSlotRef::new(slot))
         }
     }
 
-    /// Returns a `LocalReusableSlot` that targets the current frame.
+    /// Returns a `ReusableSlot` that targets the current frame.
     #[inline]
-    pub fn local_reusable_slot(&mut self) -> LocalReusableSlot<'scope> {
+    pub fn reusable_slot(&mut self) -> ReusableSlot<'scope, LocalSlotRef<'scope>> {
         unsafe {
             let slot = self.frame.frame.raw.get_root(self.offset);
+            let slot = LocalSlotRef::new(slot);
             self.offset += 1;
-            LocalReusableSlot::new(slot)
+            ReusableSlot::new(slot)
         }
     }
 
@@ -282,23 +278,24 @@ impl<'scope> UnsizedLocalGcFrame<'scope> {
         self.frame.size()
     }
 
-    /// Returns a `LocalOutput` that targets the current frame.
+    /// Returns an `Output` that targets the current frame.
     #[inline]
-    pub fn local_output(&mut self) -> LocalOutput<'scope> {
+    pub fn output(&mut self) -> Output<'scope, LocalSlotRef<'scope>> {
         unsafe {
             let slot = self.frame.get_root(self.offset);
             self.offset += 1;
-            LocalOutput::new(slot)
+            Output::new(LocalSlotRef::new(slot))
         }
     }
 
-    /// Returns a `LocalReusableSlot` that targets the current frame.
+    /// Returns a `ReusableSlot` that targets the current frame.
     #[inline]
-    pub fn local_reusable_slot(&mut self) -> LocalReusableSlot<'scope> {
+    pub fn reusable_slot(&mut self) -> ReusableSlot<'scope, LocalSlotRef<'scope>> {
         unsafe {
             let slot = self.frame.get_root(self.offset);
+            let slot = LocalSlotRef::new(slot);
             self.offset += 1;
-            LocalReusableSlot::new(slot)
+            ReusableSlot::new(slot)
         }
     }
 
@@ -327,13 +324,14 @@ pub struct BorrowedFrame<'borrow, 'current, F>(
     pub(crate) PhantomData<&'current ()>,
 );
 
+// FIXME: scope trait
 impl<'borrow, 'current> BorrowedFrame<'borrow, 'current, GcFrame<'current>> {
     /// Create a temporary scope by calling [`GcFrame::scope`].
 
     #[inline]
-    pub fn scope<T, F>(self, func: F) -> JlrsResult<T>
+    pub fn scope<T, F>(self, func: F) -> T
     where
-        for<'inner> F: FnOnce(GcFrame<'inner>) -> JlrsResult<T>,
+        for<'inner> F: FnOnce(GcFrame<'inner>) -> T,
     {
         self.0.scope(func)
     }
@@ -343,9 +341,9 @@ impl<'borrow, 'current> BorrowedFrame<'borrow, 'current, GcFrame<'current>> {
 impl<'borrow, 'current> BorrowedFrame<'borrow, 'current, AsyncGcFrame<'current>> {
     /// Create a temporary scope by calling [`GcFrame::scope`].
     #[inline]
-    pub fn scope<T, F>(self, func: F) -> JlrsResult<T>
+    pub fn scope<T, F>(self, func: F) -> T
     where
-        for<'inner> F: FnOnce(GcFrame<'inner>) -> JlrsResult<T>,
+        for<'inner> F: FnOnce(GcFrame<'inner>) -> T,
     {
         self.0.scope(func)
     }

@@ -24,18 +24,17 @@ use jl_sys::{
 use crate::error::JlrsResult;
 #[cfg(feature = "async-rt")]
 use crate::runtime::executor::Executor;
+#[cfg(feature = "local-rt")]
+use crate::runtime::handle::local_handle::LocalHandle;
 #[cfg(feature = "multi-rt")]
 use crate::runtime::handle::mt_handle::MtHandle;
-#[cfg(feature = "local-rt")]
-use crate::runtime::{handle::local_handle::LocalHandle, sync_rt::PendingJulia};
 use crate::{init_jlrs, InstallJlrsCore};
 
 /// Build a runtime.
 ///
 /// With this builder you can set a custom system image by calling [`Builder::image`],
 /// the builder can be upgraded to an [`AsyncBuilder`] by calling
-/// [`Builder::async_runtime`] and providing a backing runtime. To start the runtime you
-/// must call [`Builder::start`].
+/// [`Builder::async_runtime`] and providing a backing runtime.
 pub struct Builder {
     pub(crate) image: Option<(PathBuf, PathBuf)>,
     pub(crate) install_jlrs_core: InstallJlrsCore,
@@ -59,17 +58,7 @@ impl Builder {
 
     #[cfg(feature = "local-rt")]
     #[inline]
-    #[deprecated]
-    /// initialize Julia on the current thread.
-    ///
-    /// Deprecated: use [`Builder::start_local`] instead.
-    pub unsafe fn start(self) -> JlrsResult<PendingJulia> {
-        PendingJulia::init(self)
-    }
-
-    #[cfg(feature = "local-rt")]
-    #[inline]
-    /// initialize Julia on the current thread.
+    /// Initialize Julia on the current thread.
     pub fn start_local(self) -> JlrsResult<LocalHandle> {
         use crate::{error::RuntimeError, runtime::state::can_init};
 
@@ -83,6 +72,10 @@ impl Builder {
         }
     }
 
+    /// Start the multithreaded runtime from the current thread.
+    ///
+    /// A new thread is spawned which calls `func`. Julia will remain enabled until `func`
+    /// returns.
     #[inline]
     #[cfg(feature = "multi-rt")]
     pub fn start_mt<'env, T: 'static + Send, F>(self, func: F) -> JlrsResult<T>

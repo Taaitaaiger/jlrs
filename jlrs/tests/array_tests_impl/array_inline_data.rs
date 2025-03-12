@@ -30,317 +30,305 @@ pub(crate) mod tests {
     }
 
     fn inline_data() {
-        JULIA.with(|j| {
-            let mut frame = StackFrame::new();
-            let mut jlrs = j.borrow_mut();
+        JULIA.with(|handle| {
+            handle.borrow_mut().with_stack(|mut stack| {
+                stack
+                    .returning::<JlrsResult<_>>()
+                    .scope(|mut frame| {
+                        unsafe {
+                            let arr = Value::eval_string(&mut frame, "IWRL[IWRL(1,1) IWRL(2,2)]")
+                                .unwrap();
+                            let arr = arr.cast::<TypedArray<IWRL>>().unwrap();
+                            let accessor = arr.inline_data();
 
-            jlrs.instance(&mut frame)
-                .returning::<JlrsResult<_>>()
-                .scope(|mut frame| {
-                    unsafe {
-                        let arr =
-                            Value::eval_string(&mut frame, "IWRL[IWRL(1,1) IWRL(2,2)]").unwrap();
-                        let arr = arr.cast::<TypedArray<IWRL>>().unwrap();
-                        let accessor = arr.inline_data();
+                            assert_eq!(accessor[[0, 0]].a, 1);
+                            assert_eq!(accessor[[0, 1]].a, 2);
+                        }
 
-                        assert_eq!(accessor[[0, 0]].a, 1);
-                        assert_eq!(accessor[[0, 1]].a, 2);
-                    }
-
-                    Ok(())
-                })
-                .unwrap();
+                        Ok(())
+                    })
+                    .unwrap();
+            });
         });
     }
 
     fn inline_data_get() {
-        JULIA.with(|j| {
-            let mut frame = StackFrame::new();
-            let mut jlrs = j.borrow_mut();
+        JULIA.with(|handle| {
+            handle.borrow_mut().with_stack(|mut stack| {
+                stack
+                    .returning::<JlrsResult<_>>()
+                    .scope(|mut frame| {
+                        unsafe {
+                            let arr = Value::eval_string(&mut frame, "IWRL[IWRL(1,1) IWRL(2,2)]")
+                                .unwrap();
+                            let arr = arr.cast::<TypedArray<IWRL>>().unwrap();
+                            let accessor = arr.inline_data();
 
-            jlrs.instance(&mut frame)
-                .returning::<JlrsResult<_>>()
-                .scope(|mut frame| {
-                    unsafe {
-                        let arr =
-                            Value::eval_string(&mut frame, "IWRL[IWRL(1,1) IWRL(2,2)]").unwrap();
-                        let arr = arr.cast::<TypedArray<IWRL>>().unwrap();
-                        let accessor = arr.inline_data();
+                            assert!(accessor.get([0, 0]).is_some());
+                            assert!(accessor.get([0, 1]).is_some());
+                        }
 
-                        assert!(accessor.get([0, 0]).is_some());
-                        assert!(accessor.get([0, 1]).is_some());
-                    }
-
-                    Ok(())
-                })
-                .unwrap();
+                        Ok(())
+                    })
+                    .unwrap();
+            });
         });
     }
 
     fn inline_data_get_unchecked() {
-        JULIA.with(|j| {
-            let mut frame = StackFrame::new();
-            let mut jlrs = j.borrow_mut();
+        JULIA.with(|handle| {
+            handle.borrow_mut().with_stack(|mut stack| {
+                stack
+                    .returning::<JlrsResult<_>>()
+                    .scope(|mut frame| {
+                        unsafe {
+                            let arr = Value::eval_string(&mut frame, "IWRL[IWRL(1,1) IWRL(2,2)]")
+                                .unwrap();
+                            let arr = arr.cast::<TypedArray<IWRL>>().unwrap();
+                            let accessor = arr.inline_data();
 
-            jlrs.instance(&mut frame)
-                .returning::<JlrsResult<_>>()
-                .scope(|mut frame| {
-                    unsafe {
-                        let arr =
-                            Value::eval_string(&mut frame, "IWRL[IWRL(1,1) IWRL(2,2)]").unwrap();
-                        let arr = arr.cast::<TypedArray<IWRL>>().unwrap();
-                        let accessor = arr.inline_data();
+                            assert_eq!(accessor.get_unchecked([0, 0]).a, 1);
+                            assert_eq!(accessor.get_unchecked([0, 1]).a, 2);
+                        }
 
-                        assert_eq!(accessor.get_unchecked([0, 0]).a, 1);
-                        assert_eq!(accessor.get_unchecked([0, 1]).a, 2);
-                    }
-
-                    Ok(())
-                })
-                .unwrap();
+                        Ok(())
+                    })
+                    .unwrap();
+            });
         });
     }
 
     fn inline_data_as_slice() {
-        JULIA.with(|j| {
-            let mut frame = StackFrame::new();
-            let mut jlrs = j.borrow_mut();
+        JULIA.with(|handle| {
+            handle.borrow_mut().with_stack(|mut stack| {
+                stack
+                    .returning::<JlrsResult<_>>()
+                    .scope(|mut frame| {
+                        unsafe {
+                            let arr = Value::eval_string(&mut frame, "IWRL[IWRL(1,1) IWRL(2,2)]")
+                                .unwrap();
+                            let arr = arr.cast::<TypedArray<IWRL>>().unwrap();
+                            let accessor = arr.inline_data();
+                            let slice = accessor.as_slice();
 
-            jlrs.instance(&mut frame)
-                .returning::<JlrsResult<_>>()
-                .scope(|mut frame| {
-                    unsafe {
-                        let arr =
-                            Value::eval_string(&mut frame, "IWRL[IWRL(1,1) IWRL(2,2)]").unwrap();
-                        let arr = arr.cast::<TypedArray<IWRL>>().unwrap();
-                        let accessor = arr.inline_data();
-                        let slice = accessor.as_slice();
+                            assert_eq!(slice[0].a, 1);
+                            assert_eq!(slice[1].a, 2);
+                        }
 
-                        assert_eq!(slice[0].a, 1);
-                        assert_eq!(slice[1].a, 2);
-                    }
-
-                    Ok(())
-                })
-                .unwrap();
+                        Ok(())
+                    })
+                    .unwrap();
+            });
         });
     }
 
     fn inline_data_into_slice() {
-        JULIA.with(|j| {
-            let mut frame = StackFrame::new();
-            let mut jlrs = j.borrow_mut();
+        JULIA.with(|handle| {
+            handle.borrow_mut().with_stack(|mut stack| {
+                stack
+                    .returning::<JlrsResult<_>>()
+                    .scope(|mut frame| {
+                        unsafe {
+                            let arr = Value::eval_string(&mut frame, "IWRL[IWRL(1,1) IWRL(2,2)]")
+                                .unwrap();
+                            let arr = arr.cast::<TypedArray<IWRL>>().unwrap();
+                            let accessor = arr.inline_data();
+                            let slice = accessor.into_slice();
 
-            jlrs.instance(&mut frame)
-                .returning::<JlrsResult<_>>()
-                .scope(|mut frame| {
-                    unsafe {
-                        let arr =
-                            Value::eval_string(&mut frame, "IWRL[IWRL(1,1) IWRL(2,2)]").unwrap();
-                        let arr = arr.cast::<TypedArray<IWRL>>().unwrap();
-                        let accessor = arr.inline_data();
-                        let slice = accessor.into_slice();
+                            assert_eq!(slice[0].a, 1);
+                            assert_eq!(slice[1].a, 2);
+                        }
 
-                        assert_eq!(slice[0].a, 1);
-                        assert_eq!(slice[1].a, 2);
-                    }
-
-                    Ok(())
-                })
-                .unwrap();
+                        Ok(())
+                    })
+                    .unwrap();
+            });
         });
     }
 
     fn inline_data_get_value() {
-        JULIA.with(|j| {
-            let mut frame = StackFrame::new();
-            let mut jlrs = j.borrow_mut();
+        JULIA.with(|handle| {
+            handle.borrow_mut().with_stack(|mut stack| {
+                stack
+                    .returning::<JlrsResult<_>>()
+                    .scope(|mut frame| {
+                        unsafe {
+                            let arr = Value::eval_string(&mut frame, "IWRL[IWRL(1,1) IWRL(2,2)]")
+                                .unwrap();
+                            let arr = arr.cast::<TypedArray<IWRL>>().unwrap();
+                            let accessor = arr.inline_data();
 
-            jlrs.instance(&mut frame)
-                .returning::<JlrsResult<_>>()
-                .scope(|mut frame| {
-                    unsafe {
-                        let arr =
-                            Value::eval_string(&mut frame, "IWRL[IWRL(1,1) IWRL(2,2)]").unwrap();
-                        let arr = arr.cast::<TypedArray<IWRL>>().unwrap();
-                        let accessor = arr.inline_data();
+                            assert_eq!(
+                                accessor
+                                    .get_value(&mut frame, [0, 0])
+                                    .unwrap()
+                                    .unwrap()
+                                    .unbox::<IWRL>()
+                                    .unwrap()
+                                    .a,
+                                1
+                            );
+                            assert_eq!(
+                                accessor
+                                    .get_value(&mut frame, [0, 1])
+                                    .unwrap()
+                                    .unwrap()
+                                    .unbox::<IWRL>()
+                                    .unwrap()
+                                    .a,
+                                2
+                            );
+                        }
 
-                        assert_eq!(
-                            accessor
-                                .get_value(&mut frame, [0, 0])
-                                .unwrap()
-                                .unwrap()
-                                .unbox::<IWRL>()
-                                .unwrap()
-                                .a,
-                            1
-                        );
-                        assert_eq!(
-                            accessor
-                                .get_value(&mut frame, [0, 1])
-                                .unwrap()
-                                .unwrap()
-                                .unbox::<IWRL>()
-                                .unwrap()
-                                .a,
-                            2
-                        );
-                    }
-
-                    Ok(())
-                })
-                .unwrap();
+                        Ok(())
+                    })
+                    .unwrap();
+            });
         });
     }
 
     fn inline_data_get_value_unchecked() {
-        JULIA.with(|j| {
-            let mut frame = StackFrame::new();
-            let mut jlrs = j.borrow_mut();
+        JULIA.with(|handle| {
+            handle.borrow_mut().with_stack(|mut stack| {
+                stack
+                    .returning::<JlrsResult<_>>()
+                    .scope(|mut frame| {
+                        unsafe {
+                            let arr = Value::eval_string(&mut frame, "IWRL[IWRL(1,1) IWRL(2,2)]")
+                                .unwrap();
+                            let arr = arr.cast::<TypedArray<IWRL>>().unwrap();
+                            let accessor = arr.inline_data();
 
-            jlrs.instance(&mut frame)
-                .returning::<JlrsResult<_>>()
-                .scope(|mut frame| {
-                    unsafe {
-                        let arr =
-                            Value::eval_string(&mut frame, "IWRL[IWRL(1,1) IWRL(2,2)]").unwrap();
-                        let arr = arr.cast::<TypedArray<IWRL>>().unwrap();
-                        let accessor = arr.inline_data();
+                            assert_eq!(
+                                accessor
+                                    .get_value_unchecked(&mut frame, [0, 0])
+                                    .unbox::<IWRL>()
+                                    .unwrap()
+                                    .a,
+                                1
+                            );
+                            assert_eq!(
+                                accessor
+                                    .get_value_unchecked(&mut frame, [0, 1])
+                                    .unbox::<IWRL>()
+                                    .unwrap()
+                                    .a,
+                                2
+                            );
+                        }
 
-                        assert_eq!(
-                            accessor
-                                .get_value_unchecked(&mut frame, [0, 0])
-                                .unbox::<IWRL>()
-                                .unwrap()
-                                .a,
-                            1
-                        );
-                        assert_eq!(
-                            accessor
-                                .get_value_unchecked(&mut frame, [0, 1])
-                                .unbox::<IWRL>()
-                                .unwrap()
-                                .a,
-                            2
-                        );
-                    }
-
-                    Ok(())
-                })
-                .unwrap();
+                        Ok(())
+                    })
+                    .unwrap();
+            });
         });
     }
 
     fn inline_data_with_layout() {
-        JULIA.with(|j| {
-            let mut frame = StackFrame::new();
-            let mut jlrs = j.borrow_mut();
-
-            jlrs.instance(&mut frame)
-                .returning::<JlrsResult<_>>()
-                .scope(|mut frame| {
-                    unsafe {
-                        let arr = Value::eval_string(
-                            &mut frame,
-                            "AIDE{true}[AIDE{true}(1,1) AIDE{true}(2,2)]",
-                        )
-                        .unwrap();
-                        let arr = arr
-                            .cast::<TypedArray<AIDETypeConstructor<ConstantBool<true>>>>()
+        JULIA.with(|handle| {
+            handle.borrow_mut().with_stack(|mut stack| {
+                stack
+                    .returning::<JlrsResult<_>>()
+                    .scope(|mut frame| {
+                        unsafe {
+                            let arr = Value::eval_string(
+                                &mut frame,
+                                "AIDE{true}[AIDE{true}(1,1) AIDE{true}(2,2)]",
+                            )
                             .unwrap();
-                        let accessor = arr.inline_data_with_layout();
+                            let arr = arr
+                                .cast::<TypedArray<AIDETypeConstructor<ConstantBool<true>>>>()
+                                .unwrap();
+                            let accessor = arr.inline_data_with_layout();
 
-                        assert_eq!(accessor.get([0, 0]).unwrap().a, 1);
-                        assert_eq!(accessor.get([0, 1]).unwrap().a, 2);
-                    }
+                            assert_eq!(accessor.get([0, 0]).unwrap().a, 1);
+                            assert_eq!(accessor.get([0, 1]).unwrap().a, 2);
+                        }
 
-                    Ok(())
-                })
-                .unwrap();
+                        Ok(())
+                    })
+                    .unwrap();
+            });
         });
     }
 
     fn try_inline_data() {
-        JULIA.with(|j| {
-            let mut frame = StackFrame::new();
-            let mut jlrs = j.borrow_mut();
+        JULIA.with(|handle| {
+            handle.borrow_mut().with_stack(|mut stack| {
+                stack
+                    .returning::<JlrsResult<_>>()
+                    .scope(|mut frame| {
+                        unsafe {
+                            let arr = Value::eval_string(&mut frame, "IWRL[IWRL(1,1) IWRL(2,2)]")
+                                .unwrap();
+                            let arr = arr.cast::<TypedArray<IWRL>>().unwrap();
+                            let accessor = arr.try_inline_data::<IWRL>();
+                            assert!(accessor.is_ok());
+                        }
 
-            jlrs.instance(&mut frame)
-                .returning::<JlrsResult<_>>()
-                .scope(|mut frame| {
-                    unsafe {
-                        let arr =
-                            Value::eval_string(&mut frame, "IWRL[IWRL(1,1) IWRL(2,2)]").unwrap();
-                        let arr = arr.cast::<TypedArray<IWRL>>().unwrap();
-                        let accessor = arr.try_inline_data::<IWRL>();
-                        assert!(accessor.is_ok());
-                    }
-
-                    Ok(())
-                })
-                .unwrap();
+                        Ok(())
+                    })
+                    .unwrap();
+            });
         });
     }
 
     fn try_inline_data_err() {
-        JULIA.with(|j| {
-            let mut frame = StackFrame::new();
-            let mut jlrs = j.borrow_mut();
+        JULIA.with(|handle| {
+            handle.borrow_mut().with_stack(|mut stack| {
+                stack
+                    .returning::<JlrsResult<_>>()
+                    .scope(|mut frame| {
+                        unsafe {
+                            let arr = Value::eval_string(&mut frame, "IWRL[IWRL(1,1) IWRL(2,2)]")
+                                .unwrap();
+                            let arr = arr.cast::<TypedArray<IWRL>>().unwrap();
+                            let accessor = arr.try_inline_data::<AIDE>();
+                            assert!(accessor.is_err());
+                        }
 
-            jlrs.instance(&mut frame)
-                .returning::<JlrsResult<_>>()
-                .scope(|mut frame| {
-                    unsafe {
-                        let arr =
-                            Value::eval_string(&mut frame, "IWRL[IWRL(1,1) IWRL(2,2)]").unwrap();
-                        let arr = arr.cast::<TypedArray<IWRL>>().unwrap();
-                        let accessor = arr.try_inline_data::<AIDE>();
-                        assert!(accessor.is_err());
-                    }
-
-                    Ok(())
-                })
-                .unwrap();
+                        Ok(())
+                    })
+                    .unwrap();
+            });
         });
     }
 
     fn inline_data_unchecked() {
-        JULIA.with(|j| {
-            let mut frame = StackFrame::new();
-            let mut jlrs = j.borrow_mut();
+        JULIA.with(|handle| {
+            handle.borrow_mut().with_stack(|mut stack| {
+                stack
+                    .returning::<JlrsResult<_>>()
+                    .scope(|mut frame| {
+                        unsafe {
+                            let arr = Value::eval_string(&mut frame, "IWRL[IWRL(1,1) IWRL(2,2)]")
+                                .unwrap();
+                            let arr = arr.cast::<TypedArray<IWRL>>().unwrap();
+                            let accessor = arr.inline_data_unchecked::<IWRL>();
 
-            jlrs.instance(&mut frame)
-                .returning::<JlrsResult<_>>()
-                .scope(|mut frame| {
-                    unsafe {
-                        let arr =
-                            Value::eval_string(&mut frame, "IWRL[IWRL(1,1) IWRL(2,2)]").unwrap();
-                        let arr = arr.cast::<TypedArray<IWRL>>().unwrap();
-                        let accessor = arr.inline_data_unchecked::<IWRL>();
+                            assert_eq!(accessor[[0, 0]].a, 1);
+                            assert_eq!(accessor[[0, 1]].a, 2);
+                        }
 
-                        assert_eq!(accessor[[0, 0]].a, 1);
-                        assert_eq!(accessor[[0, 1]].a, 2);
-                    }
-
-                    Ok(())
-                })
-                .unwrap();
+                        Ok(())
+                    })
+                    .unwrap();
+            });
         });
     }
 
     pub(crate) fn array_inline_data_tests() {
-        JULIA.with(|j| {
-            let mut frame = StackFrame::new();
-            let mut jlrs = j.borrow_mut();
-
-            jlrs.instance(&mut frame)
-                .returning::<JlrsResult<_>>()
-                .scope(|frame| unsafe {
-                    Value::eval_string(&frame, "struct IWRL a::Int8; b end").unwrap();
-                    Value::eval_string(&frame, "struct AIDE{T} a::UInt8; b end").unwrap();
-                    Ok(())
-                })
-                .unwrap();
+        JULIA.with(|handle| {
+            handle.borrow_mut().with_stack(|mut stack| {
+                stack
+                    .returning::<JlrsResult<_>>()
+                    .scope(|frame| unsafe {
+                        Value::eval_string(&frame, "struct IWRL a::Int8; b end").unwrap();
+                        Value::eval_string(&frame, "struct AIDE{T} a::UInt8; b end").unwrap();
+                        Ok(())
+                    })
+                    .unwrap();
+            });
         });
 
         inline_data();

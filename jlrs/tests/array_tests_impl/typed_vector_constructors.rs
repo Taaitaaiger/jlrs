@@ -3,11 +3,12 @@ pub(crate) mod tests {
     use jlrs::{
         data::managed::array::{dimensions::Dims, TypedVector},
         prelude::*,
+        runtime::handle::with_stack::StackHandle,
     };
 
     use crate::util::JULIA;
 
-    fn typed_vector_from_bytes(julia: &mut Julia) {
+    fn typed_vector_from_bytes(julia: &mut StackHandle) {
         julia
             .returning::<JlrsResult<_>>()
             .scope(|mut frame| {
@@ -25,7 +26,7 @@ pub(crate) mod tests {
             .unwrap();
     }
 
-    fn typed_vector_from_bytes_unchecked(julia: &mut Julia) {
+    fn typed_vector_from_bytes_unchecked(julia: &mut StackHandle) {
         julia
             .returning::<JlrsResult<_>>()
             .scope(|mut frame| {
@@ -41,13 +42,11 @@ pub(crate) mod tests {
     }
 
     pub(crate) fn typed_vector_constructors_test() {
-        JULIA.with(|j| {
-            let mut frame = StackFrame::new();
-            let mut jlrs = j.borrow_mut();
-
-            let mut inst = jlrs.instance(&mut frame);
-            typed_vector_from_bytes(&mut inst);
-            typed_vector_from_bytes_unchecked(&mut inst);
+        JULIA.with(|handle| {
+            handle.borrow_mut().with_stack(|mut stack| {
+                typed_vector_from_bytes(&mut stack);
+                typed_vector_from_bytes_unchecked(&mut stack);
+            });
         });
     }
 }

@@ -9,8 +9,8 @@ use jl_sys::jlrs_gc_safe_enter;
 use crate::runtime::handle::mt_handle::MtHandle;
 use crate::{
     error::{JlrsError, RuntimeError},
-    memory::get_tls,
-    prelude::{JlrsResult, StackFrame},
+    memory::{get_tls, stack_frame::StackFrame},
+    prelude::JlrsResult,
     runtime::{
         builder::{init_runtime, Builder},
         executor::Executor,
@@ -260,13 +260,14 @@ mod mt_impl {
     use super::super::{init_runtime, Builder};
     use crate::{
         error::{JlrsError, RuntimeError},
-        memory::gc::gc_safe,
-        prelude::{AsyncHandle, JlrsResult, StackFrame},
+        memory::{gc::gc_safe, stack_frame::StackFrame},
+        prelude::JlrsResult,
         runtime::{
             executor::Executor,
             handle::{
                 async_handle::{
                     cancellation_token::CancellationToken, channel::channel, on_main_thread,
+                    AsyncHandle,
                 },
                 mt_handle::{wait_loop, MtHandle, EXIT_LOCK},
                 wait,

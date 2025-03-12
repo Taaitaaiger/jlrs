@@ -1,10 +1,12 @@
 #[cfg(feature = "local-rt")]
 pub(crate) mod tests {
-    use jlrs::{data::managed::array::VectorAny, prelude::*};
+    use jlrs::{
+        data::managed::array::VectorAny, prelude::*, runtime::handle::with_stack::StackHandle,
+    };
 
     use crate::util::JULIA;
 
-    fn vector_any_new_any(julia: &mut Julia) {
+    fn vector_any_new_any(julia: &mut StackHandle) {
         julia
             .returning::<JlrsResult<_>>()
             .scope(|mut frame| {
@@ -16,12 +18,10 @@ pub(crate) mod tests {
     }
 
     pub(crate) fn vector_any_tests() {
-        JULIA.with(|j| {
-            let mut frame = StackFrame::new();
-            let mut jlrs = j.borrow_mut();
-
-            let mut inst = jlrs.instance(&mut frame);
-            vector_any_new_any(&mut inst);
+        JULIA.with(|handle| {
+            handle.borrow_mut().with_stack(|mut stack| {
+                vector_any_new_any(&mut stack);
+            });
         });
     }
 }

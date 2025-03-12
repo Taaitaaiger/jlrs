@@ -6,16 +6,16 @@ mod tests {
     use super::util::JULIA;
 
     fn eval_string(string: &str, with_result: impl for<'f> FnOnce(JuliaResult<'f, 'static>)) {
-        JULIA.with(|j| unsafe {
-            let mut frame = StackFrame::new();
-            let mut jlrs = j.borrow_mut();
-            jlrs.instance(&mut frame)
-                .returning::<JlrsResult<_>>()
-                .scope(|mut frame| {
-                    with_result(Value::eval_string(&mut frame, string));
-                    Ok(())
-                })
-                .unwrap();
+        JULIA.with(|handle| {
+            handle.borrow_mut().with_stack(|mut stack| {
+                stack
+                    .returning::<JlrsResult<_>>()
+                    .scope(|mut frame| {
+                        with_result(unsafe { Value::eval_string(&mut frame, string) });
+                        Ok(())
+                    })
+                    .unwrap();
+            });
         });
     }
 
@@ -44,40 +44,40 @@ mod tests {
         eval_string("increase(Int32(12))", |result| {
             assert_eq!(result.unwrap().unbox::<i32>().unwrap(), 13i32);
         });
-        JULIA.with(|j| {
-            let mut frame = StackFrame::new();
-            let mut jlrs = j.borrow_mut();
-            jlrs.instance(&mut frame)
-                .returning::<JlrsResult<_>>()
-                .scope(|mut frame| unsafe {
-                    let func = Module::main(&frame)
-                        .function(&frame, "increase")?
-                        .as_managed();
-                    let twelve = Value::new(&mut frame, 12i32);
-                    let result = func.call1(&mut frame, twelve);
-                    assert_eq!(result.unwrap().unbox::<i32>().unwrap(), 13i32);
-                    Ok(())
-                })
-                .unwrap();
+        JULIA.with(|handle| {
+            handle.borrow_mut().with_stack(|mut stack| {
+                stack
+                    .returning::<JlrsResult<_>>()
+                    .scope(|mut frame| unsafe {
+                        let func = Module::main(&frame)
+                            .function(&frame, "increase")?
+                            .as_managed();
+                        let twelve = Value::new(&mut frame, 12i32);
+                        let result = func.call1(&mut frame, twelve);
+                        assert_eq!(result.unwrap().unbox::<i32>().unwrap(), 13i32);
+                        Ok(())
+                    })
+                    .unwrap();
+            });
         });
     }
 
     fn print_error() {
-        JULIA.with(|j| {
-            let mut frame = StackFrame::new();
-            let mut jlrs = j.borrow_mut();
-            jlrs.instance(&mut frame)
-                .returning::<JlrsResult<_>>()
-                .scope(|mut frame| unsafe {
-                    Value::eval_string(
-                        &mut frame,
-                        "ErrorException(\"This is an expected message\")",
-                    )
-                    .unwrap()
-                    .print_error();
-                    Ok(())
-                })
-                .unwrap();
+        JULIA.with(|handle| {
+            handle.borrow_mut().with_stack(|mut stack| {
+                stack
+                    .returning::<JlrsResult<_>>()
+                    .scope(|mut frame| unsafe {
+                        Value::eval_string(
+                            &mut frame,
+                            "ErrorException(\"This is an expected message\")",
+                        )
+                        .unwrap()
+                        .print_error();
+                        Ok(())
+                    })
+                    .unwrap();
+            });
         });
     }
 
