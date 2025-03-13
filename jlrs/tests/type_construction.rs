@@ -19,15 +19,14 @@ mod tests {
         prelude::*,
         tvar, tvars,
     };
+    use jlrs_macros::encode_as_constant_bytes;
 
     use super::util::JULIA;
 
     fn construct_array_type() {
-        JULIA.with(|j| {
-            let mut frame = StackFrame::new();
-            let mut jlrs = j.borrow_mut();
-
-            jlrs.instance(&mut frame)
+        JULIA.with(|handle| {
+            handle.borrow_mut().with_stack(|mut stack| {
+                stack
                 .returning::<JlrsResult<_>>().scope(|mut frame| {
                     let ty = <ArrayTypeConstructor<AbstractChar, ConstantIsize<2>> as ConstructType>::construct_type(&mut frame);
                     assert!(ty.is::<DataType>());
@@ -44,14 +43,13 @@ mod tests {
                 })
                 .unwrap();
         });
+        });
     }
 
     fn construct_unranked_array_type() {
-        JULIA.with(|j| {
-            let mut frame = StackFrame::new();
-            let mut jlrs = j.borrow_mut();
-
-            jlrs.instance(&mut frame)
+        JULIA.with(|handle| {
+            handle.borrow_mut().with_stack(|mut stack| {
+                stack
                 .returning::<JlrsResult<_>>().scope(|mut frame| {
                     let ty = <ArrayTypeConstructor<AbstractChar, TypeVarConstructor<Name<'N'>>> as ConstructType>::construct_type(&mut frame);
                     let ua = ty.cast::<UnionAll>().unwrap();
@@ -66,62 +64,67 @@ mod tests {
                 })
                 .unwrap();
         });
+        });
     }
 
     fn construct_untyped_array_type() {
-        JULIA.with(|j| {
-            let mut frame = StackFrame::new();
-            let mut jlrs = j.borrow_mut();
+        JULIA.with(|handle| {
+            handle.borrow_mut().with_stack(|mut stack| {
+                stack
+                    .returning::<JlrsResult<_>>()
+                    .scope(|mut frame| {
+                        let ty = <ArrayTypeConstructor<
+                            TypeVarConstructor<Name<'T'>>,
+                            ConstantIsize<1>,
+                        > as ConstructType>::construct_type(
+                            &mut frame
+                        );
+                        let ua = ty.cast::<UnionAll>().unwrap();
+                        let base = ua.base_type();
 
-            jlrs.instance(&mut frame)
-                .returning::<JlrsResult<_>>().scope(|mut frame| {
-                    let ty = <ArrayTypeConstructor<TypeVarConstructor<Name<'T'>>, ConstantIsize<1>> as ConstructType>::construct_type(&mut frame);
-                    let ua = ty.cast::<UnionAll>().unwrap();
-                    let base = ua.base_type();
+                        let elem_param = base.parameter(0).unwrap();
+                        assert!(elem_param.is::<TypeVar>());
 
-                    let elem_param = base.parameter(0).unwrap();
-                    assert!(elem_param.is::<TypeVar>());
-
-                    let rank_param = base.parameter(1).unwrap();
-                    assert_eq!(rank_param.unbox::<isize>().unwrap(), 1);
-                    Ok(())
-                })
-                .unwrap();
+                        let rank_param = base.parameter(1).unwrap();
+                        assert_eq!(rank_param.unbox::<isize>().unwrap(), 1);
+                        Ok(())
+                    })
+                    .unwrap();
+            });
         });
     }
 
     fn construct_array_type_with_bounded_type() {
-        JULIA.with(|j| {
-            let mut frame = StackFrame::new();
-            let mut jlrs = j.borrow_mut();
+        JULIA.with(|handle| {
+            handle.borrow_mut().with_stack(|mut stack| {
+                stack
+                    .returning::<JlrsResult<_>>()
+                    .scope(|mut frame| {
+                        let ty = <ArrayTypeConstructor<
+                            TypeVarConstructor<Name<'T'>, AbstractChar>,
+                            ConstantIsize<1>,
+                        > as ConstructType>::construct_type(
+                            &mut frame
+                        );
+                        let ua = ty.cast::<UnionAll>().unwrap();
+                        let base = ua.base_type();
 
-            jlrs.instance(&mut frame)
-                .returning::<JlrsResult<_>>()
-                .scope(|mut frame| {
-                    let ty = <ArrayTypeConstructor<
-                        TypeVarConstructor<Name<'T'>, AbstractChar>,
-                        ConstantIsize<1>,
-                    > as ConstructType>::construct_type(&mut frame);
-                    let ua = ty.cast::<UnionAll>().unwrap();
-                    let base = ua.base_type();
+                        let elem_param = base.parameter(0).unwrap();
+                        assert!(elem_param.is::<TypeVar>());
 
-                    let elem_param = base.parameter(0).unwrap();
-                    assert!(elem_param.is::<TypeVar>());
-
-                    let rank_param = base.parameter(1).unwrap();
-                    assert_eq!(rank_param.unbox::<isize>().unwrap(), 1);
-                    Ok(())
-                })
-                .unwrap();
+                        let rank_param = base.parameter(1).unwrap();
+                        assert_eq!(rank_param.unbox::<isize>().unwrap(), 1);
+                        Ok(())
+                    })
+                    .unwrap();
+            });
         });
     }
 
     fn construct_union_type() {
-        JULIA.with(|j| {
-            let mut frame = StackFrame::new();
-            let mut jlrs = j.borrow_mut();
-
-            jlrs.instance(&mut frame)
+        JULIA.with(|handle| {
+            handle.borrow_mut().with_stack(|mut stack| {
+                stack
                 .returning::<JlrsResult<_>>().scope(|mut frame| {
                     let ty = <UnionTypeConstructor<AbstractChar, Integer> as ConstructType>::construct_type(&mut frame);
                     let un = ty.cast::<Union>().unwrap();
@@ -142,89 +145,91 @@ mod tests {
                 })
                 .unwrap();
         });
+        });
     }
 
     fn construct_union_type_three_variants() {
-        JULIA.with(|j| {
-            let mut frame = StackFrame::new();
-            let mut jlrs = j.borrow_mut();
+        JULIA.with(|handle| {
+            handle.borrow_mut().with_stack(|mut stack| {
+                stack
+                    .returning::<JlrsResult<_>>()
+                    .scope(|mut frame| {
+                        let ty = <UnionTypeConstructor<
+                            AbstractChar,
+                            UnionTypeConstructor<AbstractString, Real>,
+                        > as ConstructType>::construct_type(
+                            &mut frame
+                        );
+                        let un = ty.cast::<Union>().unwrap();
+                        let variants = un.variants();
+                        assert_eq!(variants.len(), 3);
 
-            jlrs.instance(&mut frame)
-                .returning::<JlrsResult<_>>()
-                .scope(|mut frame| {
-                    let ty = <UnionTypeConstructor<
-                        AbstractChar,
-                        UnionTypeConstructor<AbstractString, Real>,
-                    > as ConstructType>::construct_type(&mut frame);
-                    let un = ty.cast::<Union>().unwrap();
-                    let variants = un.variants();
-                    assert_eq!(variants.len(), 3);
-
-                    Ok(())
-                })
-                .unwrap();
+                        Ok(())
+                    })
+                    .unwrap();
+            });
         });
     }
 
     fn construct_union_type_overlapping_variants() {
-        JULIA.with(|j| {
-            let mut frame = StackFrame::new();
-            let mut jlrs = j.borrow_mut();
+        JULIA.with(|handle| {
+            handle.borrow_mut().with_stack(|mut stack| {
+                stack
+                    .returning::<JlrsResult<_>>()
+                    .scope(|mut frame| {
+                        let ty = <UnionTypeConstructor<
+                            Integer,
+                            UnionTypeConstructor<AbstractChar, Real>,
+                        > as ConstructType>::construct_type(
+                            &mut frame
+                        );
+                        let un = ty.cast::<Union>().unwrap();
+                        let variants = un.variants();
+                        assert_eq!(variants.len(), 2); // Integer <: Real
 
-            jlrs.instance(&mut frame)
-                .returning::<JlrsResult<_>>()
-                .scope(|mut frame| {
-                    let ty = <UnionTypeConstructor<
-                        Integer,
-                        UnionTypeConstructor<AbstractChar, Real>,
-                    > as ConstructType>::construct_type(&mut frame);
-                    let un = ty.cast::<Union>().unwrap();
-                    let variants = un.variants();
-                    assert_eq!(variants.len(), 2); // Integer <: Real
-
-                    Ok(())
-                })
-                .unwrap();
+                        Ok(())
+                    })
+                    .unwrap();
+            });
         });
     }
 
     fn construct_with_env() {
-        JULIA.with(|j| {
-            let mut frame = StackFrame::new();
-            let mut jlrs = j.borrow_mut();
+        JULIA.with(|handle| {
+            handle.borrow_mut().with_stack(|mut stack| {
+                stack
+                    .returning::<JlrsResult<_>>()
+                    .scope(|mut frame| {
+                        type Foo = encode_as_constant_bytes!("Foo");
+                        type Env = tvars!(
+                            tvar!(Foo; Integer),
+                            tvar!('M'),
+                            tvar!('A'; AbstractArray<tvar!(Foo), tvar!('M')>)
+                        );
+                        type Ty = RefTypeConstructor<tvar!('A')>;
 
-            jlrs.instance(&mut frame)
-                .returning::<JlrsResult<_>>()
-                .scope(|mut frame| {
-                    type Foo = encode_as_constant_bytes!("Foo");
-                    type Env = tvars!(
-                        tvar!(Foo; Integer),
-                        tvar!('M'),
-                        tvar!('A'; AbstractArray<tvar!(Foo), tvar!('M')>)
-                    );
-                    type Ty = RefTypeConstructor<tvar!('A')>;
+                        let sym = Foo::symbol(&frame);
+                        assert_eq!(sym.as_str().unwrap(), "Foo");
 
-                    let sym = Foo::symbol(&frame);
-                    assert_eq!(sym.as_str().unwrap(), "Foo");
+                        let env = Env::into_env(&mut frame);
 
-                    let env = Env::into_env(&mut frame);
+                        let ty = Ty::construct_type_with_env(&mut frame, &env);
+                        assert!(ty.is::<UnionAll>());
+                        let ua = unsafe { ty.cast_unchecked::<UnionAll>() };
 
-                    let ty = Ty::construct_type_with_env(&mut frame, &env);
-                    assert!(ty.is::<UnionAll>());
-                    let ua = unsafe { ty.cast_unchecked::<UnionAll>() };
+                        let unwrapped_ty = ua.body().cast::<DataType>().unwrap();
+                        let param = unwrapped_ty.parameter(0).unwrap();
 
-                    let unwrapped_ty = ua.body().cast::<DataType>().unwrap();
-                    let param = unwrapped_ty.parameter(0).unwrap();
+                        assert!(param.is::<TypeVar>());
+                        let tvar = unsafe { param.cast_unchecked::<TypeVar>() };
+                        let env_param = env.get("A".to_symbol(&frame)).unwrap();
 
-                    assert!(param.is::<TypeVar>());
-                    let tvar = unsafe { param.cast_unchecked::<TypeVar>() };
-                    let env_param = env.get("A".to_symbol(&frame)).unwrap();
+                        assert_eq!(tvar.as_value(), env_param);
 
-                    assert_eq!(tvar.as_value(), env_param);
-
-                    Ok(())
-                })
-                .unwrap();
+                        Ok(())
+                    })
+                    .unwrap();
+            });
         });
     }
 

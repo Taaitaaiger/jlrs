@@ -944,13 +944,8 @@
 //! [`MtHandle`]: crate::runtime::handle::mt_handle::MtHandle
 //! [`MtHandle::with`]: crate::runtime::handle::mt_handle::MtHandle::with
 //! [`Builder::start_local`]: crate::runtime::builder::Builder::start_local
-//! [`Julia`]: crate::runtime::sync_rt::Julia
-//! [`Julia::scope`]: crate::runtime::sync_rt::Julia::scope
-//! [`Julia::scope_with_capacity`]: crate::runtime::sync_rt::Julia::scope_with_capacity
-//! [`Julia::init`]: crate::runtime::sync_rt::Julia::init
 //! [`AsyncJulia::init`]: crate::multitask::runtime::AsyncJulia::init
 //! [`AsyncJulia::init_async`]: crate::multitask::runtime::AsyncJulia::init_async
-//! [`Julia::init_with_image`]: crate::runtime::sync_rt::Julia::init_with_image
 //! [`CCall`]: crate::ccall::runtime::handle::CCall
 //! [`Unrooted`]: crate::memory::target::unrooted::Unrooted
 //! [`GcFrame`]: crate::memory::target::frame::GcFrame
@@ -1001,8 +996,6 @@ use std::{
 };
 
 use jl_sys::jlrs_init_missing_functions;
-#[cfg(feature = "local-rt")]
-use once_cell::sync::OnceCell;
 use prelude::Managed;
 use semver::Version;
 
@@ -1138,11 +1131,6 @@ fn preferred_jlrs_core_version() -> Option<InstallJlrsCore> {
 
     None
 }
-
-// The chosen install method is stored in a OnceCell when the local runtime is used to
-// avoid having to store it in `PendingJulia`.
-#[cfg(feature = "local-rt")]
-pub(crate) static INSTALL_METHOD: OnceCell<InstallJlrsCore> = OnceCell::new();
 
 #[cfg_attr(
     not(any(

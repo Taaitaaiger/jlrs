@@ -6,14 +6,9 @@ mod tests {
     use super::util::JULIA;
 
     fn return_value_from_scope() {
-        JULIA.with(|j| {
-            let mut frame = StackFrame::new();
-            let mut jlrs = j.borrow_mut();
-
-            let out = jlrs
-                .instance(&mut frame)
-                .returning::<JlrsResult<_>>()
-                .scope(|mut frame| {
+        JULIA.with(|handle| {
+            handle.borrow_mut().with_stack(|mut stack| {
+                let out = stack.returning::<JlrsResult<_>>().scope(|mut frame| {
                     let output = frame.output();
 
                     frame
@@ -22,19 +17,15 @@ mod tests {
                         .unbox::<usize>()
                 });
 
-            assert_eq!(out.unwrap(), 1);
+                assert_eq!(out.unwrap(), 1);
+            });
         });
     }
 
     fn return_result_from_scope() {
-        JULIA.with(|j| {
-            let mut frame = StackFrame::new();
-            let mut jlrs = j.borrow_mut();
-
-            let out = jlrs
-                .instance(&mut frame)
-                .returning::<JlrsResult<_>>()
-                .scope(|mut frame| {
+        JULIA.with(|handle| {
+            handle.borrow_mut().with_stack(|mut stack| {
+                let out = stack.returning::<JlrsResult<_>>().scope(|mut frame| {
                     let output = frame.output();
 
                     frame
@@ -53,7 +44,8 @@ mod tests {
                         .unbox::<usize>()
                 });
 
-            assert_eq!(out.unwrap(), 3);
+                assert_eq!(out.unwrap(), 3);
+            });
         });
     }
 

@@ -55,14 +55,14 @@
 //! As you can see in that example, `i` can be returned from the subscope because `i` is
 //! guaranteed to outlive it, while `j` can't because it doesn't. In many cases, though, we want
 //! to create a subscope and return data created in that scope. In that case, we'll need to
-//! allocate an [`LocalOutput`] or [`Output`] in the targeted scope:
+//! allocate an [`Output`] in the targeted scope:
 //!
 //! ```
 //! # use jlrs::prelude::*;
 //! # fn main() {
 //! let mut julia = Builder::new().start_local().unwrap();
 //! julia.local_scope::<1>(|mut frame| {
-//!     let output = frame.local_output();
+//!     let output = frame.output();
 //!     frame.local_scope::<0>(|_| Value::new(output, 2u64));
 //! });
 //! # }
@@ -162,7 +162,6 @@
 //! [`GcFrame`]: crate::memory::target::frame::GcFrame
 //! [`LocalGcFrame`]: crate::memory::target::frame::LocalGcFrame
 //! [`Output`]: crate::memory::target::output::Output
-//! [`LocalOutput`]: crate::memory::target::output::LocalOutput
 //! [`GcFrame::scope`]: crate::memory::target::frame::GcFrame::scope
 //! [`GcFrame::output`]: crate::memory::target::frame::GcFrame::output
 //! [`Target`]: crate::memory::target::Target

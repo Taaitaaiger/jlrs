@@ -7,10 +7,6 @@ use atomic::Ordering;
 #[cfg(not(any(windows, target_os = "windows", feature = "windows")))]
 use jl_sys::{jl_dlclose, jl_dlopen, jl_dlsym};
 
-#[doc(hidden)]
-#[cfg(feature = "local-rt")]
-pub mod test;
-
 pub trait RequireSendSync: 'static + Send + Sync {}
 
 pub trait RequireSend: Send {}

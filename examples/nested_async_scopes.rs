@@ -52,13 +52,13 @@ impl AsyncTask for MyTask {
 
 impl Register for MyTask {
     // Include the custom code MyTask needs.
-    async fn register<'base>(mut frame: AsyncGcFrame<'base>) -> JlrsResult<()> {
+    async fn register<'base>(frame: AsyncGcFrame<'base>) -> JlrsResult<()> {
         unsafe {
             let path = PathBuf::from("MyModule.jl");
             if path.exists() {
-                Value::include(&mut frame, "MyModule.jl")?.into_jlrs_result()?;
+                frame.runtime_settings().include("MyModule.jl")?;
             } else {
-                Value::include(&mut frame, "examples/MyModule.jl")?.into_jlrs_result()?;
+                frame.runtime_settings().include("examples/MyModule.jl")?;
             }
         }
         Ok(())

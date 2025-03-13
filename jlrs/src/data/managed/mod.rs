@@ -416,10 +416,9 @@ pub trait Managed<'scope, 'data>: private::ManagedPriv<'scope, 'data> {
 
     /// Convert `self` to its error string, i.e. the string that is shown when calling
     /// `Base.showerror`. This string can contain ANSI color codes if this is enabled by calling
-    /// [`Julia::error_color`] or [`AsyncHandle::error_color`].
+    /// [`Runtime::error_color`].
     ///
-    /// [`Julia::error_color`]: crate::runtime::sync_rt::Julia::error_color
-    /// [`AsyncHandle::error_color`]: crate::runtime::handle::async_handle::AsyncHandle::error_color
+    /// [`Runtime::error_color`]: crate::runtime::Runtime::error_color
     fn error_string(self) -> JlrsResult<String> {
         // Safety: all Julia data that is accessed is globally rooted, the result is converted
         // to a String before the GC can free it.

@@ -7,25 +7,24 @@ use jlrs::{prelude::*, runtime::handle::ccall::throw_exception, weak_handle};
 pub unsafe extern "C" fn assert_less_than(a: i32, b: i32) {
     match weak_handle!() {
         Ok(handle) => {
-            let res = handle
-                .local_scope::<2>(|mut frame| {
-                    if a >= b {
-                        let msg = JuliaString::new(&mut frame, "a is larger than b").as_value();
+            let res = handle.local_scope::<2>(|mut frame| {
+                if a >= b {
+                    let msg = JuliaString::new(&mut frame, "a is larger than b").as_value();
 
-                        let leaked = Module::core(&frame)
-                            .global(&frame, "AssertionError")
-                            .expect("AssertionError does not exist in Core")
-                            .as_value()
-                            .cast::<DataType>()
-                            .expect("AssertionError is not a DataType")
-                            .instantiate_unchecked(&mut frame, [msg])
-                            .leak();
+                    let leaked = Module::core(&frame)
+                        .global(&frame, "AssertionError")
+                        .expect("AssertionError does not exist in Core")
+                        .as_value()
+                        .cast::<DataType>()
+                        .expect("AssertionError is not a DataType")
+                        .instantiate_unchecked(&mut frame, [msg])
+                        .leak();
 
-                        return Err(leaked);
-                    }
+                    return Err(leaked);
+                }
 
-                    Ok(())
-                });
+                Ok(())
+            });
 
             // Safe: there are no pendings drops.
             if let Err(exc) = res {

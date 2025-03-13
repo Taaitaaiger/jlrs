@@ -14,8 +14,7 @@ use jl_sys::{jl_adopt_thread, jlrs_clear_gc_stack, jlrs_gc_safe_enter, jlrs_ptls
 use once_cell::sync::OnceCell;
 
 use crate::{
-    memory::gc::gc_unsafe_with,
-    prelude::StackFrame,
+    memory::{gc::gc_unsafe_with, stack_frame::StackFrame},
     runtime::{
         executor::Executor,
         handle::{

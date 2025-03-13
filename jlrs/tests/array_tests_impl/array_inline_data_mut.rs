@@ -11,128 +11,123 @@ pub(crate) mod tests {
     use crate::util::JULIA;
 
     fn inline_data_mut() {
-        JULIA.with(|j| {
-            let mut frame = StackFrame::new();
-            let mut jlrs = j.borrow_mut();
+        JULIA.with(|handle| {
+            handle.borrow_mut().with_stack(|mut stack| {
+                stack
+                    .returning::<JlrsResult<_>>()
+                    .scope(|mut frame| {
+                        unsafe {
+                            let data = vec![1.0, 2.0];
+                            let mut arr =
+                                TypedArray::<f32>::from_vec_unchecked(&mut frame, data, (1, 2));
+                            let accessor = arr.inline_data_mut();
+                            assert_eq!(accessor[[0, 0]], 1.0);
+                            assert_eq!(accessor[[0, 1]], 2.0);
+                        }
 
-            jlrs.instance(&mut frame)
-                .returning::<JlrsResult<_>>()
-                .scope(|mut frame| {
-                    unsafe {
-                        let data = vec![1.0, 2.0];
-                        let mut arr =
-                            TypedArray::<f32>::from_vec_unchecked(&mut frame, data, (1, 2));
-                        let accessor = arr.inline_data_mut();
-                        assert_eq!(accessor[[0, 0]], 1.0);
-                        assert_eq!(accessor[[0, 1]], 2.0);
-                    }
-
-                    Ok(())
-                })
-                .unwrap();
+                        Ok(())
+                    })
+                    .unwrap();
+            });
         });
     }
 
     fn inline_data_mut_set_value() {
-        JULIA.with(|j| {
-            let mut frame = StackFrame::new();
-            let mut jlrs = j.borrow_mut();
+        JULIA.with(|handle| {
+            handle.borrow_mut().with_stack(|mut stack| {
+                stack
+                    .returning::<JlrsResult<_>>()
+                    .scope(|mut frame| {
+                        unsafe {
+                            let data = vec![1.0, 2.0];
+                            let mut arr =
+                                TypedArray::<f32>::from_vec_unchecked(&mut frame, data, (1, 2));
+                            let mut accessor = arr.inline_data_mut();
 
-            jlrs.instance(&mut frame)
-                .returning::<JlrsResult<_>>()
-                .scope(|mut frame| {
-                    unsafe {
-                        let data = vec![1.0, 2.0];
-                        let mut arr =
-                            TypedArray::<f32>::from_vec_unchecked(&mut frame, data, (1, 2));
-                        let mut accessor = arr.inline_data_mut();
+                            frame.local_scope::<3>(|mut frame| {
+                                let v1 = Value::new(&mut frame, 2.0f32);
+                                let v2 = Value::new(&mut frame, 3.0f32);
+                                let v3 = Value::new(&mut frame, 3.0f64);
+                                accessor.set_value(&frame, [0, 0], v1).unwrap().unwrap();
+                                accessor.set_value(&frame, [0, 1], v2).unwrap().unwrap();
+                                assert!(accessor.set_value(&frame, [0, 2], v2).is_err());
+                                assert!(accessor.set_value(&frame, [0, 1], v3).unwrap().is_err());
+                            });
 
-                        frame.local_scope::<3>(|mut frame| {
-                            let v1 = Value::new(&mut frame, 2.0f32);
-                            let v2 = Value::new(&mut frame, 3.0f32);
-                            let v3 = Value::new(&mut frame, 3.0f64);
-                            accessor.set_value(&frame, [0, 0], v1).unwrap().unwrap();
-                            accessor.set_value(&frame, [0, 1], v2).unwrap().unwrap();
-                            assert!(accessor.set_value(&frame, [0, 2], v2).is_err());
-                            assert!(accessor.set_value(&frame, [0, 1], v3).unwrap().is_err());
-                        });
+                            assert_eq!(
+                                accessor
+                                    .get_value(&mut frame, [0, 0])
+                                    .unwrap()
+                                    .unwrap()
+                                    .unbox::<f32>()
+                                    .unwrap(),
+                                2.0
+                            );
+                            assert_eq!(
+                                accessor
+                                    .get_value(&mut frame, [0, 1])
+                                    .unwrap()
+                                    .unwrap()
+                                    .unbox::<f32>()
+                                    .unwrap(),
+                                3.0
+                            );
+                            assert!(accessor.get_value(&mut frame, [1, 1]).is_none());
+                        }
 
-                        assert_eq!(
-                            accessor
-                                .get_value(&mut frame, [0, 0])
-                                .unwrap()
-                                .unwrap()
-                                .unbox::<f32>()
-                                .unwrap(),
-                            2.0
-                        );
-                        assert_eq!(
-                            accessor
-                                .get_value(&mut frame, [0, 1])
-                                .unwrap()
-                                .unwrap()
-                                .unbox::<f32>()
-                                .unwrap(),
-                            3.0
-                        );
-                        assert!(accessor.get_value(&mut frame, [1, 1]).is_none());
-                    }
-
-                    Ok(())
-                })
-                .unwrap();
+                        Ok(())
+                    })
+                    .unwrap();
+            });
         });
     }
 
     fn inline_data_mut_set_value_unchecked() {
-        JULIA.with(|j| {
-            let mut frame = StackFrame::new();
-            let mut jlrs = j.borrow_mut();
+        JULIA.with(|handle| {
+            handle.borrow_mut().with_stack(|mut stack| {
+                stack
+                    .returning::<JlrsResult<_>>()
+                    .scope(|mut frame| {
+                        unsafe {
+                            let data = vec![1.0, 2.0];
+                            let mut arr =
+                                TypedArray::<f32>::from_vec_unchecked(&mut frame, data, (1, 2));
+                            let mut accessor = arr.inline_data_mut();
 
-            jlrs.instance(&mut frame)
-                .returning::<JlrsResult<_>>()
-                .scope(|mut frame| {
-                    unsafe {
-                        let data = vec![1.0, 2.0];
-                        let mut arr =
-                            TypedArray::<f32>::from_vec_unchecked(&mut frame, data, (1, 2));
-                        let mut accessor = arr.inline_data_mut();
+                            frame.local_scope::<2>(|mut frame| {
+                                let v1 = Value::new(&mut frame, 1.0f32);
+                                let v2 = Value::new(&mut frame, 2.0f32);
+                                accessor.set_value_unchecked([0, 0], v1);
+                                accessor.set_value_unchecked([0, 1], v2);
+                            });
 
-                        frame.local_scope::<2>(|mut frame| {
-                            let v1 = Value::new(&mut frame, 1.0f32);
-                            let v2 = Value::new(&mut frame, 2.0f32);
-                            accessor.set_value_unchecked([0, 0], v1);
-                            accessor.set_value_unchecked([0, 1], v2);
-                        });
+                            assert_eq!(
+                                accessor
+                                    .get_value_unchecked(&mut frame, [0, 0])
+                                    .unbox::<f32>()
+                                    .unwrap(),
+                                1.0
+                            );
+                            assert_eq!(
+                                accessor
+                                    .get_value_unchecked(&mut frame, [0, 1])
+                                    .unbox::<f32>()
+                                    .unwrap(),
+                                2.0
+                            );
+                        }
 
-                        assert_eq!(
-                            accessor
-                                .get_value_unchecked(&mut frame, [0, 0])
-                                .unbox::<f32>()
-                                .unwrap(),
-                            1.0
-                        );
-                        assert_eq!(
-                            accessor
-                                .get_value_unchecked(&mut frame, [0, 1])
-                                .unbox::<f32>()
-                                .unwrap(),
-                            2.0
-                        );
-                    }
-
-                    Ok(())
-                })
-                .unwrap();
+                        Ok(())
+                    })
+                    .unwrap();
+            });
         });
     }
 
     fn inline_data_mut_with_layout() {
-        JULIA.with(|j| {
-            let mut frame = StackFrame::new();
-            let mut jlrs = j.borrow_mut();
-
-            jlrs.instance(&mut frame)
+        JULIA.with(|handle| {
+            handle.borrow_mut().with_stack(|mut stack| {
+                stack
                 .returning::<JlrsResult<_>>().scope(|mut frame| {
                     unsafe {
                         #[derive(ValidField, ValidLayout, IsBits, Debug, Clone, Typecheck, Unbox, PartialEq)]
@@ -161,72 +156,70 @@ pub(crate) mod tests {
                 })
                 .unwrap();
         });
+        });
     }
 
     fn try_inline_data_mut() {
-        JULIA.with(|j| {
-            let mut frame = StackFrame::new();
-            let mut jlrs = j.borrow_mut();
+        JULIA.with(|handle| {
+            handle.borrow_mut().with_stack(|mut stack| {
+                stack
+                    .returning::<JlrsResult<_>>()
+                    .scope(|mut frame| {
+                        unsafe {
+                            let data = vec![1.0, 2.0];
+                            let mut arr =
+                                TypedArray::<f32>::from_vec_unchecked(&mut frame, data, (1, 2));
+                            let accessor = arr.try_inline_data_mut::<f32>()?;
+                            assert_eq!(accessor[[0, 0]], 1.0);
+                            assert_eq!(accessor[[0, 1]], 2.0);
+                        }
 
-            jlrs.instance(&mut frame)
-                .returning::<JlrsResult<_>>()
-                .scope(|mut frame| {
-                    unsafe {
-                        let data = vec![1.0, 2.0];
-                        let mut arr =
-                            TypedArray::<f32>::from_vec_unchecked(&mut frame, data, (1, 2));
-                        let accessor = arr.try_inline_data_mut::<f32>()?;
-                        assert_eq!(accessor[[0, 0]], 1.0);
-                        assert_eq!(accessor[[0, 1]], 2.0);
-                    }
-
-                    Ok(())
-                })
-                .unwrap();
+                        Ok(())
+                    })
+                    .unwrap();
+            });
         });
     }
 
     fn try_inline_data_mut_err() {
-        JULIA.with(|j| {
-            let mut frame = StackFrame::new();
-            let mut jlrs = j.borrow_mut();
+        JULIA.with(|handle| {
+            handle.borrow_mut().with_stack(|mut stack| {
+                stack
+                    .returning::<JlrsResult<_>>()
+                    .scope(|mut frame| {
+                        unsafe {
+                            let data = vec![1.0, 2.0];
+                            let mut arr =
+                                TypedArray::<f32>::from_vec_unchecked(&mut frame, data, (1, 2));
+                            let accessor = arr.try_inline_data_mut::<f64>();
+                            assert!(accessor.is_err());
+                        }
 
-            jlrs.instance(&mut frame)
-                .returning::<JlrsResult<_>>()
-                .scope(|mut frame| {
-                    unsafe {
-                        let data = vec![1.0, 2.0];
-                        let mut arr =
-                            TypedArray::<f32>::from_vec_unchecked(&mut frame, data, (1, 2));
-                        let accessor = arr.try_inline_data_mut::<f64>();
-                        assert!(accessor.is_err());
-                    }
-
-                    Ok(())
-                })
-                .unwrap();
+                        Ok(())
+                    })
+                    .unwrap();
+            });
         });
     }
     fn inline_data_mut_unchecked() {
-        JULIA.with(|j| {
-            let mut frame = StackFrame::new();
-            let mut jlrs = j.borrow_mut();
+        JULIA.with(|handle| {
+            handle.borrow_mut().with_stack(|mut stack| {
+                stack
+                    .returning::<JlrsResult<_>>()
+                    .scope(|mut frame| {
+                        unsafe {
+                            let data = vec![1.0, 2.0];
+                            let mut arr =
+                                TypedArray::<f32>::from_vec_unchecked(&mut frame, data, (1, 2));
+                            let accessor = arr.inline_data_mut_unchecked::<f32>();
+                            assert_eq!(accessor[[0, 0]], 1.0);
+                            assert_eq!(accessor[[0, 1]], 2.0);
+                        }
 
-            jlrs.instance(&mut frame)
-                .returning::<JlrsResult<_>>()
-                .scope(|mut frame| {
-                    unsafe {
-                        let data = vec![1.0, 2.0];
-                        let mut arr =
-                            TypedArray::<f32>::from_vec_unchecked(&mut frame, data, (1, 2));
-                        let accessor = arr.inline_data_mut_unchecked::<f32>();
-                        assert_eq!(accessor[[0, 0]], 1.0);
-                        assert_eq!(accessor[[0, 1]], 2.0);
-                    }
-
-                    Ok(())
-                })
-                .unwrap();
+                        Ok(())
+                    })
+                    .unwrap();
+            });
         });
     }
 

@@ -14,7 +14,7 @@ use super::abstract_type::{AbstractType, AnyType};
 use crate::{
     convert::to_symbol::ToSymbol,
     data::{
-        layout::{is_bits::IsBits, typed_layout::HasLayout},
+        layout::{is_bits::IsBits, tuple::Tuple, typed_layout::HasLayout},
         managed::{
             array::dimensions::DimsExt,
             datatype::DataType,
@@ -28,11 +28,10 @@ use crate::{
     },
     gc_safe::{GcSafeOnceLock, GcSafeRwLock},
     memory::{
-        scope::LocalScope,
-        scope::LocalScopeExt,
+        scope::{LocalScope, LocalScopeExt},
         target::{unrooted::Unrooted, RootingTarget, Target},
     },
-    prelude::{ConstructTypedArray, Symbol, Tuple},
+    prelude::{ConstructTypedArray, Symbol},
     private::Private,
 };
 

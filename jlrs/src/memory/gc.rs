@@ -1,5 +1,7 @@
 //! Manage the garbage collector.
 
+use std::marker::PhantomData;
+
 pub use jl_sys::GcCollection;
 use jl_sys::{
     jl_gc_collect, jl_gc_collection_t, jl_gc_enable, jl_gc_is_enabled, jl_gc_mark_queue_obj,
@@ -12,8 +14,6 @@ use super::{
     target::{unrooted::Unrooted, Target},
     PTls,
 };
-#[cfg(feature = "local-rt")]
-use crate::runtime::sync_rt::Julia;
 use crate::{
     call::Call,
     data::managed::{
@@ -24,11 +24,24 @@ use crate::{
     private::Private,
 };
 
+/// Provides access to [`Gc`] to any active handle, can be created with
+/// [`IsActive::gc_interface`].
+/// 
+/// [`IsActive::gc_interface`]: crate::runtime::handle::IsActive::gc_interface
+pub struct GcInterface<H>(PhantomData<H>);
+
+impl<'borrow, H> GcInterface<&'borrow H> {
+    #[inline(always)]
+    pub(crate) fn new(_: &'borrow H) -> Self {
+        GcInterface(PhantomData)
+    }
+}
+
 /// Manage the GC.
 ///
 /// This trait provides several methods that can be used to enable or disable the GC, force a
 /// collection, insert a safepoint, and to enable and disable GC logging. It's implemented for
-/// [`Julia`] and all [`Target`]s.
+/// [`GcInterface`] and all [`Target`]s.
 pub trait Gc: private::GcPriv {
     /// Enable or disable the GC.
     #[inline]
@@ -44,8 +57,6 @@ pub trait Gc: private::GcPriv {
     fn enable_gc_logging(&self, on: bool) {
         // Safety: Julia is active, this method is called from a thread known to Julia, and no
         // Julia data is returned by this method.
-
-        use super::target::unrooted::Unrooted;
 
         let global = unsafe { Unrooted::new() };
 
@@ -281,16 +292,17 @@ pub(crate) unsafe fn gc_unsafe_with<F: for<'scope> FnOnce(Unrooted<'scope>) -> T
     res
 }
 
-#[cfg(feature = "local-rt")]
-impl Gc for Julia<'_> {}
 impl<'frame, Tgt: Target<'frame>> Gc for Tgt {}
 
+impl<H> Gc for GcInterface<H> {}
+
 mod private {
+    use super::GcInterface;
     use crate::memory::target::Target;
-    #[cfg(feature = "local-rt")]
-    use crate::runtime::sync_rt::Julia;
+
     pub trait GcPriv {}
+
     impl<'frame, Tgt: Target<'frame>> GcPriv for Tgt {}
-    #[cfg(feature = "local-rt")]
-    impl GcPriv for Julia<'_> {}
+
+    impl<H> GcPriv for GcInterface<H> {}
 }

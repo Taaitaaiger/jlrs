@@ -5,7 +5,7 @@
 //! `Value::new` if all fields implement the `IntoJulia` trait:
 //!
 //! ```
-//! # use jlrs::prelude::*;
+//! # use jlrs::{prelude::*, data::layout::tuple::Tuple2};
 //! # fn main() {
 //! # let mut julia = Builder::new().start_local().unwrap();
 //! julia.local_scope::<1>(|mut frame| {

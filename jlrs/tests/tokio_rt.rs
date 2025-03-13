@@ -7,7 +7,7 @@ mod async_util;
 mod tests {
     use std::sync::Arc;
 
-    use jlrs::prelude::*;
+    use jlrs::{prelude::*, runtime::handle::async_handle::AsyncHandle};
     use once_cell::sync::OnceCell;
 
     use super::async_util::{async_tasks::*, ASYNC_TESTS_JL};

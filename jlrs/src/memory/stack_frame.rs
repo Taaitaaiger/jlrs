@@ -15,13 +15,6 @@ use crate::{
 };
 
 /// A raw, inactive GC frame.
-///
-/// When the [local runtime] or [`CCall`] is used a `StackFrame` must be provided so the GC can
-/// find all data rooted in active [`GcFrame`]s.
-///
-/// [local runtime]: crate::runtime::sync_rt::Julia
-/// [`CCall`]: crate::runtime::handle::ccall::CCall
-/// [`GcFrame`]: crate::memory::target::frame::GcFrame
 #[repr(C)]
 pub struct StackFrame<const N: usize> {
     s: SplitGcFrame<1, N>,

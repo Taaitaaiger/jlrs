@@ -39,8 +39,13 @@ use crate::{
     },
     convert::into_jlrs_result::IntoJlrsResult,
     error::IOError,
-    memory::{gc::gc_unsafe_with, get_tls, stack_frame::JlrsStackFrame, target::frame::GcFrame},
-    prelude::{JlrsResult, LocalScope, Module, StackFrame, Value},
+    memory::{
+        gc::gc_unsafe_with,
+        get_tls,
+        stack_frame::{JlrsStackFrame, StackFrame},
+        target::frame::GcFrame,
+    },
+    prelude::{JlrsResult, LocalScope, Module, Value},
     runtime::executor::{Executor, IsFinished},
     util::RequireSendSync,
     weak_handle_unchecked,
@@ -120,60 +125,6 @@ impl AsyncHandle {
         Dispatch::new(msg, &self.sender, receiver)
     }
 
-    /// Prepare to include a file.
-    ///
-    /// Returns an error if the file doesn't exist.
-    ///
-    /// Safety: the content of the file is evaluated if it exists, which can't be checked for
-    /// correctness.
-    pub unsafe fn include<P>(&self, path: P) -> JlrsResult<Dispatch<Message, JlrsResult<()>>>
-    where
-        P: AsRef<Path>,
-    {
-        if !path.as_ref().exists() {
-            Err(IOError::NotFound {
-                path: path.as_ref().to_string_lossy().into(),
-            })?
-        }
-
-        let (sender, receiver) = oneshot_channel();
-        let pending_task = IncludeTask::new(path.as_ref().into(), sender);
-        let msg = MessageInner::Include(Box::new(pending_task)).wrap();
-
-        let dispatch = Dispatch::new(msg, &self.sender, receiver);
-        Ok(dispatch)
-    }
-
-    /// Evaluate `using {module_name}`.
-    ///
-    /// Safety: `module_name` must be a valid module or package name.
-    pub unsafe fn using(&self, module_name: String) -> Dispatch<Message, JlrsResult<()>> {
-        let (sender, receiver) = oneshot_channel();
-        let pending_task = BlockingTask::new(
-            move |mut frame| unsafe {
-                let cmd = format!("using {}", module_name);
-                Value::eval_string(&mut frame, cmd)
-                    .map(|_| ())
-                    .into_jlrs_result()
-            },
-            sender,
-        );
-
-        let msg = MessageInner::BlockingTask(Box::new(pending_task)).wrap();
-        Dispatch::new(msg, &self.sender, receiver)
-    }
-
-    /// Prepare to enable or disable colored error messages originating from Julia.
-    ///
-    /// This feature is disabled by default and is a global property.
-    pub fn error_color(&self, enable: bool) -> Dispatch<Message, ()> {
-        let (sender, receiver) = oneshot_channel();
-        let pending_task = SetErrorColorTask::new(enable, sender);
-        let msg = MessageInner::ErrorColor(Box::new(pending_task)).wrap();
-
-        Dispatch::new(msg, &self.sender, receiver)
-    }
-
     /// The current number of workers in the thread pool.
     pub fn n_workers(&self) -> usize {
         self.n_workers.load(Ordering::Relaxed)
@@ -197,6 +148,48 @@ impl AsyncHandle {
                 PoolIdOrToken::Token(ref token) => token.cancel(),
             }
         }
+    }
+
+    pub(crate) unsafe fn include<P>(&self, path: P) -> JlrsResult<Dispatch<Message, JlrsResult<()>>>
+    where
+        P: AsRef<Path>,
+    {
+        if !path.as_ref().exists() {
+            Err(IOError::NotFound {
+                path: path.as_ref().to_string_lossy().into(),
+            })?
+        }
+
+        let (sender, receiver) = oneshot_channel();
+        let pending_task = IncludeTask::new(path.as_ref().into(), sender);
+        let msg = MessageInner::Include(Box::new(pending_task)).wrap();
+
+        let dispatch = Dispatch::new(msg, &self.sender, receiver);
+        Ok(dispatch)
+    }
+
+    pub(crate) unsafe fn using(&self, module_name: String) -> Dispatch<Message, JlrsResult<()>> {
+        let (sender, receiver) = oneshot_channel();
+        let pending_task = BlockingTask::new(
+            move |mut frame| unsafe {
+                let cmd = format!("using {}", module_name);
+                Value::eval_string(&mut frame, cmd)
+                    .map(|_| ())
+                    .into_jlrs_result()
+            },
+            sender,
+        );
+
+        let msg = MessageInner::BlockingTask(Box::new(pending_task)).wrap();
+        Dispatch::new(msg, &self.sender, receiver)
+    }
+
+    pub(crate) fn error_color(&self, enable: bool) -> Dispatch<Message, ()> {
+        let (sender, receiver) = oneshot_channel();
+        let pending_task = SetErrorColorTask::new(enable, sender);
+        let msg = MessageInner::ErrorColor(Box::new(pending_task)).wrap();
+
+        Dispatch::new(msg, &self.sender, receiver)
     }
 
     pub(crate) unsafe fn new_main(sender: Sender<Message>, token: CancellationToken) -> Self {

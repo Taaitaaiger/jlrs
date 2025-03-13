@@ -11,33 +11,31 @@ mod tests {
     macro_rules! impl_test {
         ($type:ty, $type_test_name:ident, $into_test_name:ident, $val:expr, $assoc_ty:ident) => {
             fn $type_test_name() {
-                JULIA.with(|j| {
-                    let mut frame = StackFrame::new();
-                    let mut jlrs = j.borrow_mut();
+                JULIA.with(|handle| {
+                    handle.borrow_mut().with_stack(|mut stack| {
+                        stack
+                            .returning::<JlrsResult<_>>()
+                            .scope(|frame| unsafe {
+                                let ty = <$type as IntoJulia>::julia_type(&frame).as_value();
+                                assert_eq!(ty, DataType::$assoc_ty(&frame).as_value());
+                                assert!(ty.cast::<DataType>()?.is::<$type>());
 
-                    jlrs.instance(&mut frame)
-                        .returning::<JlrsResult<_>>()
-                        .scope(|frame| unsafe {
-                            let ty = <$type as IntoJulia>::julia_type(&frame).as_value();
-                            assert_eq!(ty, DataType::$assoc_ty(&frame).as_value());
-                            assert!(ty.cast::<DataType>()?.is::<$type>());
-
-                            Ok(())
-                        })
-                        .unwrap();
+                                Ok(())
+                            })
+                            .unwrap();
+                    });
                 });
             }
 
             fn $into_test_name() {
-                JULIA.with(|j| {
-                    let mut frame = StackFrame::new();
-                    let mut jlrs = j.borrow_mut();
-
-                    jlrs.instance(&mut frame).scope(|frame| unsafe {
-                        frame.local_scope::<0>(|frame| {
-                            let val = $val.into_julia(&frame).as_value();
-                            assert!(val.is::<$type>());
-                        })
+                JULIA.with(|handle| {
+                    handle.borrow_mut().with_stack(|mut stack| {
+                        stack.scope(|frame| unsafe {
+                            frame.local_scope::<0>(|frame| {
+                                let val = $val.into_julia(&frame).as_value();
+                                assert!(val.is::<$type>());
+                            })
+                        });
                     });
                 });
             }
@@ -47,42 +45,40 @@ mod tests {
     macro_rules! impl_ptr_test {
         ($type:ty, $type_test_name:ident, $into_test_name:ident, $assoc_ty:ident) => {
             fn $type_test_name() {
-                JULIA.with(|j| {
-                    let mut frame = StackFrame::new();
-                    let mut jlrs = j.borrow_mut();
+                JULIA.with(|handle| {
+                    handle.borrow_mut().with_stack(|mut stack| {
+                        stack
+                            .returning::<JlrsResult<_>>()
+                            .scope(|mut frame| unsafe {
+                                let ty = <*mut $type as IntoJulia>::julia_type(&frame).as_value();
+                                let args = [DataType::$assoc_ty(&frame).as_value()];
 
-                    jlrs.instance(&mut frame)
-                        .returning::<JlrsResult<_>>()
-                        .scope(|mut frame| unsafe {
-                            let ty = <*mut $type as IntoJulia>::julia_type(&frame).as_value();
-                            let args = [DataType::$assoc_ty(&frame).as_value()];
+                                let applied = UnionAll::pointer_type(&frame)
+                                    .as_value()
+                                    .apply_type_unchecked(&mut frame, args);
 
-                            let applied = UnionAll::pointer_type(&frame)
-                                .as_value()
-                                .apply_type_unchecked(&mut frame, args);
+                                assert_eq!(ty, applied);
+                                assert!(applied.cast::<DataType>()?.is::<*mut $type>());
 
-                            assert_eq!(ty, applied);
-                            assert!(applied.cast::<DataType>()?.is::<*mut $type>());
-
-                            Ok(())
-                        })
-                        .unwrap();
+                                Ok(())
+                            })
+                            .unwrap();
+                    });
                 });
             }
 
             fn $into_test_name() {
-                JULIA.with(|j| {
-                    let mut frame = StackFrame::new();
-                    let mut jlrs = j.borrow_mut();
-
-                    jlrs.instance(&mut frame)
-                        .returning::<JlrsResult<_>>()
-                        .scope(|frame| unsafe {
-                            let val = null_mut::<$type>().into_julia(&frame).as_value();
-                            assert!(val.is::<*mut $type>());
-                            Ok(())
-                        })
-                        .unwrap();
+                JULIA.with(|handle| {
+                    handle.borrow_mut().with_stack(|mut stack| {
+                        stack
+                            .returning::<JlrsResult<_>>()
+                            .scope(|frame| unsafe {
+                                let val = null_mut::<$type>().into_julia(&frame).as_value();
+                                assert!(val.is::<*mut $type>());
+                                Ok(())
+                            })
+                            .unwrap();
+                    });
                 });
             }
         };
@@ -185,35 +181,33 @@ mod tests {
     impl_ptr_test!(f64, f64_ptr_julia_type, f64_ptr_into_julia, float64_type);
 
     fn void_ptr_julia_type() {
-        JULIA.with(|j| {
-            let mut frame = StackFrame::new();
-            let mut jlrs = j.borrow_mut();
-
-            jlrs.instance(&mut frame)
-                .returning::<JlrsResult<_>>()
-                .scope(|frame| unsafe {
-                    let ty = <*mut c_void as IntoJulia>::julia_type(&frame).as_value();
-                    assert_eq!(ty, DataType::voidpointer_type(&frame).as_value());
-                    assert!(ty.cast::<DataType>()?.is::<*mut c_void>());
-                    Ok(())
-                })
-                .unwrap();
+        JULIA.with(|handle| {
+            handle.borrow_mut().with_stack(|mut stack| {
+                stack
+                    .returning::<JlrsResult<_>>()
+                    .scope(|frame| unsafe {
+                        let ty = <*mut c_void as IntoJulia>::julia_type(&frame).as_value();
+                        assert_eq!(ty, DataType::voidpointer_type(&frame).as_value());
+                        assert!(ty.cast::<DataType>()?.is::<*mut c_void>());
+                        Ok(())
+                    })
+                    .unwrap();
+            });
         });
     }
 
     fn void_ptr_into_julia() {
-        JULIA.with(|j| {
-            let mut frame = StackFrame::new();
-            let mut jlrs = j.borrow_mut();
-
-            jlrs.instance(&mut frame)
-                .returning::<JlrsResult<_>>()
-                .scope(|frame| unsafe {
-                    let val = null_mut::<c_void>().into_julia(&frame).as_value();
-                    assert!(val.is::<*mut c_void>());
-                    Ok(())
-                })
-                .unwrap();
+        JULIA.with(|handle| {
+            handle.borrow_mut().with_stack(|mut stack| {
+                stack
+                    .returning::<JlrsResult<_>>()
+                    .scope(|frame| unsafe {
+                        let val = null_mut::<c_void>().into_julia(&frame).as_value();
+                        assert!(val.is::<*mut c_void>());
+                        Ok(())
+                    })
+                    .unwrap();
+            });
         });
     }
 

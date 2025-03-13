@@ -170,7 +170,7 @@ impl<'scope> UnionAll<'scope> {
         target.with_local_scope::<1>(|target, mut frame| unsafe {
             let params = ty.parameters();
             let params = params.data();
-            let mut local_output = frame.local_output();
+            let mut output = frame.output();
             let mut body = erase_scope_lifetime(ty.as_value());
 
             for pidx in (0..params.len()).rev() {
@@ -178,7 +178,7 @@ impl<'scope> UnionAll<'scope> {
                 let param = param.unwrap_unchecked().as_value();
                 if param.is::<TypeVar>() {
                     let tvar = param.cast_unchecked::<TypeVar>();
-                    let b = UnionAll::new_unchecked(&mut local_output, tvar, body).as_value();
+                    let b = UnionAll::new_unchecked(&mut output, tvar, body).as_value();
                     body = erase_scope_lifetime(b);
                 }
             }

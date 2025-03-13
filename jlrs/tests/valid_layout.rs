@@ -11,33 +11,33 @@ mod tests {
     macro_rules! impl_valid_layout_test {
         ($name:ident, $invalid_name:ident, $t:ty, $val:expr) => {
             fn $name() {
-                JULIA.with(|j| {
-                    let mut frame = StackFrame::new();
-                    let mut jlrs = j.borrow_mut();
-                    jlrs.instance(&mut frame)
-                        .returning::<JlrsResult<_>>()
-                        .scope(|mut frame| {
-                            let val: $t = $val;
-                            let v = Value::new(&mut frame, val);
-                            assert!(<$t>::valid_layout(v.datatype().as_value()));
-                            Ok(())
-                        })
-                        .unwrap();
+                JULIA.with(|handle| {
+                    handle.borrow_mut().with_stack(|mut stack| {
+                        stack
+                            .returning::<JlrsResult<_>>()
+                            .scope(|mut frame| {
+                                let val: $t = $val;
+                                let v = Value::new(&mut frame, val);
+                                assert!(<$t>::valid_layout(v.datatype().as_value()));
+                                Ok(())
+                            })
+                            .unwrap();
+                    })
                 })
             }
 
             fn $invalid_name() {
-                JULIA.with(|j| {
-                    let mut frame = StackFrame::new();
-                    let mut jlrs = j.borrow_mut();
-                    jlrs.instance(&mut frame)
-                        .returning::<JlrsResult<_>>()
-                        .scope(|mut frame| {
-                            let v = Value::new(&mut frame, null_mut::<$t>());
-                            assert!(!<$t>::valid_layout(v.datatype().as_value()));
-                            Ok(())
-                        })
-                        .unwrap();
+                JULIA.with(|handle| {
+                    handle.borrow_mut().with_stack(|mut stack| {
+                        stack
+                            .returning::<JlrsResult<_>>()
+                            .scope(|mut frame| {
+                                let v = Value::new(&mut frame, null_mut::<$t>());
+                                assert!(!<$t>::valid_layout(v.datatype().as_value()));
+                                Ok(())
+                            })
+                            .unwrap();
+                    })
                 })
             }
         };
@@ -144,57 +144,57 @@ mod tests {
     );
 
     fn invalid_ptr_layout() {
-        JULIA.with(|j| {
-            let mut frame = StackFrame::new();
-            let mut jlrs = j.borrow_mut();
-            jlrs.instance(&mut frame)
-                .returning::<JlrsResult<_>>()
-                .scope(|mut frame| {
-                    let v = Value::new(&mut frame, null_mut::<u8>());
-                    assert!(!<u8>::valid_layout(v.datatype().as_value()));
-                    Ok(())
-                })
-                .unwrap();
+        JULIA.with(|handle| {
+            handle.borrow_mut().with_stack(|mut stack| {
+                stack
+                    .returning::<JlrsResult<_>>()
+                    .scope(|mut frame| {
+                        let v = Value::new(&mut frame, null_mut::<u8>());
+                        assert!(!<u8>::valid_layout(v.datatype().as_value()));
+                        Ok(())
+                    })
+                    .unwrap();
+            })
         })
     }
 
     /*
     TODO
     fn valid_layout_array() {
-        JULIA.with(|j| {
-            let mut frame = StackFrame::new();
-            let mut jlrs = j.borrow_mut();
-            jlrs.instance(&mut frame)
-                .returning::<JlrsResult<_>>().scope(|mut frame| {
-                    unsafe {
-                        let v = Array::new::<i32, _, _>(&mut frame, (2, 2))
-                            .into_jlrs_result()?
-                            .as_value();
-                        assert!(ArrayRef::valid_layout(v.datatype().as_value()));
+        JULIA.with(|handle| {
+            handle.borrow_mut().with_stack(|mut stack| {
+                stack
+                    .returning::<JlrsResult<_>>().scope(|mut frame| {
+                        unsafe {
+                            let v = Array::new::<i32, _, _>(&mut frame, (2, 2))
+                                .into_jlrs_result()?
+                                .as_value();
+                            assert!(ArrayRef::valid_layout(v.datatype().as_value()));
 
-                        let ua = Module::base(&frame).global(&frame, "Array")?.as_managed();
+                            let ua = Module::base(&frame).global(&frame, "Array")?.as_managed();
 
-                        assert!(ArrayRef::valid_layout(ua));
-                    }
-                    Ok(())
-                })
-                .unwrap();
+                            assert!(ArrayRef::valid_layout(ua));
+                        }
+                        Ok(())
+                    })
+                    .unwrap();
+            })
         })
     }
 
     fn invalid_layout_array() {
-        JULIA.with(|j| {
-            let mut frame = StackFrame::new();
-            let mut jlrs = j.borrow_mut();
-            jlrs.instance(&mut frame)
-                .returning::<JlrsResult<_>>().scope(|mut frame| {
-                    let v = Array::new::<i32, _, _>(&mut frame, (2, 2))
-                        .into_jlrs_result()?
-                        .as_value();
-                    assert!(!bool::valid_layout(v));
-                    Ok(())
-                })
-                .unwrap();
+        JULIA.with(|handle| {
+            handle.borrow_mut().with_stack(|mut stack| {
+                stack
+                    .returning::<JlrsResult<_>>().scope(|mut frame| {
+                        let v = Array::new::<i32, _, _>(&mut frame, (2, 2))
+                            .into_jlrs_result()?
+                            .as_value();
+                        assert!(!bool::valid_layout(v));
+                        Ok(())
+                    })
+                    .unwrap();
+            })
         })
     }*/
 

@@ -76,14 +76,13 @@ pub(crate) unsafe fn init_global_cache() {
 
 /// Functionality in Julia can be accessed through its module system. You can get a handle to the
 /// three standard modules, `Main`, `Base`, and `Core` and access their submodules through them.
-/// If you include your own Julia code with [`Julia::include`] or [`AsyncHandle::include`], its
+/// If you include your own Julia code with [`Runtime::include`], its
 /// contents are made available relative to `Main`.
 ///
 /// The most important methods offered are those that let you access submodules, functions, and
 /// other global values defined in the module.
 ///
-/// [`Julia::include`]: crate::runtime::sync_rt::Julia::include
-/// [`AsyncHandle::include`]: crate::runtime::handle::async_handle::AsyncHandle::include
+/// [`Runtime::include`]: crate::runtime::Runtime::include
 #[derive(Copy, Clone, PartialEq)]
 #[repr(transparent)]
 pub struct Module<'scope>(NonNull<jl_module_t>, PhantomData<&'scope ()>);
@@ -191,11 +190,10 @@ impl<'scope> Module<'scope> {
     }
 
     /// Returns a handle to Julia's `Main`-module. If you include your own Julia code with
-    /// [`Julia::include`] or [`AsyncHandle::include`] its contents are made available relative to
+    /// [`Runtime::include`] its contents are made available relative to
     /// `Main`.
     ///
-    /// [`Julia::include`]: crate::runtime::sync_rt::Julia::include
-    /// [`AsyncHandle::include`]: crate::runtime::handle::async_handle::AsyncHandle::include
+    /// [`Runtime::include`]: crate::runtime::Runtime::include
     #[inline]
     pub fn main<Tgt: Target<'scope>>(_: &Tgt) -> Self {
         // Safety: the Main module is globally rooted

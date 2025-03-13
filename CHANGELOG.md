@@ -34,7 +34,19 @@
 
 - `Target::with_local_scope` has been moved to a new trait, `LocalScopeExt`, and like `LocalScope::local_scope` only takes its size as a constant generic. This trait also provides `LocalScopeExt::with_unsized_local_scope`.
 
-- Many functions from `CCall` have been removed or turned into free-standing functions, the remainder has been deprecated. Use the `weak_handle` macro instead.
+- Many methods of `CCall` have been removed or turned into free-standing functions, the remainder has been deprecated. Use the `weak_handle` macro instead.
+
+- `error_color`, `include`, and `using` have been moved from the different handle types (and `Value`) to a new trait, `Runtime`.
+
+- `RuntimeSettings` has been added to allow targets to make use of the `Runtime` trait, it can be created by calling `Target::runtime_settings`.
+
+- `Gc` is no longer implemented for `LocalHandle`, but is implemented for `GcInterface` which can be created for all active handles by calling `IsActive::gc_interface`.
+
+- The old sync runtime has been removed.
+
+- `AsyncHandle` and the content of the tuple module have been removed from the prelude.
+
+- `LocalOutput` and `LocalReusableSlot` are now just `Output` and `ReusableSlot`, these types have gained a generic that expresses which kind of slot is targeted. Methods named `local_output` and `local_reusable_scope` are now named `output` and `reusable_scope`.
 
 ## v0.21
 
