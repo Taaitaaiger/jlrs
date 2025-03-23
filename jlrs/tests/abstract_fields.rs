@@ -11,9 +11,9 @@ mod tests {
             handle.borrow_mut().with_stack(|mut stack| {
                 stack
                     .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| {
+                    .scope(|mut frame| unsafe {
                         frame.gc_collect(jlrs::memory::gc::GcCollection::Full);
-                        let ty = unsafe {
+                        let ty = {
                             Module::main(&frame)
                                 .submodule(&frame, "JlrsTests")?
                                 .as_managed()
@@ -22,10 +22,7 @@ mod tests {
                         };
 
                         let arg1 = Value::new(&mut frame, 3u32);
-                        let instance = ty
-                            .cast::<DataType>()?
-                            .instantiate(&mut frame, &mut [arg1])?
-                            .into_jlrs_result()?;
+                        let instance = ty.call(&mut frame, &mut [arg1]).into_jlrs_result()?;
 
                         let field = instance.field_accessor().field("a")?.access::<u32>()?;
                         assert_eq!(field, 3);

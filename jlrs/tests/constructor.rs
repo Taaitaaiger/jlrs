@@ -129,51 +129,9 @@ mod tests {
         });
     }
 
-    fn call_instantiate() {
-        JULIA.with(|handle| {
-            handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| {
-                        unsafe {
-                            let ty = Module::main(&frame)
-                                .submodule(&frame, "JlrsTests")?
-                                .as_managed()
-                                .global(&frame, "HasConstructors")?
-                                .as_value();
-
-                            let arg = Value::new(&mut frame, 1i16);
-                            let args = [DataType::int64_type(&frame).as_value(), arg];
-
-                            let value = ty
-                                .cast::<DataType>()?
-                                .instantiate_unchecked(&mut frame, args);
-
-                            let is_i64 = value
-                                .field_accessor()
-                                .field("a")?
-                                .access::<WeakDataType>()?
-                                .as_managed()
-                                .is::<i64>();
-
-                            assert!(is_i64);
-
-                            let field_b = value.field_accessor().field("b")?.access::<i16>()?;
-
-                            assert_eq!(field_b, 1);
-                        };
-
-                        Ok(())
-                    })
-                    .unwrap();
-            });
-        });
-    }
-
     #[test]
     fn constructor_tests() {
         call_outer_constructor();
         call_inner_constructor();
-        call_instantiate();
     }
 }

@@ -19,15 +19,16 @@
 //!
 //! [`julia_module`]: ::jlrs_macros::julia_module
 
+use crate::{
+    call::Call,
+    data::{managed::value::ValueRet, types::construct_type::ConstructType},
+    prelude::{JlrsResult, LocalScope as _, Nothing},
+    weak_handle_unchecked,
+};
 #[cfg(feature = "ccall")]
 use crate::{
     data::managed::module::JlrsCore,
     prelude::{JuliaString, Managed},
-};
-use crate::{
-    data::{managed::value::ValueRet, types::construct_type::ConstructType},
-    prelude::{JlrsResult, LocalScope as _, Nothing},
-    weak_handle_unchecked,
 };
 
 /// Trait implemented by types that can be used as argument types of Rust functions exposed by the
@@ -149,7 +150,10 @@ unsafe impl<T: CCallReturn> CCallReturn for JlrsResult<T> {
                     let handle = weak_handle_unchecked!();
                     let e = handle.local_scope::<1>(|mut frame| {
                         let msg = JuliaString::new(&mut frame, format!("{}", e)).as_value();
-                        let err = JlrsCore::jlrs_error(&frame).instantiate_unchecked(&frame, [msg]);
+                        let err = JlrsCore::jlrs_error(&frame)
+                            .as_value()
+                            .call(&frame, [msg])
+                            .unwrap();
                         err.leak()
                     });
                     crate::runtime::handle::ccall::throw_exception(e)

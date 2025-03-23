@@ -507,12 +507,7 @@ extern "C" {
         var: *mut crate::types::jl_sym_t,
         val: *mut crate::types::jl_value_t,
     );
-
-    pub fn jl_is_imported(
-        m: *mut crate::types::jl_module_t,
-        s: *mut crate::types::jl_sym_t,
-    ) -> std::ffi::c_int;
-
+    
     pub fn jl_cpu_threads() -> std::ffi::c_int;
 
     pub fn jl_is_debugbuild() -> std::ffi::c_int;
@@ -1104,10 +1099,4 @@ extern "C" {
     ) -> *mut std::ffi::c_char;
 
     pub fn jlrs_init_missing_functions();
-
-    pub fn jlrs_set_global(
-        m: *mut crate::types::jl_module_t,
-        var: *mut crate::types::jl_sym_t,
-        val: *mut crate::types::jl_value_t,
-    );
 }

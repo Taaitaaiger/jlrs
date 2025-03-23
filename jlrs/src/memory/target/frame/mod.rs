@@ -21,7 +21,7 @@ pub use self::async_frame::*;
 use super::{
     output::Output,
     reusable_slot::ReusableSlot,
-    slot_ref::{LocalSlotRef, StackRef},
+    slot_ref::{LocalSlotRef, StackSlotRef},
     unrooted::Unrooted,
     ExtendedTarget, Target,
 };
@@ -75,7 +75,7 @@ impl<'scope> GcFrame<'scope> {
     #[inline]
     pub fn as_extended_target<'borrow>(
         &'borrow mut self,
-    ) -> ExtendedTarget<'scope, 'scope, 'borrow, Output<'scope, StackRef<'scope>>> {
+    ) -> ExtendedTarget<'scope, 'scope, 'borrow, Output<'scope, StackSlotRef<'scope>>> {
         let target = self.output();
         ExtendedTarget {
             target,
@@ -98,19 +98,19 @@ impl<'scope> GcFrame<'scope> {
 
     /// Returns an `Output` that targets the current frame.
     #[inline]
-    pub fn output(&mut self) -> Output<'scope, StackRef<'scope>> {
+    pub fn output(&mut self) -> Output<'scope, StackSlotRef<'scope>> {
         unsafe {
             let offset = self.stack.reserve_slot();
-            Output::new(StackRef::new(self.stack, offset))
+            Output::new(StackSlotRef::new(self.stack, offset))
         }
     }
 
     /// Returns a `ReusableSlot` that targets the current frame.
     #[inline]
-    pub fn reusable_slot(&mut self) -> ReusableSlot<'scope, StackRef<'scope>> {
+    pub fn reusable_slot(&mut self) -> ReusableSlot<'scope, StackSlotRef<'scope>> {
         unsafe {
             let offset = self.stack.reserve_slot();
-            let slot = StackRef::new(self.stack, offset);
+            let slot = StackSlotRef::new(self.stack, offset);
             ReusableSlot::new(slot)
         }
     }

@@ -111,7 +111,6 @@ extern "C"
     const jl_datatype_layout_t *jl_datatype_layout(jl_datatype_t *t);
 #endif
 
-    void jlrs_set_global(jl_module_t *m JL_ROOTING_ARGUMENT, jl_sym_t *var, jl_value_t *val JL_ROOTED_ARGUMENT);
 #ifdef __cplusplus
 }
 #endif // __cplusplus

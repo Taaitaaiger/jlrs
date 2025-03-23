@@ -26,7 +26,7 @@ use crate::{
 
 /// Provides access to [`Gc`] to any active handle, can be created with
 /// [`IsActive::gc_interface`].
-/// 
+///
 /// [`IsActive::gc_interface`]: crate::runtime::handle::IsActive::gc_interface
 pub struct GcInterface<H>(PhantomData<H>);
 

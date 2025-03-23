@@ -80,8 +80,8 @@ struct ModuleOrNothing
     a::Union{Module, Nothing}
 end
 
-has_nothing = ModuleOrNothing(nothing)
-has_module = ModuleOrNothing(Base)
+const has_nothing = ModuleOrNothing(nothing)
+const has_module = ModuleOrNothing(Base)
 
 struct NoUnionsBits
     a::Int16

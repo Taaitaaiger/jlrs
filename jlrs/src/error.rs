@@ -319,8 +319,6 @@ pub enum AccessError {
 /// Data instantiation errors.
 #[derive(Debug, Error, Clone)]
 pub enum InstantiationError {
-    #[error("cannot create array with DataType::instantiate")]
-    ArrayNotSupported,
     #[error("NamedTuples must have an equal number of keys and values, got {n_names} keys and {n_values} values")]
     NamedTupleSizeMismatch { n_names: usize, n_values: usize },
     #[error("expected a shape for {vec_size} elements, got a shape for {dim_size} elements")]

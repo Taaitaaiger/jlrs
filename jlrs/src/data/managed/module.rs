@@ -4,14 +4,17 @@
 //! modules, `Main`, `Base` and `Core`. Any Julia code that you include in jlrs is made available
 //! relative to the `Main` module.
 
-// todo: jl_new_module
-
-use std::{any::TypeId, marker::PhantomData, ptr::NonNull};
+use std::{
+    any::TypeId,
+    ffi::c_void,
+    marker::PhantomData,
+    ptr::{null_mut, NonNull},
+    sync::atomic::{AtomicPtr, Ordering},
+};
 
 use jl_sys::{
-    jl_base_module, jl_core_module, jl_get_global, jl_is_const, jl_is_imported, jl_main_module,
-    jl_module_t, jl_module_type, jl_set_const, jlrs_module_name, jlrs_module_parent,
-    jlrs_set_global,
+    jl_base_module, jl_core_module, jl_get_global, jl_is_const, jl_main_module, jl_module_t,
+    jl_module_type, jl_set_const, jlrs_module_name, jlrs_module_parent, jl_set_global,
 };
 use rustc_hash::FxHashMap;
 
@@ -37,8 +40,8 @@ use crate::{
     error::{AccessError, JlrsResult, TypeError},
     gc_safe::{GcSafeOnceLock, GcSafeRwLock},
     impl_julia_typecheck, inline_static_ref,
-    memory::target::{Target, TargetException, TargetResult},
-    prelude::DataType,
+    memory::target::{unrooted::Unrooted, Target, TargetException, TargetResult},
+    prelude::{DataType, WeakValue},
     private::Private,
 };
 
@@ -222,17 +225,6 @@ impl<'scope> Module<'scope> {
         unsafe { JLRS_CORE.get_or_eval(target) }
     }
 
-    /// Returns `true` if `self` has imported `sym`.
-    #[inline]
-    pub fn is_imported<N: ToSymbol>(self, sym: N) -> bool {
-        // Safety: the pointer points to valid data, the C API function is called with
-        // valid arguments.
-        unsafe {
-            let sym = sym.to_symbol_priv(Private);
-            jl_is_imported(self.unwrap(Private), sym.unwrap(Private)) != 0
-        }
-    }
-
     /// Returns the submodule named `name` relative to this module. You have to visit this level
     /// by level: you can't access `Main.A.B` by calling this function with `"A.B"`, but have to
     /// access `A` first and then `B`.
@@ -247,28 +239,10 @@ impl<'scope> Module<'scope> {
         N: ToSymbol,
         Tgt: Target<'target>,
     {
-        // Safety: the pointer points to valid data, the C API function is called with
-        // valid arguments and its result is checked.
-        unsafe {
-            let symbol = name.to_symbol_priv(Private);
-            let submodule = jl_get_global(self.unwrap(Private), symbol.unwrap(Private));
-            if submodule.is_null() {
-                Err(AccessError::GlobalNotFound {
-                    name: symbol.as_str().unwrap_or("<Non-UTF8 symbol>").into(),
-                    module: self.name().as_str().unwrap_or("<Non-UTF8 symbol>").into(),
-                })?
-            }
-
-            let submodule_nn = NonNull::new_unchecked(submodule);
-            let submodule_v = Value::wrap_non_null(submodule_nn, Private);
-            if !submodule_v.is::<Self>() {
-                Err(TypeError::NotAModule {
-                    name: symbol.as_str().unwrap_or("<Non-UTF8 symbol>").into(),
-                    ty: submodule_v.datatype().name().into(),
-                })?
-            }
-
-            Ok(target.data_from_ptr(submodule_nn.cast(), Private))
+        // Safety: We don't hit a safepoint before the data has been rooted.
+        match self.global(&target, name) {
+            Ok(v) => unsafe { Ok(v.as_value().cast::<Module>()?.root(target)) },
+            Err(e) => Err(e)?,
         }
     }
 
@@ -304,9 +278,10 @@ impl<'scope> Module<'scope> {
         }
     }
 
-    /// Set a global value in this module. Note that if this global already exists, this can
-    /// make the old value unreachable. If an excection is thrown, it's caught, rooted and
-    /// returned.
+    /// Set a global value in this module. Creating new globals at runtime is not supported for
+    /// Julia 1.12+
+    ///
+    /// If an excection is thrown, it's caught and returned.
     ///
     /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
     /// this value is allowed.
@@ -323,7 +298,7 @@ impl<'scope> Module<'scope> {
         let symbol = name.to_symbol_priv(Private);
 
         let callback = || {
-            jlrs_set_global(
+            jl_set_global(
                 self.unwrap(Private),
                 symbol.unwrap(Private),
                 value.unwrap(Private),
@@ -334,8 +309,8 @@ impl<'scope> Module<'scope> {
         target.exception_from_ptr(res, Private)
     }
 
-    /// Set a global value in this module. Note that if this global already exists, this can
-    /// make the old value unreachable.
+    /// Set a global value in this module. Creating new globals at runtime is not supported for
+    /// Julia 1.12+.
     ///
     /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
     /// this value is allowed.
@@ -346,16 +321,16 @@ impl<'scope> Module<'scope> {
     {
         let symbol = name.to_symbol_priv(Private);
 
-        jlrs_set_global(
+        jl_set_global(
             self.unwrap(Private),
             symbol.unwrap(Private),
             value.unwrap(Private),
         );
     }
 
-    /// Set a constant in this module. If Julia throws an exception it's caught and rooted in the
-    /// current frame, if the exception can't be rooted a `JlrsError::AllocError` is returned. If
-    /// no exception is thrown a weak reference to the constant is returned.
+    /// Set a constant in this module.
+    ///
+    /// If Julia throws an exception it's caught and returned.
     pub fn set_const<'target, N, Tgt>(
         self,
         target: Tgt,
@@ -392,8 +367,9 @@ impl<'scope> Module<'scope> {
         }
     }
 
-    /// Set a constant in this module. If the constant already exists the process aborts,
-    /// otherwise a weak reference to the constant is returned.
+    /// Set a constant in this module.
+    ///
+    /// If the constant already exists the process aborts, otherwise the constant is returned.
     ///
     /// Safety: This method must not throw an error if called from a `ccall`ed function.
     #[inline]
@@ -417,6 +393,7 @@ impl<'scope> Module<'scope> {
     }
 
     /// Returns the global named `name` in this module.
+    ///
     /// Returns an error if the global doesn't exist.
     pub fn global<'target, N, Tgt>(
         self,
@@ -427,20 +404,49 @@ impl<'scope> Module<'scope> {
         N: ToSymbol,
         Tgt: Target<'target>,
     {
-        // Safety: the pointer points to valid data, the C API function is called with
-        // valid arguments and its result is checked.
         unsafe {
-            let symbol = name.to_symbol_priv(Private);
+            let name = name.to_symbol(&target);
+            catch_exceptions(
+                || self.global_unchecked(target, name),
+                |_| {
+                    AccessError::GlobalNotFound {
+                        name: name.as_str().unwrap_or("<Non-UTF8 symbol>").into(),
+                        module: self.name().as_str().unwrap_or("<Non-UTF8 symbol>").into(),
+                    }
+                    .into()
+                },
+            )
+        }
+    }
 
-            let global = jl_get_global(self.unwrap(Private), symbol.unwrap(Private));
-            if global.is_null() {
-                Err(AccessError::GlobalNotFound {
-                    name: symbol.as_str().unwrap_or("<Non-UTF8 symbol>").into(),
-                    module: self.name().as_str().unwrap_or("<Non-UTF8 symbol>").into(),
-                })?;
+    /// Returns the global named `name` in this module.
+    ///
+    /// Safety: If the global doesn't exist, an exception is thrown
+    pub unsafe fn global_unchecked<'target, N, Tgt>(
+        self,
+        target: Tgt,
+        name: N,
+    ) -> ValueData<'target, 'static, Tgt>
+    where
+        N: ToSymbol,
+        Tgt: Target<'target>,
+    {
+        static FUNC: AtomicPtr<c_void> = AtomicPtr::new(null_mut());
+        let mut fptr = FUNC.load(Ordering::Relaxed);
+        if fptr.is_null() {
+            unsafe {
+                fptr = load_getproperty();
             }
+            FUNC.store(fptr, Ordering::Relaxed);
+        }
 
-            Ok(target.data_from_ptr(NonNull::new_unchecked(global), Private))
+        let name = name.to_symbol(&target);
+        unsafe {
+            let getproperty_func = std::mem::transmute::<
+                *mut c_void,
+                unsafe extern "C" fn(Module, Symbol) -> WeakValue<'target, 'static>,
+            >(fptr);
+            getproperty_func(self, name).root(target)
         }
     }
 
@@ -482,7 +488,9 @@ impl<'scope> Module<'scope> {
     }
 
     /// Load a module by calling `Base.require` and return this module if it has been loaded
-    /// successfully. This method can be used to load parts of the standard library like
+    /// successfully.
+    ///
+    /// This method can be used to load parts of the standard library like
     /// `LinearAlgebra`. This requires one slot on the GC stack. Note that the loaded module is
     /// not made available in the module used to call this method, you can use
     /// `Module::set_global` to do so.
@@ -694,5 +702,19 @@ impl Main {
         Tgt: Target<'target>,
     {
         inline_static_ref!(INCLUDE, Function, "Main.include", target)
+    }
+}
+
+#[cold]
+#[inline(never)]
+// Safety: don't call before Julia has been initialized, or after it has been shut down.
+unsafe fn load_getproperty() -> *mut c_void {
+    unsafe {
+        let unrooted = Unrooted::new();
+        let module = Module::jlrs_core(&unrooted);
+        let sym = Symbol::new(&unrooted, "getproperty_c");
+        let v = jl_get_global(module.unwrap(Private), sym.unwrap(Private)).cast::<*mut c_void>();
+        debug_assert!(!v.is_null() && !(*v).is_null());
+        *v
     }
 }

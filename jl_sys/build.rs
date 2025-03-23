@@ -249,6 +249,8 @@ fn compile_jlrs_cc(julia_dir: &str, target: Option<Target>) {
             c.define("JLRS_EXPECTED_MINOR_VERSION", Some("11"));
         } else if #[cfg(feature = "julia-1-12")] {
             c.define("JLRS_EXPECTED_MINOR_VERSION", Some("12"));
+        } else if #[cfg(feature = "julia-1-13")] {
+            c.define("JLRS_EXPECTED_MINOR_VERSION", Some("13"));
         }
     };
 

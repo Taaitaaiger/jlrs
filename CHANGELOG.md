@@ -48,6 +48,16 @@
 
 - `LocalOutput` and `LocalReusableSlot` are now just `Output` and `ReusableSlot`, these types have gained a generic that expresses which kind of slot is targeted. Methods named `local_output` and `local_reusable_scope` are now named `output` and `reusable_scope`.
 
+- `DataType::instantiate` has been removed, call the `DataType` as a constructor instead.
+
+- Exporting a new global with `static` is no longer possible to account for changes in Julia, creating new globals with `Module::set_global(_unchecked)` will not work on Julia 1.12+.
+
+- `Module::is_imported` has been removed.
+
+- The `julia-1-13` version feature has been added.
+
+- An example that shows how the multithreaded runtime can be used with rayon has been added.
+
 ## v0.21
 
 - Support generating bindings for Julia enums with integer base types in combination with JlrsCore.Reflect and the `Enum` derive macro.

@@ -15,9 +15,8 @@ pub unsafe extern "C" fn assert_less_than(a: i32, b: i32) {
                         .global(&frame, "AssertionError")
                         .expect("AssertionError does not exist in Core")
                         .as_value()
-                        .cast::<DataType>()
-                        .expect("AssertionError is not a DataType")
-                        .instantiate_unchecked(&mut frame, [msg])
+                        .call(&mut frame, [msg])
+                        .unwrap()
                         .leak();
 
                     return Err(leaked);

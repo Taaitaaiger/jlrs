@@ -235,8 +235,7 @@ mod tests {
                             .global(&mut frame, "VecElement")?
                             .as_value()
                             .apply_type_unchecked(&mut frame, args)
-                            .cast::<DataType>()?
-                            .instantiate(&mut frame, &mut [value])?
+                            .call(&mut frame, &mut [value])
                             .into_jlrs_result()?
                             .datatype();
 

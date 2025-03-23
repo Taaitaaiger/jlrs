@@ -262,26 +262,26 @@ mod tests {
         })
     }
 
-    fn set_global() {
-        JULIA.with(|handle| {
-            handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| unsafe {
-                        let main = Module::main(&frame);
-                        let value = Value::new(&mut frame, 1usize);
+    // fn set_global() {
+    //     JULIA.with(|handle| {
+    //         handle.borrow_mut().with_stack(|mut stack| {
+    //             stack
+    //                 .returning::<JlrsResult<_>>()
+    //                 .scope(|mut frame| unsafe {
+    //                     let main = Module::main(&frame);
+    //                     let value = Value::new(&mut frame, 1usize);
 
-                        main.set_global(&mut frame, "one", value)
-                            .into_jlrs_result()?;
+    //                     main.set_global(&mut frame, "one", value)
+    //                         .into_jlrs_result()?;
 
-                        let value = main.global(&frame, "one")?.as_managed();
-                        assert_eq!(value.unbox::<usize>()?, 1);
-                        Ok(())
-                    })
-                    .unwrap();
-            })
-        })
-    }
+    //                     let value = main.global(&frame, "one")?.as_managed();
+    //                     assert_eq!(value.unbox::<usize>()?, 1);
+    //                     Ok(())
+    //                 })
+    //                 .unwrap();
+    //         })
+    //     })
+    // }
 
     fn set_const() {
         JULIA.with(|handle| {
@@ -379,25 +379,6 @@ mod tests {
         })
     }
 
-    fn is_imported() {
-        JULIA.with(|handle| {
-            handle.borrow_mut().with_stack(|mut stack| {
-                let res = stack.returning::<JlrsResult<_>>().scope(|mut frame| {
-                    let main = Module::main(&frame);
-                    assert!(!main.is_imported("+"));
-                    unsafe {
-                        Value::eval_string(&mut frame, "import Base: +").into_jlrs_result()?;
-                    }
-                    assert!(main.is_imported("+"));
-
-                    Ok(())
-                });
-
-                assert!(res.is_ok());
-            })
-        })
-    }
-
     fn submodule_must_be_module() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
@@ -424,26 +405,6 @@ mod tests {
                     assert!(main.set_const(&mut frame, "pi", value).is_err());
 
                     unsafe { assert!(main.set_global(&mut frame, "pi", value).is_err()) }
-
-                    Ok(())
-                });
-
-                assert!(res.is_ok());
-            })
-        })
-    }
-
-    fn set_global_unchecked() {
-        JULIA.with(|handle| {
-            handle.borrow_mut().with_stack(|mut stack| {
-                let res = stack.returning::<JlrsResult<_>>().scope(|mut frame| {
-                    let main = Module::main(&frame);
-                    assert!(main.global(&mut frame, "FOO").is_err());
-
-                    let value = Value::new(&mut frame, 1usize);
-                    unsafe { main.set_global_unchecked("FOO", value) }
-
-                    assert_eq!(value, main.global(&mut frame, "FOO")?);
 
                     Ok(())
                 });
@@ -508,18 +469,15 @@ mod tests {
         use_string_for_access();
         use_cow_for_access();
         use_dyn_str_for_access();
-        set_global();
         set_const();
         #[cfg(any(feature = "julia-1-10", feature = "julia-1-11",))]
         set_const_twice();
         eval_using();
         module_parent();
         extend_lifetime_with_root();
-        is_imported();
         submodule_must_be_module();
         #[cfg(any(feature = "julia-1-10", feature = "julia-1-11",))]
         cant_redefine_const();
-        set_global_unchecked();
         set_const_unchecked();
         function_must_be_function();
     }

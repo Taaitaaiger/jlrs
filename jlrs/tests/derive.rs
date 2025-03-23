@@ -94,13 +94,10 @@ mod tests {
                     .scope(|mut frame| unsafe {
                         let constr = Module::main(&frame)
                             .global(&frame, "DoubleVariant")?
-                            .as_managed()
-                            .cast::<DataType>()?;
+                            .as_managed();
 
                         let v2 = Value::new(&mut frame, 2i16);
-                        let jl_val = constr
-                            .instantiate(&mut frame, &mut [v2])?
-                            .into_jlrs_result()?;
+                        let jl_val = constr.call(&mut frame, &mut [v2]).into_jlrs_result()?;
 
                         assert!(jl_val.datatype().is::<DoubleVariant>());
 
@@ -125,13 +122,10 @@ mod tests {
                     .scope(|mut frame| unsafe {
                         let constr = Module::main(&frame)
                             .global(&frame, "DoubleVariant")?
-                            .as_managed()
-                            .cast::<DataType>()?;
+                            .as_managed();
 
                         let v2 = Value::new(&mut frame, 2i16);
-                        let jl_val = constr
-                            .instantiate(&mut frame, &mut [v2])?
-                            .into_jlrs_result()?;
+                        let jl_val = constr.call(&mut frame, &mut [v2]).into_jlrs_result()?;
 
                         let unboxed = jl_val.unbox::<DoubleVariant>()?;
                         assert!(
@@ -153,13 +147,10 @@ mod tests {
                     .scope(|mut frame| unsafe {
                         let constr = Module::main(&frame)
                             .global(&frame, "DoubleVariant")?
-                            .as_managed()
-                            .cast::<DataType>()?;
+                            .as_managed();
 
                         let v2 = Value::new(&mut frame, 2i16);
-                        let jl_val = constr
-                            .instantiate(&mut frame, &mut [v2])?
-                            .into_jlrs_result()?;
+                        let jl_val = constr.call(&mut frame, &mut [v2]).into_jlrs_result()?;
 
                         let unboxed = jl_val.unbox::<DoubleVariant>()?;
                         assert!(
