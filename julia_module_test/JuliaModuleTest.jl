@@ -153,12 +153,6 @@ end
 
     @test JuliaModuleTest.CONST_STATIC_U8 == 0x2
     @test isconst(JuliaModuleTest, :CONST_STATIC_U8)
-
-    @test JuliaModuleTest.STATIC_CONST_U8 == 0x1
-    @test !isconst(JuliaModuleTest, :STATIC_CONST_U8)
-
-    @test JuliaModuleTest.STATIC_U8 == 0x2
-    @test !isconst(JuliaModuleTest, :STATIC_U8)
 end
 
 @testset "POpaque" begin

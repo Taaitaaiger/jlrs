@@ -172,7 +172,7 @@ impl AsyncHandle {
         let (sender, receiver) = oneshot_channel();
         let pending_task = BlockingTask::new(
             move |mut frame| unsafe {
-                let cmd = format!("using {}", module_name);
+                let cmd = format!("import {}", module_name);
                 Value::eval_string(&mut frame, cmd)
                     .map(|_| ())
                     .into_jlrs_result()

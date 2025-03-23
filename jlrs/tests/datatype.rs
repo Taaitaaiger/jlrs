@@ -496,10 +496,9 @@ mod tests {
                     .scope(|mut frame| {
                         let ty = TypedArray::<usize>::new(&mut frame, 1)
                             .into_jlrs_result()?
-                            .as_value()
-                            .datatype();
+                            .as_value();
 
-                        let instance = ty.instantiate(&mut frame, []);
+                        let instance = unsafe { ty.call(&mut frame, []) };
                         assert!(instance.is_err());
 
                         Ok(())
@@ -514,17 +513,16 @@ mod tests {
             handle.borrow_mut().with_stack(|mut stack| {
                 stack
                     .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| {
-                        let ty = unsafe {
+                    .scope(|mut frame| unsafe {
+                        let ty = {
                             Module::main(&frame)
                                 .submodule(&frame, "JlrsTests")?
                                 .as_managed()
                                 .global(&frame, "WithAbstract")?
                                 .as_value()
-                                .cast::<DataType>()?
                         };
 
-                        let instance = ty.instantiate(&mut frame, [])?;
+                        let instance = ty.call(&mut frame, []);
                         assert!(instance.is_err());
 
                         Ok(())

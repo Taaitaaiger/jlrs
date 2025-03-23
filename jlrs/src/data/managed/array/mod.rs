@@ -875,7 +875,10 @@ impl<const N: isize> ArrayBase<'_, '_, Unknown, N> {
         Tgt: Target<'target>,
         D: DimsExt,
     {
-        let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
+        const {
+            let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
+        }
+
         if DimsRankAssert::<D, N>::NEEDS_RUNTIME_RANK_CHECK {
             assert_eq!(N as usize, dims.rank());
         }

@@ -23,22 +23,14 @@ use jlrs_macros::julia_version;
 
 use super::{type_name::TypeName, value::ValueData, Weak};
 use crate::{
-    catch::{catch_exceptions, unwrap_exc},
     convert::to_symbol::ToSymbol,
     data::{
         managed::{
-            array::Array,
-            private::ManagedPriv,
-            simple_vector::SimpleVector,
-            symbol::Symbol,
-            type_var::TypeVar,
-            union_all::UnionAll,
-            value::{Value, ValueResult},
-            Managed,
+            private::ManagedPriv, simple_vector::SimpleVector, symbol::Symbol, type_var::TypeVar,
+            union_all::UnionAll, value::Value, Managed,
         },
         types::{construct_type::TypeVarEnv, typecheck::Typecheck},
     },
-    error::{InstantiationError, JlrsResult},
     impl_julia_typecheck,
     memory::{
         scope::LocalScopeExt,
@@ -49,10 +41,10 @@ use crate::{
 
 /// Julia type information.
 ///
-/// You can access a [`Value`]'s datatype by by calling [`Value::datatype`]. If a `DataType` is
-/// concrete and not a subtype of `Array` a new instance can be created with
-/// [`DataType::instantiate`]. To call a constructor, convert the `DataType` to a
-/// `Value` with [`Managed::as_value`] and call it as a Julia function.
+/// You can access a [`Value`]'s datatype by by calling [`Value::datatype`].
+///
+/// To call a constructor, convert the `DataType` to a `Value` with [`Managed::as_value`] and call
+/// it.
 #[derive(Copy, Clone)]
 #[repr(transparent)]
 pub struct DataType<'scope>(NonNull<jl_datatype_t>, PhantomData<&'scope ()>);
@@ -490,54 +482,13 @@ impl<'scope> DataType<'scope> {
 
     /// Create a new instance of this `DataType`, using `values` to set the fields.
     ///
-    /// This calls the function's `new` function. This functions returns an error if the given
-    /// `DataType` isn't concrete or is an array type. For custom array types you must use
-    /// [`Array::new_for`].
-    ///
-    /// To call a constructor of the type, convert it to a `Value` and call it as a function.
-    pub fn instantiate<'target, 'value, 'data, V, Tgt>(
-        self,
-        target: Tgt,
-        values: V,
-    ) -> JlrsResult<ValueResult<'target, 'data, Tgt>>
-    where
-        Tgt: Target<'target>,
-        V: AsRef<[Value<'value, 'data>]>,
-    {
-        // Safety: the pointer points to valid data, if an exception is thrown it's caught
-        unsafe {
-            if self.is::<Array>() {
-                Err(InstantiationError::ArrayNotSupported)?;
-            }
-
-            let values = values.as_ref();
-            let callback = || {
-                jl_new_structv(
-                    self.unwrap(Private),
-                    values.as_ptr() as *mut _,
-                    values.len() as _,
-                )
-            };
-
-            let res = match catch_exceptions(callback, unwrap_exc) {
-                Ok(ptr) => Ok(NonNull::new_unchecked(ptr)),
-                Err(e) => Err(e),
-            };
-
-            Ok(target.result_from_ptr(res, Private))
-        }
-    }
-
-    /// Create a new instance of this `DataType`, using `values` to set the fields.
-    ///
-    /// This calls the function's `new` function. This functions returns an error if the given
-    /// `DataType` isn't concrete or is an array type. For custom array types you must use
-    /// [`Array::new_for`].
+    /// This method calls the function's `new` function, and throws an exception if the
+    /// type cannot be instantiated.
     ///
     /// To call a constructor of the type, convert it to a `Value` and call it as a function.
     ///
     /// Safety: an exception must not be thrown if this method is called from a `ccall`ed
-    /// function.
+    /// function. Only `new` is called, not a constructor.
     #[inline]
     pub unsafe fn instantiate_unchecked<'target, 'value, 'data, V, Tgt>(
         self,

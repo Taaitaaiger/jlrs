@@ -26,7 +26,7 @@ extern "C"
 #if JULIA_VERSION_MINOR >= 11
             jl_value_t *exc = jl_current_exception(jl_current_task);
 #else
-            jl_value_t *exc = jl_current_exception();
+        jl_value_t *exc = jl_current_exception();
 #endif
             jlrs_catch_t the_exc = {JLRS_CATCH_EXCEPTION, exc};
             return the_exc;
@@ -373,16 +373,6 @@ extern "C"
         return jl_genericmemory_how(a->ref.mem);
 #else
     return (int)a->flags.how;
-#endif
-    }
-
-    void jlrs_set_global(jl_module_t *m JL_ROOTING_ARGUMENT, jl_sym_t *var, jl_value_t *val JL_ROOTED_ARGUMENT)
-    {
-#if JULIA_VERSION_MINOR >= 11
-        jl_binding_t *bp = jl_get_binding_wr(m, var, 1);
-        jl_checked_assignment(bp, m, var, val);
-#else
-    jl_set_global(m, var, val);
 #endif
     }
 #ifdef __cplusplus

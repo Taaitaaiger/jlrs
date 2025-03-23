@@ -7,6 +7,7 @@ edition = "2021"
 [dev-dependencies]
 jlrs = { version = "0.22", path = "../jlrs", features = ["full"] }
 tokio = { version = "1", features = ["macros", "rt"]}
+rayon = "1.10"
 
 [[example]]
 name = "async_tasks"
@@ -23,6 +24,10 @@ path = "persistent_tasks.rs"
 [[example]]
 name = "nested_async_scopes"
 path = "nested_async_scopes.rs"
+
+[[example]]
+name = "with_rayon"
+path = "with_rayon.rs"
 
 [[example]]
 name = "ccall"

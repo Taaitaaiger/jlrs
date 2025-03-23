@@ -50,7 +50,7 @@
 //! local scopes can be created using any target, and async scopes can only be created using an
 //! `AsyncGcFrame`.
 //!
-//! Frames lets you create  [`Output`]s and [`ReusableSlot`]s which are very similar. Both
+//! Frames let you create  [`Output`]s and [`ReusableSlot`]s which are very similar. Both
 //! target a reserved slot in that frame, they can be reused and consumed. When they're taken by
 //!  value they're consumed, and both types return data that will remain rooted until you leave
 //! the scope of the frame that roots them. They can also be taken by mutable reference, and here

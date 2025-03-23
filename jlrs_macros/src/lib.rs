@@ -77,11 +77,6 @@ use self::{constant_bytes::*, version::emit_if_compatible};
 ///     // `static MY_CONST: u8 = 1` and `const MY_CONST: u8 = 1` can be exposed this way.
 ///     const MY_CONST: u8;
 ///
-///     // Exports `MY_CONST` as the global `MY_GLOBAL`, its type must implement `IntoJulia`.
-///     // `MY_CONST` can be defined in Rust as either static or constant data, i.e. both
-///     // `static MY_CONST: u8 = 1` and `const MY_CONST: u8 = 1` can be exposed this way.
-///     static MY_CONST: u8 as MY_GLOBAL;
-///
 ///     // You can loop over types to export types and functions multiple times with
 ///     // different type parameters.
 ///     for T in [f32, f64] {

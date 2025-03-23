@@ -55,8 +55,7 @@ mod tests {
                             .as_managed()
                             .apply_type(&mut frame, args)
                             .into_jlrs_result()?
-                            .cast::<DataType>()?
-                            .instantiate(&mut frame, [v])?
+                            .call(&mut frame, [v])
                             .into_jlrs_result()?
                             .get_field(&mut frame, "a")?
                             .unbox::<i8>()?;
@@ -87,15 +86,13 @@ mod tests {
                         let v1 = vts
                             .apply_type(&mut frame, &mut [ty1])
                             .into_jlrs_result()?
-                            .cast::<DataType>()?
-                            .instantiate(&mut frame, &mut [])?
+                            .call(&mut frame, &mut [])
                             .into_jlrs_result()?;
 
                         let v2 = vts
                             .apply_type(&mut frame, &mut [ty2])
                             .into_jlrs_result()?
-                            .cast::<DataType>()?
-                            .instantiate(&mut frame, &mut [])?
+                            .call(&mut frame, &mut [])
                             .into_jlrs_result()?;
 
                         let func = Module::main(&frame)

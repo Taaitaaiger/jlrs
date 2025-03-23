@@ -665,48 +665,6 @@ impl Parse for ExportedConst {
     }
 }
 
-struct ExportedGlobal {
-    _static_token: Token![static],
-    name: Ident,
-    _colon: Token![:],
-    ty: Type,
-    _as_token: Option<Token![as]>,
-    name_override: Option<Ident>,
-}
-
-impl Parse for ExportedGlobal {
-    fn parse(input: ParseStream) -> Result<Self> {
-        let static_token = input.parse()?;
-        let name = input.parse()?;
-        let colon = input.parse()?;
-        let ty = input.parse()?;
-
-        let lookahead = input.lookahead1();
-        if lookahead.peek(Token![as]) {
-            let as_token = input.parse()?;
-            let name_override = input.parse()?;
-
-            Ok(ExportedGlobal {
-                _static_token: static_token,
-                name: name,
-                _colon: colon,
-                ty: ty,
-                _as_token: Some(as_token),
-                name_override: Some(name_override),
-            })
-        } else {
-            Ok(ExportedGlobal {
-                _static_token: static_token,
-                name: name,
-                _colon: colon,
-                ty: ty,
-                _as_token: None,
-                name_override: None,
-            })
-        }
-    }
-}
-
 struct ExportedAlias {
     _type_token: Token![type],
     name: Ident,
@@ -833,16 +791,6 @@ impl<'a> GenericEnvironment<'a> {
     fn new(generics: &'a ExportedGenerics) -> Self {
         let parameter = &generics.type_param;
         let values: Vec<_> = generics.types.iter().collect();
-
-        let n_globals = generics
-            .items
-            .iter()
-            .filter(|f| f.is_exported_const() || f.is_exported_global())
-            .count();
-
-        if n_globals != 0 {
-            panic!("Globals and constants must be defined outside a `for` block.")
-        }
 
         let items: Vec<_> = generics
             .items
@@ -1031,7 +979,6 @@ enum ModuleItem {
     ExportedFunction(ExportedFunction),
     ExportedMethod(ExportedMethod),
     ExportedConst(ExportedConst),
-    ExportedGlobal(ExportedGlobal),
     ItemWithAttrs(ItemWithAttrs),
     ExportedGenerics(ExportedGenerics),
     ExportedAlias(ExportedAlias),
@@ -1152,26 +1099,6 @@ impl ModuleItem {
         }
     }
 
-    fn is_exported_global(&self) -> bool {
-        match self {
-            ModuleItem::ExportedGlobal(_) => true,
-            ModuleItem::ItemWithAttrs(ItemWithAttrs { item, .. }) if item.is_exported_global() => {
-                true
-            }
-            _ => false,
-        }
-    }
-
-    fn get_exported_global(&self) -> &ExportedGlobal {
-        match self {
-            ModuleItem::ExportedGlobal(ref exported_global) => exported_global,
-            ModuleItem::ItemWithAttrs(ItemWithAttrs { item, .. }) if item.is_exported_global() => {
-                item.get_exported_global()
-            }
-            _ => panic!(),
-        }
-    }
-
     fn is_exported_generics(&self) -> bool {
         match self {
             ModuleItem::ExportedGenerics(_) => true,
@@ -1247,8 +1174,6 @@ impl Parse for ModuleItem {
             input.parse().map(ModuleItem::ExportedConst)
         } else if lookahead.peek(Token![type]) {
             input.parse().map(ModuleItem::ExportedAlias)
-        } else if lookahead.peek(Token![static]) {
-            input.parse().map(ModuleItem::ExportedGlobal)
         } else if lookahead.peek(Token![#]) {
             input.parse().map(ModuleItem::ItemWithAttrs)
         } else if lookahead.peek(Token![for]) {
@@ -1288,7 +1213,6 @@ impl JuliaModule {
         let generic_type_fragments = TypeFragments::generate_generic(&self, init_fn);
         let const_fragments = ConstFragments::generate(&self, init_fn);
         let alias_fragments = AliasFragments::generate(&self, init_fn);
-        let global_fragments = GlobalFragments::generate(&self, init_fn);
         let doc_fragments = DocFragments::generate(&self, init_fn)?;
 
         let type_init_fn = type_fragments.type_init_fn;
@@ -1311,8 +1235,6 @@ impl JuliaModule {
         let const_init_fn_ident = const_fragments.const_init_ident;
         let alias_init_fn = alias_fragments.alias_init_fn;
         let alias_init_fn_ident = alias_fragments.alias_init_ident;
-        let global_init_fn = global_fragments.global_init_fn;
-        let global_init_fn_ident = global_fragments.global_init_ident;
         let doc_init_fn = doc_fragments.init_docs_fn;
         let doc_init_fn_ident = doc_fragments.init_docs_fn_ident;
 
@@ -1344,12 +1266,6 @@ impl JuliaModule {
             }
         };
 
-        let invoke_global_init: Expr = parse_quote! {
-            if precompiling == 1 {
-                #global_init_fn_ident(&mut frame, module);
-            }
-        };
-
         let generated = quote::quote! {
 
             #[no_mangle]
@@ -1376,8 +1292,6 @@ impl JuliaModule {
                 #const_init_fn
 
                 #alias_init_fn
-
-                #global_init_fn
 
                 #doc_init_fn
 
@@ -1419,7 +1333,6 @@ impl JuliaModule {
                             #invoke_type_init;
                             #invoke_generic_type_init;
                             #invoke_const_init;
-                            #invoke_global_init;
                             #invoke_alias_init;
 
                             let mut arr = ::jlrs::data::managed::array::Vector::new_for_unchecked(&mut frame, function_info_ty.as_value(), 0);
@@ -1498,13 +1411,6 @@ impl JuliaModule {
             .iter()
             .filter(|it| it.is_exported_alias())
             .map(|it| it.get_exported_alias())
-    }
-
-    fn get_exported_globals(&self) -> impl Iterator<Item = &ExportedGlobal> {
-        self.items
-            .iter()
-            .filter(|it| it.is_exported_global())
-            .map(|it| it.get_exported_global())
     }
 
     fn get_exported_generics(&self) -> impl Iterator<Item = &ExportedGenerics> {
@@ -1895,36 +1801,6 @@ impl AliasFragments {
     }
 }
 
-struct GlobalFragments {
-    global_init_fn: ItemFn,
-    global_init_ident: Ident,
-}
-
-impl GlobalFragments {
-    fn generate(module: &JuliaModule, init_fn: &InitFn) -> Self {
-        let global_init_ident = format_ident!("{}_globals", init_fn.init_fn);
-
-        let global_init_fragments = module.get_exported_globals().map(global_info_fragment);
-
-        let global_init_fn = parse_quote! {
-            unsafe fn #global_init_ident(
-                frame: &mut ::jlrs::memory::target::frame::GcFrame,
-                module: ::jlrs::data::managed::module::Module,
-            ) {
-
-                #(
-                    #global_init_fragments
-                )*
-            }
-        };
-
-        GlobalFragments {
-            global_init_ident,
-            global_init_fn,
-        }
-    }
-}
-
 fn doc_info_fragment((index, info): (usize, &ItemWithAttrs)) -> Result<Expr> {
     match info.item.as_ref() {
         ModuleItem::InitFn(i) => Err(syn::Error::new_spanned(
@@ -2038,29 +1914,6 @@ fn doc_info_fragment((index, info): (usize, &ItemWithAttrs)) -> Result<Expr> {
             Ok(q)
         }
         ModuleItem::ExportedConst(val) => {
-            let name_ident = &val.name;
-            let rename = val.name_override.as_ref().unwrap_or(name_ident).to_string();
-            let doc = info.get_docstr()?;
-
-            let q = parse_quote! {
-                {
-                    frame.scope(|mut frame| {
-                        unsafe {
-                            let item = ::jlrs::data::managed::symbol::Symbol::new(&frame, #rename);
-                            let signature = ::jlrs::data::managed::value::Value::bottom_type(&frame);
-                            let doc = ::jlrs::data::managed::string::JuliaString::new(&mut frame, #doc);
-
-                            let doc_it = doc_item_ty.instantiate_unchecked(&mut frame, [module.as_value(), item.as_value(), signature, doc.as_value()]);
-                            accessor.set_value(&mut frame, #index, doc_it).unwrap().into_jlrs_result().unwrap();
-                        }
-                    });
-                }
-
-            };
-
-            Ok(q)
-        }
-        ModuleItem::ExportedGlobal(val) => {
             let name_ident = &val.name;
             let rename = val.name_override.as_ref().unwrap_or(name_ident).to_string();
             let doc = info.get_docstr()?;
@@ -2543,25 +2396,6 @@ fn alias_info_fragment(info: &ExportedAlias) -> Expr {
                 let value = <#ty as ::jlrs::data::types::construct_type::ConstructType>::construct_type(&frame).as_value();
                 module.set_const_unchecked(#name, value);
             }
-        }
-    }
-}
-
-fn global_info_fragment(info: &ExportedGlobal) -> Expr {
-    let name = &info.name;
-    let rename = info.name_override.as_ref().unwrap_or(name).to_string();
-    let ty = &info.ty;
-
-    parse_quote! {
-        {
-            frame.scope(move |mut frame| {
-                let v: #ty = #name;
-                let value = ::jlrs::data::managed::value::Value::new(&mut frame, v);
-
-                unsafe {
-                    module.set_global_unchecked(#rename, value);
-                }
-            });
         }
     }
 }

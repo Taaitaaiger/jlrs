@@ -1471,7 +1471,7 @@ fn do_construct<'target, T: ConstructType>(
 
             if ty.is::<DataType>() {
                 let dt = ty.cast_unchecked::<DataType>();
-                if !dt.has_free_type_vars() && (!dt.is::<Tuple>() || dt.is_concrete_type()) {
+                if !dt.has_free_type_vars() && (!dt.is::<Tuple>() && dt.is_concrete_type()) {
                     ct.data.write().insert(tid, ty.leak().as_value());
                 }
             } else if ty.is::<u8>() || ty.is::<i8>() {

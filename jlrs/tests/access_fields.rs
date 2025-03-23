@@ -31,8 +31,7 @@ mod tests {
                             .as_managed()
                             .apply_type(&mut frame, &mut tys)
                             .into_jlrs_result()?
-                            .cast::<DataType>()?
-                            .instantiate(&mut frame, &mut [])?
+                            .call0(&mut frame)
                             .into_jlrs_result()?;
 
                         assert!(res
@@ -137,15 +136,12 @@ mod tests {
                             .submodule(&frame, "JlrsTests")?
                             .as_managed()
                             .global(&frame, "MutableStruct")?
-                            .as_managed()
-                            .cast::<DataType>()?;
+                            .as_managed();
 
                         let x = Value::new(&mut frame, 2.0f32);
                         let y = Value::new(&mut frame, 3u64);
 
-                        let mut_struct = func
-                            .instantiate(&mut frame, &mut [x, y])?
-                            .into_jlrs_result()?;
+                        let mut_struct = func.call(&mut frame, &mut [x, y]).into_jlrs_result()?;
                         assert!(mut_struct.is::<Mutable>());
 
                         assert!(mut_struct.get_field(&mut frame, "x").is_ok());
@@ -179,15 +175,12 @@ mod tests {
                             .submodule(&frame, "JlrsTests")?
                             .as_managed()
                             .global(&frame, "MutableStruct")?
-                            .as_managed()
-                            .cast::<DataType>()?;
+                            .as_managed();
 
                         let x = Value::new(&mut frame, 2.0f32);
                         let y = Value::new(&mut frame, 3u64);
 
-                        let mut_struct = func
-                            .instantiate(&mut frame, &mut [x, y])?
-                            .into_jlrs_result()?;
+                        let mut_struct = func.call(&mut frame, &mut [x, y]).into_jlrs_result()?;
                         assert!(mut_struct.is::<Mutable>());
 
                         assert!(mut_struct.get_field(&mut frame, "z").is_err());

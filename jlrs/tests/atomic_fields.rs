@@ -13,8 +13,8 @@ mod tests {
             handle.borrow_mut().with_stack(|mut stack| {
                 stack
                     .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| {
-                        let ty = unsafe {
+                    .scope(|mut frame| unsafe {
+                        let ty = {
                             Module::main(&frame)
                                 .submodule(&frame, "JlrsStableTests")?
                                 .as_managed()
@@ -23,10 +23,7 @@ mod tests {
                         };
 
                         let arg1 = Value::new(&mut frame, 3u32);
-                        let instance = ty
-                            .cast::<DataType>()?
-                            .instantiate(&mut frame, &mut [arg1])?
-                            .into_jlrs_result()?;
+                        let instance = ty.call(&mut frame, &mut [arg1]).into_jlrs_result()?;
 
                         let a = instance.field_accessor().field("a")?.access::<u32>()?;
                         assert_eq!(a, 3);
@@ -43,8 +40,8 @@ mod tests {
             handle.borrow_mut().with_stack(|mut stack| {
                 stack
                     .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| {
-                        let ty = unsafe {
+                    .scope(|mut frame| unsafe {
+                        let ty = {
                             Module::main(&frame)
                                 .submodule(&frame, "JlrsStableTests")?
                                 .as_managed()
@@ -53,11 +50,7 @@ mod tests {
                         };
 
                         let tup = Value::new(&mut frame, Tuple4(1u64, 2u64, 3u64, 4u64));
-
-                        let instance = ty
-                            .cast::<DataType>()?
-                            .instantiate(&mut frame, &mut [tup])?
-                            .into_jlrs_result()?;
+                        let instance = ty.call(&mut frame, &mut [tup]).into_jlrs_result()?;
 
                         let a = instance
                             .field_accessor()
@@ -77,8 +70,8 @@ mod tests {
             handle.borrow_mut().with_stack(|mut stack| {
                 stack
                     .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| {
-                        let ty = unsafe {
+                    .scope(|mut frame| unsafe {
+                        let ty = {
                             Module::main(&frame)
                                 .submodule(&frame, "JlrsStableTests")?
                                 .as_managed()
@@ -88,10 +81,7 @@ mod tests {
 
                         let tup = Value::new(&mut frame, Tuple2(1u32, 2u16));
 
-                        let instance = ty
-                            .cast::<DataType>()?
-                            .instantiate(&mut frame, &mut [tup])?
-                            .into_jlrs_result()?;
+                        let instance = ty.call(&mut frame, &mut [tup]).into_jlrs_result()?;
 
                         let a = instance
                             .field_accessor()
