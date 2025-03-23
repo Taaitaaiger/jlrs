@@ -507,7 +507,7 @@ extern "C" {
         var: *mut crate::types::jl_sym_t,
         val: *mut crate::types::jl_value_t,
     );
-    
+
     pub fn jl_cpu_threads() -> std::ffi::c_int;
 
     pub fn jl_is_debugbuild() -> std::ffi::c_int;

@@ -253,11 +253,11 @@
 //! If you want to embed Julia in a Rust application, you must enable a runtime and a version
 //! feature:
 //!
-//! `jlrs = {version = "0.20.0", features = ["local-rt", "julia-1-11"]}`
+//! `jlrs = {version = "0.22", features = ["local-rt", "julia-1-11"]}`
 //!
-//! `jlrs = {version = "0.20.0", features = ["tokio-rt", "julia-1-11"]}`
+//! `jlrs = {version = "0.22", features = ["tokio-rt", "julia-1-11"]}`
 //!
-//! `jlrs = {version = "0.20.0", features = ["multi-rt", "julia-1-11"]}`
+//! `jlrs = {version = "0.22", features = ["multi-rt", "julia-1-11"]}`
 //!
 //! When Julia is embedded in an application, it must be initialized before it can be used. A
 //! [`Builder`] is available to configure the runtime before starting it. This lets you set
@@ -630,6 +630,47 @@
 //! assert_eq!(res, 3);
 //!
 //! // The runtime thread exits when the last instance of `julia` is dropped.
+//! std::mem::drop(julia);
+//! thread_handle.join().unwrap();
+//! # }
+//! ```
+//!
+//! Async closures implement `AsyncTask`:
+//!
+//! ```
+//! use jlrs::prelude::*;
+//!
+//! # fn main() {
+//! let (julia, thread_handle) = Builder::new()
+//!     .async_runtime(Tokio::<3>::new(false))
+//!     .spawn()
+//!     .unwrap();
+//!
+//! let a = 1u64;
+//! let b = 2u64;
+//!
+//! // It's necessary to provide frame's type
+//! let async_task = julia
+//!     .task(async move |mut frame: AsyncGcFrame| -> JlrsResult<u64> {
+//!         let a = Value::new(&mut frame, a);
+//!         let b = Value::new(&mut frame, b);
+//!
+//!         let func: Value = Module::base(&frame).global(&mut frame, "+")?;
+//!         unsafe { func.call_async(&mut frame, [a, b]) }
+//!             .await
+//!             .into_jlrs_result()?
+//!             .unbox::<u64>()
+//!     })
+//!     .try_dispatch()
+//!     .expect("unable to dispatch task");
+//!
+//! let res = async_task
+//!     .blocking_recv()
+//!     .expect("unable to receive result")
+//!     .expect("AdditionTask failed");
+//!
+//! assert_eq!(res, 3);
+//!
 //! std::mem::drop(julia);
 //! thread_handle.join().unwrap();
 //! # }

@@ -1,3 +1,5 @@
+//! Local and dynamic scopes
+
 use jl_sys::unsized_local_scope;
 
 use super::target::{
