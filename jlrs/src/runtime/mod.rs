@@ -237,7 +237,7 @@ unsafe fn include<P: AsRef<Path>>(path: P) -> JlrsResult<()> {
 unsafe fn using<S: AsRef<str>>(module_name: S) -> JlrsResult<()> {
     unsafe {
         weak_handle_unchecked!().local_scope::<1>(|mut frame| {
-            let cmd = format!("import {}", module_name.as_ref());
+            let cmd = format!("using {}", module_name.as_ref());
             Value::eval_string(&mut frame, cmd)
                 .map(|_| ())
                 .into_jlrs_result()

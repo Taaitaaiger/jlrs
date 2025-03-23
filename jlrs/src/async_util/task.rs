@@ -23,6 +23,18 @@ pub trait AsyncTask: 'static + Send {
     fn run(self, frame: AsyncGcFrame) -> impl Future<Output = Self::Output>;
 }
 
+impl<A, U> AsyncTask for A
+where
+    A: AsyncFnOnce(AsyncGcFrame) -> U + Send + 'static,
+    U: Send + 'static,
+{
+    type Output = U;
+
+    fn run<'frame>(self, frame: AsyncGcFrame<'frame>) -> impl Future<Output = Self::Output> {
+        self(frame)
+    }
+}
+
 /// Persistent task
 ///
 /// Unlike an [`AsyncTask`], which is executed once, a persistent task is initialized and then
@@ -98,17 +110,5 @@ pub fn sleep<'scope, 'data, Tgt: Target<'scope>>(target: &Tgt, duration: Duratio
                 inline_static_ref!(SLEEP, Value<'static, 'static>, "Base.sleep", target);
             func.call1(target, secs).expect("sleep threw an exception");
         })
-    }
-}
-
-impl<A, U> AsyncTask for A
-where
-    for<'scope> A: AsyncFnOnce(AsyncGcFrame<'scope>) -> U + Send + 'static,
-    U: Send + 'static,
-{
-    type Output = U;
-
-    fn run<'frame>(self, frame: AsyncGcFrame<'frame>) -> impl Future<Output = Self::Output> {
-        self(frame)
     }
 }

@@ -14,7 +14,7 @@ use std::{
 
 use jl_sys::{
     jl_base_module, jl_core_module, jl_get_global, jl_is_const, jl_main_module, jl_module_t,
-    jl_module_type, jl_set_const, jlrs_module_name, jlrs_module_parent, jl_set_global,
+    jl_module_type, jl_set_const, jl_set_global, jlrs_module_name, jlrs_module_parent,
 };
 use rustc_hash::FxHashMap;
 
