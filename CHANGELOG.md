@@ -58,6 +58,8 @@
 
 - An example that shows how the multithreaded runtime can be used with rayon has been added.
 
+- Cached data is guaranteed to be rooted.
+
 ## v0.21
 
 - Support generating bindings for Julia enums with integer base types in combination with JlrsCore.Reflect and the `Enum` derive macro.

@@ -614,6 +614,8 @@ extern "C" {
         bj: *mut crate::types::jl_value_t,
     );
 
+    pub fn jl_gc_set_cb_root_scanner(cb: crate::jl_gc_cb_root_scanner_t, enable: std::ffi::c_int);
+
     pub fn jl_dlopen(
         filename: *const std::ffi::c_char,
         flags: std::ffi::c_uint,

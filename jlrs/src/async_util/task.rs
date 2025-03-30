@@ -30,7 +30,7 @@ where
 {
     type Output = U;
 
-    fn run<'frame>(self, frame: AsyncGcFrame<'frame>) -> impl Future<Output = Self::Output> {
+    fn run(self, frame: AsyncGcFrame) -> impl Future<Output = Self::Output> {
         self(frame)
     }
 }

@@ -1,6 +1,10 @@
 #![allow(non_camel_case_types)]
 
-use std::{cell::Cell, ffi::c_void, ptr::null_mut};
+use std::{
+    cell::Cell,
+    ffi::{c_int, c_void},
+    ptr::null_mut,
+};
 
 #[repr(u32)]
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -78,7 +82,10 @@ pub struct jl_genericmemory_t {
 
 pub type jl_markfunc_t =
     unsafe extern "C" fn(ptls: *mut jl_tls_states_t, obj: *mut jl_value_t) -> usize;
+
 pub type jl_sweepfunc_t = unsafe extern "C" fn(obj: *mut jl_value_t);
+
+pub type jl_gc_cb_root_scanner_t = unsafe extern "C" fn(c_int);
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]

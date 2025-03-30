@@ -102,6 +102,7 @@ lock_api = "0.4"
 fnv = "1"
 atomic = "0.6"
 semver = "1"
+rustversion = "1"
 
 async-channel = { version = "2", optional = true }
 half = { version = "2.4", optional = true }

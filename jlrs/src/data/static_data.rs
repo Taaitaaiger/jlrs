@@ -14,16 +14,45 @@ use std::{
 use jl_sys::{jl_sym_t, jl_symbol_n, jl_value_t};
 
 use super::{
+    cache::Cache,
     managed::private::ManagedPriv,
     types::{construct_type::ConstructType, typecheck::Typecheck},
 };
 use crate::{
     data::managed::{module::Module, value::ValueUnbound, Managed},
     gc_safe::GcSafeOnceLock,
-    memory::target::Target,
+    memory::{target::Target, PTls},
     prelude::{Symbol, Value},
     private::Private,
 };
+
+#[rustversion::before(1.85)]
+type CacheImpl = GcSafeOnceLock<Cache<()>>;
+#[rustversion::since(1.85)]
+type CacheImpl = Cache<()>;
+
+#[rustversion::before(1.85)]
+static CACHE: CacheImpl = CacheImpl::new();
+#[rustversion::since(1.85)]
+static CACHE: CacheImpl = CacheImpl::new(());
+
+#[rustversion::before(1.85)]
+pub(crate) unsafe fn init_static_data_cache() {
+    CACHE.set(Default::default()).ok();
+}
+
+#[rustversion::since(1.85)]
+pub(crate) unsafe fn init_static_data_cache() {}
+
+#[rustversion::before(1.85)]
+pub(crate) unsafe fn mark_static_data_cache(ptls: PTls, full: bool) {
+    CACHE.get().map(|cache| cache.mark(ptls, full));
+}
+
+#[rustversion::since(1.85)]
+pub(crate) unsafe fn mark_static_data_cache(ptls: PTls, full: bool) {
+    CACHE.mark(ptls, full);
+}
 
 struct StaticDataInner<T>(ValueUnbound, PhantomData<T>);
 unsafe impl<T> Send for StaticDataInner<T> {}
@@ -107,6 +136,10 @@ where
                 .as_value()
                 .cast::<T>()
                 .unwrap();
+
+            CACHE.get_unchecked().write(|cache| {
+                cache.roots_mut().insert(global.as_value());
+            });
 
             return StaticDataInner(global.as_value(), PhantomData);
         });
@@ -263,6 +296,10 @@ where
                 .cast::<T>()
                 .unwrap();
 
+            CACHE.get_unchecked().write(|cache| {
+                cache.roots_mut().insert(global.as_value());
+            });
+
             let ptr = global.unwrap(Private);
             self.global.store(ptr, Ordering::Relaxed);
             T::wrap_non_null(NonNull::new_unchecked(ptr), Private)
@@ -296,6 +333,10 @@ where
             .as_value()
             .cast::<T>()
             .unwrap();
+
+        CACHE.get_unchecked().write(|cache| {
+            cache.roots_mut().insert(v.as_value());
+        });
 
         let ptr = v.unwrap(Private);
         self.global.store(ptr, Ordering::Relaxed);
@@ -345,6 +386,9 @@ where
     {
         unsafe {
             let v = T::construct_type(target).as_value();
+            CACHE.get_unchecked().write(|cache| {
+                cache.roots_mut().insert(v);
+            });
             self.global.store(v.unwrap(Private), Ordering::Relaxed);
 
             v
