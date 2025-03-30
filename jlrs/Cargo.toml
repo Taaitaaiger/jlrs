@@ -90,7 +90,6 @@ macos = ["jl-sys/macos"]
 docs = ["jl-sys/docs", "full", "julia-1-12"]
 
 [dependencies]
-cfg-if = "1"
 jl-sys = { version = "0.26", path = "../jl_sys" }
 jlrs-macros = { version = "0.5", path = "../jlrs_macros" }
 smallvec = {version = "1", features = ["const_generics"]}
