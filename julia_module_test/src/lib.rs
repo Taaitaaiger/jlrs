@@ -39,7 +39,7 @@ julia_module! {
     become julia_module_tests_init_fn;
 
     fn takes_no_args_returns_nothing();
-    fn takes_no_args_returns_usize() -> usize;
+    fn  takes_no_args_returns_usize() -> usize;
 
     fn takes_usize_returns_usize(a: usize) -> usize;
     fn takes_array(a: Array) -> usize;
@@ -151,7 +151,7 @@ julia_module! {
         v: TypedValue<'_, 'static, FourGenericsM<tvar!('A'), tvar!('B'), i32, i32>>,
     ) -> TypedValueRet<FourGenericsM<tvar!('A'), tvar!('B'), i32, i32>>  use tvars!(tvar!('A'), tvar!('B'));
 
-    fn takes_four_generics_i_trailing1(
+    pub fn takes_four_generics_i_trailing1(
         v: TypedValue<'_, 'static, FourGenericsI<i32, i32, i32, tvar!('D')>>,
     ) -> TypedValueRet<FourGenericsI<i32, i32, i32, tvar!('D')>> use tvars!(tvar!('D'));
 
@@ -159,5 +159,5 @@ julia_module! {
     const STATIC_U8: u8 as CONST_STATIC_U8;
 
     type POpaque64 = POpaque<f64>;
-    in POpaque<f64> fn new(value: f64) -> TypedValueRet<POpaque<f64>> as POpaque64;
+    in POpaque<f64> pub fn new(value: f64) -> TypedValueRet<POpaque<f64>> as POpaque64;
 }
