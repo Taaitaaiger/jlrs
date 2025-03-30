@@ -178,7 +178,7 @@ pub trait Gc: private::GcPriv {
 
 /// Mark `obj`, returns `true` if `obj` points to young data.
 ///
-/// This method can be used to implement custom mark functions. If a foreign type contains
+/// This function can be used to implement custom mark functions. If a foreign type contains
 /// references to Julia data, a custom `mark` function must be implemented that calls this
 /// function on each of those references.
 ///
@@ -192,7 +192,7 @@ pub unsafe fn mark_queue_obj(ptls: PTls, obj: WeakValue) -> bool {
 
 /// Mark `objs`.
 ///
-/// This method can be used to implement custom mark functions. If a foreign type contains
+/// This function can be used to implement custom mark functions. If a foreign type contains
 /// references to Julia data, a custom `mark` function must be implemented. This method can be
 /// used on arrays of references to Julia data instead of calling [`mark_queue_obj`] for each
 /// reference in that array.

@@ -29,6 +29,7 @@ use crate::{
     catch::{catch_exceptions, unwrap_exc},
     convert::to_symbol::ToSymbol,
     data::{
+        cache::Cache,
         layout::nothing::Nothing,
         managed::{
             function::Function, private::ManagedPriv, symbol::Symbol, union_all::UnionAll,
@@ -38,43 +39,46 @@ use crate::{
         types::{construct_type::ConstructType, typecheck::Typecheck},
     },
     error::{AccessError, JlrsResult, TypeError},
-    gc_safe::{GcSafeOnceLock, GcSafeRwLock},
+    gc_safe::GcSafeOnceLock,
     impl_julia_typecheck, inline_static_ref,
-    memory::target::{unrooted::Unrooted, Target, TargetException, TargetResult},
+    memory::{
+        target::{unrooted::Unrooted, Target, TargetException, TargetResult},
+        PTls,
+    },
     prelude::{DataType, WeakValue},
     private::Private,
 };
 
-struct GlobalCache {
-    // FxHashMap is significantly faster than HashMap with default hasher
-    // Boxed slice is faster to hash than a Vec
-    data: GcSafeRwLock<FxHashMap<Box<[u8]>, (TypeId, ValueUnbound)>>,
-}
+#[rustversion::before(1.85)]
+type CacheImpl =
+    crate::gc_safe::GcSafeOnceLock<Cache<FxHashMap<Box<[u8]>, (TypeId, ValueUnbound)>>>;
+#[rustversion::since(1.85)]
+type CacheImpl = Cache<FxHashMap<Box<[u8]>, (TypeId, ValueUnbound)>>;
 
-impl GlobalCache {
-    #[cfg_attr(
-        not(any(
-            feature = "local-rt",
-            feature = "async-rt",
-            feature = "multi-rt",
-            feature = "ccall"
-        )),
-        allow(unused)
-    )]
-    fn new() -> Self {
-        GlobalCache {
-            data: GcSafeRwLock::default(),
-        }
-    }
-}
+#[rustversion::before(1.85)]
+static CACHE: CacheImpl = CacheImpl::new();
+#[rustversion::since(1.85)]
+static CACHE: CacheImpl = CacheImpl::new({
+    let hasher = rustc_hash::FxBuildHasher;
+    std::collections::HashMap::with_hasher(hasher)
+});
 
-unsafe impl Send for GlobalCache {}
-unsafe impl Sync for GlobalCache {}
-
-static CACHE: GcSafeOnceLock<GlobalCache> = GcSafeOnceLock::new();
-
+#[rustversion::before(1.85)]
 pub(crate) unsafe fn init_global_cache() {
-    CACHE.set(GlobalCache::new()).ok();
+    CACHE.set(Default::default()).ok();
+}
+
+#[rustversion::since(1.85)]
+pub(crate) unsafe fn init_global_cache() {}
+
+#[rustversion::before(1.85)]
+pub(crate) unsafe fn mark_global_cache(ptls: PTls, full: bool) {
+    CACHE.get().map(|cache| cache.mark(ptls, full));
+}
+
+#[rustversion::since(1.85)]
+pub(crate) unsafe fn mark_global_cache(ptls: PTls, full: bool) {
+    CACHE.mark(ptls, full);
 }
 
 /// Functionality in Julia can be accessed through its module system. You can get a handle to the
@@ -125,13 +129,13 @@ impl<'scope> Module<'scope> {
         Tgt: Target<'target>,
     {
         let tid = T::type_id();
-        let data = &CACHE.get_unchecked().data;
-        let path = path.as_ref();
+        let cache = &CACHE.get_unchecked();
 
-        {
-            if let Some(cached) = data.read().get(path.as_bytes()) {
+        let path = path.as_ref();
+        let res = cache.read(|cache| -> JlrsResult<Option<_>> {
+            if let Some(cached) = cache.cache().get(path.as_bytes()) {
                 if cached.0 == tid {
-                    return Ok(cached.1.cast_unchecked());
+                    return Ok(Some(cached.1.cast_unchecked()));
                 } else {
                     let ty = T::construct_type(target).as_value();
                     Err(TypeError::NotA {
@@ -140,6 +144,11 @@ impl<'scope> Module<'scope> {
                     })?
                 }
             }
+            Ok(None)
+        })?;
+
+        if let Some(res) = res {
+            return Ok(res);
         }
 
         let mut parts = path.split('.');
@@ -182,12 +191,13 @@ impl<'scope> Module<'scope> {
             }
         };
 
-        {
-            data.write().insert(
+        cache.write(|cache| {
+            cache.roots_mut().insert(item.as_value());
+            cache.cache_mut().insert(
                 path.as_bytes().into(),
                 (tid, erase_scope_lifetime(item.as_value())),
             );
-        }
+        });
 
         Ok(item)
     }

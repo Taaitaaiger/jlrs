@@ -1033,10 +1033,17 @@
 
 use std::{
     env,
+    ffi::c_int,
     sync::atomic::{AtomicBool, Ordering},
 };
 
-use jl_sys::jlrs_init_missing_functions;
+use data::{
+    managed::module::mark_global_cache,
+    static_data::{init_static_data_cache, mark_static_data_cache},
+    types::construct_type::mark_constructed_type_cache,
+};
+use jl_sys::{jl_gc_set_cb_root_scanner, jlrs_init_missing_functions};
+use memory::get_tls;
 use prelude::Managed;
 use semver::Version;
 
@@ -1194,6 +1201,9 @@ pub(crate) unsafe fn init_jlrs(install_jlrs_core: &InstallJlrsCore, allow_overri
     init_constructed_type_cache();
     init_symbol_cache();
     init_global_cache();
+    init_static_data_cache();
+
+    jl_gc_set_cb_root_scanner(root_scanner, 1);
 
     if let Some(preferred_version) = preferred_jlrs_core_version() {
         if allow_override {
@@ -1213,4 +1223,25 @@ pub(crate) unsafe fn init_jlrs(install_jlrs_core: &InstallJlrsCore, allow_overri
 
     init_ledger();
     Stack::init();
+}
+
+#[cfg_attr(
+    not(any(
+        feature = "local-rt",
+        feature = "async-rt",
+        feature = "multi-rt",
+        feature = "ccall"
+    )),
+    allow(unused)
+)]
+unsafe extern "C" fn root_scanner(full: c_int) {
+    unsafe {
+        let ptls = get_tls();
+        debug_assert!(!ptls.is_null());
+
+        let full = full != 0;
+        mark_constructed_type_cache(ptls, full);
+        mark_global_cache(ptls, full);
+        mark_static_data_cache(ptls, full);
+    }
 }

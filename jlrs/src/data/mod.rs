@@ -36,6 +36,7 @@
 //! [`Value`]: crate::data::managed::value::Value
 //! [`Array`]: crate::data::managed::array::Array
 
+mod cache;
 pub mod layout;
 pub mod managed;
 pub mod static_data;

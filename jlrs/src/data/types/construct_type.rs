@@ -14,6 +14,7 @@ use super::abstract_type::{AbstractType, AnyType};
 use crate::{
     convert::to_symbol::ToSymbol,
     data::{
+        cache::Cache,
         layout::{is_bits::IsBits, tuple::Tuple, typed_layout::HasLayout},
         managed::{
             array::dimensions::DimsExt,
@@ -22,21 +23,27 @@ use crate::{
             type_var::{TypeVar, TypeVarData},
             union::Union,
             union_all::UnionAll,
-            value::{Value, ValueData},
+            value::{Value, ValueData, ValueUnbound},
             Managed,
         },
     },
-    gc_safe::{GcSafeOnceLock, GcSafeRwLock},
     memory::{
         scope::{LocalScope, LocalScopeExt},
         target::{unrooted::Unrooted, RootingTarget, Target},
+        PTls,
     },
-    prelude::{ConstructTypedArray, Symbol},
+    prelude::{ConstructTypedArray, Symbol, WeakValue},
     private::Private,
 };
 
-static CONSTRUCTED_TYPE_CACHE: GcSafeOnceLock<ConstructedTypes> = GcSafeOnceLock::new();
+#[rustversion::before(1.85)]
+type CacheImpl = crate::gc_safe::GcSafeOnceLock<ConstructedTypes>;
+#[rustversion::since(1.85)]
+type CacheImpl = ConstructedTypes;
 
+static CONSTRUCTED_TYPE_CACHE: CacheImpl = CacheImpl::new();
+
+#[rustversion::before(1.85)]
 #[cfg_attr(
     not(any(
         feature = "local-rt",
@@ -48,6 +55,30 @@ static CONSTRUCTED_TYPE_CACHE: GcSafeOnceLock<ConstructedTypes> = GcSafeOnceLock
 )]
 pub(crate) unsafe fn init_constructed_type_cache() {
     CONSTRUCTED_TYPE_CACHE.set(ConstructedTypes::new()).ok();
+}
+
+#[rustversion::since(1.85)]
+#[cfg_attr(
+    not(any(
+        feature = "local-rt",
+        feature = "async-rt",
+        feature = "multi-rt",
+        feature = "ccall"
+    )),
+    allow(unused)
+)]
+pub(crate) unsafe fn init_constructed_type_cache() {}
+
+#[rustversion::before(1.85)]
+pub(crate) unsafe fn mark_constructed_type_cache(ptls: PTls, full: bool) {
+    CONSTRUCTED_TYPE_CACHE
+        .get()
+        .map(|cache| cache.data.mark(ptls, full));
+}
+
+#[rustversion::since(1.85)]
+pub(crate) unsafe fn mark_constructed_type_cache(ptls: PTls, full: bool) {
+    CONSTRUCTED_TYPE_CACHE.data.mark(ptls, full);
 }
 
 /// Define a fast key type for a constructible type.
@@ -245,10 +276,9 @@ pub unsafe trait ConstructType: Sized {
     {
         if Self::CACHEABLE {
             unsafe {
-                let unrooted = Unrooted::new();
                 CONSTRUCTED_TYPE_CACHE
                     .get_unchecked()
-                    .find_or_construct::<Self>(unrooted)
+                    .find_or_construct::<Self>()
                     .root(target)
             }
         } else {
@@ -277,10 +307,9 @@ pub unsafe trait ConstructType: Sized {
     {
         if Self::CACHEABLE {
             unsafe {
-                let unrooted = Unrooted::new();
                 CONSTRUCTED_TYPE_CACHE
                     .get_unchecked()
-                    .find_or_construct_with_env::<Self>(unrooted, env)
+                    .find_or_construct_with_env::<Self>(env)
                     .root(target)
             }
         } else {
@@ -1414,68 +1443,101 @@ unsafe impl<U: ConstructType> ConstructType for *mut U {
 }
 
 struct ConstructedTypes {
-    data: GcSafeRwLock<FnvHashMap<TypeId, Value<'static, 'static>>>,
+    data: Cache<FnvHashMap<TypeId, ValueUnbound>>,
 }
 
 impl ConstructedTypes {
+    #[rustversion::since(1.85)]
+    const fn new() -> Self {
+        let hasher = fnv::FnvBuildHasher::new();
+        let map = std::collections::HashMap::with_hasher(hasher);
+        let cache = Cache::new(map);
+
+        ConstructedTypes { data: cache }
+    }
+
+    #[rustversion::before(1.85)]
     fn new() -> Self {
-        ConstructedTypes {
-            data: GcSafeRwLock::new(FnvHashMap::default()),
-        }
+        let map = FnvHashMap::default();
+        let cache = Cache::new(map);
+
+        ConstructedTypes { data: cache }
+    }
+
+    #[inline(always)]
+    #[rustversion::since(1.85)]
+    fn get_unchecked(&self) -> &Self {
+        self
     }
 
     #[inline]
-    fn find_or_construct<'target, T: ConstructType>(
-        &self,
-        target: Unrooted<'target>,
-    ) -> ValueData<'target, 'static, Unrooted<'target>> {
+    fn find_or_construct<T: ConstructType>(&self) -> WeakValue<'static, 'static> {
         let tid = T::type_id();
+        let res = unsafe {
+            self.data.read(|cache| {
+                if let Some(res) = cache.cache().get(&tid).copied() {
+                    return Some(res.as_weak());
+                }
 
-        {
-            if let Some(res) = self.data.read().get(&tid).copied() {
-                return res.root(target);
-            }
+                None
+            })
+        };
+
+        if let Some(res) = res {
+            return res;
         }
 
-        do_construct::<T>(target, self, tid)
+        do_construct::<T>(self, tid)
     }
 
     #[inline]
-    fn find_or_construct_with_env<'target, T: ConstructType>(
+    fn find_or_construct_with_env<T: ConstructType>(
         &self,
-        target: Unrooted<'target>,
         env: &TypeVarEnv,
-    ) -> ValueData<'target, 'static, Unrooted<'target>> {
+    ) -> WeakValue<'static, 'static> {
         let tid = T::type_id();
+        let res = unsafe {
+            self.data.read(|cache| {
+                if let Some(res) = cache.cache().get(&tid).copied() {
+                    return Some(res.as_weak());
+                }
 
-        {
-            if let Some(res) = self.data.read().get(&tid).copied() {
-                return res.root(target);
-            }
+                None
+            })
+        };
+
+        if let Some(res) = res {
+            return res;
         }
 
-        do_construct_with_context::<T>(target, self, tid, env)
+        do_construct_with_context::<T>(self, tid, env)
     }
 }
 
 // #[inline(never)]
 #[cold]
-fn do_construct<'target, T: ConstructType>(
-    target: Unrooted<'target>,
+fn do_construct<T: ConstructType>(
     ct: &ConstructedTypes,
     tid: TypeId,
-) -> ValueData<'target, 'static, Unrooted<'target>> {
+) -> WeakValue<'static, 'static> {
     unsafe {
-        target.with_local_scope::<1>(|target, mut frame| {
+        let unrooted = Unrooted::new();
+        unrooted.with_local_scope::<1>(|target, mut frame| {
             let ty = T::construct_type_uncached(&mut frame);
 
             if ty.is::<DataType>() {
                 let dt = ty.cast_unchecked::<DataType>();
-                if !dt.has_free_type_vars() && (!dt.is::<Tuple>() && dt.is_concrete_type()) {
-                    ct.data.write().insert(tid, ty.leak().as_value());
+                if !dt.has_free_type_vars() && (!dt.is::<Tuple>() || dt.is_concrete_type()) {
+                    ct.data.write(|cache| {
+                        cache.cache_mut().insert(tid, ty.leak().as_value());
+                        cache.roots_mut().insert(ty.as_value());
+                    });
                 }
             } else if ty.is::<u8>() || ty.is::<i8>() {
-                ct.data.write().insert(tid, ty.leak().as_value());
+                ct.data.write(|cache| {
+                    cache.cache_mut().insert(tid, ty.leak().as_value());
+                    cache.roots_mut().insert(ty.as_value());
+                });
             }
 
             ty.root(target)
@@ -1485,29 +1547,32 @@ fn do_construct<'target, T: ConstructType>(
 
 // #[inline(never)]
 #[cold]
-fn do_construct_with_context<'target, T: ConstructType>(
-    target: Unrooted<'target>,
+fn do_construct_with_context<T: ConstructType>(
     ct: &ConstructedTypes,
     tid: TypeId,
     env: &TypeVarEnv,
-) -> ValueData<'target, 'static, Unrooted<'target>> {
+) -> WeakValue<'static, 'static> {
     unsafe {
-        target.with_local_scope::<1>(|target, mut frame| {
+        let unrooted = Unrooted::new();
+        unrooted.with_local_scope::<1>(|target, mut frame| {
             let ty = T::construct_type_with_env_uncached(&mut frame, env);
 
             if ty.is::<DataType>() {
                 let dt = ty.cast_unchecked::<DataType>();
                 if !dt.has_free_type_vars() && (!dt.is::<Tuple>() || dt.is_concrete_type()) {
-                    ct.data.write().insert(tid, ty.leak().as_value());
+                    ct.data.write(|cache| {
+                        cache.cache_mut().insert(tid, ty.leak().as_value());
+                        cache.roots_mut().insert(ty.as_value());
+                    });
                 }
             } else if ty.is::<u8>() || ty.is::<i8>() {
-                ct.data.write().insert(tid, ty.leak().as_value());
+                ct.data.write(|cache| {
+                    cache.cache_mut().insert(tid, ty.leak().as_value());
+                    cache.roots_mut().insert(ty.as_value());
+                });
             }
 
             ty.root(target)
         })
     }
 }
-
-unsafe impl Sync for ConstructedTypes {}
-unsafe impl Send for ConstructedTypes {}
