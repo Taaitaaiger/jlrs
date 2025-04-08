@@ -48,3 +48,24 @@ unsafe impl CCallReturn for Nothing {
 impl_construct_julia_type!(Nothing, jl_nothing_type);
 
 unsafe impl IsBits for Nothing {}
+
+impl_julia_typecheck!((), jl_nothing_type);
+impl_valid_layout!((), jl_nothing_type);
+
+unsafe impl Unbox for () {
+    type Output = Self;
+}
+
+unsafe impl IntoJulia for () {
+    #[inline]
+    fn julia_type<'scope, Tgt>(target: Tgt) -> DataTypeData<'scope, Tgt>
+    where
+        Tgt: Target<'scope>,
+    {
+        DataType::nothing_type(&target).root(target)
+    }
+}
+
+impl_construct_julia_type!((), jl_nothing_type);
+
+unsafe impl IsBits for () {}

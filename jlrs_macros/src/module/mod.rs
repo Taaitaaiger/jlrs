@@ -19,9 +19,8 @@ use proc_macro::TokenStream;
 use proc_macro2::Span;
 use syn::{
     parse::{Parse, ParseStream},
-    parse_quote,
     punctuated::Punctuated,
-    Attribute, Error, Expr, Ident, Result, Token,
+    Attribute, Error, Ident, Result, Token,
 };
 
 use self::parameters::{Apply, ResolvedParameterList};

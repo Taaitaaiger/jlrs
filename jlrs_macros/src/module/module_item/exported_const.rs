@@ -60,18 +60,14 @@ pub struct ConstFragments {
 impl ConstFragments {
     pub fn generate(module: &JuliaModule, init_fn: &InitFn) -> Self {
         let const_init_ident = format_ident!("{}_consts", init_fn.init_fn);
-
         let const_init_fragments = module.get_exported_consts().map(const_info_fragment);
 
         let const_init_fn = parse_quote! {
-            unsafe fn #const_init_ident<'target, Tgt: ::jlrs::memory::target::Target<'target>>(
+            fn #const_init_ident<'target, Tgt: ::jlrs::memory::target::Target<'target>>(
                 frame: &Tgt,
                 module: ::jlrs::data::managed::module::Module,
             ) {
-
-                #(
-                    #const_init_fragments
-                )*
+                #(#const_init_fragments;)*
             }
         };
 
@@ -88,15 +84,10 @@ fn const_info_fragment(info: &ExportedConst) -> Expr {
     let ty = &info.ty;
 
     parse_quote! {
-        {
-            frame.local_scope::<1>(move |mut frame| {
-                let v: #ty = #name;
-                let value = ::jlrs::data::managed::value::Value::new(&mut frame, v);
-
-                unsafe {
-                    module.set_const_unchecked(#rename, value);
-                }
-            });
-        }
+        frame.local_scope::<2>(move |mut frame| {
+            let v: #ty = #name;
+            let value = ::jlrs::data::managed::value::Value::new(&mut frame, v);
+            module.set_const(&mut frame, #rename, value).into_jlrs_result().unwrap();
+        })
     }
 }

@@ -256,10 +256,12 @@ impl MethodFragments {
             ) {
                 use ::jlrs::data::managed::array::{data::accessor::{AccessorMut1D as _, AccessorMut as _, Accessor as _}, dimensions::Dims as _};
 
-                let mut accessor = array.indeterminate_data_mut();
-                let offset = accessor.array().dimensions().size();
-                accessor.grow_end_unchecked(#n_methods);
-                #(#method_init_fragments)*
+                unsafe {
+                    let mut accessor = array.indeterminate_data_mut();
+                    let offset = accessor.array().dimensions().size();
+                    accessor.grow_end_unchecked(#n_methods);
+                    #(#method_init_fragments)*
+                }
             }
         };
 
@@ -290,9 +292,11 @@ impl MethodFragments {
             ) {
                 use ::jlrs::data::managed::array::{data::accessor::{AccessorMut1D as _, AccessorMut as _, Accessor as _}, dimensions::Dims as _};
 
-                let mut accessor = array.indeterminate_data_mut();
-                let offset = accessor.array().dimensions().size();
-                #(#init_methods_fragments)*
+                unsafe {
+                    let mut accessor = array.indeterminate_data_mut();
+                    let offset = accessor.array().dimensions().size();
+                    #(#init_methods_fragments)*
+                }
             }
         };
 
@@ -471,9 +475,9 @@ fn method_arg_type_fragments<'a>(
                     let span = parent.span();
                     parse_quote_spanned! {
                         span=> if env.is_empty() {
-                            <<TypedValue::<#parent> as ::jlrs::convert::ccall_types::CCallArg>::CCallArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(&mut frame)
+                            <<::jlrs::data::managed::value::typed::TypedValue::<#parent> as ::jlrs::convert::ccall_types::CCallArg>::CCallArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(&mut frame)
                         } else {
-                            <<TypedValue::<#parent> as ::jlrs::convert::ccall_types::CCallArg>::CCallArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type_with_env(&mut frame, &env)
+                            <<::jlrs::data::managed::value::typed::TypedValue::<#parent> as ::jlrs::convert::ccall_types::CCallArg>::CCallArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type_with_env(&mut frame, &env)
                         }
                     }
                 },
@@ -566,9 +570,9 @@ fn method_arg_type_fragments_in_env<'a>(
                     parse_quote_spanned! {
                         span=> if env.is_empty() {
 
-                            <<TypedValue::<#parent> as ::jlrs::convert::ccall_types::CCallArg>::CCallArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(&mut frame)
+                            <<::jlrs::data::managed::value::typed::TypedValue::<#parent> as ::jlrs::convert::ccall_types::CCallArg>::CCallArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(&mut frame)
                         } else {
-                            <<TypedValue::<#parent> as ::jlrs::convert::ccall_types::CCallArg>::CCallArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type_with_env(&mut frame, &env)
+                            <<::jlrs::data::managed::value::typed::TypedValue::<#parent> as ::jlrs::convert::ccall_types::CCallArg>::CCallArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type_with_env(&mut frame, &env)
 
                         }
                     }

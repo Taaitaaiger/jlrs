@@ -40,18 +40,14 @@ pub struct AliasFragments {
 impl AliasFragments {
     pub fn generate(module: &JuliaModule, init_fn: &InitFn) -> Self {
         let alias_init_ident = format_ident!("{}_aliases", init_fn.init_fn);
-
-        let const_init_fragments = module.get_exported_aliases().map(alias_info_fragment);
+        let alias_init_fragments = module.get_exported_aliases().map(alias_info_fragment);
 
         let alias_init_fn = parse_quote! {
-            unsafe fn #alias_init_ident<'target, Tgt: ::jlrs::memory::target::Target<'target>>(
+            fn #alias_init_ident<'target, Tgt: ::jlrs::memory::target::Target<'target>>(
                 frame: &Tgt,
                 module: ::jlrs::data::managed::module::Module,
             ) {
-
-                #(
-                    #const_init_fragments
-                )*
+                #(#alias_init_fragments)*;
             }
         };
 
@@ -67,13 +63,9 @@ fn alias_info_fragment(info: &ExportedAlias) -> Expr {
     let ty = &info.ty;
 
     parse_quote! {
-        {
-            frame.local_scope::<1>(move |mut frame| {
-                unsafe {
-                    let value = <#ty as ::jlrs::data::types::construct_type::ConstructType>::construct_type(&mut frame);
-                    module.set_const_unchecked(#name, value);
-                }
-            });
-        }
+        frame.local_scope::<2>(move |mut frame| {
+            let value = <#ty as ::jlrs::data::types::construct_type::ConstructType>::construct_type(&mut frame);
+            module.set_const(&mut frame, #name, value).into_jlrs_result().unwrap();
+        })
     }
 }

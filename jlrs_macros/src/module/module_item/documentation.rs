@@ -35,10 +35,12 @@ impl DocFragments {
             ) {
                 use ::jlrs::data::managed::array::{data::accessor::{AccessorMut1D as _, AccessorMut as _, Accessor as _}, dimensions::Dims as _};
 
-                let mut accessor = array.indeterminate_data_mut();
-                accessor.grow_end_unchecked(#n_docs);
+                unsafe {
+                    let mut accessor = array.indeterminate_data_mut();
+                    accessor.grow_end_unchecked(#n_docs);
 
-                #(#fragments)*
+                    #(#fragments)*
+                }
             }
         };
 

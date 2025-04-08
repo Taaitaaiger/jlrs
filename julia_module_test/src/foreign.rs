@@ -1,4 +1,4 @@
-use std::ops::AddAssign;
+use std::{collections::HashMap, ops::AddAssign};
 
 use jlrs::{
     data::{
@@ -6,23 +6,17 @@ use jlrs::{
             typed::{TypedValue, TypedValueRet},
             ValueRet,
         },
-        types::{
-            construct_type::ConstructType,
-            foreign_type::{ForeignType, OpaqueType, ParametricBase, ParametricVariant},
-        },
+        types::{construct_type::ConstructType, foreign_type::mark::Mark},
     },
-    impl_type_parameters, impl_variant_parameters,
-    memory::gc::{mark_queue_obj, write_barrier},
-    prelude::{Managed, Value, WeakValue},
+    memory::gc::{write_barrier},
+    prelude::{ForeignType, Managed, OpaqueType, Value, WeakValue},
     weak_handle_unchecked,
 };
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, OpaqueType)]
 pub struct OpaqueInt {
     a: i32,
 }
-
-unsafe impl OpaqueType for OpaqueInt {}
 
 impl OpaqueInt {
     pub fn new(value: i32) -> TypedValueRet<OpaqueInt> {
@@ -43,14 +37,20 @@ impl OpaqueInt {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, OpaqueType)]
 pub struct POpaque<T> {
     value: T,
 }
 
 impl<T> POpaque<T>
 where
-    T: 'static + Send + ConstructType + AddAssign + Copy + jlrs::convert::into_julia::IntoJulia,
+    T: 'static
+        + Send
+        + Sync
+        + ConstructType
+        + AddAssign
+        + Copy
+        + jlrs::convert::into_julia::IntoJulia,
 {
     pub fn new(value: T) -> TypedValueRet<Self> {
         let weak_handle = unsafe { weak_handle_unchecked!() };
@@ -71,19 +71,7 @@ where
     }
 }
 
-unsafe impl<T> ParametricBase for POpaque<T>
-where
-    T: 'static + Send + ConstructType,
-{
-    type Key = POpaque<()>;
-    impl_type_parameters!('T');
-}
-
-unsafe impl<T: 'static + Send + ConstructType> ParametricVariant for POpaque<T> {
-    impl_variant_parameters!(T);
-}
-
-#[derive(Clone)]
+#[derive(Clone, OpaqueType)]
 pub struct POpaqueTwo<T, U> {
     value: T,
     value2: U,
@@ -91,8 +79,20 @@ pub struct POpaqueTwo<T, U> {
 
 impl<T, U> POpaqueTwo<T, U>
 where
-    T: 'static + Send + ConstructType + AddAssign + Copy + jlrs::convert::into_julia::IntoJulia,
-    U: 'static + Send + ConstructType + AddAssign + Copy + jlrs::convert::into_julia::IntoJulia,
+    T: 'static
+        + Send
+        + Sync
+        + ConstructType
+        + AddAssign
+        + Copy
+        + jlrs::convert::into_julia::IntoJulia,
+    U: 'static
+        + Send
+        + Sync
+        + ConstructType
+        + AddAssign
+        + Copy
+        + jlrs::convert::into_julia::IntoJulia,
 {
     pub fn new(value: T, value2: U) -> TypedValueRet<Self> {
         let weak_handle = unsafe { weak_handle_unchecked!() };
@@ -109,39 +109,36 @@ where
     }
 }
 
-unsafe impl<T, U> ParametricBase for POpaqueTwo<T, U>
-where
-    T: 'static + Send + ConstructType,
-    U: 'static + Send + ConstructType,
-{
-    type Key = POpaqueTwo<(), ()>;
-    impl_type_parameters!('T', 'U');
+unsafe fn mark_map<M: Mark, P: jlrs::data::types::foreign_type::ForeignType>(
+    data: &HashMap<(), M>,
+    ptls: jlrs::memory::PTls,
+    parent: &P,
+) -> usize {
+    data.values().map(|v| unsafe { v.mark(ptls, parent) }).sum()
 }
 
-unsafe impl<T, U> ParametricVariant for POpaqueTwo<T, U>
-where
-    T: 'static + Send + ConstructType,
-    U: 'static + Send + ConstructType,
-{
-    impl_variant_parameters!(T, U);
-}
-
+#[derive(ForeignType)]
 pub struct ForeignThing {
+    #[jlrs(mark)]
     a: WeakValue<'static, 'static>,
+    #[jlrs(mark_with = mark_map)]
+    b: HashMap<(), WeakValue<'static, 'static>>,
 }
 
 unsafe impl Send for ForeignThing {}
-
-unsafe impl ForeignType for ForeignThing {
-    fn mark(ptls: jlrs::memory::PTls, data: &Self) -> usize {
-        unsafe { mark_queue_obj(ptls, data.a) as usize }
-    }
-}
+unsafe impl Sync for ForeignThing {}
 
 impl ForeignThing {
     pub fn new(value: Value<'_, 'static>) -> TypedValueRet<ForeignThing> {
         let weak_handle = unsafe { weak_handle_unchecked!() };
-        TypedValue::new(weak_handle, ForeignThing { a: value.leak() }).leak()
+        TypedValue::new(
+            weak_handle,
+            ForeignThing {
+                a: value.leak(),
+                b: HashMap::default(),
+            },
+        )
+        .leak()
     }
 
     pub fn get(&self) -> ValueRet {

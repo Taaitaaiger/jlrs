@@ -55,7 +55,7 @@ impl ExportedType {
             let ty = resolver.apply(name);
 
             parse_quote! {
-                <#ty as ::jlrs::data::types::foreign_type::ParametricVariant>::create_variant(&mut output, sym)
+                <#ty as ::jlrs::data::types::foreign_type::OpaqueType>::create_variant(&mut output, sym)
             }
         }).unique();
 
@@ -63,7 +63,7 @@ impl ExportedType {
             {
                 let sym = ::jlrs::data::managed::symbol::Symbol::new(&frame, #rename);
                 let module = #override_module_fragment;
-                let ty = <#ty as ::jlrs::data::types::foreign_type::ParametricBase>::create_type(&mut output, sym, module);
+                let ty = <#ty as ::jlrs::data::types::foreign_type::OpaqueType>::create_type(&mut output, sym, module);
                 let ty = ::jlrs::data::managed::erase_scope_lifetime(ty).rewrap(&mut output);
                 module.set_const_unchecked(sym, ty);
 
@@ -107,14 +107,14 @@ impl ExportedType {
 
                 parse_quote! {
                     {
-                        let params = <#ty as ::jlrs::data::types::foreign_type::ParametricVariant>::variant_parameters(&mut output);
+                        let params = <#ty as ::jlrs::data::types::foreign_type::OpaqueType>::variant_parameters(&mut output);
                         let params = ::jlrs::data::managed::erase_scope_lifetime(params);
                         let params = params.data();
                         let param_slice = params.as_atomic_slice().assume_immutable_non_null();
                         let dt = ua.apply_types_unchecked(&mut output, param_slice).cast::<::jlrs::data::managed::datatype::DataType>().unwrap();
                         let dt = ::jlrs::data::managed::erase_scope_lifetime(dt);
 
-                        <#ty as ::jlrs::data::types::foreign_type::ParametricVariant>::reinit_variant(dt);
+                        <#ty as ::jlrs::data::types::foreign_type::OpaqueType>::reinit_variant(dt);
                     }
                 }
             }).unique();
@@ -132,7 +132,7 @@ impl ExportedType {
 
                     let dt = ua.base_type();
 
-                    <#ty as ::jlrs::data::types::foreign_type::ParametricBase>::reinit_type(dt);
+                    <#ty as ::jlrs::data::types::foreign_type::OpaqueType>::reinit_type(dt);
 
                     #(
                         #variants;
@@ -191,9 +191,11 @@ impl TypeFragments {
                 frame.local_scope::<1>(|mut frame| {
                     let mut output = frame.output();
 
-                    #(
-                        #init_types_fragments
-                    )*
+                    unsafe {
+                        #(
+                            #init_types_fragments
+                        )*
+                    }
                 });
             }
         };
@@ -210,9 +212,11 @@ impl TypeFragments {
                 frame.local_scope::<1>(|mut frame| {
                     let mut output = frame.output();
 
-                    #(
-                        #reinit_types_fragments
-                    )*
+                    unsafe {
+                        #(
+                            #reinit_types_fragments
+                        )*
+                    }
                 });
             }
         };
@@ -241,9 +245,11 @@ impl TypeFragments {
                 frame.local_scope::<1>(|mut frame| {
                     let mut output = frame.output();
 
-                    #(
-                        #init_types_fragments
-                    )*
+                    unsafe {
+                        #(
+                            #init_types_fragments
+                        )*
+                    }
                 });
             }
         };
@@ -263,9 +269,11 @@ impl TypeFragments {
                 frame.local_scope::<1>(|mut frame| {
                     let mut output = frame.output();
 
-                    #(
-                        #reinit_types_fragments
-                    )*
+                    unsafe {
+                        #(
+                            #reinit_types_fragments
+                        )*
+                    }
                 });
             }
         };
@@ -297,7 +305,8 @@ fn init_type_fragment(info: &ExportedType) -> Expr {
         {
             let sym = ::jlrs::data::managed::symbol::Symbol::new(&frame, #rename);
             let module = #override_module_fragment;
-            let ty = <#ty as ::jlrs::data::types::foreign_type::OpaqueType>::create_type(&mut output, sym, module);
+            let _ty = <#ty as ::jlrs::data::types::foreign_type::OpaqueType>::create_type(&mut output, sym, module);
+            let ty = <#ty as ::jlrs::data::types::foreign_type::OpaqueType>::create_variant(&mut output, sym);
             module.set_const_unchecked(sym, <::jlrs::data::managed::datatype::DataType as ::jlrs::data::managed::Managed>::as_value(ty));
         }
     }

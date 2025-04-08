@@ -266,9 +266,11 @@ impl FunctionFragments {
             ) {
                 use ::jlrs::data::managed::array::data::accessor::{AccessorMut1D as _, AccessorMut as _, AccessorMut as _};
 
-                let mut accessor = array.indeterminate_data_mut();
-                accessor.grow_end_unchecked(#n_functions);
-                #(#fragments)*
+                unsafe {
+                    let mut accessor = array.indeterminate_data_mut();
+                    accessor.grow_end_unchecked(#n_functions);
+                    #(#fragments)*
+                }
             }
         };
 
@@ -298,9 +300,11 @@ impl FunctionFragments {
                 function_info_ty: ::jlrs::data::managed::datatype::DataType,
             ) {
                 use ::jlrs::data::managed::array::{data::accessor::{AccessorMut1D as _, AccessorMut as _, Accessor as _}, dimensions::Dims as _};
-                let mut accessor = array.indeterminate_data_mut();
-                let offset = accessor.array().dimensions().size();
-                #(#init_functions_fragments)*
+                unsafe {
+                    let mut accessor = array.indeterminate_data_mut();
+                    let offset = accessor.array().dimensions().size();
+                    #(#init_functions_fragments)*
+                }
             }
         };
 
