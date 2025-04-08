@@ -7,8 +7,6 @@ mod version;
 
 use proc_macro::TokenStream;
 
-#[cfg(feature = "derive")]
-use self::derive::*;
 #[cfg(feature = "ccall")]
 use self::module::*;
 use self::{constant_bytes::*, version::emit_if_compatible};
@@ -82,7 +80,7 @@ use self::{constant_bytes::*, version::emit_if_compatible};
 ///     for T in [f32, f64] {
 ///         fn has_generic(t: T) -> T;
 ///
-///         // POpaque<T> must implement `ParametricBase` and `ParametricVariant`.
+///         // POpaque<T> must implement `OpaqueType`.
 ///         struct POpaque<T>;
 ///
 ///         in POpaque<T> fn new(value: T) -> TypedValueRet<POpaque<T>> as POpaque;
@@ -157,8 +155,13 @@ pub fn julia_version(attr: TokenStream, item: TokenStream) -> TokenStream {
 #[cfg(feature = "derive")]
 #[proc_macro_derive(IntoJulia, attributes(jlrs))]
 pub fn into_julia_derive(input: TokenStream) -> TokenStream {
+    use derive::into_julia::impl_into_julia;
+
     let ast = syn::parse(input).unwrap();
-    impl_into_julia(&ast)
+    match impl_into_julia(&ast) {
+        Ok(tokens) => tokens,
+        Err(err) => err.to_compile_error().into(),
+    }
 }
 
 /// Derive `IsBits`.
@@ -167,8 +170,13 @@ pub fn into_julia_derive(input: TokenStream) -> TokenStream {
 #[cfg(feature = "derive")]
 #[proc_macro_derive(IsBits, attributes(jlrs))]
 pub fn is_bits_derive(input: TokenStream) -> TokenStream {
+    use derive::is_bits::impl_is_bits;
+
     let ast = syn::parse(input).unwrap();
-    impl_is_bits(&ast)
+    match impl_is_bits(&ast) {
+        Ok(tokens) => tokens,
+        Err(err) => err.to_compile_error().into(),
+    }
 }
 
 /// Derive `HasLayout`.
@@ -177,8 +185,13 @@ pub fn is_bits_derive(input: TokenStream) -> TokenStream {
 #[cfg(feature = "derive")]
 #[proc_macro_derive(HasLayout, attributes(jlrs))]
 pub fn is_has_layout(input: TokenStream) -> TokenStream {
+    use derive::has_layout::impl_has_layout;
+
     let ast = syn::parse(input).unwrap();
-    impl_has_layout(&ast)
+    match impl_has_layout(&ast) {
+        Ok(tokens) => tokens,
+        Err(err) => err.to_compile_error().into(),
+    }
 }
 
 /// Derive `Unbox`.
@@ -187,8 +200,13 @@ pub fn is_has_layout(input: TokenStream) -> TokenStream {
 #[cfg(feature = "derive")]
 #[proc_macro_derive(Unbox, attributes(jlrs))]
 pub fn unbox_derive(input: TokenStream) -> TokenStream {
+    use derive::unbox::impl_unbox;
+
     let ast = syn::parse(input).unwrap();
-    impl_unbox(&ast)
+    match impl_unbox(&ast) {
+        Ok(tokens) => tokens,
+        Err(err) => err.to_compile_error().into(),
+    }
 }
 
 /// Derive `Typecheck`.
@@ -197,8 +215,13 @@ pub fn unbox_derive(input: TokenStream) -> TokenStream {
 #[cfg(feature = "derive")]
 #[proc_macro_derive(Typecheck, attributes(jlrs))]
 pub fn typecheck_derive(input: TokenStream) -> TokenStream {
+    use derive::typecheck::impl_typecheck;
+
     let ast = syn::parse(input).unwrap();
-    impl_typecheck(&ast)
+    match impl_typecheck(&ast) {
+        Ok(tokens) => tokens,
+        Err(err) => err.to_compile_error().into(),
+    }
 }
 
 /// Derive `ValidLayout`.
@@ -207,8 +230,13 @@ pub fn typecheck_derive(input: TokenStream) -> TokenStream {
 #[cfg(feature = "derive")]
 #[proc_macro_derive(ValidLayout, attributes(jlrs))]
 pub fn valid_layout_derive(input: TokenStream) -> TokenStream {
+    use derive::valid_layout::impl_valid_layout;
+
     let ast = syn::parse(input).unwrap();
-    impl_valid_layout(&ast)
+    match impl_valid_layout(&ast) {
+        Ok(tokens) => tokens,
+        Err(err) => err.to_compile_error().into(),
+    }
 }
 
 /// Derive `ValidField`.
@@ -217,8 +245,13 @@ pub fn valid_layout_derive(input: TokenStream) -> TokenStream {
 #[cfg(feature = "derive")]
 #[proc_macro_derive(ValidField, attributes(jlrs))]
 pub fn valid_field_derive(input: TokenStream) -> TokenStream {
+    use derive::valid_field::impl_valid_field;
+
     let ast = syn::parse(input).unwrap();
-    impl_valid_field(&ast)
+    match impl_valid_field(&ast) {
+        Ok(tokens) => tokens,
+        Err(err) => err.to_compile_error().into(),
+    }
 }
 
 /// Derive `ConstructType`.
@@ -227,8 +260,13 @@ pub fn valid_field_derive(input: TokenStream) -> TokenStream {
 #[cfg(feature = "derive")]
 #[proc_macro_derive(ConstructType, attributes(jlrs))]
 pub fn construct_type_derive(input: TokenStream) -> TokenStream {
+    use derive::construct_type::impl_construct_type;
+
     let ast = syn::parse(input).unwrap();
-    impl_construct_type(&ast)
+    match impl_construct_type(&ast) {
+        Ok(tokens) => tokens,
+        Err(err) => err.to_compile_error().into(),
+    }
 }
 
 /// Derive `CCallArg`.
@@ -237,8 +275,13 @@ pub fn construct_type_derive(input: TokenStream) -> TokenStream {
 #[cfg(feature = "derive")]
 #[proc_macro_derive(CCallArg, attributes(jlrs))]
 pub fn ccall_arg_derive(input: TokenStream) -> TokenStream {
+    use derive::ccall_arg::impl_ccall_arg;
+
     let ast = syn::parse(input).unwrap();
-    impl_ccall_arg(&ast)
+    match impl_ccall_arg(&ast) {
+        Ok(tokens) => tokens,
+        Err(err) => err.to_compile_error().into(),
+    }
 }
 
 /// Derive `CCallReturn`.
@@ -247,8 +290,13 @@ pub fn ccall_arg_derive(input: TokenStream) -> TokenStream {
 #[cfg(feature = "derive")]
 #[proc_macro_derive(CCallReturn, attributes(jlrs))]
 pub fn ccall_return_derive(input: TokenStream) -> TokenStream {
+    use derive::ccall_return::impl_ccall_return;
+
     let ast = syn::parse(input).unwrap();
-    impl_ccall_return(&ast)
+    match impl_ccall_return(&ast) {
+        Ok(tokens) => tokens,
+        Err(err) => err.to_compile_error().into(),
+    }
 }
 
 /// Derive `Enum`.
@@ -257,6 +305,37 @@ pub fn ccall_return_derive(input: TokenStream) -> TokenStream {
 #[cfg(feature = "derive")]
 #[proc_macro_derive(Enum, attributes(jlrs))]
 pub fn enum_derive(input: TokenStream) -> TokenStream {
+    use derive::enum_impl::impl_enum;
+
     let ast = syn::parse(input).unwrap();
-    impl_enum(&ast)
+    match impl_enum(&ast) {
+        Ok(tokens) => tokens,
+        Err(err) => err.to_compile_error().into(),
+    }
+}
+
+/// Derive `OpaqueType`.
+#[cfg(feature = "derive")]
+#[proc_macro_derive(OpaqueType, attributes(jlrs))]
+pub fn opaque_type_derive(input: TokenStream) -> TokenStream {
+    use derive::opaque_type::impl_opaque_type;
+
+    let ast = syn::parse(input).unwrap();
+    match impl_opaque_type(&ast) {
+        Ok(tokens) => tokens,
+        Err(err) => err.to_compile_error().into(),
+    }
+}
+
+/// Derive `ForeignType`.
+#[cfg(feature = "derive")]
+#[proc_macro_derive(ForeignType, attributes(jlrs))]
+pub fn foreign_type_derive(input: TokenStream) -> TokenStream {
+    use derive::foreign_type::impl_foreign_type;
+
+    let ast = syn::parse(input).unwrap();
+    match impl_foreign_type(&ast) {
+        Ok(tokens) => tokens,
+        Err(err) => err.to_compile_error().into(),
+    }
 }

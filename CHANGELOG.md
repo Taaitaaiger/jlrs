@@ -60,6 +60,12 @@
 
 - Cached data is guaranteed to be rooted.
 
+- `()` maps to `Nothing`.
+
+- Custom marking functions can be implemented with the `Mark` trait.
+
+- `ParametricBase` and `ParametricVariant` have been remove, `OpaqueType` can now handle types with type parameters. Both `OpaqueType` and `ForeignType` are now derive traits.
+
 ## v0.21
 
 - Support generating bindings for Julia enums with integer base types in combination with JlrsCore.Reflect and the `Enum` derive macro.

@@ -246,7 +246,7 @@ macro_rules! bytes {
     message = "the trait bound `{Self}: ConstructType` is not satisfied",
     label = "the trait `ConstructType` is not implemented for `{Self}`",
     note = "Custom types that implement `ConstructType` should be generated with JlrsCore.reflect",
-    note = "Do not implement `ForeignType`, `OpaqueType`, or `ParametricVariant` unless this type is exported to Julia with `julia_module!`"
+    note = "Do not implement `ForeignType` or `OpaqueType` unless this type is exported to Julia with `julia_module!`"
 )]
 
 pub unsafe trait ConstructType: Sized {

@@ -3,7 +3,7 @@ use syn::{
     PathArguments, ReturnType, Type, TypePath,
 };
 
-use super::GenericEnvironment;
+use super::module_item::generics::GenericEnvironment;
 
 #[derive(Debug)]
 pub(super) struct ParameterEnvironment<'a> {

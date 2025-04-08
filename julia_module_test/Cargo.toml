@@ -6,6 +6,9 @@ edition = "2021"
 [profile.release]
 panic = "abort"
 
+[profile.dev]
+panic = "abort"
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [features]
 julia-1-10 = ["jlrs/julia-1-10"]

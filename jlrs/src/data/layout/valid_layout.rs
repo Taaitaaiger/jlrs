@@ -34,7 +34,7 @@ use crate::{
     message = "the trait bound `{Self}: ValidLayout` is not satisfied",
     label = "the trait `ValidLayout` is not implemented for `{Self}`",
     note = "Custom types that implement `ValidLayout` should be generated with JlrsCore.reflect",
-    note = "Do not implement `ForeignType`, `OpaqueType`, or `ParametricVariant` unless this type is exported to Julia with `julia_module!`"
+    note = "Do not implement `ForeignType` or `OpaqueType` unless this type is exported to Julia with `julia_module!`"
 )]
 pub unsafe trait ValidLayout {
     /// Must be `true` if the Rust type is a managed type.

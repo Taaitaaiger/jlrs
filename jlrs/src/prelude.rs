@@ -5,10 +5,12 @@ pub use jlrs_macros::julia_module;
 pub use jlrs_macros::julia_version;
 #[cfg(feature = "jlrs-derive")]
 pub use jlrs_macros::{
-    CCallArg, CCallReturn, ConstructType, Enum, HasLayout, IntoJulia, IsBits, Typecheck, Unbox,
-    ValidField, ValidLayout,
+    CCallArg, CCallReturn, ConstructType, Enum, ForeignType, HasLayout, IntoJulia, IsBits,
+    OpaqueType, Typecheck, Unbox, ValidField, ValidLayout,
 };
 
+#[cfg(feature = "jlrs-derive")]
+pub use crate::data::types::foreign_type::ForeignType as _;
 #[cfg(feature = "async-rt")]
 pub use crate::runtime::builder::AsyncBuilder;
 #[cfg(any(feature = "async-rt", feature = "local-rt", feature = "multi-rt"))]

@@ -14,17 +14,17 @@ use std::{
     ptr::{null_mut, NonNull},
 };
 
-use jl_sys::{jl_tagged_gensym, jl_value_t, jlrs_gc_wb};
-use once_cell::sync::Lazy;
+use jl_sys::{jl_gc_mark_queue_objarray, jl_sym_t, jl_tagged_gensym, jl_value_t, jlrs_gc_wb};
 
 use crate::{
     call::Call,
     data::{
         managed::{module::Module, private::ManagedPriv, symbol::Symbol, value::Value, Managed},
-        types::foreign_type::{create_foreign_type_nostack, ForeignType},
+        types::foreign_type::{ForeignType, OpaqueType},
     },
+    gc_safe::GcSafeOnceLock,
     memory::{target::unrooted::Unrooted, PTls},
-    prelude::LocalScope,
+    prelude::{IntoJlrsResult, LocalScope, Target},
     private::Private,
 };
 
@@ -53,44 +53,26 @@ unsafe impl Send for Stack {}
 unsafe impl Sync for Stack {}
 
 unsafe impl ForeignType for Stack {
-    fn mark(ptls: PTls, data: &Self) -> usize {
+    unsafe fn mark<P>(ptls: PTls, data: &Self, parent: &P) -> usize {
         // We can only get here while the GC is running, so there are no active mutable borrows,
         // but this function might be called from multiple threads so an immutable reference must
         // be used.
         let slots = unsafe { &*data.slots.get() };
         let slots_ptr = slots.as_ptr() as *const _;
         let n_slots = slots.len();
-        let value_slots = unsafe { std::slice::from_raw_parts(slots_ptr, n_slots) };
 
         unsafe {
-            crate::memory::gc::mark_queue_objarray(ptls, data.as_value_ref(), value_slots);
+            jl_gc_mark_queue_objarray(
+                ptls,
+                parent as *const _ as *mut _,
+                slots_ptr as *mut _,
+                n_slots,
+            );
         }
 
         0
     }
 }
-
-pub(crate) struct StaticSymbol(Symbol<'static>);
-impl StaticSymbol {
-    #[inline]
-    pub(crate) fn as_symbol(&self) -> Symbol {
-        self.0
-    }
-}
-unsafe impl Send for StaticSymbol {}
-unsafe impl Sync for StaticSymbol {}
-
-// Each "instance" of jlrs needs its own stack type to account for multiple versions of jlrs being
-// used by different crates, and that libraries distributed as JLLs might be compiled with
-// different versions of Rust.
-//
-// Safety: This data can only be initialized after Julia has been initialized, and must only be
-// accessed from threads that can call into Julia.
-pub(crate) static STACK_TYPE_NAME: Lazy<StaticSymbol> = Lazy::new(|| unsafe {
-    let stack = "Stack";
-    let sym = jl_tagged_gensym(stack.as_ptr().cast(), stack.len());
-    StaticSymbol(Symbol::wrap_non_null(NonNull::new_unchecked(sym), Private))
-});
 
 impl Stack {
     // Create the foreign type Stack in the JlrsCore module, or return immediately if it already
@@ -104,42 +86,48 @@ impl Stack {
         )),
         allow(unused)
     )]
-    pub(crate) unsafe fn init() {
+    pub(crate) unsafe fn init<'target, Tgt: Target<'target>>(tgt: &Tgt) {
         unsafe {
-            let unrooted = Unrooted::new();
+            let module = Module::jlrs_core(tgt);
 
-            unrooted.local_scope::<1>(|mut frame| {
-                let module = Module::jlrs_core(&unrooted);
+            #[repr(transparent)]
+            struct SendSycSym(*mut jl_sym_t);
+            unsafe impl Send for SendSycSym {}
+            unsafe impl Sync for SendSycSym {}
+            static SYM: GcSafeOnceLock<SendSycSym> = GcSafeOnceLock::new();
 
-                let sym = STACK_TYPE_NAME.as_symbol();
-                if module.global(&unrooted, sym).is_ok() {
-                    return;
-                }
-                let lock_fn = module
-                    .global(&unrooted, "lock_init_lock")
-                    .unwrap()
-                    .as_value();
-
-                let unlock_fn = module
-                    .global(&unrooted, "unlock_init_lock")
-                    .unwrap()
-                    .as_value();
-
-                lock_fn.call0(unrooted).unwrap();
-
-                if module.global(unrooted, sym).is_ok() {
-                    unlock_fn.call0(unrooted).unwrap();
-                    return;
-                }
-
-                // Safety: create_foreign_type is called with the correct arguments, the new type is
-                // rooted until the constant has been set, and we've just checked if JlrsCore.Stack
-                // already exists.
-                let dt = create_foreign_type_nostack::<Self, _>(&mut frame, sym, module);
-                module.set_const_unchecked(sym, dt.as_value());
-
-                unlock_fn.call0(unrooted).unwrap();
+            let sym = SYM.get_or_init(|| {
+                let stack = "Stack";
+                SendSycSym(jl_tagged_gensym(stack.as_ptr().cast(), stack.len()))
             });
+
+            let sym = Symbol::wrap_non_null(NonNull::new_unchecked(sym.0), Private);
+            if module.global(tgt, sym).is_ok() {
+                return;
+            }
+
+            let lock_fn = module.global(tgt, "lock_init_lock").unwrap().as_value();
+            let unlock_fn = module.global(tgt, "unlock_init_lock").unwrap().as_value();
+
+            lock_fn.call0(tgt).unwrap();
+
+            if module.global(tgt, sym).is_ok() {
+                unlock_fn.call0(tgt).unwrap();
+                return;
+            }
+
+            // Safety: create_foreign_type is called with the correct arguments, the new type is
+            // rooted until the constant has been set, and we've just checked if JlrsCore.Stack
+            // already exists.
+            tgt.local_scope::<2>(|mut frame| {
+                let dt = <Self as OpaqueType>::create_type(&mut frame, sym, module);
+                module
+                    .set_const(&mut frame, sym, dt.as_value())
+                    .into_jlrs_result()
+                    .unwrap();
+            });
+
+            unlock_fn.call0(tgt).unwrap();
         };
     }
 
@@ -202,6 +190,7 @@ impl Stack {
         // no active borrows.
         let slots = &mut *self.slots.get();
         slots.truncate(offset);
+        slots.shrink_to(offset);
     }
 
     // Returns the size of the stack

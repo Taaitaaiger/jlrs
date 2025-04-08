@@ -8,11 +8,7 @@ use std::{
 
 use jl_sys::{pop_frame, SplitGcFrame};
 
-use super::context::stack::{Stack, STACK_TYPE_NAME};
-use crate::{
-    data::managed::{private::ManagedPriv, value::Value},
-    private::Private,
-};
+use super::context::stack::Stack;
 
 /// A raw, inactive GC frame.
 #[repr(C)]
@@ -110,7 +106,7 @@ impl<'scope, 'inner, const N: usize> JlrsStackFrame<'scope, 'inner, N> {
         allow(unused)
     )]
     unsafe fn new(pinned: &'inner mut PinnedFrame<'scope, N>) -> Self {
-        if !Self::is_init(&pinned) {
+        if pinned.raw.s.get_head_root(0).get().is_null() {
             {
                 let ptr = Stack::alloc();
                 pinned.raw.s.set_head_root(0, ptr.cast());
@@ -142,23 +138,5 @@ impl<'scope, 'inner, const N: usize> JlrsStackFrame<'scope, 'inner, N> {
         NonNull::new_unchecked(self.pinned.raw.s.get_tail_root(n).get())
             .cast()
             .as_ref()
-    }
-
-    #[inline]
-    #[cfg_attr(
-        not(any(feature = "local-rt", feature = "async-rt", feature = "ccall")),
-        allow(unused)
-    )]
-    fn is_init(pinned: &PinnedFrame<'_, N>) -> bool {
-        unsafe {
-            let ptr = pinned.raw.s.get_head_root(0).get();
-            if !ptr.is_null() {
-                let v = Value::wrap_non_null(NonNull::new_unchecked(ptr).cast(), Private);
-                let sym = STACK_TYPE_NAME.as_symbol();
-                return v.datatype_name() == sym.as_str().unwrap();
-            }
-
-            false
-        }
     }
 }

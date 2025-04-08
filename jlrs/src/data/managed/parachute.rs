@@ -25,7 +25,7 @@ use super::{private::ManagedPriv, Managed};
 use crate::{
     data::{
         managed::{datatype::DataType, module::Module, symbol::Symbol, value::Value},
-        types::foreign_type::{create_foreign_type_internal, ForeignType},
+        types::foreign_type::{ForeignType, OpaqueType},
     },
     memory::target::{unrooted::Unrooted, Target},
     prelude::LocalScope,
@@ -113,8 +113,7 @@ pub(crate) struct Parachute<T: Sync + Send + 'static> {
 
 unsafe impl<T: Send + Sync + 'static> ForeignType for Parachute<T> {
     const TYPE_FN: Option<unsafe fn() -> DataType<'static>> = Some(init_foreign::<Self>);
-    const HAS_POINTERS: bool = false;
-    fn mark(_: crate::memory::PTls, _: &Self) -> usize {
+    unsafe fn mark<P>(_: crate::memory::PTls, _: &Self, _: &P) -> usize {
         0
     }
 }
@@ -133,7 +132,7 @@ unsafe fn init_foreign<T: ForeignType>() -> DataType<'static> {
         let dt = unrooted.local_scope::<1>(|mut frame| {
             let sym = Symbol::new(&frame, name.as_str());
             let module = Module::main(&frame);
-            let dt = create_foreign_type_internal::<T, _>(&mut frame, sym, module);
+            let dt = <T as OpaqueType>::create_type(&mut frame, sym, module);
             module.set_const_unchecked(sym, dt.as_value());
             dt.unwrap_non_null(Private)
         });
