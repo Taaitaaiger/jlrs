@@ -243,13 +243,15 @@ mod mt_impl {
                 unsafe {
                     wait_loop();
 
+                    let th_res = handle.join();
+
                     // Returned from wait_main, so we're about to exit Julia becuase all handles have
                     // been dropped. Next we need to wait until we've returned from `notify_main` too.
                     gc_safe(|| wait(&EXIT_LOCK));
                     set_exit();
                     jl_atexit_hook(0);
 
-                    handle.join()
+                    th_res
                 }
             });
 

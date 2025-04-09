@@ -1,4 +1,4 @@
-name: CI
+name: Julia-pre
 
 on:
   push:

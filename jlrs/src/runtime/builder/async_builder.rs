@@ -321,6 +321,10 @@ mod mt_impl {
 
                 wait_loop();
 
+                // The spawned thread may have been adopted, so join it before
+                // calling jl_atexit_hook
+                let th_res = handle.join();
+
                 match res {
                     Ok(_) => {
                         // Returned from wait_main, so we're about to exit Julia becuase all handles have
@@ -335,7 +339,7 @@ mod mt_impl {
                     }
                 }
 
-                handle.join()
+                th_res
             }
         });
 
