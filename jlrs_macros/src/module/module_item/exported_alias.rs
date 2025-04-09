@@ -47,7 +47,7 @@ impl AliasFragments {
                 frame: &Tgt,
                 module: ::jlrs::data::managed::module::Module,
             ) {
-                #(#alias_init_fragments)*;
+                #(#alias_init_fragments;)*
             }
         };
 
