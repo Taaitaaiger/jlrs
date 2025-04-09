@@ -95,6 +95,7 @@ version feature. The following version features are currently supported:
 
 - `julia-1-10`
 - `julia-1-11`
+- `julia-1-12`
 
 Exactly one version feature must be enabled. Otherwise, jlrs will fail to compile.
 
@@ -105,6 +106,7 @@ these version features as follows:
 [features]
 julia-1-10 = ["jlrs/julia-1-10"]
 julia-1-11 = ["jlrs/julia-1-11"]
+julia-1-12 = ["jlrs/julia-1-12"]
 ```
 
 ### Runtimes

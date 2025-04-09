@@ -89,6 +89,7 @@
 //!
 //!  - `julia-1-10`
 //!  - `julia-1-11`
+//!  - `julia-1-12`
 //!
 //! Exactly one version feature must be enabled. Otherwise, jlrs will fail to compile.
 //!
@@ -99,6 +100,7 @@
 //! [features]
 //! julia-1-10 = ["jlrs/julia-1-10"]
 //! julia-1-11 = ["jlrs/julia-1-11"]
+//! julia-1-12 = ["jlrs/julia-1-12"]
 //! ```
 //!
 //! ## Runtimes
