@@ -650,7 +650,7 @@ pub mod functions {
 
         // Removed in Julia 1.11
 
-        #[cfg(any(feature = "julia-1-10",))]
+        #[cfg(feature = "julia-1-10")]
         pub fn jl_new_array(
             atype: *mut crate::types::jl_value_t,
             dims: *mut crate::types::jl_value_t,

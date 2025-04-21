@@ -83,7 +83,7 @@ impl jl_gcframe_t {
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
-#[cfg(not(any(feature = "julia-1-10",)))]
+#[cfg(not(feature = "julia-1-10"))]
 pub struct jl_genericmemory_t {
     _unused: [u8; 0],
     _marker: PhantomData<(*mut u8, PhantomPinned)>,
