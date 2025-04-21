@@ -79,29 +79,7 @@
 //! # Features
 //!
 //! Most functionality of jlrs is only available if the proper features are enabled. These
-//! features generally belong to one of three categories: versions, runtimes and utilities.
-//!
-//! ## Versions
-//!
-//! The Julia C API is unstable and there are minor incompatibilities between different versions
-//! of Julia. To ensure the correct bindings are used for a particular version of Julia you must
-//! enable a version feature. The following version features are currently supported:
-//!
-//!  - `julia-1-10`
-//!  - `julia-1-11`
-//!  - `julia-1-12`
-//!
-//! Exactly one version feature must be enabled. Otherwise, jlrs will fail to compile.
-//!
-//! If you want your crate to be compatible with multiple versions of Julia, you should "reexport"
-//! these version features as follows:
-//!
-//! ```toml
-//! [features]
-//! julia-1-10 = ["jlrs/julia-1-10"]
-//! julia-1-11 = ["jlrs/julia-1-11"]
-//! julia-1-12 = ["jlrs/julia-1-12"]
-//! ```
+//! features generally belong to one of two categories: runtimes and utilities.
 //!
 //! ## Runtimes
 //!
@@ -255,11 +233,11 @@
 //! If you want to embed Julia in a Rust application, you must enable a runtime and a version
 //! feature:
 //!
-//! `jlrs = {version = "0.22", features = ["local-rt", "julia-1-11"]}`
+//! `jlrs = {version = "0.22", features = ["local-rt"]}`
 //!
-//! `jlrs = {version = "0.22", features = ["tokio-rt", "julia-1-11"]}`
+//! `jlrs = {version = "0.22", features = ["tokio-rt"]}`
 //!
-//! `jlrs = {version = "0.22", features = ["multi-rt", "julia-1-11"]}`
+//! `jlrs = {version = "0.22", features = ["multi-rt"]}`
 //!
 //! When Julia is embedded in an application, it must be initialized before it can be used. A
 //! [`Builder`] is available to configure the runtime before starting it. This lets you set

@@ -6,45 +6,26 @@ const MAJOR_VERSION: usize = 1;
 const LTS_MINOR_VERSION: usize = 10;
 const NIGHTLY_MINOR_VERSION: usize = 13;
 
-#[cfg(not(any(
-    feature = "julia-1-10",
-    feature = "julia-1-11",
-    feature = "julia-1-12",
-    feature = "julia-1-13",
-)))]
-compile_error!(
-    "A Julia version must be selected by enabling exactly one of the following version features:
-    julia-1-10
-    julia-1-11
-    julia-1-12
-    julia-1-13"
-);
-
 #[cfg(any(
-    all(feature = "julia-1-10", feature = "julia-1-11"),
-    all(feature = "julia-1-10", feature = "julia-1-12"),
-    all(feature = "julia-1-10", feature = "julia-1-13"),
-    all(feature = "julia-1-11", feature = "julia-1-12"),
-    all(feature = "julia-1-11", feature = "julia-1-13"),
-    all(feature = "julia-1-12", feature = "julia-1-13"),
+    all(julia_1_10, julia_1_11),
+    all(julia_1_10, julia_1_12),
+    all(julia_1_10, julia_1_13),
+    all(julia_1_11, julia_1_12),
+    all(julia_1_11, julia_1_13),
+    all(julia_1_12, julia_1_13),
 ))]
 compile_error!("Multiple Julia version features have been enabled");
 
 // Avoid a second error if no version feature is enabled
-#[cfg(not(any(
-    feature = "julia-1-10",
-    feature = "julia-1-11",
-    feature = "julia-1-12",
-    feature = "julia-1-13"
-)))]
+#[cfg(not(any(julia_1_10, julia_1_11, julia_1_12, julia_1_13)))]
 const SELECTED_MINOR_VERSION: usize = 10;
-#[cfg(feature = "julia-1-10")]
+#[cfg(julia_1_10)]
 const SELECTED_MINOR_VERSION: usize = 10;
-#[cfg(feature = "julia-1-11")]
+#[cfg(julia_1_11)]
 const SELECTED_MINOR_VERSION: usize = 11;
-#[cfg(feature = "julia-1-12")]
+#[cfg(julia_1_12)]
 const SELECTED_MINOR_VERSION: usize = 12;
-#[cfg(feature = "julia-1-13")]
+#[cfg(julia_1_13)]
 const SELECTED_MINOR_VERSION: usize = 13;
 
 pub fn emit_if_compatible(attr: TokenStream, item: TokenStream) -> TokenStream {

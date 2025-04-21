@@ -505,7 +505,7 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
                 self.state = ViewState::AtomicBuffer;
                 self.offset = 0;
             }
-            #[cfg(not(any(feature = "julia-1-10", feature = "julia-1-11")))]
+            #[cfg(not(any(julia_1_10, julia_1_11)))]
             sz if sz <= 16 => {
                 let atomic = &*ptr.cast::<atomic::Atomic<u128>>();
                 let v = atomic.load(ordering);

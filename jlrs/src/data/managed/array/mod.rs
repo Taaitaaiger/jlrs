@@ -503,9 +503,9 @@ pub trait ConstructTypedArray<T: ConstructType, const N: isize> {
                 let array_type = Self::array_type(&target, &dims).as_value();
                 let array = dims.alloc_array_with_data(&target, array_type, data.as_mut_ptr() as _);
 
-                #[cfg(not(any(feature = "julia-1-10",)))]
+                #[cfg(not(julia_1_10))]
                 let mem = jl_sys::inlined::jlrs_array_mem(array.ptr().as_ptr());
-                #[cfg(any(feature = "julia-1-10",))]
+                #[cfg(julia_1_10)]
                 let mem = array.ptr().as_ptr().cast();
 
                 jl_gc_add_ptr_finalizer(get_tls(), mem, droparray::<U> as *mut c_void);
@@ -546,9 +546,9 @@ pub trait ConstructTypedArray<T: ConstructType, const N: isize> {
 
         let array_type = Self::array_type(&target, &dims).as_value();
         let array = dims.alloc_array_with_data(&target, array_type, data.as_mut_ptr() as _);
-        #[cfg(not(any(feature = "julia-1-10",)))]
+        #[cfg(not(julia_1_10))]
         let mem = jl_sys::inlined::jlrs_array_mem(array.ptr().as_ptr());
-        #[cfg(any(feature = "julia-1-10",))]
+        #[cfg(julia_1_10)]
         let mem = array.ptr().as_ptr().cast();
 
         jl_gc_add_ptr_finalizer(get_tls(), mem, droparray::<U> as *mut c_void);
@@ -1179,9 +1179,9 @@ impl<const N: isize> ArrayBase<'_, '_, Unknown, N> {
                 let array_type = jl_apply_array_type(ty.unwrap(Private), D::RANK as _);
                 let array_type = Value::wrap_non_null(NonNull::new_unchecked(array_type), Private);
                 let array = dims.alloc_array_with_data(&target, array_type, data.as_mut_ptr() as _);
-                #[cfg(not(any(feature = "julia-1-10",)))]
+                #[cfg(not(julia_1_10))]
                 let mem = jl_sys::inlined::jlrs_array_mem(array.ptr().as_ptr());
-                #[cfg(any(feature = "julia-1-10",))]
+                #[cfg(julia_1_10)]
                 let mem = array.ptr().as_ptr().cast();
 
                 jl_gc_add_ptr_finalizer(get_tls(), mem, droparray::<U> as *mut c_void);
@@ -1225,9 +1225,9 @@ impl<const N: isize> ArrayBase<'_, '_, Unknown, N> {
         let array_type = jl_apply_array_type(ty.unwrap(Private), D::RANK as _);
         let array_type = Value::wrap_non_null(NonNull::new_unchecked(array_type), Private);
         let array = dims.alloc_array_with_data(&target, array_type, data.as_mut_ptr() as _);
-        #[cfg(not(any(feature = "julia-1-10",)))]
+        #[cfg(not(julia_1_10))]
         let mem = jl_sys::inlined::jlrs_array_mem(array.ptr().as_ptr());
-        #[cfg(any(feature = "julia-1-10",))]
+        #[cfg(julia_1_10)]
         let mem = array.ptr().as_ptr().cast();
 
         jl_gc_add_ptr_finalizer(get_tls(), mem, droparray::<U> as *mut c_void);

@@ -7,7 +7,7 @@ set -euxo pipefail
 echo "backend: Gtk3Agg" > matplotlibrc
 
 cargo llvm-cov clean --workspace;
-cargo llvm-cov --features full,julia-1-11,ccall --workspace --no-report
+cargo llvm-cov --features full,ccall --workspace --no-report
 cargo llvm-cov --example ccall --no-report -- --test-threads=1
 cargo llvm-cov run --example async_tasks --no-report
 cargo llvm-cov run --example call_julia --no-report
