@@ -21,7 +21,7 @@
 
 use std::{marker::PhantomData, ptr::NonNull};
 
-use jl_sys::{jl_apply_tuple_type_v, jlrs_tuple_of};
+use jl_sys::jlrs_tuple_of;
 
 use crate::{
     catch::{catch_exceptions, unwrap_exc},
@@ -257,11 +257,9 @@ macro_rules! impl_tuple {
                         $(<$types as $crate::data::types::construct_type::ConstructType>::construct_type(&mut frame)),+
                     ];
 
+                    let tt = $crate::data::managed::datatype::DataType::anytuple_type(&frame).as_value();
                     unsafe {
-                        target.data_from_ptr(
-                            ::std::ptr::NonNull::new_unchecked(::jl_sys::jl_apply_tuple_type_v(types.as_mut_ptr().cast(), types.len()).cast()),
-                            $crate::private::Private,
-                        )
+                        tt.apply_type_unchecked(target, types)
                     }
                 })
             }
@@ -280,11 +278,9 @@ macro_rules! impl_tuple {
                             $(<$types as $crate::data::types::construct_type::ConstructType>::construct_type_with_env(&mut frame, env)),+
                         ];
 
+                        let tt = $crate::data::managed::datatype::DataType::anytuple_type(&frame).as_value();
                         unsafe {
-                            target.data_from_ptr(
-                                ::std::ptr::NonNull::new_unchecked(::jl_sys::jl_apply_tuple_type_v(types.as_mut_ptr().cast(), types.len()).cast()),
-                                $crate::private::Private,
-                            )
+                            tt.apply_type_unchecked(target, types)
                         }
                     })
             }
@@ -518,8 +514,8 @@ unsafe impl<T: ConstructType, const N: usize> ConstructType for NTuple<T, N> {
             target.with_local_scope::<1>(|target, mut frame| {
                 let ty = T::construct_type(&mut frame);
                 let types = [ty; N];
-                let applied = jl_apply_tuple_type_v(&types as *const _ as *mut _, N);
-                target.data_from_ptr(NonNull::new_unchecked(applied.cast()), Private)
+                let tt = DataType::anytuple_type(&frame).as_value();
+                tt.apply_type_unchecked(target, types)
             })
         }
     }
@@ -535,8 +531,8 @@ unsafe impl<T: ConstructType, const N: usize> ConstructType for NTuple<T, N> {
             target.with_local_scope::<1>(|target, mut frame| {
                 let ty = T::construct_type_with_env(&mut frame, env);
                 let types = [ty; N];
-                let applied = jl_apply_tuple_type_v(&types as *const _ as *mut _, N);
-                target.data_from_ptr(NonNull::new_unchecked(applied.cast()), Private)
+                let tt = DataType::anytuple_type(&frame).as_value();
+                tt.apply_type_unchecked(target, types)
             })
         }
     }

@@ -114,7 +114,7 @@ extern "C"
             }
         }
 
-        return (jl_datatype_t *)jl_apply_tuple_type_v(params, rank);
+        return (jl_datatype_t *)jl_apply_type((jl_value_t*)jl_anytuple_type, params, rank);
     }
 
     jl_value_t *jlrs_tuple_of(jl_value_t **values, size_t n)
@@ -126,7 +126,7 @@ extern "C"
         }
 
         // Should be a leaf type
-        jl_datatype_t *tupty = (jl_datatype_t *)jl_apply_tuple_type_v(types, n);
+        jl_datatype_t *tupty = (jl_datatype_t *)jl_apply_type((jl_value_t*)jl_anytuple_type, types, n);
 
         return jl_new_structv(tupty, values, n);
     }

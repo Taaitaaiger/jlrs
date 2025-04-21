@@ -275,11 +275,6 @@ extern "C" {
         n: usize,
     ) -> *mut crate::types::jl_value_t;
 
-    pub fn jl_apply_tuple_type_v(
-        p: *mut *mut crate::types::jl_value_t,
-        np: usize,
-    ) -> *mut crate::types::jl_value_t;
-
     pub fn jl_new_datatype(
         name: *mut crate::types::jl_sym_t,
         module: *mut crate::types::jl_module_t,
@@ -495,12 +490,6 @@ extern "C" {
 
     pub fn jl_get_UNAME() -> *mut crate::types::jl_sym_t;
 
-    pub fn jl_type_error(
-        fname: *const std::ffi::c_char,
-        expected: *mut crate::types::jl_value_t,
-        got: *mut crate::types::jl_value_t,
-    ) -> !;
-
     pub fn jl_exception_occurred() -> *mut crate::types::jl_value_t;
 
     pub fn jl_is_initialized() -> std::ffi::c_int;
@@ -611,12 +600,6 @@ extern "C" {
 
     pub fn jl_gc_safepoint();
 
-    pub fn jl_current_exception(
-        #[cfg(not(feature = "julia-1-10"))] ct: *mut crate::types::jl_task_t,
-    ) -> *mut crate::types::jl_value_t;
-
-    pub fn jl_get_world_counter() -> usize;
-
     pub fn jl_init();
 
     pub fn jl_init_with_image(
@@ -625,30 +608,6 @@ extern "C" {
     );
 
     pub fn jl_symbol(str: *const std::ffi::c_char) -> *mut crate::types::jl_sym_t;
-
-    // Removed in Julia 1.11
-
-    #[cfg(feature = "julia-1-10")]
-    pub fn jl_new_array(
-        atype: *mut crate::types::jl_value_t,
-        dims: *mut crate::types::jl_value_t,
-    ) -> *mut crate::types::jl_array_t;
-
-    #[cfg(feature = "julia-1-10")]
-    pub fn jl_arrayref(a: *mut crate::types::jl_array_t, i: usize)
-        -> *mut crate::types::jl_value_t;
-
-    #[cfg(feature = "julia-1-10")]
-    pub fn jl_arrayset(
-        a: *mut crate::types::jl_array_t,
-        v: *mut crate::types::jl_value_t,
-        i: usize,
-    );
-
-    #[cfg(feature = "julia-1-10")]
-    pub fn jl_array_typetagdata(a: *mut crate::types::jl_array_t) -> *mut std::os::raw::c_char;
-
-    pub fn jl_get_pgcstack() -> *mut *mut crate::types::jl_gcframe_t;
 
     pub fn jl_egal(
         a: *const crate::types::jl_value_t,
@@ -666,6 +625,14 @@ extern "C" {
     pub fn jl_enter_threaded_region();
 
     pub fn jl_exit_threaded_region();
+
+    // Removed in Julia 1.11
+
+    #[cfg(any(feature = "julia-1-10",))]
+    pub fn jl_new_array(
+        atype: *mut crate::types::jl_value_t,
+        dims: *mut crate::types::jl_value_t,
+    ) -> *mut crate::types::jl_array_t;
 
     // Added in Julia 1.11
 
@@ -933,6 +900,11 @@ mod indirect {
     extern "C" {
         #![allow(unused)]
 
+        // TODO: is this ok? It's unused, but compiling with BinaryBuilder complains
+        // about jl_options being undefined.
+        #[cfg(feature = "yggdrasil")]
+        pub static mut jl_options: std::mem::MaybeUninit<i8>;
+
         pub static mut jl_small_typeof: *mut std::ffi::c_void;
 
         pub static mut jl_excstack_state: *mut std::ffi::c_void;
@@ -959,6 +931,26 @@ mod indirect {
 
         pub static mut jl_egal__bitstag: *mut std::ffi::c_void;
 
+        pub static mut jl_get_pgcstack: *mut std::ffi::c_void;
+
+        pub static mut jl_current_exception: *mut std::ffi::c_void;
+
+        pub static mut jl_get_world_counter: *mut std::ffi::c_void;
+
+        // Removed in Julia 1.11
+
+        #[cfg(feature = "julia-1-10")]
+        pub static mut jl_new_array: *mut std::ffi::c_void;
+
+        #[cfg(feature = "julia-1-10")]
+        pub static mut jl_arrayref: *mut std::ffi::c_void;
+
+        #[cfg(feature = "julia-1-10")]
+        pub static mut jl_arrayset: *mut std::ffi::c_void;
+
+        #[cfg(feature = "julia-1-10")]
+        pub static mut jl_array_typetagdata: *mut std::ffi::c_void;
+
         // Added in Julia 1.11
 
         #[cfg(not(feature = "julia-1-10"))]
@@ -966,10 +958,5 @@ mod indirect {
 
         #[cfg(not(feature = "julia-1-10"))]
         pub static mut jl_genericmemoryref: *mut std::ffi::c_void;
-
-        // TODO: is this ok? It's unused, but compiling with BinaryBuilder complains
-        // about jl_options being undefined.
-        #[cfg(feature = "yggdrasil")]
-        pub static mut jl_options: std::mem::MaybeUninit<i8>;
     }
 }
