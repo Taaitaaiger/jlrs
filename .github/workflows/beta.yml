@@ -34,7 +34,7 @@ jobs:
           julia -e "import Pkg; Pkg.add(url=\"https://github.com/Taaitaaiger/JlrsCore.jl\", rev=\"5cc78665dcea3a400f10dda831fbf36f66f625a9\")"
           export JULIA_DIR="$(dirname $(dirname $(which julia)))"
           export LD_LIBRARY_PATH="${JULIA_DIR}/lib:${LD_LIBRARY_PATH}"
-          cargo test --features full,julia-1-12 --verbose
+          cargo test --features full --verbose
 
   test-macos:
     runs-on: macos-latest
@@ -61,7 +61,7 @@ jobs:
           julia -e "import Pkg; Pkg.add(url=\"https://github.com/Taaitaaiger/JlrsCore.jl\", rev=\"5cc78665dcea3a400f10dda831fbf36f66f625a9\")"
           export JULIA_DIR="$(dirname $(dirname $(which julia)))"
           export DYLD_LIBRARY_PATH="${JULIA_DIR}/lib:${DYLD_LIBRARY_PATH}"
-          cargo test --features full,julia-1-12 --verbose
+          cargo test --features full --verbose
 
   test-windows-gnu:
     runs-on: windows-latest
@@ -86,7 +86,7 @@ jobs:
       - name: Run tests
         run: |
           julia -e 'import Pkg; Pkg.add(url="https://github.com/Taaitaaiger/JlrsCore.jl", rev="5cc78665dcea3a400f10dda831fbf36f66f625a9")'
-          cargo test --features full,julia-1-12 --verbose
+          cargo test --features full --verbose
 
   test-windows-msvc:
     runs-on: windows-latest
@@ -114,7 +114,7 @@ jobs:
       - name: Run tests
         run: |
           julia -e 'import Pkg; Pkg.add(url="https://github.com/Taaitaaiger/JlrsCore.jl", rev="5cc78665dcea3a400f10dda831fbf36f66f625a9")'
-          cargo test --features full,julia-1-12 --verbose
+          cargo test --features full --verbose
 
   julia-module-test-linux:
     runs-on: ubuntu-latest
@@ -142,7 +142,7 @@ jobs:
       - name: Run module tests
         run: |
           cd julia_module_test
-          cargo build --features julia-1-12
+          cargo build
           cp ./target/debug/libjulia_module_test.so .
           julia JuliaModuleTest.jl
 
@@ -166,7 +166,7 @@ jobs:
         run: |
           julia -e 'import Pkg; Pkg.add(url="https://github.com/Taaitaaiger/JlrsCore.jl", rev="5cc78665dcea3a400f10dda831fbf36f66f625a9")'
           cd julia_module_test
-          cargo build --features julia-1-12
+          cargo build
           cp ./target/debug/julia_module_test.* libjulia_module_test.dll
           julia JuliaModuleTest.jl
 
@@ -192,6 +192,6 @@ jobs:
           export JULIA_DIR="$(dirname $(dirname $(which julia)))"
           export DYLD_LIBRARY_PATH="${JULIA_DIR}/lib:${DYLD_LIBRARY_PATH}"
           cd julia_module_test
-          cargo build --features julia-1-12
+          cargo build
           cp ./target/debug/libjulia_module_test.* .
           julia JuliaModuleTest.jl

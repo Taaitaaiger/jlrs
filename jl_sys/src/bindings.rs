@@ -926,7 +926,7 @@ pub mod jlrs_cc {
 }
 
 /// On Windows we use raw dylib linkage to avoid having to create an import lib for Julia. If a
-/// symbol is used in jlrs_cc, either directly or inside a macro or static inline function, we 
+/// symbol is used in jlrs_cc, either directly or inside a macro or static inline function, we
 /// need to mention them.
 #[cfg(all(
     any(windows, target_os = "windows", feature = "windows"),

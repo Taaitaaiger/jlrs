@@ -67,7 +67,7 @@ impl jl_gcframe_t {
         jl_gcframe_t {
             n_roots: N << 2,
             prev: Cell::new(null_mut()),
-            _marker: PhantomData
+            _marker: PhantomData,
         }
     }
 
@@ -76,7 +76,7 @@ impl jl_gcframe_t {
         jl_gcframe_t {
             n_roots: (m + n) << 2,
             prev: Cell::new(null_mut()),
-            _marker: PhantomData
+            _marker: PhantomData,
         }
     }
 }
