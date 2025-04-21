@@ -175,14 +175,6 @@ extern "C" {
 
     pub static mut jl_base_module: *mut crate::types::jl_module_t;
 
-    // TODO: is this ok? It's unused, but compiling with BinaryBuilder complains
-    // about jl_options being undefined.
-    #[cfg(all(
-        any(windows, target_os = "windows", feature = "windows"),
-        feature = "yggdrasil"
-    ))]
-    pub static mut jl_options: std::mem::MaybeUninit<i8>;
-
     pub static mut jl_vararg_type: *mut crate::types::jl_datatype_t;
 
     pub static mut jl_atomicerror_type: *mut crate::types::jl_datatype_t;
@@ -201,30 +193,27 @@ extern "C" {
 
     pub static mut jl_n_gcthreads: std::ffi::c_int;
 
-    // Used indirectly
-    pub static mut jl_small_typeof: [*mut crate::types::jl_datatype_t; 128usize];
-
     // Added in Julia 1.11
 
-    #[cfg(not(any(feature = "julia-1-10",)))]
+    #[cfg(not(feature = "julia-1-10"))]
     pub static mut jl_genericmemory_type: *mut crate::types::jl_unionall_t;
 
-    #[cfg(not(any(feature = "julia-1-10",)))]
+    #[cfg(not(feature = "julia-1-10"))]
     pub static mut jl_genericmemory_typename: *mut crate::types::jl_typename_t;
 
-    #[cfg(not(any(feature = "julia-1-10",)))]
+    #[cfg(not(feature = "julia-1-10"))]
     pub static mut jl_genericmemoryref_type: *mut crate::types::jl_unionall_t;
 
-    #[cfg(not(any(feature = "julia-1-10",)))]
+    #[cfg(not(feature = "julia-1-10"))]
     pub static mut jl_genericmemoryref_typename: *mut crate::types::jl_typename_t;
 
-    #[cfg(not(any(feature = "julia-1-10",)))]
+    #[cfg(not(feature = "julia-1-10"))]
     pub static mut jl_an_empty_memory_any: *mut crate::types::jl_value_t;
 
-    #[cfg(not(any(feature = "julia-1-10",)))]
+    #[cfg(not(feature = "julia-1-10"))]
     pub static mut jl_bfloat16_type: *mut crate::types::jl_datatype_t;
 
-    #[cfg(not(any(feature = "julia-1-10",)))]
+    #[cfg(not(feature = "julia-1-10"))]
     pub static mut jl_array_uint32_type: *mut crate::types::jl_value_t;
 
     pub fn jl_gc_enable(on: std::ffi::c_int) -> std::ffi::c_int;
@@ -303,14 +292,6 @@ extern "C" {
         mutabl: std::ffi::c_int,
         ninitialized: std::ffi::c_int,
     ) -> *mut crate::types::jl_datatype_t;
-
-    // pub fn jl_new_primitivetype(
-    //     name: *mut crate::types::jl_value_t,
-    //     module: *mut crate::types::jl_module_t,
-    //     sup: *mut crate::types::jl_datatype_t,
-    //     parameters: *mut crate::types::jl_svec_t,
-    //     nbits: usize,
-    // ) -> *mut crate::types::jl_datatype_t;
 
     pub fn jl_new_structv(
         ty: *mut crate::types::jl_datatype_t,
@@ -556,8 +537,6 @@ extern "C" {
 
     pub fn jl_throw(e: *mut crate::types::jl_value_t) -> !;
 
-    // pub fn jl_process_events() -> std::ffi::c_int;
-
     pub fn jl_stdout_stream() -> *mut crate::types::JL_STREAM;
 
     pub fn jl_stderr_stream() -> *mut crate::types::JL_STREAM;
@@ -632,41 +611,11 @@ extern "C" {
 
     pub fn jl_gc_safepoint();
 
-    // Used indirectly
-    pub fn jl_excstack_state(
-        #[cfg(not(any(feature = "julia-1-10",)))] ct: *mut crate::types::jl_task_t,
-    ) -> usize;
-
-    // Used indirectly
-    pub fn jl_enter_handler(
-        #[cfg(not(any(feature = "julia-1-10",)))] ct: *mut crate::types::jl_task_t,
-        eh: *mut std::ffi::c_void,
-    );
-
-    // Used indirectly
-    pub fn jl_eh_restore_state(
-        #[cfg(not(any(feature = "julia-1-10",)))] ct: *mut crate::types::jl_task_t,
-        eh: *mut std::ffi::c_void,
-    );
-
-    // Used indirectly
-    pub fn jl_eh_restore_state_noexcept(
-        #[cfg(not(any(feature = "julia-1-10",)))] ct: *mut crate::types::jl_task_t,
-        state: usize,
-    );
-
     pub fn jl_current_exception(
-        #[cfg(not(any(feature = "julia-1-10",)))] ct: *mut crate::types::jl_task_t,
+        #[cfg(not(feature = "julia-1-10"))] ct: *mut crate::types::jl_task_t,
     ) -> *mut crate::types::jl_value_t;
 
     pub fn jl_get_world_counter() -> usize;
-
-    // Used indirectly
-    pub fn jl_apply_generic(
-        F: *mut crate::types::jl_value_t,
-        args: *mut *mut crate::types::jl_value_t,
-        nargs: u32,
-    ) -> *mut crate::types::jl_value_t;
 
     pub fn jl_init();
 
@@ -677,51 +626,27 @@ extern "C" {
 
     pub fn jl_symbol(str: *const std::ffi::c_char) -> *mut crate::types::jl_sym_t;
 
-    // Used indirectly
-    pub fn jl_gc_queue_multiroot(
-        str: *const crate::types::jl_value_t,
-        stored: *const std::ffi::c_void,
-        dt: *mut crate::types::jl_datatype_t,
-    );
-
-    // Used indirectly
-    pub fn jl_gc_queue_root(root: *const crate::types::jl_value_t);
-
-    // Used indirectly
-    pub fn jl_compute_fieldtypes(
-        st: *mut crate::types::jl_datatype_t,
-        stack: *mut std::os::raw::c_void,
-        #[cfg(not(any(feature = "julia-1-10",)))] cacheable: std::ffi::c_int,
-    ) -> *mut crate::types::jl_svec_t;
-
     // Removed in Julia 1.11
 
-    #[cfg(any(feature = "julia-1-10",))]
+    #[cfg(feature = "julia-1-10")]
     pub fn jl_new_array(
         atype: *mut crate::types::jl_value_t,
         dims: *mut crate::types::jl_value_t,
     ) -> *mut crate::types::jl_array_t;
 
-    #[cfg(any(feature = "julia-1-10",))]
+    #[cfg(feature = "julia-1-10")]
     pub fn jl_arrayref(a: *mut crate::types::jl_array_t, i: usize)
         -> *mut crate::types::jl_value_t;
 
-    #[cfg(any(feature = "julia-1-10",))]
+    #[cfg(feature = "julia-1-10")]
     pub fn jl_arrayset(
         a: *mut crate::types::jl_array_t,
         v: *mut crate::types::jl_value_t,
         i: usize,
     );
 
-    #[cfg(any(feature = "julia-1-10",))]
+    #[cfg(feature = "julia-1-10")]
     pub fn jl_array_typetagdata(a: *mut crate::types::jl_array_t) -> *mut std::os::raw::c_char;
-
-    // Used indirectly
-    pub fn jl_egal__unboxed(
-        a: *const crate::types::jl_value_t,
-        b: *const crate::types::jl_value_t,
-        dtag: usize,
-    ) -> std::os::raw::c_int;
 
     pub fn jl_get_pgcstack() -> *mut *mut crate::types::jl_gcframe_t;
 
@@ -729,55 +654,6 @@ extern "C" {
         a: *const crate::types::jl_value_t,
         b: *const crate::types::jl_value_t,
     ) -> std::os::raw::c_int;
-
-    // Used indirectly
-    pub fn jl_egal__bits(
-        a: *const crate::types::jl_value_t,
-        b: *const crate::types::jl_value_t,
-        dt: *mut crate::types::jl_datatype_t,
-    ) -> std::os::raw::c_int;
-
-    // Used indirectly
-    pub fn jl_setjmp(
-        ptr: *mut std::ffi::c_void,
-        #[cfg(not(any(feature = "julia-1-10",)))] savesigs: std::ffi::c_int,
-    );
-
-    // pub fn jl_atomic_new_bits(
-    //     dt: *mut crate::types::jl_value_t,
-    //     src: *const std::ffi::c_char,
-    // ) -> *mut crate::types::jl_value_t;
-
-    // pub fn jl_atomic_store_bits(
-    //     dst: *mut std::ffi::c_char,
-    //     src: *const crate::types::jl_value_t,
-    //     nb: std::ffi::c_int,
-    // );
-
-    // pub fn jl_atomic_swap_bits(
-    //     dt: *mut crate::types::jl_value_t,
-    //     dst: *mut std::ffi::c_char,
-    //     src: *const crate::types::jl_value_t,
-    //     nb: std::ffi::c_int,
-    // ) -> *mut crate::types::jl_value_t;
-
-    // // Used indirectly
-    // pub fn jl_atomic_bool_cmpswap_bits(
-    //     dst: *mut std::ffi::c_char,
-    //     expected: *const crate::types::jl_value_t,
-    //     src: *const crate::types::jl_value_t,
-    //     nb: std::ffi::c_int,
-    // ) -> std::ffi::c_int;
-
-    // // Used indirectly
-    // pub fn jl_atomic_cmpswap_bits(
-    //     dt: *mut crate::types::jl_datatype_t,
-    //     rettype: *mut crate::types::jl_datatype_t,
-    //     dst: *mut std::ffi::c_char,
-    //     expected: *const crate::types::jl_value_t,
-    //     src: *const crate::types::jl_value_t,
-    //     nb: std::ffi::c_int,
-    // ) -> *mut crate::types::jl_value_t;
 
     pub fn jl_adopt_thread() -> *mut *mut crate::types::jl_gcframe_t;
 
@@ -791,49 +667,14 @@ extern "C" {
 
     pub fn jl_exit_threaded_region();
 
-    // Added in Julia 1.10
-
-    // Used indirectly
-    pub fn jl_egal__bitstag(
-        a: *const crate::types::jl_value_t,
-        b: *const crate::types::jl_value_t,
-        dtag: usize,
-    ) -> std::os::raw::c_int;
-
     // Added in Julia 1.11
 
-    // Used indirectly
-    #[cfg(not(any(feature = "julia-1-10",)))]
-    pub fn jl_unwrap_unionall(v: *mut crate::types::jl_value_t) -> *mut crate::types::jl_value_t;
-
-    // Used indirectly
-    #[cfg(not(any(feature = "julia-1-10",)))]
-    pub fn jl_genericmemoryref(
-        m: *mut crate::types::jl_genericmemory_t,
-        index: usize,
-    ) -> *mut crate::types::jl_value_t;
-
-    #[cfg(not(any(feature = "julia-1-10",)))]
+    #[cfg(not(feature = "julia-1-10"))]
     pub fn jl_alloc_array_nd(
         atype: *mut crate::types::jl_value_t,
         dims: *mut usize,
         ndims: usize,
     ) -> *mut crate::types::jl_array_t;
-
-    #[cfg(not(any(feature = "julia-1-10", feature = "julia-1-11",)))]
-    pub fn jl_get_binding_wr(
-        m: *mut crate::types::jl_module_t,
-        var: *mut crate::types::jl_sym_t,
-        alloc: std::ffi::c_int,
-    ) -> *mut std::ffi::c_void;
-
-    #[cfg(not(any(feature = "julia-1-10", feature = "julia-1-11",)))]
-    pub fn jl_checked_assignment(
-        m: *mut std::ffi::c_void,
-        m: *mut crate::types::jl_module_t,
-        var: *mut crate::types::jl_sym_t,
-        rhs: *mut crate::types::jl_value_t,
-    ) -> *mut std::ffi::c_void;
 }
 
 // jlrs_cc functions
@@ -1095,10 +936,103 @@ extern "C" {
 
     // Added in Julia 1.11
 
-    #[cfg(not(any(feature = "julia-1-10",)))]
+    #[cfg(not(feature = "julia-1-10"))]
     pub fn jlrs_genericmemory_typetagdata(
         m: *mut crate::types::jl_genericmemory_t,
     ) -> *mut std::ffi::c_char;
 
     pub fn jlrs_init_missing_functions();
+}
+
+#[cfg(all(
+    any(windows, target_os = "windows", feature = "windows"),
+    any(target_env = "msvc", feature = "yggdrasil")
+))]
+mod indirect {
+    #[link(name = "libjulia", kind = "raw-dylib")]
+    extern "C" {
+        pub static mut jl_small_typeof: [*mut crate::types::jl_datatype_t; 128usize];
+
+        pub fn jl_excstack_state(
+            #[cfg(not(feature = "julia-1-10"))] ct: *mut crate::types::jl_task_t,
+        ) -> usize;
+
+        pub fn jl_enter_handler(
+            #[cfg(not(feature = "julia-1-10"))] ct: *mut crate::types::jl_task_t,
+            eh: *mut std::ffi::c_void,
+        );
+
+        pub fn jl_eh_restore_state(
+            #[cfg(not(feature = "julia-1-10"))] ct: *mut crate::types::jl_task_t,
+            eh: *mut std::ffi::c_void,
+        );
+
+        pub fn jl_eh_restore_state_noexcept(
+            #[cfg(not(feature = "julia-1-10"))] ct: *mut crate::types::jl_task_t,
+            state: usize,
+        );
+
+        pub fn jl_apply_generic(
+            F: *mut crate::types::jl_value_t,
+            args: *mut *mut crate::types::jl_value_t,
+            nargs: u32,
+        ) -> *mut crate::types::jl_value_t;
+
+        pub fn jl_gc_queue_multiroot(
+            str: *const crate::types::jl_value_t,
+            stored: *const std::ffi::c_void,
+            dt: *mut crate::types::jl_datatype_t,
+        );
+
+        pub fn jl_gc_queue_root(root: *const crate::types::jl_value_t);
+
+        pub fn jl_compute_fieldtypes(
+            st: *mut crate::types::jl_datatype_t,
+            stack: *mut std::os::raw::c_void,
+            #[cfg(not(feature = "julia-1-10"))] cacheable: std::ffi::c_int,
+        ) -> *mut crate::types::jl_svec_t;
+
+        pub fn jl_egal__unboxed(
+            a: *const crate::types::jl_value_t,
+            b: *const crate::types::jl_value_t,
+            dtag: usize,
+        ) -> std::os::raw::c_int;
+
+        pub fn jl_egal__bits(
+            a: *const crate::types::jl_value_t,
+            b: *const crate::types::jl_value_t,
+            dt: *mut crate::types::jl_datatype_t,
+        ) -> std::os::raw::c_int;
+
+        pub fn jl_setjmp(
+            ptr: *mut std::ffi::c_void,
+            #[cfg(not(feature = "julia-1-10"))] savesigs: std::ffi::c_int,
+        );
+
+        // Added in Julia 1.10
+
+        pub fn jl_egal__bitstag(
+            a: *const crate::types::jl_value_t,
+            b: *const crate::types::jl_value_t,
+            dtag: usize,
+        ) -> std::os::raw::c_int;
+
+        // Added in Julia 1.11
+
+        #[cfg(not(feature = "julia-1-10"))]
+        pub fn jl_unwrap_unionall(
+            v: *mut crate::types::jl_value_t,
+        ) -> *mut crate::types::jl_value_t;
+
+        #[cfg(not(feature = "julia-1-10"))]
+        pub fn jl_genericmemoryref(
+            m: *mut crate::types::jl_genericmemory_t,
+            index: usize,
+        ) -> *mut crate::types::jl_value_t;
+
+        // TODO: is this ok? It's unused, but compiling with BinaryBuilder complains
+        // about jl_options being undefined.
+        #[cfg(feature = "yggdrasil")]
+        pub static mut jl_options: std::mem::MaybeUninit<i8>;
+    }
 }
