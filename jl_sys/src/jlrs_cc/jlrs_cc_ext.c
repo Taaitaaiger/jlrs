@@ -60,11 +60,6 @@ extern "C"
     }
 #endif
 
-    uint32_t jlrs_datatype_nptrs(jl_datatype_t *ty)
-    {
-        return jl_datatype_layout(ty)->npointers;
-    }
-
     jl_typename_t *jlrs_datatype_typename(jl_datatype_t *ty)
     {
         return ty->name;
@@ -239,11 +234,6 @@ extern "C"
     uint8_t jlrs_datatype_zeroinit(jl_datatype_t *ty)
     {
         return ty->zeroinit;
-    }
-
-    uint8_t jlrs_datatype_isconcretetype(jl_datatype_t *ty)
-    {
-        return ty->isconcretetype;
     }
 
     int jlrs_datatype_has_layout(jl_datatype_t *t)

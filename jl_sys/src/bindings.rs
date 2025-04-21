@@ -703,8 +703,6 @@ extern "C" {
 
     pub fn jlrs_array_data(a: *mut crate::types::jl_array_t) -> *mut std::ffi::c_void;
 
-    pub fn jlrs_array_ndims(a: *mut crate::types::jl_array_t) -> usize;
-
     pub fn jlrs_exprarg(e: *mut crate::types::jl_expr_t, n: usize)
         -> *mut crate::types::jl_value_t;
 
@@ -737,8 +735,6 @@ extern "C" {
         i: std::ffi::c_int,
     ) -> std::ffi::c_int;
 
-    pub fn jlrs_ptr_offset(st: *mut crate::types::jl_datatype_t, i: std::ffi::c_int) -> u32;
-
     pub fn jlrs_is_primitivetype(v: *mut std::ffi::c_void) -> std::ffi::c_int;
 
     pub fn jlrs_isbits(t: *mut std::ffi::c_void) -> std::ffi::c_int;
@@ -757,11 +753,6 @@ extern "C" {
     pub fn jlrs_unbox_long(x: *mut crate::types::jl_value_t) -> isize;
 
     pub fn jlrs_unbox_ulong(x: *mut crate::types::jl_value_t) -> usize;
-
-    pub fn jlrs_apply(
-        args: *mut *mut crate::types::jl_value_t,
-        nargs: u32,
-    ) -> *mut crate::types::jl_value_t;
 
     pub fn jlrs_current_task() -> *mut crate::types::jl_task_t;
 
@@ -797,8 +788,6 @@ extern "C" {
 
     pub fn jlrs_datatype_has_layout(t: *mut crate::types::jl_datatype_t) -> std::ffi::c_int;
 
-    pub fn jlrs_datatype_nptrs(ty: *mut crate::types::jl_datatype_t) -> u32;
-
     pub fn jlrs_datatype_typename(
         ty: *mut crate::types::jl_datatype_t,
     ) -> *mut crate::types::jl_typename_t;
@@ -828,8 +817,6 @@ extern "C" {
     pub fn jlrs_datatype_mutable(ty: *mut crate::types::jl_datatype_t) -> u8;
 
     pub fn jlrs_datatype_zeroinit(ty: *mut crate::types::jl_datatype_t) -> u8;
-
-    pub fn jlrs_datatype_isconcretetype(ty: *mut crate::types::jl_datatype_t) -> u8;
 
     pub fn jlrs_set_nthreads(nthreads: i16);
 
@@ -934,13 +921,6 @@ extern "C" {
 
     pub fn jlrs_set_nthreads_per_pool(nthreads_per_pool: *const i16);
 
-    // Added in Julia 1.11
-
-    #[cfg(not(feature = "julia-1-10"))]
-    pub fn jlrs_genericmemory_typetagdata(
-        m: *mut crate::types::jl_genericmemory_t,
-    ) -> *mut std::ffi::c_char;
-
     pub fn jlrs_init_missing_functions();
 }
 
@@ -983,7 +963,6 @@ mod indirect {
 
         #[cfg(not(feature = "julia-1-10"))]
         pub static mut jl_unwrap_unionall: *mut std::ffi::c_void;
-
 
         #[cfg(not(feature = "julia-1-10"))]
         pub static mut jl_genericmemoryref: *mut std::ffi::c_void;
