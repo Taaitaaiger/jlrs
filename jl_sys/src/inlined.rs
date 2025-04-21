@@ -8,7 +8,7 @@ use std::{
 
 use crate::jl_array_t;
 
-#[cfg(feature = "julia-1-10")]
+#[cfg(julia_1_10)]
 #[inline]
 pub const unsafe fn jlrs_array_data_fast(a: *mut jl_array_t) -> *mut std::ffi::c_void {
     #[repr(C)]
@@ -20,7 +20,7 @@ pub const unsafe fn jlrs_array_data_fast(a: *mut jl_array_t) -> *mut std::ffi::c
     NonNull::new_unchecked(a as *mut RawArray).as_ref().ptr
 }
 
-#[cfg(not(feature = "julia-1-10"))]
+#[cfg(not(julia_1_10))]
 #[inline]
 pub const unsafe fn jlrs_array_data_fast(a: *mut jl_array_t) -> *mut std::ffi::c_void {
     #[repr(C)]
@@ -42,7 +42,7 @@ pub const unsafe fn jlrs_array_data_fast(a: *mut jl_array_t) -> *mut std::ffi::c
         .ptr_or_offset
 }
 
-#[cfg(feature = "julia-1-10")]
+#[cfg(julia_1_10)]
 #[inline]
 pub const unsafe fn jlrs_array_dims_ptr(a: *mut jl_array_t) -> *mut usize {
     #[repr(C)]
@@ -60,7 +60,7 @@ pub const unsafe fn jlrs_array_dims_ptr(a: *mut jl_array_t) -> *mut usize {
     (a as *mut u8).add(OFFSET) as *mut usize
 }
 
-#[cfg(not(feature = "julia-1-10"))]
+#[cfg(not(julia_1_10))]
 #[inline]
 pub const unsafe fn jlrs_array_dims_ptr(a: *mut jl_array_t) -> *mut usize {
     #[repr(C)]
@@ -80,7 +80,7 @@ pub const unsafe fn jlrs_array_dims_ptr(a: *mut jl_array_t) -> *mut usize {
     (a as *mut u8).add(OFFSET) as *mut usize
 }
 
-#[cfg(not(feature = "julia-1-10"))]
+#[cfg(not(julia_1_10))]
 #[inline]
 pub const unsafe fn jlrs_array_mem(a: *mut jl_array_t) -> *mut crate::types::jl_value_t {
     #[repr(C)]

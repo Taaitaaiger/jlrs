@@ -18,10 +18,10 @@ rust-version = "1.79"
 [features]
 default = []
 
-# Enable all features except any version features
+# Enable all features
 full = ["local-rt", "tokio-rt", "jlrs-ndarray", "f16", "complex", "jlrs-derive", "ccall", "multi-rt"]
 
-# Enable all features except any version features or runtimes
+# Enable all features except any  runtimes
 full-no-rt = ["async", "jlrs-ndarray", "f16", "jlrs-derive", "ccall"]
 
 # Runtimes

@@ -10,19 +10,20 @@ use std::{ffi::OsStr, os::unix::prelude::OsStrExt};
 
 use cfg_if::cfg_if;
 
+const MIN_MINOR_VERSION: i32 = 10;
+const MAX_MINOR_VERSION: i32 = 13;
+
 fn main() {
     #[cfg(feature = "docs")]
     {
-        // TODO: depend on activated feature
         println!("cargo::metadata=version=1.12.0");
-        println!("cargo::rustc-cfg=feature=\"julia-1-12\"");
+        emit_julia_version(1, 12);
         return;
     }
 
     if env::var("DOCS_RS").is_ok() {
-        // TODO: depend on activated feature
         println!("cargo::metadata=version=1.12.0");
-        println!("cargo::rustc-cfg=feature=\"julia-1-12\"");
+        emit_julia_version(1, 12);
         return;
     }
 
@@ -97,12 +98,40 @@ fn detect_julia_version() {
 
     assert!(major != -1 && minor != -1 && patch != -1);
     if is_dev {
-        println!("cargo::warning=Detected development version of Julia {major}.{minor}.{patch}, bindings may not be up-to-date. \
-        Please report any issues you encounter at https://www.github.com/Taaitaaiger/jlrs/issues");
+        println!(
+            "cargo::warning=Detected development version of Julia {major}.{minor}.{patch}, \
+            bindings may not be up-to-date. Please report any issues you encounter at \
+            https://www.github.com/Taaitaaiger/jlrs/issues"
+        );
     }
 
-    println!("cargo::metadata=version={major}.{minor}.{patch}");
-    println!("cargo::rustc-cfg=feature=\"julia-{}-{}\"", major, minor);
+    enable_julia_cfgs(MIN_MINOR_VERSION, MAX_MINOR_VERSION);
+
+    if major > MAX_MINOR_VERSION {
+        println!(
+            "cargo::warning=Detected unsupported version of Julia {major}.{minor}.{patch}, \
+            assuming compatibility with 1.{MAX_MINOR_VERSION}. Please report any issues you 
+            encounter at https://www.github.com/Taaitaaiger/jlrs/issues"
+        );
+
+        println!("cargo::metadata=version={major}.{MAX_MINOR_VERSION}.0");
+        emit_julia_version(1, MAX_MINOR_VERSION);
+    } else {
+        println!("cargo::metadata=version={major}.{minor}.{patch}");
+        emit_julia_version(major, minor);
+    }
+}
+
+fn enable_julia_cfgs(min_version: i32, max_version: i32) {
+    let versions: Vec<String> = (min_version..=max_version)
+        .map(|minor| format!("julia_1_{minor}"))
+        .collect();
+    let versions_joined = versions.join(",");
+    println!("cargo::rustc-check-cfg=cfg({versions_joined})");
+}
+
+fn emit_julia_version(major: i32, minor: i32) {
+    println!("cargo::rustc-cfg=julia_{major}_{minor}");
 }
 
 #[cfg(feature = "yggdrasil")]

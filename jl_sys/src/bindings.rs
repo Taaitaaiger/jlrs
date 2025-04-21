@@ -196,25 +196,25 @@ pub mod globals {
 
         // Added in Julia 1.11
 
-        #[cfg(not(feature = "julia-1-10"))]
+        #[cfg(not(julia_1_10))]
         pub static mut jl_genericmemory_type: *mut crate::types::jl_unionall_t;
 
-        #[cfg(not(feature = "julia-1-10"))]
+        #[cfg(not(julia_1_10))]
         pub static mut jl_genericmemory_typename: *mut crate::types::jl_typename_t;
 
-        #[cfg(not(feature = "julia-1-10"))]
+        #[cfg(not(julia_1_10))]
         pub static mut jl_genericmemoryref_type: *mut crate::types::jl_unionall_t;
 
-        #[cfg(not(feature = "julia-1-10"))]
+        #[cfg(not(julia_1_10))]
         pub static mut jl_genericmemoryref_typename: *mut crate::types::jl_typename_t;
 
-        #[cfg(not(feature = "julia-1-10"))]
+        #[cfg(not(julia_1_10))]
         pub static mut jl_an_empty_memory_any: *mut crate::types::jl_value_t;
 
-        #[cfg(not(feature = "julia-1-10"))]
+        #[cfg(not(julia_1_10))]
         pub static mut jl_bfloat16_type: *mut crate::types::jl_datatype_t;
 
-        #[cfg(not(feature = "julia-1-10"))]
+        #[cfg(not(julia_1_10))]
         pub static mut jl_array_uint32_type: *mut crate::types::jl_value_t;
     }
 }
@@ -650,7 +650,7 @@ pub mod functions {
 
         // Removed in Julia 1.11
 
-        #[cfg(feature = "julia-1-10")]
+        #[cfg(julia_1_10)]
         pub fn jl_new_array(
             atype: *mut crate::types::jl_value_t,
             dims: *mut crate::types::jl_value_t,
@@ -658,7 +658,7 @@ pub mod functions {
 
         // Added in Julia 1.11
 
-        #[cfg(not(feature = "julia-1-10"))]
+        #[cfg(not(julia_1_10))]
         pub fn jl_alloc_array_nd(
             atype: *mut crate::types::jl_value_t,
             dims: *mut usize,
@@ -970,21 +970,21 @@ mod indirect {
 
         // Removed in Julia 1.11
 
-        #[cfg(feature = "julia-1-10")]
+        #[cfg(julia_1_10)]
         pub static mut jl_arrayref: *mut std::ffi::c_void;
 
-        #[cfg(feature = "julia-1-10")]
+        #[cfg(julia_1_10)]
         pub static mut jl_arrayset: *mut std::ffi::c_void;
 
-        #[cfg(feature = "julia-1-10")]
+        #[cfg(julia_1_10)]
         pub static mut jl_array_typetagdata: *mut std::ffi::c_void;
 
         // Added in Julia 1.11
 
-        #[cfg(not(feature = "julia-1-10"))]
+        #[cfg(not(julia_1_10))]
         pub static mut jl_unwrap_unionall: *mut std::ffi::c_void;
 
-        #[cfg(not(feature = "julia-1-10"))]
+        #[cfg(not(julia_1_10))]
         pub static mut jl_genericmemoryref: *mut std::ffi::c_void;
     }
 }

@@ -14,9 +14,8 @@ const NIGHTLY_MINOR_VERSION: usize = 13;
     all(julia_1_11, julia_1_13),
     all(julia_1_12, julia_1_13),
 ))]
-compile_error!("Multiple Julia version features have been enabled");
+compile_error!("Multiple Julia versions have been detected");
 
-// Avoid a second error if no version feature is enabled
 #[cfg(not(any(julia_1_10, julia_1_11, julia_1_12, julia_1_13)))]
 const SELECTED_MINOR_VERSION: usize = 10;
 #[cfg(julia_1_10)]
