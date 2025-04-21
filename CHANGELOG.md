@@ -10,7 +10,9 @@
 
 - The multithreaded runtime uses scoped threads internally, this allows closures to reference non-static data and ensures the adopted threads have exited before the runtime thread, but requires calling `MtHandle::spawn` to spawn a new thread.
 
-- The `julia-1-6`, `julia-1-7`, `julia-1-8`, and `julia-1-9` features have been removed.
+- Support for Julia 1.6 - 1.9 (pre-LTS versions) has been dropped.
+
+- Version features have been removed, the appropriate version is detected at compile time and propagated automatically.
 
 - The `Executor`, `AsyncTask`, and `PersistentTask` traits no longer use `async_trait`. To migrate existing `PersistentTask`s, remove the `async_trait`-annotation. `AsyncTask`s now take `self` by value, so to migrate them remove the annotation and change `&mut self` in `run` to `self`.
 
@@ -53,8 +55,6 @@
 - Exporting a new global with `static` is no longer possible to account for changes in Julia, creating new globals with `Module::set_global(_unchecked)` will not work on Julia 1.12+.
 
 - `Module::is_imported` has been removed.
-
-- The `julia-1-13` version feature has been added.
 
 - An example that shows how the multithreaded runtime can be used with rayon has been added.
 

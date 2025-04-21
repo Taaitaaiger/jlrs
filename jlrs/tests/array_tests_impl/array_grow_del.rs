@@ -2,9 +2,7 @@
 pub(crate) mod tests {
     use jlrs::{
         data::managed::array::{data::accessor::AccessorMut1D, TypedVector},
-        memory::gc::Gc,
         prelude::*,
-        weak_handle_unchecked,
     };
 
     use crate::util::JULIA;
@@ -38,25 +36,6 @@ pub(crate) mod tests {
         });
     }
 
-    #[cfg(any(feature = "julia-1-10"))]
-    fn typed_vector_grow_end_err() {
-        JULIA.with(|handle| {
-            handle.borrow_mut().with_stack(|mut stack| {
-                stack.scope(|mut frame| unsafe {
-                    let data = vec![1.0f32, 2.0];
-                    let mut arr = TypedVector::<f32>::from_vec(&mut frame, data, 2)
-                        .unwrap()
-                        .unwrap();
-
-                    assert_eq!(arr.length(), 2);
-                    let success = arr.bits_data_mut().grow_end(&frame, 1);
-                    assert!(success.is_err());
-                    assert_eq!(arr.length(), 2);
-                });
-            });
-        });
-    }
-
     fn typed_vector_del_end() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
@@ -85,39 +64,8 @@ pub(crate) mod tests {
         });
     }
 
-    #[cfg(any(feature = "julia-1-10"))]
-    fn typed_vector_del_end_err() {
-        JULIA.with(|handle| {
-            handle.borrow_mut().with_stack(|mut stack| {
-                stack.scope(|mut frame| unsafe {
-                    let data = vec![1.0f32, 2.0];
-                    let mut arr = TypedVector::<f32>::from_vec(&mut frame, data, 2)
-                        .unwrap()
-                        .unwrap();
-
-                    assert_eq!(arr.length(), 2);
-                    let success = arr.bits_data_mut().del_end(&frame, 1);
-                    assert!(success.is_err());
-                    assert_eq!(arr.length(), 2);
-                });
-            });
-        });
-    }
-
     pub(crate) fn array_grow_del_tests() {
         typed_vector_grow_end();
-        #[cfg(any(feature = "julia-1-10"))]
-        typed_vector_grow_end_err();
-
         typed_vector_del_end();
-        #[cfg(any(feature = "julia-1-10"))]
-        typed_vector_del_end_err();
-
-        unsafe {
-            let handle = weak_handle_unchecked!();
-            handle.gc_collect(jl_sys::jl_gc_collection_t::Full);
-            handle.gc_collect(jl_sys::jl_gc_collection_t::Full);
-            handle.gc_collect(jl_sys::jl_gc_collection_t::Full);
-        }
     }
 }

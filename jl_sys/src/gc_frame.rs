@@ -1,7 +1,7 @@
 use std::{
     cell::Cell,
     ffi::c_void,
-    marker::PhantomPinned,
+    marker::{PhantomData, PhantomPinned},
     mem::MaybeUninit,
     ptr::{self, null_mut, NonNull},
 };
@@ -21,7 +21,7 @@ pub struct SplitGcFrame<const M: usize, const N: usize> {
     header: jl_gcframe_t,
     roots_head: Roots<M>,
     roots_tail: Roots<N>,
-    _pinned: PhantomPinned,
+    _marker: PhantomData<(*mut u8, PhantomPinned)>,
 }
 
 impl<const M: usize, const N: usize> SplitGcFrame<M, N> {
@@ -31,7 +31,7 @@ impl<const M: usize, const N: usize> SplitGcFrame<M, N> {
             header: jl_gcframe_t::new_split(M, N),
             roots_head: [NULL_CELL; M],
             roots_tail: [NULL_CELL; N],
-            _pinned: PhantomPinned,
+            _marker: PhantomData,
         }
     }
 
@@ -74,7 +74,7 @@ impl<const M: usize, const N: usize> SplitGcFrame<M, N> {
 pub struct RawGcFrame<const N: usize> {
     header: jl_gcframe_t,
     roots: Roots<N>,
-    _pinned: PhantomPinned,
+    _marker: PhantomData<(*mut u8, PhantomPinned)>,
 }
 
 impl<const N: usize> RawGcFrame<N> {
@@ -83,7 +83,7 @@ impl<const N: usize> RawGcFrame<N> {
         RawGcFrame {
             header: jl_gcframe_t::new::<N>(),
             roots: [NULL_CELL; N],
-            _pinned: PhantomPinned,
+            _marker: PhantomData,
         }
     }
 
@@ -189,7 +189,7 @@ impl<T> VolatilePtr<T> {
 #[repr(transparent)]
 struct GcStack {
     ptr: VolatilePtr<jl_gcframe_t>,
-    _pinned: PhantomPinned,
+    _marker: PhantomData<(*mut u8, PhantomPinned)>,
 }
 
 impl GcStack {

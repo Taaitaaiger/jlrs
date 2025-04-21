@@ -1,57 +1,151 @@
-use std::env;
 #[cfg(not(feature = "yggdrasil"))]
 use std::path::PathBuf;
 #[cfg(not(feature = "yggdrasil"))]
 use std::process::Command;
 #[cfg(target_os = "windows")]
 use std::str::FromStr;
+use std::{env, io::Read};
 #[cfg(any(target_os = "linux", target_os = "macos", target_os = "freebsd"))]
 use std::{ffi::OsStr, os::unix::prelude::OsStrExt};
 
 use cfg_if::cfg_if;
 
+const MIN_MINOR_VERSION: i32 = 10;
+const MAX_MINOR_VERSION: i32 = 13;
+
 fn main() {
     #[cfg(feature = "docs")]
-    return;
-
-    if env::var("DOCS_RS").is_ok() {
+    {
+        println!("cargo::metadata=version=1.12.0");
+        emit_julia_version(1, 12);
         return;
     }
 
-    println!("cargo:rerun-if-changed=src/jlrs_cc/jlrs_cc_ext.c");
-    println!("cargo:rerun-if-changed=src/jlrs_cc/jlrs_cc_hacks.c");
-    println!("cargo:rerun-if-changed=src/jlrs_cc/jlrs_cc_reexport.c");
-    println!("cargo:rerun-if-changed=src/jlrs_cc/jlrs_cc_fast_tls.c");
-    println!("cargo:rerun-if-changed=src/jlrs_cc/jlrs_cc_ext.h");
-    println!("cargo:rerun-if-changed=src/jlrs_cc/jlrs_cc_hacks.h");
-    println!("cargo:rerun-if-changed=src/jlrs_cc/jlrs_cc_reexport.h");
-    println!("cargo:rerun-if-changed=src/jlrs_cc/jlrs_cc.h");
-    println!("cargo:rerun-if-changed=src/jlrs_cc/jlrs_cc_fast_tls.h");
-    println!("cargo:rerun-if-env-changed=JULIA_DIR");
+    if env::var("DOCS_RS").is_ok() {
+        println!("cargo::metadata=version=1.12.0");
+        emit_julia_version(1, 12);
+        return;
+    }
 
-    let julia_dir =
-        find_julia().expect("JULIA_DIR is not set and no installed version of Julia can be found");
+    println!("cargo::rerun-if-changed=src/jlrs_cc/jlrs_cc_ext.c");
+    println!("cargo::rerun-if-changed=src/jlrs_cc/jlrs_version.c");
+    println!("cargo::rerun-if-changed=src/jlrs_cc/jlrs_cc_hacks.c");
+    println!("cargo::rerun-if-changed=src/jlrs_cc/jlrs_cc_reexport.c");
+    println!("cargo::rerun-if-changed=src/jlrs_cc/jlrs_cc_fast_tls.c");
+    println!("cargo::rerun-if-changed=src/jlrs_cc/jlrs_cc_ext.h");
+    println!("cargo::rerun-if-changed=src/jlrs_cc/jlrs_cc_hacks.h");
+    println!("cargo::rerun-if-changed=src/jlrs_cc/jlrs_cc_reexport.h");
+    println!("cargo::rerun-if-changed=src/jlrs_cc/jlrs_cc.h");
+    println!("cargo::rerun-if-changed=src/jlrs_cc/jlrs_cc_fast_tls.h");
+    println!("cargo::rerun-if-env-changed=JULIA_DIR");
+    println!("cargo::rerun-if-env-changed=PATH");
+    println!("cargo::rerun-if-env-changed=LD_LIBRARY_PATH");
+    println!("cargo::rerun-if-env-changed=DYLD_LIBRARY_PATH");
+
+    detect_julia_version();
+
+    let julia_dir = find_julia_dir()
+        .expect("JULIA_DIR is not set and no installed version of Julia can be found");
+
+    let julia_dir = julia_dir
+        .as_os_str()
+        .to_str()
+        .expect("path contains invalid characters");
 
     let target = interpret_target();
-
     compile_jlrs_cc(&julia_dir, target);
     set_flags(&julia_dir, target);
 }
 
-#[cfg(feature = "yggdrasil")]
-fn find_julia() -> Option<String> {
-    if let Ok(mut path) = env::var("WORKSPACE") {
-        path.push_str("/destdir");
-        return Some(path);
+fn detect_julia_version() {
+    let mut julia_dir = find_julia_dir()
+        .expect("JULIA_DIR is not set and no installed version of Julia can be found");
+
+    julia_dir.push("include/julia/julia_version.h");
+
+    let mut julia_version_file =
+        std::fs::File::open(julia_dir).expect("Cannot find julia_version.h");
+
+    let mut buf = Vec::new();
+    julia_version_file
+        .read_to_end(&mut buf)
+        .expect("Cannot read julia_version.h");
+
+    let julia_version_content = String::from_utf8(buf).expect("Not UTF8");
+    let mut major = -1;
+    let mut minor = -1;
+    let mut patch = -1;
+    let mut is_dev = false;
+
+    for line in julia_version_content.lines() {
+        if let Some(m) = line.strip_prefix("#define JULIA_VERSION_STRING ") {
+            is_dev = m.contains("DEV");
+            continue;
+        }
+        if let Some(m) = line.strip_prefix("#define JULIA_VERSION_MAJOR ") {
+            major = m.parse().unwrap();
+            continue;
+        }
+        if let Some(m) = line.strip_prefix("#define JULIA_VERSION_MINOR ") {
+            minor = m.parse().unwrap();
+            continue;
+        }
+        if let Some(m) = line.strip_prefix("#define JULIA_VERSION_PATCH ") {
+            patch = m.parse().unwrap();
+            continue;
+        }
     }
 
-    None
+    assert!(major != -1 && minor != -1 && patch != -1);
+    if is_dev {
+        println!(
+            "cargo::warning=Detected development version of Julia {major}.{minor}.{patch}, \
+            bindings may not be up-to-date. Please report any issues you encounter at \
+            https://www.github.com/Taaitaaiger/jlrs/issues"
+        );
+    }
+
+    enable_julia_cfgs(MIN_MINOR_VERSION, MAX_MINOR_VERSION);
+
+    if major > MAX_MINOR_VERSION {
+        println!(
+            "cargo::warning=Detected unsupported version of Julia {major}.{minor}.{patch}, \
+            assuming compatibility with 1.{MAX_MINOR_VERSION}. Please report any issues you 
+            encounter at https://www.github.com/Taaitaaiger/jlrs/issues"
+        );
+
+        println!("cargo::metadata=version={major}.{MAX_MINOR_VERSION}.0");
+        emit_julia_version(1, MAX_MINOR_VERSION);
+    } else {
+        println!("cargo::metadata=version={major}.{minor}.{patch}");
+        emit_julia_version(major, minor);
+    }
+}
+
+fn enable_julia_cfgs(min_version: i32, max_version: i32) {
+    let versions: Vec<String> = (min_version..=max_version)
+        .map(|minor| format!("julia_1_{minor}"))
+        .collect();
+    let versions_joined = versions.join(",");
+    println!("cargo::rustc-check-cfg=cfg({versions_joined})");
+}
+
+fn emit_julia_version(major: i32, minor: i32) {
+    println!("cargo::rustc-cfg=julia_{major}_{minor}");
+}
+
+#[cfg(feature = "yggdrasil")]
+fn find_julia_dir() -> Option<PathBuf> {
+    let mut path = PathBuf::from(env::var_os("WORKSPACE")?);
+    path.push("destdir");
+
+    return Some(path);
 }
 
 #[cfg(not(feature = "yggdrasil"))]
-fn find_julia() -> Option<String> {
-    if let Ok(path) = env::var("JULIA_DIR") {
-        return Some(path);
+fn find_julia_dir() -> Option<PathBuf> {
+    if let Some(path) = env::var_os("JULIA_DIR") {
+        return Some(PathBuf::from(path));
     }
 
     cfg_if! {
@@ -67,7 +161,7 @@ fn find_julia() -> Option<String> {
                 return None;
             }
 
-            Some(julia_path.to_string_lossy().to_string())
+            Some(julia_path)
         } else if #[cfg(target_os = "windows")] {
             let out = Command::new("cmd")
                 .args(["/C", "where", "julia"])
@@ -88,9 +182,9 @@ fn find_julia() -> Option<String> {
                 return None;
             }
 
-            Some(julia_path.to_string_lossy().to_string())
+            Some(julia_path)
         } else {
-            unimplemented!("Only Linux and Windows are supported")
+            unimplemented!("Julia detection not implemented for this platform, try setting JULIA_DIR")
         }
     }
 }
@@ -130,8 +224,8 @@ fn interpret_target() -> Option<Target> {
 fn set_flags(julia_dir: &str, target: Option<Target>) {
     if let Some(Target::WindowsI686) = target {
         // Linking is necessary until raw dylib linkage is supported for this target
-        println!("cargo:rustc-link-lib=julia");
-        println!("cargo:rustc-link-lib=uv-2");
+        println!("cargo::rustc-link-lib=julia");
+        println!("cargo::rustc-link-lib=uv-2");
     }
 }
 
@@ -139,43 +233,43 @@ fn set_flags(julia_dir: &str, target: Option<Target>) {
 fn set_flags(julia_dir: &str, _tgt: Option<Target>) {
     cfg_if! {
         if #[cfg(all(target_os = "linux", not(any(feature = "windows", feature = "macos"))))] {
-            println!("cargo:rustc-link-arg=-rdynamic");
-            println!("cargo:rustc-link-search={}/lib", &julia_dir);
+            println!("cargo::rustc-link-arg=-rdynamic");
+            println!("cargo::rustc-link-search={}/lib", julia_dir);
 
             cfg_if! {
                 if #[cfg(feature = "debug")] {
-                    println!("cargo:rustc-link-lib=julia-debug");
+                    println!("cargo::rustc-link-lib=julia-debug");
                 } else {
-                    println!("cargo:rustc-link-lib=julia");
+                    println!("cargo::rustc-link-lib=julia");
                 }
             }
         } else if #[cfg(any(target_os = "macos", target_os = "freebsd", feature = "macos"))] {
-            println!("cargo:rustc-link-search={}/lib", &julia_dir);
+            println!("cargo::rustc-link-search={}/lib", &julia_dir);
 
             cfg_if! {
                 if #[cfg(feature = "debug")] {
-                    println!("cargo:rustc-link-lib=julia-debug");
+                    println!("cargo::rustc-link-lib=julia-debug");
                 } else {
-                    println!("cargo:rustc-link-lib=julia");
+                    println!("cargo::rustc-link-lib=julia");
                 }
             }
         } else if #[cfg(all(target_os = "windows", target_env = "msvc"))] {
-            println!("cargo:rustc-link-search={}/bin", &julia_dir);
-            println!("cargo:rustc-link-search={}/lib", &julia_dir);
+            println!("cargo::rustc-link-search={}/bin", &julia_dir);
+            println!("cargo::rustc-link-search={}/lib", &julia_dir);
         } else if #[cfg(any(all(target_os = "windows", target_env = "gnu"), feature = "windows"))] {
-            println!("cargo:rustc-link-search={}/bin", &julia_dir);
+            println!("cargo::rustc-link-search={}/bin", &julia_dir);
 
             cfg_if! {
                 if #[cfg(feature = "debug")] {
-                    println!("cargo:rustc-link-lib=julia-debug");
+                    println!("cargo::rustc-link-lib=julia-debug");
                 } else {
-                    println!("cargo:rustc-link-lib=julia");
+                    println!("cargo::rustc-link-lib=julia");
                 }
             }
 
-            println!("cargo:rustc-link-lib=openlibm");
-            println!("cargo:rustc-link-lib=libuv-2");
-            println!("cargo:rustc-link-arg=-Wl,--stack,8388608");
+            println!("cargo::rustc-link-lib=openlibm");
+            println!("cargo::rustc-link-lib=libuv-2");
+            println!("cargo::rustc-link-arg=-Wl,--stack,8388608");
         } else {
             panic!("Unsupported platform")
         }
@@ -241,18 +335,6 @@ fn compile_jlrs_cc(julia_dir: &str, target: Option<Target>) {
 
     #[cfg(feature = "lto")]
     c.flag("-flto=thin");
-
-    cfg_if! {
-        if #[cfg(feature = "julia-1-10")] {
-            c.define("JLRS_EXPECTED_MINOR_VERSION", Some("10"));
-        } else if #[cfg(feature = "julia-1-11")] {
-            c.define("JLRS_EXPECTED_MINOR_VERSION", Some("11"));
-        } else if #[cfg(feature = "julia-1-12")] {
-            c.define("JLRS_EXPECTED_MINOR_VERSION", Some("12"));
-        } else if #[cfg(feature = "julia-1-13")] {
-            c.define("JLRS_EXPECTED_MINOR_VERSION", Some("13"));
-        }
-    };
 
     // Enable fast (i.e. local-exec) TLS. Only enable this feature if you're embedding Julia in a
     // Rust application.

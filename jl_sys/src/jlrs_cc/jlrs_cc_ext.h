@@ -36,7 +36,6 @@ extern "C"
     int jlrs_datatype_has_layout(jl_datatype_t *t);
 
     // datatype field getters
-    uint32_t jlrs_datatype_nptrs(jl_datatype_t *ty);
     jl_typename_t *jlrs_datatype_typename(jl_datatype_t *ty);
     int32_t jlrs_datatype_first_ptr(jl_datatype_t *ty);
     uint32_t jlrs_field_offset(jl_datatype_t *st, int i);
@@ -45,7 +44,6 @@ extern "C"
     jl_svec_t *jlrs_datatype_parameters(jl_datatype_t *ty);
     jl_value_t *jlrs_datatype_instance(jl_datatype_t *ty);
     uint8_t jlrs_datatype_zeroinit(jl_datatype_t *ty);
-    uint8_t jlrs_datatype_isconcretetype(jl_datatype_t *ty);
 
     uint8_t jlrs_datatype_isinlinealloc(jl_datatype_t *ty);
     uint8_t jlrs_datatype_abstract(jl_datatype_t *ty);

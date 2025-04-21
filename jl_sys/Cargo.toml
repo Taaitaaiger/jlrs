@@ -18,11 +18,6 @@ links = "julia"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-julia-1-10 = ["jlrs-macros/julia-1-10"]
-julia-1-11 = ["jlrs-macros/julia-1-11"]
-julia-1-12 = ["jlrs-macros/julia-1-12"]
-julia-1-13 = ["jlrs-macros/julia-1-13"]
-
 fast-tls = []
 lto = []
 
@@ -32,12 +27,11 @@ i686 = []
 debug = []
 macos = []
 windows = []
-docs = ["julia-1-12"]
+docs = []
 
 [build-dependencies]
 cc = "1"
 cfg-if = "1"
-jlrs-macros = { path = "../jlrs_macros", version = "0.5"}
 
 [package.metadata.docs.rs]
 features = ["docs"]

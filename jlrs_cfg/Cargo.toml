@@ -1,0 +1,17 @@
+[package]
+name = "jlrs-cfg"
+version = "0.1.0"
+authors = ["Thomas van Doornmalen <thomas.vandoornmalen@gmail.com>"]
+description = "Configure jlrs based on detected Julia version"
+documentation = "https://docs.rs/jlrs-cfg"
+homepage = "https://github.com/Taaitaaiger/jlrs"
+repository = "https://github.com/Taaitaaiger/jlrs"
+readme = "../README.md"
+keywords = ["Julia", "math", "mathematics", "bindings", "ffi"]
+license = "MIT"
+edition = "2021"
+rust-version = "1.79"
+
+[features]
+
+[dependencies]

@@ -16,10 +16,6 @@ rust-version = "1.79"
 
 [features]
 default = []
-julia-1-10 = []
-julia-1-11 = []
-julia-1-12 = []
-julia-1-13 = []
 windows = []
 
 derive = ["proc-macro2"]
@@ -33,6 +29,10 @@ proc-macro2 = { version = "1", optional = true }
 syn = { version = "2", features = ["full", "extra-traits", "printing"] }
 quote = { version = "1" }
 itertools = "0.14"
+jl-sys = { path = "../jl_sys", version = "0.26"}
+
+[build-dependencies]
+jlrs-cfg = { path = "../jlrs_cfg", version = "0.1"}
 
 [package.metadata.docs.rs]
-features = ["ccall", "derive", "julia-1-12"]
+features = ["ccall", "derive"]

@@ -262,27 +262,6 @@ mod tests {
         })
     }
 
-    // fn set_global() {
-    //     JULIA.with(|handle| {
-    //         handle.borrow_mut().with_stack(|mut stack| {
-    //             stack
-    //                 .returning::<JlrsResult<_>>()
-    //                 .scope(|mut frame| unsafe {
-    //                     let main = Module::main(&frame);
-    //                     let value = Value::new(&mut frame, 1usize);
-
-    //                     main.set_global(&mut frame, "one", value)
-    //                         .into_jlrs_result()?;
-
-    //                     let value = main.global(&frame, "one")?.as_managed();
-    //                     assert_eq!(value.unbox::<usize>()?, 1);
-    //                     Ok(())
-    //                 })
-    //                 .unwrap();
-    //         })
-    //     })
-    // }
-
     fn set_const() {
         JULIA.with(|handle| {
             handle.borrow().error_color(true);
@@ -300,27 +279,6 @@ mod tests {
                         Ok(())
                     })
                     .unwrap();
-            })
-        })
-    }
-
-    #[julia_version(until = "1.11")]
-    fn set_const_twice() {
-        JULIA.with(|handle| {
-            handle.borrow_mut().with_stack(|mut stack| {
-                let err = stack.returning::<JlrsResult<_>>().scope(|mut frame| {
-                    let main = Module::main(&frame);
-                    let value1 = Value::new(&mut frame, 3usize);
-                    let value2 = Value::new(&mut frame, 4usize);
-                    main.set_const(&frame, "TWICE", value1)
-                        .map_err(|v| unsafe { v.as_value() })
-                        .into_jlrs_result()?;
-                    main.set_const(&mut frame, "TWICE", value2)
-                        .into_jlrs_result()?;
-                    Ok(())
-                });
-
-                assert!(err.is_err());
             })
         })
     }
@@ -394,26 +352,6 @@ mod tests {
         })
     }
 
-    #[julia_version(until = "1.11")]
-    fn cant_redefine_const() {
-        JULIA.with(|handle| {
-            handle.borrow_mut().with_stack(|mut stack| {
-                let res = stack.returning::<JlrsResult<_>>().scope(|mut frame| {
-                    let value = Value::new(&mut frame, 1usize);
-                    let main = Module::base(&frame);
-
-                    assert!(main.set_const(&mut frame, "pi", value).is_err());
-
-                    unsafe { assert!(main.set_global(&mut frame, "pi", value).is_err()) }
-
-                    Ok(())
-                });
-
-                assert!(res.is_ok());
-            })
-        })
-    }
-
     fn set_const_unchecked() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
@@ -470,14 +408,10 @@ mod tests {
         use_cow_for_access();
         use_dyn_str_for_access();
         set_const();
-        #[cfg(any(feature = "julia-1-10", feature = "julia-1-11",))]
-        set_const_twice();
         eval_using();
         module_parent();
         extend_lifetime_with_root();
         submodule_must_be_module();
-        #[cfg(any(feature = "julia-1-10", feature = "julia-1-11",))]
-        cant_redefine_const();
         set_const_unchecked();
         function_must_be_function();
     }

@@ -60,11 +60,6 @@ extern "C"
     }
 #endif
 
-    uint32_t jlrs_datatype_nptrs(jl_datatype_t *ty)
-    {
-        return jl_datatype_layout(ty)->npointers;
-    }
-
     jl_typename_t *jlrs_datatype_typename(jl_datatype_t *ty)
     {
         return ty->name;
@@ -119,7 +114,7 @@ extern "C"
             }
         }
 
-        return (jl_datatype_t *)jl_apply_tuple_type_v(params, rank);
+        return (jl_datatype_t *)jl_apply_type((jl_value_t*)jl_anytuple_type, params, rank);
     }
 
     jl_value_t *jlrs_tuple_of(jl_value_t **values, size_t n)
@@ -131,7 +126,7 @@ extern "C"
         }
 
         // Should be a leaf type
-        jl_datatype_t *tupty = (jl_datatype_t *)jl_apply_tuple_type_v(types, n);
+        jl_datatype_t *tupty = (jl_datatype_t *)jl_apply_type((jl_value_t*)jl_anytuple_type, types, n);
 
         return jl_new_structv(tupty, values, n);
     }
@@ -239,11 +234,6 @@ extern "C"
     uint8_t jlrs_datatype_zeroinit(jl_datatype_t *ty)
     {
         return ty->zeroinit;
-    }
-
-    uint8_t jlrs_datatype_isconcretetype(jl_datatype_t *ty)
-    {
-        return ty->isconcretetype;
     }
 
     int jlrs_datatype_has_layout(jl_datatype_t *t)

@@ -24,7 +24,6 @@ extern "C"
         return jl_array_data_(a);
     }
 #endif
-    size_t jlrs_array_ndims(jl_array_t *a) { return jl_array_ndims(a); }
     jl_value_t *jlrs_exprarg(jl_expr_t *e, size_t n) { return jl_exprarg(e, n); }
     void jlrs_exprargset(jl_expr_t *e, size_t n, jl_value_t *v) { jl_exprargset(e, n, v); }
     size_t jlrs_expr_nargs(jl_expr_t *e) { return jl_expr_nargs(e); }
@@ -36,7 +35,6 @@ extern "C"
     uint32_t jlrs_datatype_nfields(jl_datatype_t *t) { return jl_datatype_nfields(t); }
     char *jlrs_symbol_name(jl_sym_t *s) { return jl_symbol_name(s); }
     int jlrs_field_isptr(jl_datatype_t *st, int i) { return jl_field_isptr(st, i); }
-    uint32_t jlrs_ptr_offset(jl_datatype_t *st, int i) { return jl_ptr_offset(st, i); }
     int jlrs_is_primitivetype(void *v) { return jl_is_primitivetype(v); }
     int jlrs_isbits(void *t) { return jl_isbits(t); }
     int jlrs_egal(const jl_value_t *a, const jl_value_t *b) { return jl_egal((jl_value_t *)a, (jl_value_t *)b); }
@@ -45,7 +43,6 @@ extern "C"
     jl_value_t *jlrs_box_ulong(size_t x) { return jl_box_ulong(x); }
     intptr_t jlrs_unbox_long(jl_value_t *x) { return jl_unbox_long(x); }
     size_t jlrs_unbox_ulong(jl_value_t *x) { return jl_unbox_ulong(x); }
-    jl_value_t *jlrs_apply(jl_value_t **args, uint32_t nargs) { return jl_apply(args, nargs); }
     jl_task_t *jlrs_current_task()
     {
         jl_gcframe_t **pgcstack = jl_get_pgcstack();
