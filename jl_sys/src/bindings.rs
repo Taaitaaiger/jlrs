@@ -951,84 +951,42 @@ extern "C" {
 mod indirect {
     #[link(name = "libjulia", kind = "raw-dylib")]
     extern "C" {
-        pub static mut jl_small_typeof: [*mut crate::types::jl_datatype_t; 128usize];
+        #![allow(unused)]
 
-        pub fn jl_excstack_state(
-            #[cfg(not(feature = "julia-1-10"))] ct: *mut crate::types::jl_task_t,
-        ) -> usize;
+        pub static mut jl_small_typeof: *mut std::ffi::c_void;
 
-        pub fn jl_enter_handler(
-            #[cfg(not(feature = "julia-1-10"))] ct: *mut crate::types::jl_task_t,
-            eh: *mut std::ffi::c_void,
-        );
+        pub static mut jl_excstack_state: *mut std::ffi::c_void;
 
-        pub fn jl_eh_restore_state(
-            #[cfg(not(feature = "julia-1-10"))] ct: *mut crate::types::jl_task_t,
-            eh: *mut std::ffi::c_void,
-        );
+        pub static mut jl_enter_handler: *mut std::ffi::c_void;
 
-        pub fn jl_eh_restore_state_noexcept(
-            #[cfg(not(feature = "julia-1-10"))] ct: *mut crate::types::jl_task_t,
-            state: usize,
-        );
+        pub static mut jl_eh_restore_state: *mut std::ffi::c_void;
 
-        pub fn jl_apply_generic(
-            F: *mut crate::types::jl_value_t,
-            args: *mut *mut crate::types::jl_value_t,
-            nargs: u32,
-        ) -> *mut crate::types::jl_value_t;
+        pub static mut jl_eh_restore_state_noexcept: *mut std::ffi::c_void;
 
-        pub fn jl_gc_queue_multiroot(
-            str: *const crate::types::jl_value_t,
-            stored: *const std::ffi::c_void,
-            dt: *mut crate::types::jl_datatype_t,
-        );
+        pub static mut jl_apply_generic: *mut std::ffi::c_void;
 
-        pub fn jl_gc_queue_root(root: *const crate::types::jl_value_t);
+        pub static mut jl_gc_queue_multiroot: *mut std::ffi::c_void;
 
-        pub fn jl_compute_fieldtypes(
-            st: *mut crate::types::jl_datatype_t,
-            stack: *mut std::os::raw::c_void,
-            #[cfg(not(feature = "julia-1-10"))] cacheable: std::ffi::c_int,
-        ) -> *mut crate::types::jl_svec_t;
+        pub static mut jl_gc_queue_root: *mut std::ffi::c_void;
 
-        pub fn jl_egal__unboxed(
-            a: *const crate::types::jl_value_t,
-            b: *const crate::types::jl_value_t,
-            dtag: usize,
-        ) -> std::os::raw::c_int;
+        pub static mut jl_compute_fieldtypes: *mut std::ffi::c_void;
 
-        pub fn jl_egal__bits(
-            a: *const crate::types::jl_value_t,
-            b: *const crate::types::jl_value_t,
-            dt: *mut crate::types::jl_datatype_t,
-        ) -> std::os::raw::c_int;
+        pub static mut jl_egal__unboxed: *mut std::ffi::c_void;
 
-        pub fn jl_setjmp(
-            ptr: *mut std::ffi::c_void,
-            #[cfg(not(feature = "julia-1-10"))] savesigs: std::ffi::c_int,
-        );
+        pub static mut jl_egal__bits: *mut std::ffi::c_void;
 
-        // Added in Julia 1.10
+        pub static mut jl_setjmp: *mut std::ffi::c_void;
 
-        pub fn jl_egal__bitstag(
-            a: *const crate::types::jl_value_t,
-            b: *const crate::types::jl_value_t,
-            dtag: usize,
-        ) -> std::os::raw::c_int;
+        pub static mut jl_egal__bitstag: *mut std::ffi::c_void;
 
         // Added in Julia 1.11
 
         #[cfg(not(feature = "julia-1-10"))]
-        pub fn jl_unwrap_unionall(
-            v: *mut crate::types::jl_value_t,
-        ) -> *mut crate::types::jl_value_t;
+        pub static mut jl_unwrap_unionall: *mut std::ffi::c_void;
+
 
         #[cfg(not(feature = "julia-1-10"))]
-        pub fn jl_genericmemoryref(
-            m: *mut crate::types::jl_genericmemory_t,
-            index: usize,
-        ) -> *mut crate::types::jl_value_t;
+        pub static mut jl_genericmemoryref: *mut std::ffi::c_void;
 
         // TODO: is this ok? It's unused, but compiling with BinaryBuilder complains
         // about jl_options being undefined.
