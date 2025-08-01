@@ -17,6 +17,7 @@ use crate::{
     catch::catch_exceptions,
     data::managed::{
         erase_scope_lifetime,
+        function::kwcall_function,
         module::{JlrsCore, Module},
         private::ManagedPriv,
         value::Value,
@@ -330,7 +331,7 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
                 AsyncMethod::InteractiveCall => JlrsCore::interactive_call(&frame),
             };
 
-            let kw_call = jl_sys::jl_kwcall_func;
+            let kw_call = kwcall_function(&frame);
 
             // WithKeywords::call has to extend the provided arguments, it has been inlined so
             // we only need to extend them once.

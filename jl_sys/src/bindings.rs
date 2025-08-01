@@ -186,8 +186,6 @@ pub mod globals {
 
         pub static jl_n_threads: std::sync::atomic::AtomicI32;
 
-        pub static mut jl_kwcall_func: *mut crate::types::jl_value_t;
-
         pub static jl_n_threadpools: std::cell::UnsafeCell<std::ffi::c_int>;
 
         pub static jl_n_threads_per_pool: std::cell::UnsafeCell<*mut std::ffi::c_int>;
@@ -216,6 +214,12 @@ pub mod globals {
 
         #[cfg(not(julia_1_10))]
         pub static mut jl_array_uint32_type: *mut crate::types::jl_value_t;
+
+        // Removed in Julia 1.12
+
+        #[cfg(any(julia_1_10, julia_1_11))]
+        pub static mut jl_kwcall_func: *mut crate::types::jl_value_t;
+
     }
 }
 

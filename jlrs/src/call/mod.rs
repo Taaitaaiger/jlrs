@@ -278,11 +278,12 @@ use std::ptr::NonNull;
 
 #[cfg(feature = "async")]
 pub use call_async::CallAsync;
-use jl_sys::{jl_call, jl_exception_occurred, jl_kwcall_func, jlrs_call_unchecked};
+use jl_sys::{jl_call, jl_exception_occurred, jlrs_call_unchecked};
 
 use crate::{
     args::Values,
     data::managed::{
+        function::kwcall_function,
         private::ManagedPriv,
         value::{Value, ValueResult},
     },
@@ -517,7 +518,7 @@ impl<'data> Call<'data> for WithKeywords<'_, 'data> {
         V: Values<'value, 'data, N>,
         Tgt: Target<'target>,
     {
-        let func = jl_kwcall_func;
+        let func = kwcall_function(&target);
 
         let values = args.into_extended_pointers_with_start(
             [
@@ -550,7 +551,7 @@ impl<'data> Call<'data> for WithKeywords<'_, 'data> {
         V: Values<'value, 'data, N>,
         Tgt: Target<'target>,
     {
-        let func = jl_kwcall_func;
+        let func = kwcall_function(&target);
 
         let values = args.into_extended_pointers_with_start(
             [

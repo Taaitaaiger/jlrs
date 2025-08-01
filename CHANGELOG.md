@@ -24,7 +24,7 @@
 
 - The diagnostics feature has been removed, custom diagnostics are enabled by default.
 
-- The environment variables `JLRS_CORE_REVISION`, `JLRS_CORE_REPO`, `JLRS_CORE_VERSION`, and `JLRS_CORE_DONT_INSTALL` can be used to override the version of JlrsCore that is used.
+- The environment variables `JLRS_CORE_REVISION`, `JLRS_CORE_REPO`, `JLRS_CORE_VERSION`, and `JLRS_CORE_NO_INSTALL` can be used to override the version of JlrsCore that is used.
 
 - If a custom version of JlrsCore is requested, the requested version is installed before it is loaded.
 
@@ -65,6 +65,8 @@
 - Custom marking functions can be implemented with the `Mark` trait.
 
 - `ParametricBase` and `ParametricVariant` have been remove, `OpaqueType` can now handle types with type parameters. Both `OpaqueType` and `ForeignType` are now derive traits.
+
+- `Module::global_unchecked` can return `None` if the global value doesn't exist.
 
 ## v0.21
 

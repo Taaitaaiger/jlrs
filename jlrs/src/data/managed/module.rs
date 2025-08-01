@@ -4,13 +4,7 @@
 //! modules, `Main`, `Base` and `Core`. Any Julia code that you include in jlrs is made available
 //! relative to the `Main` module.
 
-use std::{
-    any::TypeId,
-    ffi::c_void,
-    marker::PhantomData,
-    ptr::{null_mut, NonNull},
-    sync::atomic::{AtomicPtr, Ordering},
-};
+use std::{any::TypeId, marker::PhantomData, ptr::NonNull};
 
 use jl_sys::{
     jl_base_module, jl_core_module, jl_get_global, jl_is_const, jl_main_module, jl_module_t,
@@ -42,10 +36,10 @@ use crate::{
     gc_safe::GcSafeOnceLock,
     impl_julia_typecheck, inline_static_ref,
     memory::{
-        target::{unrooted::Unrooted, Target, TargetException, TargetResult},
+        target::{Target, TargetException, TargetResult},
         PTls,
     },
-    prelude::{DataType, WeakValue},
+    prelude::DataType,
     private::Private,
 };
 
@@ -416,16 +410,31 @@ impl<'scope> Module<'scope> {
     {
         unsafe {
             let name = name.to_symbol(&target);
-            catch_exceptions(
-                || self.global_unchecked(target, name),
-                |_| {
-                    AccessError::GlobalNotFound {
+
+            let func = || {
+                let name = name.to_symbol(&target);
+                match self.global_unchecked(target, name) {
+                    Some(x) => Ok(x),
+                    None => Err(AccessError::GlobalNotFound {
                         name: name.as_str().unwrap_or("<Non-UTF8 symbol>").into(),
                         module: self.name().as_str().unwrap_or("<Non-UTF8 symbol>").into(),
-                    }
-                    .into()
-                },
-            )
+                    })?,
+                }
+            };
+
+            let res = catch_exceptions(func, |_| {
+                AccessError::GlobalNotFound {
+                    name: name.as_str().unwrap_or("<Non-UTF8 symbol>").into(),
+                    module: self.name().as_str().unwrap_or("<Non-UTF8 symbol>").into(),
+                }
+                .into()
+            });
+
+            match res {
+                Ok(Ok(x)) => Ok(x),
+                Ok(Err(e)) => Err(e),
+                Err(e) => Err(e),
+            }
         }
     }
 
@@ -436,27 +445,16 @@ impl<'scope> Module<'scope> {
         self,
         target: Tgt,
         name: N,
-    ) -> ValueData<'target, 'static, Tgt>
+    ) -> Option<ValueData<'target, 'static, Tgt>>
     where
         N: ToSymbol,
         Tgt: Target<'target>,
     {
-        static FUNC: AtomicPtr<c_void> = AtomicPtr::new(null_mut());
-        let mut fptr = FUNC.load(Ordering::Relaxed);
-        if fptr.is_null() {
-            unsafe {
-                fptr = load_getproperty();
-            }
-            FUNC.store(fptr, Ordering::Relaxed);
-        }
-
-        let name = name.to_symbol(&target);
         unsafe {
-            let getproperty_func = std::mem::transmute::<
-                *mut c_void,
-                unsafe extern "C" fn(Module, Symbol) -> WeakValue<'target, 'static>,
-            >(fptr);
-            getproperty_func(self, name).root(target)
+            let symbol = name.to_symbol(&target);
+            let value = jl_get_global(self.unwrap(Private), symbol.unwrap(Private));
+            let ptr = NonNull::new(value)?;
+            Some(Value::wrap_non_null(ptr, Private).root(target))
         }
     }
 
@@ -712,19 +710,5 @@ impl Main {
         Tgt: Target<'target>,
     {
         inline_static_ref!(INCLUDE, Function, "Main.include", target)
-    }
-}
-
-#[cold]
-#[inline(never)]
-// Safety: don't call before Julia has been initialized, or after it has been shut down.
-unsafe fn load_getproperty() -> *mut c_void {
-    unsafe {
-        let unrooted = Unrooted::new();
-        let module = Module::jlrs_core(&unrooted);
-        let sym = Symbol::new(&unrooted, "getproperty_c");
-        let v = jl_get_global(module.unwrap(Private), sym.unwrap(Private)).cast::<*mut c_void>();
-        debug_assert!(!v.is_null() && !(*v).is_null());
-        *v
     }
 }
