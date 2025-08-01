@@ -258,6 +258,7 @@ unsafe impl ConstructType for Function<'_, '_> {
 unsafe impl<'scope, 'data> AbstractType for Function<'scope, 'data> {}
 
 #[cfg(any(julia_1_10, julia_1_11))]
+#[inline(always)]
 pub(crate) fn kwcall_function<'target, Tgt>(_target: &Tgt) -> *mut jl_value_t
 where
     Tgt: Target<'target>,
@@ -266,6 +267,7 @@ where
 }
 
 #[cfg(not(any(julia_1_10, julia_1_11)))]
+#[inline(always)]
 pub(crate) fn kwcall_function<'target, Tgt>(target: &Tgt) -> *mut jl_value_t
 where
     Tgt: Target<'target>,
