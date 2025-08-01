@@ -17,7 +17,6 @@
 //! with pointer fields, type parameters, and bits unions. When layouts are generated with
 //! JlrsReflect.jl [`Unbox`] is always derived.
 //!
-//! [`Cast`]: crate::convert::cast::Cast
 //! [`Bool`]: crate::data::layout::bool::Bool
 //! [`Char`]: crate::data::layout::char::Char
 //! [`DataType`]: crate::data::managed::datatype::DataType

@@ -126,7 +126,6 @@
 //! [`GcFrame`]: crate::memory::target::frame::GcFrame
 //! [`LocalGcFrame`]: crate::memory::target::frame::LocalGcFrame
 //! [`Output`]: crate::memory::target::output::Output
-//! [`GcFrame::scope`]: crate::memory::target::frame::GcFrame::scope
 //! [`GcFrame::output`]: crate::memory::target::frame::GcFrame::output
 //! [`Target`]: crate::memory::target::Target
 //! [`Target::into_extended_target`]: crate::memory::target::Target::into_extended_target

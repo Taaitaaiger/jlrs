@@ -532,7 +532,6 @@ impl Value<'_, '_> {
     ///
     /// A full list of supported checks can be found [here].
     ///
-    /// [`JuliaStruct`]: crate::data::managed::traits::julia_struct::JuliaStruct
     /// [here]: ../../../layout/typecheck/trait.Typecheck.html#implementors
     #[inline]
     pub fn is<T: Typecheck>(self) -> bool {
