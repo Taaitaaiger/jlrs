@@ -17,7 +17,7 @@ mod tests {
                         frame
                             .scope(|frame| {
                                 let func = unsafe {
-                                    Module::base(&frame).function(&frame, "+")?.as_managed()
+                                    Module::base(&frame).global(&frame, "+")?.as_managed()
                                 };
                                 JlrsResult::Ok(func.root(output))
                             })
@@ -38,7 +38,7 @@ mod tests {
                     .scope(|frame| {
                         let func_ty = unsafe {
                             Module::base(&frame)
-                                .function(&frame, "+")?
+                                .global(&frame, "+")?
                                 .as_managed()
                                 .datatype()
                         };

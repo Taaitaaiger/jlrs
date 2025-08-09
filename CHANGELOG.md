@@ -68,6 +68,8 @@
 
 - `Module::global_unchecked` can return `None` if the global value doesn't exist.
 
+- `Module::function` has been removed, use `Module::global` instead.
+
 ## v0.21
 
 - Support generating bindings for Julia enums with integer base types in combination with JlrsCore.Reflect and the `Enum` derive macro.

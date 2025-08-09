@@ -15,7 +15,7 @@ mod tests {
                         let func = Module::main(&frame)
                             .submodule(&frame, "JlrsTests")?
                             .as_managed()
-                            .function(&frame, "funcwithkw")?
+                            .global(&frame, "funcwithkw")?
                             .as_managed();
 
                         let v = func.call(&mut frame, [a_value]).unwrap().unbox::<isize>()?;
@@ -39,7 +39,7 @@ mod tests {
                         let func = Module::main(&frame)
                             .submodule(&frame, "JlrsTests")?
                             .as_managed()
-                            .function(&frame, "funcwithkw")?
+                            .global(&frame, "funcwithkw")?
                             .as_managed();
 
                         let kw = named_tuple!(&mut frame, "b" => b_value);
@@ -67,7 +67,7 @@ mod tests {
                         let func = Module::main(&frame)
                             .submodule(&frame, "JlrsTests")?
                             .as_managed()
-                            .function(&frame, "funcwithkw")?
+                            .global(&frame, "funcwithkw")?
                             .as_managed();
 
                         let kw = named_tuple!(&mut frame, "b" => b_value);
@@ -96,7 +96,7 @@ mod tests {
                         let func = Module::main(&frame)
                             .submodule(&frame, "JlrsTests")?
                             .as_managed()
-                            .function(&frame, "funcwithkw")?
+                            .global(&frame, "funcwithkw")?
                             .as_managed();
 
                         let kw = named_tuple!(&mut frame, "b" => b_value);
@@ -126,7 +126,7 @@ mod tests {
                         let func = Module::main(&frame)
                             .submodule(&frame, "JlrsTests")?
                             .as_managed()
-                            .function(&frame, "funcwithkw")?
+                            .global(&frame, "funcwithkw")?
                             .as_managed();
 
                         let kw = named_tuple!(&mut frame, "b" => b_value);
@@ -156,7 +156,7 @@ mod tests {
                         let func = Module::main(&frame)
                             .submodule(&frame, "JlrsTests")?
                             .as_managed()
-                            .function(&frame, "funcwithkw")?
+                            .global(&frame, "funcwithkw")?
                             .as_managed();
 
                         let kw = named_tuple!(&mut frame, "b" => b_value);
@@ -187,7 +187,7 @@ mod tests {
                         let func = Module::main(&frame)
                             .submodule(&frame, "JlrsTests")?
                             .as_managed()
-                            .function(&frame, "funcwithkw")?
+                            .global(&frame, "funcwithkw")?
                             .as_managed();
 
                         let kw = named_tuple!(&mut frame, "b" => b_value);
@@ -219,7 +219,7 @@ mod tests {
                         let func = Module::main(&frame)
                             .submodule(&frame, "JlrsTests")?
                             .as_managed()
-                            .function(&frame, "funcwithkw")?
+                            .global(&frame, "funcwithkw")?
                             .as_managed();
 
                         let kw = named_tuple!(&mut frame, "b" => b_value);
@@ -248,7 +248,7 @@ mod tests {
                         let func = Module::main(&frame)
                             .submodule(&frame, "JlrsTests")?
                             .as_managed()
-                            .function(&frame, "funcwithabstractkw")?
+                            .global(&frame, "funcwithabstractkw")?
                             .as_managed();
 
                         let kw = named_tuple!(&mut frame, "b" => b_value);
@@ -277,7 +277,7 @@ mod tests {
                         let func = Module::main(&frame)
                             .submodule(&frame, "JlrsTests")?
                             .as_managed()
-                            .function(&frame, "funcwithabstractkw")?
+                            .global(&frame, "funcwithabstractkw")?
                             .as_managed();
 
                         let kw = named_tuple!(&mut frame, "b" => b_value);

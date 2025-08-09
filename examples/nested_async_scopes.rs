@@ -36,7 +36,7 @@ impl AsyncTask for MyTask {
                     Module::main(&frame)
                         .submodule(&frame, "MyModule")?
                         .as_managed()
-                        .function(&frame, "complexfunc")?
+                        .global(&frame, "complexfunc")?
                         .as_managed()
                         .call_async(&mut frame, [dims, iters])
                         .await

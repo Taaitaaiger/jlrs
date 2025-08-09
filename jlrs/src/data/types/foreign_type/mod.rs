@@ -927,7 +927,7 @@ impl ForeignTypes {
         }
     }
 
-    fn find<T: 'static>(&self) -> Option<DataType> {
+    fn find<T: 'static>(&self) -> Option<DataType<'_>> {
         let tid = TypeId::of::<T>();
         self.data.read().get(&tid).copied()
     }

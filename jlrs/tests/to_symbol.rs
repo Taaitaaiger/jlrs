@@ -12,7 +12,7 @@ mod tests {
                 stack
                     .returning::<JlrsResult<_>>()
                     .scope(|mut frame| {
-                        assert!(Module::base(&frame).function(&mut frame, "+").is_ok());
+                        assert!(Module::base(&frame).global(&mut frame, "+").is_ok());
                         Ok(())
                     })
                     .unwrap();
@@ -27,7 +27,7 @@ mod tests {
                     .returning::<JlrsResult<_>>()
                     .scope(|mut frame| {
                         let plus = JuliaString::new(&mut frame, "+");
-                        assert!(Module::base(&frame).function(&mut frame, plus).is_ok());
+                        assert!(Module::base(&frame).global(&mut frame, plus).is_ok());
                         Ok(())
                     })
                     .unwrap();
@@ -42,7 +42,7 @@ mod tests {
                     .returning::<JlrsResult<_>>()
                     .scope(|mut frame| {
                         let plus = Symbol::new(&frame, "+");
-                        assert!(Module::base(&frame).function(&mut frame, plus).is_ok());
+                        assert!(Module::base(&frame).global(&mut frame, plus).is_ok());
                         Ok(())
                     })
                     .unwrap();

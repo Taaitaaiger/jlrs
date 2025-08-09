@@ -219,7 +219,7 @@ unsafe fn include<P: AsRef<Path>>(path: P) -> JlrsResult<()> {
             return handle.local_scope::<2>(|mut frame| {
                 let path_jl_str = JuliaString::new(&mut frame, path.as_ref().to_string_lossy());
                 Module::main(&frame)
-                    .function(&frame, "include")?
+                    .global(&frame, "include")?
                     .as_managed()
                     .call1(&mut frame, path_jl_str.as_value())
                     .into_jlrs_result()

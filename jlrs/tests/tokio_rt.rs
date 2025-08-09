@@ -76,7 +76,7 @@ mod tests {
                 Module::main(&frame)
                     .submodule(&frame, "AsyncTests")?
                     .as_managed()
-                    .function(&frame, "complexfunc")?
+                    .global(&frame, "complexfunc")?
                     .as_value()
                     .call_async(&mut frame, [dims, iters])
                     .await
@@ -216,26 +216,6 @@ mod tests {
         assert_eq!(receiver.blocking_recv().unwrap().unwrap(), 30_000_006.0);
     }
 
-    // /*
-    // #[test]
-    // fn test_nesting_call_dynamic_task() {
-    //     let julia = JULIA.get_or_init(init);
-
-    //    let receiver =
-
-    //     julia
-    //         .task(
-    //             NestingTaskAsyncDynamicCallFrame {
-    //                 dims: 6,
-    //                 iters: 5_000_000,
-    //             },
-    //         )
-    //         .try_dispatch().ok()
-    //         .unwrap();
-
-    //     assert_eq!(receiver.blocking_recv().unwrap().unwrap(), 30_000_006.0);
-    // }
-    // */
     #[test]
     fn test_persistent() {
         let julia = JULIA.get_or_init(init);

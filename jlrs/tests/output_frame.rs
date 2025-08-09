@@ -34,7 +34,7 @@ mod tests {
                                 .returning::<JlrsResult<_>>()
                                 .scope(|mut frame| unsafe {
                                     let func =
-                                        Module::base(&frame).function(&frame, "+")?.as_managed();
+                                        Module::base(&frame).global(&frame, "+")?.as_managed();
                                     let v1 = Value::new(frame.as_mut(), 1usize);
                                     let v2 = Value::new(frame.as_mut(), 2usize);
                                     Ok(func.call2(output, v1, v2))

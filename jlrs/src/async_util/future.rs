@@ -383,7 +383,7 @@ impl<'frame, 'data> Future for JuliaFuture<'frame, 'data> {
                 unsafe {
                     let global = Unrooted::new();
                     let f = Module::base(&global)
-                        .function(&global, "fetch")
+                        .global(&global, "fetch")
                         .unwrap()
                         .as_managed();
 

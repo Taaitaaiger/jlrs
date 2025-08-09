@@ -14,7 +14,7 @@ mod tests {
                         let func = Module::main(&frame)
                             .submodule(&frame, "JlrsTests")?
                             .as_managed()
-                            .function(&frame, "throws_exception")?
+                            .global(&frame, "throws_exception")?
                             .as_managed();
 
                         let res = func.call0(&mut frame);
@@ -38,7 +38,7 @@ mod tests {
                         let func = Module::main(&frame)
                             .submodule(&frame, "JlrsTests")?
                             .as_managed()
-                            .function(&frame, "throws_exception")?
+                            .global(&frame, "throws_exception")?
                             .as_managed()
                             .provide_keywords(kw)?;
 
@@ -61,7 +61,7 @@ mod tests {
                         let func = Module::main(&frame)
                             .submodule(&frame, "JlrsTests")?
                             .as_managed()
-                            .function(&frame, "throws_exception")?
+                            .global(&frame, "throws_exception")?
                             .as_managed();
 
                         let res = func.call1(&mut frame, arg);
@@ -85,7 +85,7 @@ mod tests {
                         let func = Module::main(&frame)
                             .submodule(&frame, "JlrsTests")?
                             .as_managed()
-                            .function(&frame, "throws_exception")?
+                            .global(&frame, "throws_exception")?
                             .as_managed()
                             .provide_keywords(kw)?;
 
@@ -108,7 +108,7 @@ mod tests {
                         let func = Module::main(&frame)
                             .submodule(&frame, "JlrsTests")?
                             .as_managed()
-                            .function(&frame, "throws_exception")?
+                            .global(&frame, "throws_exception")?
                             .as_managed();
 
                         let res = func.call2(&mut frame, arg, arg);
@@ -132,7 +132,7 @@ mod tests {
                         let func = Module::main(&frame)
                             .submodule(&frame, "JlrsTests")?
                             .as_managed()
-                            .function(&frame, "throws_exception")?
+                            .global(&frame, "throws_exception")?
                             .as_managed()
                             .provide_keywords(kw)?;
 
@@ -155,7 +155,7 @@ mod tests {
                         let func = Module::main(&frame)
                             .submodule(&frame, "JlrsTests")?
                             .as_managed()
-                            .function(&frame, "throws_exception")?
+                            .global(&frame, "throws_exception")?
                             .as_managed();
 
                         let res = func.call3(&mut frame, arg, arg, arg);
@@ -179,7 +179,7 @@ mod tests {
                         let func = Module::main(&frame)
                             .submodule(&frame, "JlrsTests")?
                             .as_managed()
-                            .function(&frame, "throws_exception")?
+                            .global(&frame, "throws_exception")?
                             .as_managed()
                             .provide_keywords(kw)?;
 
@@ -201,7 +201,7 @@ mod tests {
                         let func = Module::main(&frame)
                             .submodule(&frame, "JlrsTests")?
                             .as_managed()
-                            .function(&frame, "throws_exception")?
+                            .global(&frame, "throws_exception")?
                             .as_managed();
 
                         let res = func.call(&mut frame, []);
@@ -225,7 +225,7 @@ mod tests {
                         let func = Module::main(&frame)
                             .submodule(&frame, "JlrsTests")?
                             .as_managed()
-                            .function(&frame, "throws_exception")?
+                            .global(&frame, "throws_exception")?
                             .as_managed()
                             .provide_keywords(kw)?;
 

@@ -714,7 +714,7 @@
 //!
 //!         unsafe {
 //!             Module::base(&frame)
-//!                 .function(&mut frame, "sum")?
+//!                 .global(&mut frame, "sum")?
 //!                 .call1(&mut frame, state.array.as_value())
 //!                 .into_jlrs_result()?
 //!                 .unbox::<usize>()

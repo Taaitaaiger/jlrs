@@ -17,7 +17,7 @@ mod tests {
                             let array = TypedArray::<f64>::from_vec(&mut frame, data, 3)?
                                 .into_jlrs_result()?;
                             let func = Module::base(&frame)
-                                .function(&frame, "getindex")?
+                                .global(&frame, "getindex")?
                                 .as_managed();
                             let out = func.call2(&mut frame, array.as_value(), idx).unwrap_err();
 

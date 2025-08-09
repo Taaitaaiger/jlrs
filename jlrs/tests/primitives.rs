@@ -308,7 +308,7 @@ mod tests {
                             Module::main(&frame)
                                 .submodule(&frame, "JlrsTests")?
                                 .as_managed()
-                                .function(&frame, "callrust")?
+                                .global(&frame, "callrust")?
                                 .as_managed()
                                 .call1(&mut frame, val)
                                 .unwrap()

@@ -572,7 +572,7 @@ mod tests {
 
                         unsafe {
                             assert!(Module::base(&frame)
-                                .function(&frame, "typeof")?
+                                .global(&frame, "typeof")?
                                 .as_managed()
                                 .call1(&mut frame, jl_val)
                                 .unwrap()
@@ -614,7 +614,7 @@ mod tests {
                         let jl_val = constr.call1(&mut frame, v2).unwrap();
 
                         assert!(Module::base(&frame)
-                            .function(&frame, "typeof")?
+                            .global(&frame, "typeof")?
                             .as_managed()
                             .call1(&mut frame, jl_val)
                             .unwrap()
@@ -645,7 +645,7 @@ mod tests {
                         let jl_val = constr.call1(&mut frame, v2).unwrap();
 
                         assert!(Module::base(&frame)
-                            .function(&frame, "typeof")?
+                            .global(&frame, "typeof")?
                             .as_managed()
                             .call1(&mut frame, jl_val)
                             .unwrap()
@@ -704,7 +704,7 @@ mod tests {
                         let jl_val = constr.call1(&mut frame, v1).unwrap();
 
                         assert!(Module::base(&frame)
-                            .function(&frame, "typeof")?
+                            .global(&frame, "typeof")?
                             .as_managed()
                             .call1(&mut frame, jl_val)
                             .unwrap()
@@ -738,7 +738,7 @@ mod tests {
                         let jl_val = constr.call1(&mut frame, s.as_value()).into_jlrs_result()?;
 
                         assert!(Module::base(&frame)
-                            .function(&frame, "typeof")?
+                            .global(&frame, "typeof")?
                             .as_managed()
                             .call1(&mut frame, jl_val)
                             .into_jlrs_result()?
@@ -772,7 +772,7 @@ mod tests {
                         let jl_val = constr.call1(&mut frame, v1).unwrap();
 
                         assert!(Module::base(&frame)
-                            .function(&frame, "typeof")?
+                            .global(&frame, "typeof")?
                             .as_managed()
                             .call1(&mut frame, jl_val)
                             .unwrap()
@@ -812,7 +812,7 @@ mod tests {
                         let jl_val = constr.call1(&mut frame, wgt).unwrap();
 
                         assert!(Module::base(&frame)
-                            .function(&frame, "typeof")?
+                            .global(&frame, "typeof")?
                             .as_managed()
                             .call1(&mut frame, jl_val)
                             .unwrap()
@@ -852,7 +852,7 @@ mod tests {
                         let jl_val = constr.call1(&mut frame, wgt).unwrap();
 
                         assert!(Module::base(&frame)
-                            .function(&frame, "typeof")?
+                            .global(&frame, "typeof")?
                             .as_managed()
                             .call1(&mut frame, jl_val)
                             .unwrap()
@@ -894,7 +894,7 @@ mod tests {
                         let jl_val = constr.call1(&mut frame, wgt).unwrap();
 
                         assert!(Module::base(&frame)
-                            .function(&frame, "typeof")?
+                            .global(&frame, "typeof")?
                             .as_managed()
                             .call1(&mut frame, jl_val)
                             .unwrap()
@@ -928,7 +928,7 @@ mod tests {
 
                         let wgt = wgt_constr.call1(&mut frame, arr.as_value()).unwrap();
 
-                        let constr = Module::base(&frame).function(&frame, "tuple")?.as_managed();
+                        let constr = Module::base(&frame).global(&frame, "tuple")?.as_managed();
                         let int = Value::new(&mut frame, 2i32);
                         let tup = constr.call2(&mut frame, int, wgt).unwrap();
 
@@ -940,7 +940,7 @@ mod tests {
                         let jl_val = constr.call1(&mut frame, a).unwrap();
 
                         assert!(Module::base(&frame)
-                            .function(&frame, "typeof")?
+                            .global(&frame, "typeof")?
                             .as_managed()
                             .call1(&mut frame, jl_val)
                             .unwrap()
@@ -982,7 +982,7 @@ mod tests {
                         let jl_val = constr.call1(&mut frame, wgt).unwrap();
 
                         assert!(Module::base(&frame)
-                            .function(&frame, "typeof")?
+                            .global(&frame, "typeof")?
                             .as_managed()
                             .call1(&mut frame, jl_val)
                             .unwrap()
@@ -1015,8 +1015,7 @@ mod tests {
                         let v1 = Value::new(&mut frame, 1i64);
                         let wgt = wgt_constr.call1(&mut frame, v1).unwrap();
 
-                        let tup_constr =
-                            Module::base(&frame).function(&frame, "tuple")?.as_managed();
+                        let tup_constr = Module::base(&frame).global(&frame, "tuple")?.as_managed();
                         let v2 = tup_constr.call1(&mut frame, wgt).unwrap();
 
                         let constr = Module::main(&frame)
@@ -1026,7 +1025,7 @@ mod tests {
                         let jl_val = constr.call1(&mut frame, v2).unwrap();
 
                         assert!(Module::base(&frame)
-                            .function(&frame, "typeof")?
+                            .global(&frame, "typeof")?
                             .as_managed()
                             .call1(&mut frame, jl_val)
                             .unwrap()
@@ -1063,7 +1062,7 @@ mod tests {
                         let jl_val = wvt_constr.call1(&mut frame, v1).unwrap();
 
                         assert!(Module::base(&frame)
-                            .function(&frame, "typeof")?
+                            .global(&frame, "typeof")?
                             .as_managed()
                             .call1(&mut frame, jl_val)
                             .unwrap()

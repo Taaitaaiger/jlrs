@@ -14,7 +14,7 @@ mod tests {
                         let func = Module::main(&frame)
                             .submodule(&frame, "JlrsTests")?
                             .as_managed()
-                            .function(&frame, "throws_exception")?
+                            .global(&frame, "throws_exception")?
                             .as_managed();
 
                         let mut f = || func.call_unchecked(&mut frame, []);

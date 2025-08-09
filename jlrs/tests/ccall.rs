@@ -36,7 +36,7 @@ mod tests {
                         let func = Module::main(&frame)
                             .submodule(&frame, "JlrsTests")?
                             .as_managed()
-                            .function(&frame, "callrustwitharr")?
+                            .global(&frame, "callrustwitharr")?
                             .as_managed();
 
                         let out = func.call2(&mut frame, fn_ptr, arr.as_value()).unwrap();
@@ -62,7 +62,7 @@ mod tests {
                         let func = Module::main(&frame)
                             .submodule(&frame, "JlrsTests")?
                             .as_managed()
-                            .function(&frame, "callrustwitharr")?
+                            .global(&frame, "callrustwitharr")?
                             .as_managed();
 
                         let out = func.call2(&mut frame, fn_ptr, arr.as_value()).unwrap();

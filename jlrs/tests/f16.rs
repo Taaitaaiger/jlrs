@@ -16,7 +16,7 @@ mod tests {
                     .returning::<JlrsResult<_>>()
                     .scope(|mut frame| unsafe {
                         let one = Value::new(&mut frame, f16::ONE);
-                        let func = Module::base(&frame).function(&mut frame, "-")?;
+                        let func = Module::base(&frame).global(&mut frame, "-")?;
                         let res = func
                             .call2(&mut frame, one, one)
                             .into_jlrs_result()?

@@ -90,7 +90,7 @@ mod tests {
                         let dt = Module::main(&frame)
                             .submodule(&frame, "JlrsTests")?
                             .as_managed()
-                            .function(&frame, "datatype")?
+                            .global(&frame, "datatype")?
                             .as_managed();
                         let dt_val = dt.call0(&mut frame).unwrap();
 

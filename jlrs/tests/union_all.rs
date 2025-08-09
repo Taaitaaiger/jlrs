@@ -26,7 +26,7 @@ mod tests {
                         let v = ua.var();
 
                         let equals = Module::base(&frame)
-                            .function(&frame, "!=")?
+                            .global(&frame, "!=")?
                             .as_managed()
                             .call2(&mut frame, v.as_value(), atype.var().as_value())
                             .unwrap()
@@ -98,7 +98,7 @@ mod tests {
                         let func = Module::main(&frame)
                             .submodule(&frame, "JlrsTests")?
                             .as_managed()
-                            .function(&frame, "valuedispatch")?
+                            .global(&frame, "valuedispatch")?
                             .as_managed();
 
                         let o1 = func.call1(&mut frame, v1).unwrap().unbox::<isize>()?;

@@ -19,7 +19,7 @@ pub struct ExportedGenerics {
 }
 
 impl ExportedGenerics {
-    pub fn to_generic_environment(&self) -> GenericEnvironment {
+    pub fn to_generic_environment(&self) -> GenericEnvironment<'_> {
         GenericEnvironment::new(self)
     }
 }

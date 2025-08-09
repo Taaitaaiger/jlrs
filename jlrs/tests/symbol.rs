@@ -36,7 +36,7 @@ mod tests {
                         let smb = Module::main(&frame)
                             .submodule(&frame, "JlrsTests")?
                             .as_managed()
-                            .function(&frame, "symbol")?
+                            .global(&frame, "symbol")?
                             .as_managed();
                         let smb_val = smb.call0(&mut frame).unwrap();
 
@@ -99,7 +99,7 @@ mod tests {
                     .returning::<JlrsResult<_>>()
                     .scope(|mut frame| {
                         let string = JuliaString::new(&mut frame, "+");
-                        assert!(Module::base(&frame).function(&frame, string).is_ok());
+                        assert!(Module::base(&frame).global(&frame, string).is_ok());
 
                         Ok(())
                     })

@@ -15,7 +15,7 @@ mod tests {
                     .returning::<JlrsResult<_>>()
                     .scope(|mut frame| {
                         let module = Module::core(&frame);
-                        let func = module.function(&mut frame, "isa");
+                        let func = module.global(&mut frame, "isa");
                         let int64 = module.global(&mut frame, "Float64");
                         assert!(func.is_ok());
                         assert!(int64.is_ok());
@@ -33,7 +33,7 @@ mod tests {
                     .returning::<JlrsResult<_>>()
                     .scope(|mut frame| {
                         let module = Module::core(&frame);
-                        let func = module.function(&mut frame, "isa");
+                        let func = module.global(&mut frame, "isa");
                         assert!(func.is_ok());
                         Ok(())
                     })
@@ -49,7 +49,7 @@ mod tests {
                     .returning::<JlrsResult<_>>()
                     .scope(|mut frame| {
                         let module = Module::base(&frame);
-                        let func = module.function(&mut frame, "+");
+                        let func = module.global(&mut frame, "+");
                         let int64 = module.global(&mut frame, "pi");
                         assert!(func.is_ok());
                         assert!(int64.is_ok());
@@ -67,7 +67,7 @@ mod tests {
                     .returning::<JlrsResult<_>>()
                     .scope(|mut frame| {
                         let module = Module::base(&frame);
-                        let func = module.function(&mut frame, "+");
+                        let func = module.global(&mut frame, "+");
                         assert!(func.is_ok());
                         Ok(())
                     })
@@ -83,7 +83,7 @@ mod tests {
                     .returning::<JlrsResult<_>>()
                     .scope(|mut frame| {
                         let jlrs_module = Module::jlrs_core(&frame);
-                        let func = jlrs_module.function(&mut frame, "valuestring");
+                        let func = jlrs_module.global(&mut frame, "valuestring");
                         assert!(func.is_ok());
                         Ok(())
                     })
@@ -99,7 +99,7 @@ mod tests {
                     .returning::<JlrsResult<_>>()
                     .scope(|mut frame| {
                         let jlrs_module = Module::jlrs_core(&frame);
-                        let func = jlrs_module.function(&mut frame, "valuestring");
+                        let func = jlrs_module.global(&mut frame, "valuestring");
                         assert!(func.is_ok());
                         Ok(())
                     })
@@ -129,7 +129,7 @@ mod tests {
                 stack
                     .returning::<JlrsResult<_>>()
                     .scope(|mut frame| {
-                        assert!(Module::base(&frame).function(&mut frame, "foo").is_err());
+                        assert!(Module::base(&frame).global(&mut frame, "foo").is_err());
                         Ok(())
                     })
                     .unwrap();
@@ -143,7 +143,7 @@ mod tests {
                 stack
                     .returning::<JlrsResult<_>>()
                     .scope(|mut frame| {
-                        assert!(Module::base(&frame).function(&mut frame, "foo").is_err());
+                        assert!(Module::base(&frame).global(&mut frame, "foo").is_err());
                         Ok(())
                     })
                     .unwrap();
@@ -188,7 +188,7 @@ mod tests {
                         let base = Module::main(&frame)
                             .submodule(&frame, "JlrsTests")?
                             .as_managed()
-                            .function(&frame, "base")?
+                            .global(&frame, "base")?
                             .as_managed();
                         let base_val = base.call0(&mut frame).unwrap();
 
@@ -358,32 +358,13 @@ mod tests {
                 let res = stack.returning::<JlrsResult<_>>().scope(|mut frame| {
                     let main = Module::base(&frame);
 
-                    // TODO: Uncommenting this line breaks the test on Julia 1.12.0-rc1
-                    // assert!(main.global(&mut frame, "BAR").is_err());
+                    assert!(main.global(&mut frame, "BAR").is_err());
 
                     let value = Value::new(&mut frame, 1usize);
                     unsafe { main.set_const_unchecked("BAR", value) };
 
                     assert_eq!(value, main.global(&mut frame, "BAR")?);
 
-                    Ok(())
-                });
-
-                assert!(res.is_ok());
-            })
-        })
-    }
-
-    fn function_must_be_function() {
-        JULIA.with(|handle| {
-            handle.borrow_mut().with_stack(|mut stack| {
-                let res = stack.returning::<JlrsResult<_>>().scope(|mut frame| {
-                    let main = Module::base(&frame);
-
-                    let value = Value::new(&mut frame, 1usize);
-                    unsafe { main.set_const_unchecked("BAZ", value) };
-
-                    assert!(main.function(&mut frame, "BAZ").is_err());
                     Ok(())
                 });
 
@@ -415,6 +396,5 @@ mod tests {
         extend_lifetime_with_root();
         submodule_must_be_module();
         set_const_unchecked();
-        function_must_be_function();
     }
 }

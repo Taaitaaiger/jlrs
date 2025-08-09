@@ -50,7 +50,7 @@ mod tests {
                     .returning::<JlrsResult<_>>()
                     .scope(|mut frame| unsafe {
                         let func = Module::main(&frame)
-                            .function(&frame, "increase")?
+                            .global(&frame, "increase")?
                             .as_managed();
                         let twelve = Value::new(&mut frame, 12i32);
                         let result = func.call1(&mut frame, twelve);

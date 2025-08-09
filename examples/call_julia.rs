@@ -33,7 +33,7 @@ fn main() {
                         .as_managed()
                         // the same holds true for the function: the module is never reloaded so it's
                         // globally rooted
-                        .function(&frame, "complexfunc")?
+                        .global(&frame, "complexfunc")?
                         .as_managed()
                         // Call the function with the two arguments it takes
                         .call2(&mut frame, dim, iters)

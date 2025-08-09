@@ -4,17 +4,18 @@
 //! modules, `Main`, `Base` and `Core`. Any Julia code that you include in jlrs is made available
 //! relative to the `Main` module.
 
+#[cfg(not(any(julia_1_10, julia_1_11)))]
+use std::ptr::null_mut;
 use std::{any::TypeId, marker::PhantomData, ptr::NonNull};
 
 use jl_sys::{
     jl_base_module, jl_core_module, jl_get_global, jl_is_const, jl_main_module, jl_module_t,
-    jl_module_type, jl_set_const, jl_set_global, jlrs_module_name, jlrs_module_parent,
+    jl_module_type, jl_set_global, jlrs_module_name, jlrs_module_parent,
 };
 use rustc_hash::FxHashMap;
 
 use super::{
     erase_scope_lifetime,
-    function::FunctionData,
     value::{ValueData, ValueResult, ValueUnbound},
     Managed, Weak,
 };
@@ -334,6 +335,10 @@ impl<'scope> Module<'scope> {
 
     /// Set a constant in this module.
     ///
+    /// While it might be tempting to set a constant in a module, this is something you should
+    /// avoid doing. Older versions of Julia don't allow constants to be redefined and will throw
+    /// an error, more recent versions of Julia do allow this.
+    ///
     /// If Julia throws an exception it's caught and returned.
     pub fn set_const<'target, N, Tgt>(
         self,
@@ -349,15 +354,7 @@ impl<'scope> Module<'scope> {
         // valid arguments and its result is checked. if an exception is thrown it's caught
         // and returned
         unsafe {
-            let symbol = name.to_symbol_priv(Private);
-
-            let callback = || {
-                jl_set_const(
-                    self.unwrap(Private),
-                    symbol.unwrap(Private),
-                    value.unwrap(Private),
-                );
-            };
+            let callback = || self.set_const_unchecked(name, value);
 
             let res = match catch_exceptions(callback, unwrap_exc) {
                 Ok(_) => Ok(Value::wrap_non_null(
@@ -371,9 +368,11 @@ impl<'scope> Module<'scope> {
         }
     }
 
-    /// Set a constant in this module.
+    /// Set a constant in this module without catching exceptions.
     ///
-    /// If the constant already exists the process aborts, otherwise the constant is returned.
+    /// While it might be tempting to set a constant in a module, this is something you should
+    /// avoid doing. Older versions of Julia don't allow constants to be redefined and will throw
+    /// an error, more recent versions of Julia do allow this.
     ///
     /// Safety: This method must not throw an error if called from a `ccall`ed function.
     #[inline]
@@ -387,7 +386,16 @@ impl<'scope> Module<'scope> {
     {
         let symbol = name.to_symbol_priv(Private);
 
-        jl_set_const(
+        #[cfg(any(julia_1_10, julia_1_11))]
+        jl_sys::bindings::jl_set_const(
+            self.unwrap(Private),
+            symbol.unwrap(Private),
+            value.unwrap(Private),
+        );
+
+        #[cfg(not(any(julia_1_10, julia_1_11)))]
+        jl_sys::bindings::jl_declare_constant_val(
+            null_mut(),
             self.unwrap(Private),
             symbol.unwrap(Private),
             value.unwrap(Private),
@@ -455,32 +463,6 @@ impl<'scope> Module<'scope> {
             let value = jl_get_global(self.unwrap(Private), symbol.unwrap(Private));
             let ptr = NonNull::new(value)?;
             Some(Value::wrap_non_null(ptr, Private).root(target))
-        }
-    }
-
-    /// Returns the function named `name` in this module.
-    /// Returns an error if the function doesn't exist or if it's not a subtype of `Function`.
-    pub fn function<'target, N, Tgt>(
-        self,
-        target: Tgt,
-        name: N,
-    ) -> JlrsResult<FunctionData<'target, 'static, Tgt>>
-    where
-        N: ToSymbol,
-        Tgt: Target<'target>,
-    {
-        // Safety: the pointer points to valid data, the result is checked.
-        unsafe {
-            let symbol = name.to_symbol_priv(Private);
-            let func = self.global(&target, symbol)?.as_managed();
-
-            if !func.is::<Function>() {
-                let name = symbol.as_str().unwrap_or("<Non-UTF8 string>").into();
-                let ty = func.datatype_name().into();
-                Err(TypeError::NotAFunction { name, ty: ty })?;
-            }
-
-            Ok(target.data_from_ptr(func.unwrap_non_null(Private).cast(), Private))
         }
     }
 

@@ -56,7 +56,7 @@ mod tests {
                         let func = Module::main(&frame)
                             .submodule(&frame, "JlrsTests")?
                             .as_managed()
-                            .function(&frame, "inlinetuple")?
+                            .global(&frame, "inlinetuple")?
                             .as_managed();
                         let tup = func.call0(&mut frame).unwrap();
 
@@ -88,7 +88,7 @@ mod tests {
                         let func = Module::main(&frame)
                             .submodule(&frame, "JlrsTests")?
                             .as_managed()
-                            .function(&frame, "inlinetuple")?
+                            .global(&frame, "inlinetuple")?
                             .as_managed();
                         let tup = func.call0(&mut frame).unwrap();
                         assert!(tup.get_nth_field(&mut frame, 3).is_err());
@@ -110,7 +110,7 @@ mod tests {
                         let func = Module::main(&frame)
                             .submodule(&frame, "JlrsTests")?
                             .as_managed()
-                            .function(&frame, "inlinetuple")?
+                            .global(&frame, "inlinetuple")?
                             .as_managed();
                         let tup = func.call0(&mut frame).unwrap();
                         assert!(tup.get_nth_field_ref(2).is_err());
@@ -201,7 +201,7 @@ mod tests {
                         let data = vec![1.0f64, 2., 3.];
                         let array = TypedArray::<f64>::from_vec_unchecked(&mut frame, data, 3);
                         let func = Module::base(&frame)
-                            .function(&frame, "getindex")?
+                            .global(&frame, "getindex")?
                             .as_managed();
                         let out = func.call2(&mut frame, array.as_value(), idx).unwrap_err();
 
@@ -238,7 +238,7 @@ mod tests {
                             TypedArray::<f64>::from_vec(&mut frame, data, 3)?.into_jlrs_result()?;
 
                         let func = Module::base(&frame)
-                            .function(&frame, "getindex")?
+                            .global(&frame, "getindex")?
                             .as_managed();
                         let out = func.call2(&mut frame, array.as_value(), idx).unwrap_err();
 
@@ -266,7 +266,7 @@ mod tests {
                         let array =
                             Array::from_vec_for_unchecked(&mut frame, ty.as_value(), data, 3);
                         let func = Module::base(&frame)
-                            .function(&frame, "getindex")?
+                            .global(&frame, "getindex")?
                             .as_managed();
                         let out = func.call2(&mut frame, array.as_value(), idx).unwrap_err();
 
@@ -294,7 +294,7 @@ mod tests {
                         let data = vec![1.0f64, 2., 3.];
                         let array = TypedArray::<f64>::from_vec_unchecked(&mut frame, data, 3);
                         let func = Module::base(&frame)
-                            .function(&frame, "getindex")?
+                            .global(&frame, "getindex")?
                             .as_managed();
                         let out = func.call2(&mut frame, array.as_value(), idx).unwrap_err();
 

@@ -48,7 +48,7 @@ mod tests {
                         // let _reborrowed = &mut data[0];
 
                         Module::base(&frame)
-                            .function(&frame, "sum")?
+                            .global(&frame, "sum")?
                             .as_managed()
                             .call1(&mut frame, array.as_value())
                             .unwrap()
