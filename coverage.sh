@@ -2,8 +2,8 @@
 
 set -euxo pipefail
 
-#export JULIA_DIR=$HOME/julia-1.9.3
-#export LD_LIBRARY_PATH=$JULIA_DIR/lib:$JULIA_DIR/lib/julia
+#export JLRS_JULIA_DIR=$HOME/julia-1.9.3
+#export LD_LIBRARY_PATH=$JLRS_JULIA_DIR/lib:$JLRS_JULIA_DIR/lib/julia
 echo "backend: Gtk3Agg" > matplotlibrc
 
 cargo llvm-cov clean --workspace;

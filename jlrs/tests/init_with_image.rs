@@ -4,7 +4,7 @@ mod tests {
 
     #[test]
     fn init_with_image() {
-        if let Ok(julia_dir) = std::env::var("JULIA_DIR") {
+        if let Ok(julia_dir) = std::env::var("JLRS_JULIA_DIR") {
             let bindir = format!("{}/bin", julia_dir);
             #[cfg(target_os = "windows")]
             let image_path = format!("{}/lib/julia/sys.dll", julia_dir);
@@ -24,7 +24,7 @@ mod tests {
                 )
             }
         } else {
-            println!("Skipping image test because JULIA_DIR environment variable is not set.");
+            println!("Skipping image test because JLRS_JULIA_DIR environment variable is not set.");
         }
     }
 }

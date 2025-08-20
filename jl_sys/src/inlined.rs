@@ -17,7 +17,7 @@ pub const unsafe fn jlrs_array_data_fast(a: *mut jl_array_t) -> *mut std::ffi::c
         _marker: PhantomData<(*mut u8, PhantomPinned)>,
     }
 
-    NonNull::new_unchecked(a as *mut RawArray).as_ref().ptr
+    unsafe { NonNull::new_unchecked(a as *mut RawArray).as_ref().ptr }
 }
 
 #[cfg(not(julia_1_10))]
@@ -59,7 +59,7 @@ pub const unsafe fn jlrs_array_dims_ptr(a: *mut jl_array_t) -> *mut usize {
     }
 
     const OFFSET: usize = std::mem::offset_of!(RawArray, nrows);
-    (a as *mut u8).add(OFFSET) as *mut usize
+    unsafe { (a as *mut u8).add(OFFSET) as *mut usize }
 }
 
 #[cfg(not(julia_1_10))]

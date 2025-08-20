@@ -3254,11 +3254,13 @@ where
 // to ensure it's freed correctly.
 #[julia_version(until = "1.10")]
 unsafe extern "C" fn droparray<T>(a: Array) {
-    let sz = a.dimensions().size();
-    let data_ptr = a.data_ptr().cast::<T>();
+    unsafe {
+        let sz = a.dimensions().size();
+        let data_ptr = a.data_ptr().cast::<T>();
 
-    let data = Vec::from_raw_parts(data_ptr, sz, sz);
-    std::mem::drop(data);
+        let data = Vec::from_raw_parts(data_ptr, sz, sz);
+        std::mem::drop(data);
+    }
 }
 
 #[julia_version(since = "1.11")]

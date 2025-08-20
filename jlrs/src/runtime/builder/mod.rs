@@ -111,7 +111,7 @@ impl Builder {
     ///
     /// You must provide two arguments to use a custom system image, `julia_bindir` and
     /// `image_path`. The first is the absolute path to a directory that contains a
-    /// compatible Julia binary (eg `${JULIA_DIR}/bin`), the second is the path to a
+    /// compatible Julia binary (eg `${JLRS_JULIA_DIR}/bin`), the second is the path to a
     /// system image.
     ///
     /// A custom system image can be created with [`PackageCompiler`].

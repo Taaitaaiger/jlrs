@@ -37,7 +37,7 @@ fn main() {
     println!("cargo::rerun-if-changed=src/jlrs_cc/jlrs_cc_reexport.h");
     println!("cargo::rerun-if-changed=src/jlrs_cc/jlrs_cc.h");
     println!("cargo::rerun-if-changed=src/jlrs_cc/jlrs_cc_fast_tls.h");
-    println!("cargo::rerun-if-env-changed=JULIA_DIR");
+    println!("cargo::rerun-if-env-changed=JLRS_JULIA_DIR");
     println!("cargo::rerun-if-env-changed=PATH");
     println!("cargo::rerun-if-env-changed=LD_LIBRARY_PATH");
     println!("cargo::rerun-if-env-changed=DYLD_LIBRARY_PATH");
@@ -45,7 +45,7 @@ fn main() {
     detect_julia_version();
 
     let julia_dir = find_julia_dir()
-        .expect("JULIA_DIR is not set and no installed version of Julia can be found");
+        .expect("JLRS_JULIA_DIR is not set and no installed version of Julia can be found");
 
     let julia_dir = julia_dir
         .as_os_str()
@@ -59,7 +59,7 @@ fn main() {
 
 fn detect_julia_version() {
     let mut julia_dir = find_julia_dir()
-        .expect("JULIA_DIR is not set and no installed version of Julia can be found");
+        .expect("JLRS_JULIA_DIR is not set and no installed version of Julia can be found");
 
     julia_dir.push("include/julia/julia_version.h");
 
@@ -144,7 +144,7 @@ fn find_julia_dir() -> Option<PathBuf> {
 
 #[cfg(not(feature = "yggdrasil"))]
 fn find_julia_dir() -> Option<PathBuf> {
-    if let Some(path) = env::var_os("JULIA_DIR") {
+    if let Some(path) = env::var_os("JLRS_JULIA_DIR") {
         return Some(PathBuf::from(path));
     }
 
@@ -184,7 +184,7 @@ fn find_julia_dir() -> Option<PathBuf> {
 
             Some(julia_path)
         } else {
-            unimplemented!("Julia detection not implemented for this platform, try setting JULIA_DIR")
+            unimplemented!("Julia detection not implemented for this platform, try setting JLRS_JULIA_DIR")
         }
     }
 }

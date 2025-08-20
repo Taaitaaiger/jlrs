@@ -49,9 +49,9 @@
 //! executing the command `which julia`. The path to `julia.h` must be
 //! `$(which julia)/../include/julia/julia.h` and the path to the library
 //! `$(which julia)/../lib/libjulia.so`. If you want to override this default behaviour the
-//! `JULIA_DIR` environment variable must be set to the path to the appropriate `julia.x-y-z`
-//! directory, in this case `$JULIA_DIR/include/julia/julia.h` and
-//! `$JULIA_DIR/lib/libjulia.so` are used instead.
+//! `JLRS_JULIA_DIR` environment variable must be set to the path to the appropriate `julia.x-y-z`
+//! directory, in this case `$JLRS_JULIA_DIR/include/julia/julia.h` and
+//! `$JLRS_JULIA_DIR/lib/libjulia.so` are used instead.
 //!
 //! In order to be able to load `libjulia.so` this file must be on the library search path. If
 //! this is not the case you must add `/path/to/julia-x.y.z/lib` to the `LD_LIBRARY_PATH`
@@ -72,7 +72,7 @@
 //!
 //! Julia is automatically detected by executing the command `where julia`. If this returns
 //! multiple locations the first one is used. The default can be overridden by setting the
-//! `JULIA_DIR` environment variable. This doesn't work correctly with juliaup, in this case
+//! `JLRS_JULIA_DIR` environment variable. This doesn't work correctly with juliaup, in this case
 //! the environment variable must be set.
 //!
 //!

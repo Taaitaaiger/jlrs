@@ -438,7 +438,7 @@ pub unsafe trait DimsExt: Dims {
     where
         Tgt: Target<'target>,
     {
-        target.local_scope::<_, 1>(|mut frame| {
+        target.local_scope::<_, 1>(|mut frame| unsafe {
             let tuple = unsized_dim_tuple(&frame, self);
             tuple.root(&mut frame);
             jl_new_array(array_type, tuple.ptr().as_ptr())
@@ -612,7 +612,7 @@ pub unsafe trait RankedDims: Dims {
         Tgt: Target<'target>,
     {
         let _: () = Self::ASSERT_RANKED;
-        target.local_scope::<_, 1>(|mut frame| {
+        target.local_scope::<_, 1>(|mut frame| unsafe {
             let tuple = sized_dim_tuple(&frame, self);
             tuple.root(&mut frame);
             jl_new_array(array_type, tuple.ptr().as_ptr())
