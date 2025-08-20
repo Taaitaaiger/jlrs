@@ -1,6 +1,6 @@
 use syn::{
-    parse::{Parse, ParseStream},
     AttrStyle, Attribute, Expr, Lit, Meta, PatLit as ExprLit, Result,
+    parse::{Parse, ParseStream},
 };
 
 use super::ModuleItem;

@@ -114,8 +114,8 @@ use crate::{
     memory::scope::private::LocalScopePriv,
     prelude::{Managed, ValueData},
     runtime::{
-        handle::{weak_handle::WeakHandle, with_stack::StackHandle},
         RuntimeSettings,
+        handle::{weak_handle::WeakHandle, with_stack::StackHandle},
     },
 };
 
@@ -392,19 +392,19 @@ pub(crate) mod private {
     #[cfg(feature = "async")]
     use super::AsyncGcFrame;
     use super::{
+        GcFrame, Output, TargetException, TargetResult, TargetType,
         frame::{LocalGcFrame, UnsizedLocalGcFrame},
         reusable_slot::ReusableSlot,
         slot_ref::SlotRef,
         unrooted::Unrooted,
-        GcFrame, Output, TargetException, TargetResult, TargetType,
     };
     #[cfg(feature = "multi-rt")]
     use crate::runtime::handle::mt_handle::ActiveHandle;
     use crate::{
         data::managed::{
+            Managed, Weak,
             private::ManagedPriv,
             value::{Value, WeakValue},
-            Managed, Weak,
         },
         private::Private,
         runtime::handle::{weak_handle::WeakHandle, with_stack::StackHandle},
@@ -432,12 +432,14 @@ pub(crate) mod private {
             result: Result<Weak<'target, 'data, T>, WeakValue<'target, 'data>>,
             _: Private,
         ) -> TargetResult<'target, 'data, T, Self> {
-            let result = match result {
-                Ok(v) => Ok(v.ptr()),
-                Err(e) => Err(e.ptr()),
-            };
+            unsafe {
+                let result = match result {
+                    Ok(v) => Ok(v.ptr()),
+                    Err(e) => Err(e.ptr()),
+                };
 
-            self.result_from_ptr(result, Private)
+                self.result_from_ptr(result, Private)
+            }
         }
 
         // Safety: the pointer must point to valid data.
@@ -447,12 +449,14 @@ pub(crate) mod private {
             result: Result<T, Value<'target, 'data>>,
             _: Private,
         ) -> TargetResult<'target, 'data, T, Self> {
-            let result = match result {
-                Ok(v) => Ok(v.unwrap_non_null(Private)),
-                Err(e) => Err(e.unwrap_non_null(Private)),
-            };
+            unsafe {
+                let result = match result {
+                    Ok(v) => Ok(v.unwrap_non_null(Private)),
+                    Err(e) => Err(e.unwrap_non_null(Private)),
+                };
 
-            self.result_from_ptr(result, Private)
+                self.result_from_ptr(result, Private)
+            }
         }
 
         // Safety: the pointer must point to valid data.
@@ -471,7 +475,7 @@ pub(crate) mod private {
             value: NonNull<T::Wraps>,
             _: Private,
         ) -> Self::Data<'data, T> {
-            self.root(value)
+            unsafe { self.root(value) }
         }
 
         // Safety: the pointer must point to valid data.
@@ -481,9 +485,11 @@ pub(crate) mod private {
             result: Result<NonNull<T::Wraps>, NonNull<jl_value_t>>,
             _: Private,
         ) -> TargetResult<'target, 'data, T, Self> {
-            match result {
-                Ok(t) => Ok(self.root(t)),
-                Err(e) => Err(self.root(e)),
+            unsafe {
+                match result {
+                    Ok(t) => Ok(self.root(t)),
+                    Err(e) => Err(self.root(e)),
+                }
             }
         }
 
@@ -494,9 +500,11 @@ pub(crate) mod private {
             result: Result<T, NonNull<jl_value_t>>,
             _: Private,
         ) -> TargetException<'target, 'data, T, Self> {
-            match result {
-                Ok(t) => Ok(t),
-                Err(e) => Err(self.root(e)),
+            unsafe {
+                match result {
+                    Ok(t) => Ok(t),
+                    Err(e) => Err(self.root(e)),
+                }
             }
         }
     }
@@ -510,7 +518,7 @@ pub(crate) mod private {
             value: NonNull<T::Wraps>,
             _: Private,
         ) -> Self::Data<'data, T> {
-            self.root(value)
+            unsafe { self.root(value) }
         }
 
         // Safety: the pointer must point to valid data.
@@ -521,9 +529,11 @@ pub(crate) mod private {
             result: Result<NonNull<T::Wraps>, NonNull<jl_value_t>>,
             _: Private,
         ) -> TargetResult<'target, 'data, T, Self> {
-            match result {
-                Ok(t) => Ok(self.root(t)),
-                Err(e) => Err(self.root(e)),
+            unsafe {
+                match result {
+                    Ok(t) => Ok(self.root(t)),
+                    Err(e) => Err(self.root(e)),
+                }
             }
         }
 
@@ -535,9 +545,11 @@ pub(crate) mod private {
             result: Result<T, NonNull<jl_value_t>>,
             _: Private,
         ) -> TargetException<'target, 'data, T, Self> {
-            match result {
-                Ok(t) => Ok(t),
-                Err(e) => Err(self.root(e)),
+            unsafe {
+                match result {
+                    Ok(t) => Ok(t),
+                    Err(e) => Err(self.root(e)),
+                }
             }
         }
     }
@@ -551,7 +563,7 @@ pub(crate) mod private {
             value: NonNull<T::Wraps>,
             _: Private,
         ) -> Self::Data<'data, T> {
-            self.root(value)
+            unsafe { self.root(value) }
         }
 
         // Safety: the pointer must point to valid data.
@@ -562,9 +574,11 @@ pub(crate) mod private {
             result: Result<NonNull<T::Wraps>, NonNull<jl_value_t>>,
             _: Private,
         ) -> TargetResult<'target, 'data, T, Self> {
-            match result {
-                Ok(t) => Ok(self.root(t)),
-                Err(e) => Err(self.root(e)),
+            unsafe {
+                match result {
+                    Ok(t) => Ok(self.root(t)),
+                    Err(e) => Err(self.root(e)),
+                }
             }
         }
 
@@ -576,9 +590,11 @@ pub(crate) mod private {
             result: Result<T, NonNull<jl_value_t>>,
             _: Private,
         ) -> TargetException<'target, 'data, T, Self> {
-            match result {
-                Ok(t) => Ok(t),
-                Err(e) => Err(self.root(e)),
+            unsafe {
+                match result {
+                    Ok(t) => Ok(t),
+                    Err(e) => Err(self.root(e)),
+                }
             }
         }
     }
@@ -592,7 +608,7 @@ pub(crate) mod private {
             value: NonNull<T::Wraps>,
             _: Private,
         ) -> Self::Data<'data, T> {
-            self.root(value)
+            unsafe { self.root(value) }
         }
 
         // Safety: the pointer must point to valid data.
@@ -603,9 +619,11 @@ pub(crate) mod private {
             result: Result<NonNull<T::Wraps>, NonNull<jl_value_t>>,
             _: Private,
         ) -> TargetResult<'target, 'data, T, Self> {
-            match result {
-                Ok(t) => Ok(self.root(t)),
-                Err(e) => Err(self.root(e)),
+            unsafe {
+                match result {
+                    Ok(t) => Ok(self.root(t)),
+                    Err(e) => Err(self.root(e)),
+                }
             }
         }
 
@@ -617,9 +635,11 @@ pub(crate) mod private {
             result: Result<T, NonNull<jl_value_t>>,
             _: Private,
         ) -> TargetException<'target, 'data, T, Self> {
-            match result {
-                Ok(t) => Ok(t),
-                Err(e) => Err(self.root(e)),
+            unsafe {
+                match result {
+                    Ok(t) => Ok(t),
+                    Err(e) => Err(self.root(e)),
+                }
             }
         }
     }
@@ -633,7 +653,7 @@ pub(crate) mod private {
             value: NonNull<T::Wraps>,
             _: Private,
         ) -> Self::Data<'data, T> {
-            self.root(value)
+            unsafe { self.root(value) }
         }
 
         // Safety: the pointer must point to valid data.
@@ -644,9 +664,11 @@ pub(crate) mod private {
             result: Result<NonNull<T::Wraps>, NonNull<jl_value_t>>,
             _: Private,
         ) -> TargetResult<'target, 'data, T, Self> {
-            match result {
-                Ok(t) => Ok(self.root(t)),
-                Err(e) => Err(self.root(e)),
+            unsafe {
+                match result {
+                    Ok(t) => Ok(self.root(t)),
+                    Err(e) => Err(self.root(e)),
+                }
             }
         }
 
@@ -658,9 +680,11 @@ pub(crate) mod private {
             result: Result<T, NonNull<jl_value_t>>,
             _: Private,
         ) -> TargetException<'target, 'data, T, Self> {
-            match result {
-                Ok(t) => Ok(t),
-                Err(e) => Err(self.root(e)),
+            unsafe {
+                match result {
+                    Ok(t) => Ok(t),
+                    Err(e) => Err(self.root(e)),
+                }
             }
         }
     }
@@ -673,7 +697,7 @@ pub(crate) mod private {
             value: NonNull<T::Wraps>,
             _: Private,
         ) -> Self::Data<'data, T> {
-            self.root(value)
+            unsafe { self.root(value) }
         }
 
         // Safety: the pointer must point to valid data.
@@ -683,9 +707,11 @@ pub(crate) mod private {
             result: Result<NonNull<T::Wraps>, NonNull<jl_value_t>>,
             _: Private,
         ) -> TargetResult<'target, 'data, T, Self> {
-            match result {
-                Ok(t) => Ok(self.root(t)),
-                Err(e) => Err(self.root(e)),
+            unsafe {
+                match result {
+                    Ok(t) => Ok(self.root(t)),
+                    Err(e) => Err(self.root(e)),
+                }
             }
         }
 
@@ -696,9 +722,11 @@ pub(crate) mod private {
             result: Result<T, NonNull<jl_value_t>>,
             _: Private,
         ) -> TargetException<'target, 'data, T, Self> {
-            match result {
-                Ok(t) => Ok(t),
-                Err(e) => Err(self.root(e)),
+            unsafe {
+                match result {
+                    Ok(t) => Ok(t),
+                    Err(e) => Err(self.root(e)),
+                }
             }
         }
     }
@@ -712,7 +740,7 @@ pub(crate) mod private {
             value: NonNull<T::Wraps>,
             _: Private,
         ) -> Self::Data<'data, T> {
-            self.root(value)
+            unsafe { self.root(value) }
         }
 
         // Safety: the pointer must point to valid data.
@@ -722,9 +750,11 @@ pub(crate) mod private {
             result: Result<NonNull<T::Wraps>, NonNull<jl_value_t>>,
             _: Private,
         ) -> TargetResult<'target, 'data, T, Self> {
-            match result {
-                Ok(t) => Ok(self.root(t)),
-                Err(e) => Err(self.root(e)),
+            unsafe {
+                match result {
+                    Ok(t) => Ok(self.root(t)),
+                    Err(e) => Err(self.root(e)),
+                }
             }
         }
 
@@ -735,9 +765,11 @@ pub(crate) mod private {
             result: Result<T, NonNull<jl_value_t>>,
             _: Private,
         ) -> TargetException<'target, 'data, T, Self> {
-            match result {
-                Ok(t) => Ok(t),
-                Err(e) => Err(self.root(e)),
+            unsafe {
+                match result {
+                    Ok(t) => Ok(t),
+                    Err(e) => Err(self.root(e)),
+                }
             }
         }
     }
@@ -751,7 +783,7 @@ pub(crate) mod private {
             value: NonNull<T::Wraps>,
             _: Private,
         ) -> Self::Data<'data, T> {
-            self.root(value)
+            unsafe { self.root(value) }
         }
 
         // Safety: the pointer must point to valid data.
@@ -761,9 +793,11 @@ pub(crate) mod private {
             result: Result<NonNull<T::Wraps>, NonNull<jl_value_t>>,
             _: Private,
         ) -> TargetResult<'target, 'data, T, Self> {
-            match result {
-                Ok(t) => Ok(self.root(t)),
-                Err(e) => Err(self.root(e)),
+            unsafe {
+                match result {
+                    Ok(t) => Ok(self.root(t)),
+                    Err(e) => Err(self.root(e)),
+                }
             }
         }
 
@@ -774,9 +808,11 @@ pub(crate) mod private {
             result: Result<T, NonNull<jl_value_t>>,
             _: Private,
         ) -> TargetException<'target, 'data, T, Self> {
-            match result {
-                Ok(t) => Ok(t),
-                Err(e) => Err(self.root(e)),
+            unsafe {
+                match result {
+                    Ok(t) => Ok(t),
+                    Err(e) => Err(self.root(e)),
+                }
             }
         }
     }
@@ -789,7 +825,7 @@ pub(crate) mod private {
             value: NonNull<T::Wraps>,
             _: Private,
         ) -> Self::Data<'data, T> {
-            self.consume(value)
+            unsafe { self.consume(value) }
         }
 
         // Safety: the pointer must point to valid data.
@@ -799,9 +835,11 @@ pub(crate) mod private {
             result: Result<NonNull<T::Wraps>, NonNull<jl_value_t>>,
             _: Private,
         ) -> TargetResult<'target, 'data, T, Self> {
-            match result {
-                Ok(t) => Ok(self.consume(t)),
-                Err(e) => Err(self.consume(e)),
+            unsafe {
+                match result {
+                    Ok(t) => Ok(self.consume(t)),
+                    Err(e) => Err(self.consume(e)),
+                }
             }
         }
 
@@ -812,9 +850,11 @@ pub(crate) mod private {
             result: Result<T, NonNull<jl_value_t>>,
             _: Private,
         ) -> TargetException<'target, 'data, T, Self> {
-            match result {
-                Ok(t) => Ok(t),
-                Err(e) => Err(self.consume(e)),
+            unsafe {
+                match result {
+                    Ok(t) => Ok(t),
+                    Err(e) => Err(self.consume(e)),
+                }
             }
         }
     }
@@ -827,7 +867,7 @@ pub(crate) mod private {
             value: NonNull<T::Wraps>,
             _: Private,
         ) -> Self::Data<'data, T> {
-            self.temporary(value)
+            unsafe { self.temporary(value) }
         }
 
         // Safety: the pointer must point to valid data.
@@ -837,9 +877,11 @@ pub(crate) mod private {
             result: Result<NonNull<T::Wraps>, NonNull<jl_value_t>>,
             _: Private,
         ) -> TargetResult<'target, 'data, T, Self> {
-            match result {
-                Ok(t) => Ok(self.temporary(t)),
-                Err(e) => Err(self.temporary(e)),
+            unsafe {
+                match result {
+                    Ok(t) => Ok(self.temporary(t)),
+                    Err(e) => Err(self.temporary(e)),
+                }
             }
         }
 
@@ -850,9 +892,11 @@ pub(crate) mod private {
             result: Result<T, NonNull<jl_value_t>>,
             _: Private,
         ) -> TargetException<'target, 'data, T, Self> {
-            match result {
-                Ok(t) => Ok(t),
-                Err(e) => Err(self.temporary(e)),
+            unsafe {
+                match result {
+                    Ok(t) => Ok(t),
+                    Err(e) => Err(self.temporary(e)),
+                }
             }
         }
     }
@@ -865,7 +909,7 @@ pub(crate) mod private {
             value: NonNull<T::Wraps>,
             _: Private,
         ) -> Self::Data<'data, T> {
-            self.consume(value)
+            unsafe { self.consume(value) }
         }
 
         // Safety: the pointer must point to valid data.
@@ -875,9 +919,11 @@ pub(crate) mod private {
             result: Result<NonNull<T::Wraps>, NonNull<jl_value_t>>,
             _: Private,
         ) -> TargetResult<'target, 'data, T, Self> {
-            match result {
-                Ok(t) => Ok(self.consume(t)),
-                Err(e) => Err(self.consume(e)),
+            unsafe {
+                match result {
+                    Ok(t) => Ok(self.consume(t)),
+                    Err(e) => Err(self.consume(e)),
+                }
             }
         }
 
@@ -888,9 +934,11 @@ pub(crate) mod private {
             result: Result<T, NonNull<jl_value_t>>,
             _: Private,
         ) -> TargetException<'target, 'data, T, Self> {
-            match result {
-                Ok(t) => Ok(t),
-                Err(e) => Err(self.consume(e)),
+            unsafe {
+                match result {
+                    Ok(t) => Ok(t),
+                    Err(e) => Err(self.consume(e)),
+                }
             }
         }
     }
@@ -903,7 +951,7 @@ pub(crate) mod private {
             value: NonNull<T::Wraps>,
             _: Private,
         ) -> Self::Data<'data, T> {
-            self.temporary(value)
+            unsafe { self.temporary(value) }
         }
 
         // Safety: the pointer must point to valid data.
@@ -913,9 +961,11 @@ pub(crate) mod private {
             result: Result<NonNull<T::Wraps>, NonNull<jl_value_t>>,
             _: Private,
         ) -> TargetResult<'target, 'data, T, Self> {
-            match result {
-                Ok(t) => Ok(self.temporary(t)),
-                Err(e) => Err(self.temporary(e)),
+            unsafe {
+                match result {
+                    Ok(t) => Ok(self.temporary(t)),
+                    Err(e) => Err(self.temporary(e)),
+                }
             }
         }
 
@@ -926,9 +976,11 @@ pub(crate) mod private {
             result: Result<T, NonNull<jl_value_t>>,
             _: Private,
         ) -> TargetException<'target, 'data, T, Self> {
-            match result {
-                Ok(t) => Ok(t),
-                Err(e) => Err(self.temporary(e)),
+            unsafe {
+                match result {
+                    Ok(t) => Ok(t),
+                    Err(e) => Err(self.temporary(e)),
+                }
             }
         }
     }

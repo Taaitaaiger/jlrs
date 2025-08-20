@@ -9,8 +9,8 @@ use crate::{
     data::managed::{
         string::JuliaString,
         symbol::{
-            static_symbol::{StaticSymbol, Sym},
             Symbol,
+            static_symbol::{StaticSymbol, Sym},
         },
     },
     memory::target::Target,
@@ -54,40 +54,48 @@ pub(crate) mod private {
     impl<T: AsRef<str>> ToSymbolPriv for T {
         #[inline]
         unsafe fn to_symbol_priv<'symbol>(&self, _: Private) -> Symbol<'symbol> {
-            let unrooted = Unrooted::new();
-            Symbol::new(&unrooted, self)
+            unsafe {
+                let unrooted = Unrooted::new();
+                Symbol::new(&unrooted, self)
+            }
         }
     }
 
     impl<S: StaticSymbol> ToSymbolPriv for Sym<'_, S> {
         #[inline]
         unsafe fn to_symbol_priv<'symbol>(&self, _: Private) -> Symbol<'symbol> {
-            let unrooted = Unrooted::new();
-            S::get_symbol(&unrooted)
+            unsafe {
+                let unrooted = Unrooted::new();
+                S::get_symbol(&unrooted)
+            }
         }
     }
 
     impl<S: StaticSymbol> ToSymbolPriv for Sym<'_, PhantomData<S>> {
         #[inline]
         unsafe fn to_symbol_priv<'symbol>(&self, _: Private) -> Symbol<'symbol> {
-            let unrooted = Unrooted::new();
-            S::get_symbol(&unrooted)
+            unsafe {
+                let unrooted = Unrooted::new();
+                S::get_symbol(&unrooted)
+            }
         }
     }
 
     impl ToSymbolPriv for JuliaString<'_> {
         #[inline]
         unsafe fn to_symbol_priv<'symbol>(&self, _: Private) -> Symbol<'symbol> {
-            let symbol_ptr = self.as_bytes();
-            let unrooted = Unrooted::new();
-            Symbol::new_bytes(&unrooted, symbol_ptr).unwrap()
+            unsafe {
+                let symbol_ptr = self.as_bytes();
+                let unrooted = Unrooted::new();
+                Symbol::new_bytes(&unrooted, symbol_ptr).unwrap()
+            }
         }
     }
 
     impl ToSymbolPriv for Symbol<'_> {
         #[inline]
         unsafe fn to_symbol_priv<'symbol>(&self, _: Private) -> Symbol<'symbol> {
-            Symbol::wrap_non_null(self.unwrap_non_null(Private), Private)
+            unsafe { Symbol::wrap_non_null(self.unwrap_non_null(Private), Private) }
         }
     }
 }

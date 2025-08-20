@@ -16,12 +16,12 @@ use std::{ops::Deref, ptr::NonNull};
 use jl_sys::jlrs_array_data_owner;
 
 use super::{
+    ArrayBase, Unknown,
     data::accessor::{
         BitsAccessor, BitsAccessorMut, BitsUnionAccessor, BitsUnionAccessorMut,
         IndeterminateAccessor, IndeterminateAccessorMut, InlineAccessor, InlineAccessorMut,
         ManagedAccessor, ManagedAccessorMut, ValueAccessor, ValueAccessorMut,
     },
-    ArrayBase, Unknown,
 };
 use crate::{
     data::{
@@ -32,7 +32,7 @@ use crate::{
             typecheck::Typecheck,
         },
     },
-    error::{ArrayLayoutError, TypeError, CANNOT_DISPLAY_TYPE},
+    error::{ArrayLayoutError, CANNOT_DISPLAY_TYPE, TypeError},
     memory::context::ledger::Ledger,
     prelude::{JlrsResult, Managed, Value},
     private::Private,
@@ -111,7 +111,7 @@ impl<'scope, 'data, T, const N: isize> TrackedArrayBase<'scope, 'data, T, N> {
     where
         L: IsBits + ValidField,
     {
-        BitsAccessor::new(&self.data)
+        unsafe { BitsAccessor::new(&self.data) }
     }
 
     /// Create an accessor for inline data.
@@ -180,7 +180,7 @@ impl<'scope, 'data, T, const N: isize> TrackedArrayBase<'scope, 'data, T, N> {
     where
         L: ValidField,
     {
-        InlineAccessor::new(&self.data)
+        unsafe { InlineAccessor::new(&self.data) }
     }
 
     /// Create an accessor for unions of isbits types.
@@ -222,7 +222,7 @@ impl<'scope, 'data, T, const N: isize> TrackedArrayBase<'scope, 'data, T, N> {
     pub unsafe fn union_data_unchecked<'borrow>(
         &'borrow self,
     ) -> BitsUnionAccessor<'borrow, 'scope, 'data, T, N> {
-        BitsUnionAccessor::new(&self.data)
+        unsafe { BitsUnionAccessor::new(&self.data) }
     }
     /// Create an accessor for managed data.
     ///
@@ -266,7 +266,7 @@ impl<'scope, 'data, T, const N: isize> TrackedArrayBase<'scope, 'data, T, N> {
     where
         L: Managed<'scope, 'data>,
     {
-        ManagedAccessor::new(&self.data)
+        unsafe { ManagedAccessor::new(&self.data) }
     }
 
     /// Create an accessor for value data.
@@ -304,7 +304,7 @@ impl<'scope, 'data, T, const N: isize> TrackedArrayBase<'scope, 'data, T, N> {
     pub unsafe fn value_data_unchecked<'borrow>(
         &'borrow self,
     ) -> ValueAccessor<'borrow, 'scope, 'data, T, N> {
-        ValueAccessor::new(&self.data)
+        unsafe { ValueAccessor::new(&self.data) }
     }
 
     /// Create an accessor for indeterminate data.
@@ -393,8 +393,10 @@ impl<'scope, 'data, T, const N: isize> TrackedArrayBaseMut<'scope, 'data, T, N> 
     where
         T: ConstructType + ValidField + IsBits,
     {
-        // No need for checks, guaranteed to have isbits layout
-        BitsAccessorMut::new(&mut self.data)
+        unsafe {
+            // No need for checks, guaranteed to have isbits layout
+            BitsAccessorMut::new(&mut self.data)
+        }
     }
 
     /// Create a mutable accessor for `isbits` data with layout `L`.
@@ -413,8 +415,10 @@ impl<'scope, 'data, T, const N: isize> TrackedArrayBaseMut<'scope, 'data, T, N> 
         T: HasLayout<'static, 'static, Layout = L>,
         L: IsBits + ValidField,
     {
-        // No need for checks, guaranteed to have isbits layout and L is the layout of T
-        BitsAccessorMut::new(&mut self.data)
+        unsafe {
+            // No need for checks, guaranteed to have isbits layout and L is the layout of T
+            BitsAccessorMut::new(&mut self.data)
+        }
     }
 
     /// Try to create a mutable accessor for `isbits` data with layout `L`.
@@ -432,20 +436,22 @@ impl<'scope, 'data, T, const N: isize> TrackedArrayBaseMut<'scope, 'data, T, N> 
     where
         L: IsBits + ValidField,
     {
-        if !self.has_bits_layout() {
-            Err(ArrayLayoutError::NotBits {
-                element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
-            })?;
-        }
+        unsafe {
+            if !self.has_bits_layout() {
+                Err(ArrayLayoutError::NotBits {
+                    element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
+                })?;
+            }
 
-        let ty = self.element_type();
-        if !L::valid_field(ty) {
-            Err(TypeError::InvalidLayout {
-                value_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
-            })?;
-        }
+            let ty = self.element_type();
+            if !L::valid_field(ty) {
+                Err(TypeError::InvalidLayout {
+                    value_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
+                })?;
+            }
 
-        Ok(BitsAccessorMut::new(&mut self.data))
+            Ok(BitsAccessorMut::new(&mut self.data))
+        }
     }
 
     /// Create a mutable accessor for `isbits` data with layout `L` without checking any
@@ -462,7 +468,7 @@ impl<'scope, 'data, T, const N: isize> TrackedArrayBaseMut<'scope, 'data, T, N> 
     where
         L: IsBits + ValidField,
     {
-        BitsAccessorMut::new(&mut self.data)
+        unsafe { BitsAccessorMut::new(&mut self.data) }
     }
 
     /// Create a mutable accessor for inline data.
@@ -480,8 +486,10 @@ impl<'scope, 'data, T, const N: isize> TrackedArrayBaseMut<'scope, 'data, T, N> 
     where
         T: ConstructType + ValidField,
     {
-        // No need for checks, guaranteed to have inline layout
-        InlineAccessorMut::new(&mut self.data)
+        unsafe {
+            // No need for checks, guaranteed to have inline layout
+            InlineAccessorMut::new(&mut self.data)
+        }
     }
 
     /// Create a mutable accessor for inline data with layout `L`.
@@ -500,8 +508,10 @@ impl<'scope, 'data, T, const N: isize> TrackedArrayBaseMut<'scope, 'data, T, N> 
         T: ConstructType + HasLayout<'scope, 'data, Layout = L>,
         L: ValidField,
     {
-        // No need for checks, guaranteed to have inline layout and L is the layout of T
-        InlineAccessorMut::new(&mut self.data)
+        unsafe {
+            // No need for checks, guaranteed to have inline layout and L is the layout of T
+            InlineAccessorMut::new(&mut self.data)
+        }
     }
 
     /// Try to create a mutable accessor for inline data with layout `L`.
@@ -520,20 +530,22 @@ impl<'scope, 'data, T, const N: isize> TrackedArrayBaseMut<'scope, 'data, T, N> 
     where
         L: ValidField,
     {
-        if !self.has_inline_layout() {
-            Err(ArrayLayoutError::NotInline {
-                element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
-            })?;
-        }
+        unsafe {
+            if !self.has_inline_layout() {
+                Err(ArrayLayoutError::NotInline {
+                    element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
+                })?;
+            }
 
-        let ty = self.element_type();
-        if !L::valid_field(ty) {
-            Err(TypeError::InvalidLayout {
-                value_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
-            })?;
-        }
+            let ty = self.element_type();
+            if !L::valid_field(ty) {
+                Err(TypeError::InvalidLayout {
+                    value_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
+                })?;
+            }
 
-        Ok(InlineAccessorMut::new(&mut self.data))
+            Ok(InlineAccessorMut::new(&mut self.data))
+        }
     }
 
     /// Create a mutable  accessor for inline data with layout `L` without checking any
@@ -550,7 +562,7 @@ impl<'scope, 'data, T, const N: isize> TrackedArrayBaseMut<'scope, 'data, T, N> 
     where
         L: ValidField,
     {
-        InlineAccessorMut::new(&mut self.data)
+        unsafe { InlineAccessorMut::new(&mut self.data) }
     }
 
     /// Create a mutable accessor for unions of isbits types.
@@ -567,11 +579,13 @@ impl<'scope, 'data, T, const N: isize> TrackedArrayBaseMut<'scope, 'data, T, N> 
     where
         T: BitsUnionCtor,
     {
-        assert!(
-            self.has_union_layout(),
-            "Array does not have a union layout"
-        );
-        BitsUnionAccessorMut::new(&mut self.data)
+        unsafe {
+            assert!(
+                self.has_union_layout(),
+                "Array does not have a union layout"
+            );
+            BitsUnionAccessorMut::new(&mut self.data)
+        }
     }
 
     /// Try to create a mutable accessor for unions of isbits types.
@@ -586,13 +600,15 @@ impl<'scope, 'data, T, const N: isize> TrackedArrayBaseMut<'scope, 'data, T, N> 
     pub unsafe fn try_union_data_mut<'borrow>(
         &'borrow mut self,
     ) -> JlrsResult<BitsUnionAccessorMut<'borrow, 'scope, 'data, T, N>> {
-        if !self.has_union_layout() {
-            Err(ArrayLayoutError::NotUnion {
-                element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
-            })?;
-        }
+        unsafe {
+            if !self.has_union_layout() {
+                Err(ArrayLayoutError::NotUnion {
+                    element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
+                })?;
+            }
 
-        Ok(BitsUnionAccessorMut::new(&mut self.data))
+            Ok(BitsUnionAccessorMut::new(&mut self.data))
+        }
     }
 
     /// Create a mutable accessor for unions of isbits types without checking any invariants.
@@ -605,7 +621,7 @@ impl<'scope, 'data, T, const N: isize> TrackedArrayBaseMut<'scope, 'data, T, N> 
     pub unsafe fn union_data_mut_unchecked<'borrow>(
         &'borrow mut self,
     ) -> BitsUnionAccessorMut<'borrow, 'scope, 'data, T, N> {
-        BitsUnionAccessorMut::new(&mut self.data)
+        unsafe { BitsUnionAccessorMut::new(&mut self.data) }
     }
 
     /// Create a mutable accessor for managed data.
@@ -623,8 +639,10 @@ impl<'scope, 'data, T, const N: isize> TrackedArrayBaseMut<'scope, 'data, T, N> 
     where
         T: Managed<'scope, 'data> + ConstructType,
     {
-        // No need for checks, guaranteed to have correct layout
-        ManagedAccessorMut::new(&mut self.data)
+        unsafe {
+            // No need for checks, guaranteed to have correct layout
+            ManagedAccessorMut::new(&mut self.data)
+        }
     }
 
     /// Try to create a mutable accessor for managed data of type `L`.
@@ -641,14 +659,16 @@ impl<'scope, 'data, T, const N: isize> TrackedArrayBaseMut<'scope, 'data, T, N> 
     where
         L: Managed<'scope, 'data> + Typecheck,
     {
-        if !self.has_managed_layout::<L>() {
-            Err(ArrayLayoutError::NotManaged {
-                element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
-                name: L::NAME.into(),
-            })?;
-        }
+        unsafe {
+            if !self.has_managed_layout::<L>() {
+                Err(ArrayLayoutError::NotManaged {
+                    element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
+                    name: L::NAME.into(),
+                })?;
+            }
 
-        Ok(ManagedAccessorMut::new(&mut self.data))
+            Ok(ManagedAccessorMut::new(&mut self.data))
+        }
     }
 
     /// Create a mutable accessor for managed data of type `L` without checking any invariants.
@@ -664,7 +684,7 @@ impl<'scope, 'data, T, const N: isize> TrackedArrayBaseMut<'scope, 'data, T, N> 
     where
         L: Managed<'scope, 'data>,
     {
-        ManagedAccessorMut::new(&mut self.data)
+        unsafe { ManagedAccessorMut::new(&mut self.data) }
     }
 
     /// Create a mutable accessor for value data.
@@ -682,8 +702,10 @@ impl<'scope, 'data, T, const N: isize> TrackedArrayBaseMut<'scope, 'data, T, N> 
     where
         T: Managed<'scope, 'data> + ConstructType,
     {
-        // No need for checks, guaranteed to have inline layout
-        ValueAccessorMut::new(&mut self.data)
+        unsafe {
+            // No need for checks, guaranteed to have inline layout
+            ValueAccessorMut::new(&mut self.data)
+        }
     }
 
     /// Try to create a mutable accessor for value data.
@@ -697,13 +719,15 @@ impl<'scope, 'data, T, const N: isize> TrackedArrayBaseMut<'scope, 'data, T, N> 
     pub unsafe fn try_value_data_mut<'borrow>(
         &'borrow mut self,
     ) -> JlrsResult<ValueAccessorMut<'borrow, 'scope, 'data, T, N>> {
-        if !self.has_value_layout() {
-            Err(ArrayLayoutError::NotPointer {
-                element_type: self.element_type().error_string_or(CANNOT_DISPLAY_TYPE),
-            })?;
-        }
+        unsafe {
+            if !self.has_value_layout() {
+                Err(ArrayLayoutError::NotPointer {
+                    element_type: self.element_type().error_string_or(CANNOT_DISPLAY_TYPE),
+                })?;
+            }
 
-        Ok(ValueAccessorMut::new(&mut self.data))
+            Ok(ValueAccessorMut::new(&mut self.data))
+        }
     }
 
     /// Create a mutable accessor for managed data of type `L` without checking any invariants.
@@ -716,7 +740,7 @@ impl<'scope, 'data, T, const N: isize> TrackedArrayBaseMut<'scope, 'data, T, N> 
     pub unsafe fn value_data_mut_unchecked<'borrow>(
         &'borrow mut self,
     ) -> ValueAccessorMut<'borrow, 'scope, 'data, T, N> {
-        ValueAccessorMut::new(&mut self.data)
+        unsafe { ValueAccessorMut::new(&mut self.data) }
     }
 
     /// Create a mutable accessor for indeterminate data.
@@ -728,7 +752,7 @@ impl<'scope, 'data, T, const N: isize> TrackedArrayBaseMut<'scope, 'data, T, N> 
     pub unsafe fn indeterminate_data_mut<'borrow>(
         &'borrow mut self,
     ) -> IndeterminateAccessorMut<'borrow, 'scope, 'data, T, N> {
-        IndeterminateAccessorMut::new(&mut self.data)
+        unsafe { IndeterminateAccessorMut::new(&mut self.data) }
     }
 }
 

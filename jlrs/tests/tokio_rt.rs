@@ -10,7 +10,7 @@ mod tests {
     use jlrs::{prelude::*, runtime::handle::async_handle::AsyncHandle};
     use once_cell::sync::OnceCell;
 
-    use super::async_util::{async_tasks::*, ASYNC_TESTS_JL};
+    use super::async_util::{ASYNC_TESTS_JL, async_tasks::*};
 
     fn init() -> Arc<AsyncHandle> {
         unsafe {

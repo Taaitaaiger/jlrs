@@ -3,7 +3,7 @@
 use std::{
     fmt::{Debug, Formatter, Result as FmtResult},
     marker::PhantomData,
-    ptr::{null_mut, NonNull},
+    ptr::{NonNull, null_mut},
 };
 
 use jl_sys::{
@@ -11,7 +11,7 @@ use jl_sys::{
     jl_svec_t, jlrs_svec_data, jlrs_svec_len, jlrs_svecref, jlrs_svecset,
 };
 
-use super::{datatype::DataType, private::ManagedPriv, AtomicSlice, Managed, ManagedData, Weak};
+use super::{AtomicSlice, Managed, ManagedData, Weak, datatype::DataType, private::ManagedPriv};
 use crate::{
     data::{
         layout::valid_layout::{ValidField, ValidLayout},
@@ -19,7 +19,7 @@ use crate::{
         types::typecheck::Typecheck,
     },
     error::{AccessError, JlrsResult},
-    memory::target::{unrooted::Unrooted, Target, TargetResult},
+    memory::target::{Target, TargetResult, unrooted::Unrooted},
     private::Private,
 };
 
@@ -76,20 +76,22 @@ where
     /// Safety: you should only mutate a `SimpleVector` after creating it, they should generally be
     /// considered immutable.
     pub unsafe fn set(&self, index: usize, value: Option<T::InScope<'_>>) -> JlrsResult<()> {
-        if index >= self.len() {
-            Err(AccessError::OutOfBoundsSVec {
-                idx: index,
-                len: self.len(),
-            })?
+        unsafe {
+            if index >= self.len() {
+                Err(AccessError::OutOfBoundsSVec {
+                    idx: index,
+                    len: self.len(),
+                })?
+            }
+
+            let v = match value {
+                Some(v) => v.unwrap(Private).cast(),
+                None => null_mut(),
+            };
+
+            jlrs_svecset(self.0.unwrap(Private).cast(), index as _, v);
+            Ok(())
         }
-
-        let v = match value {
-            Some(v) => v.unwrap(Private).cast(),
-            None => null_mut(),
-        };
-
-        jlrs_svecset(self.0.unwrap(Private).cast(), index as _, v);
-        Ok(())
     }
 
     /// Returns the content of this `SimpleVector` as an `AtomicSlice`.
@@ -135,8 +137,10 @@ impl<'scope> SimpleVector<'scope> {
     where
         Tgt: Target<'scope>,
     {
-        let svec = NonNull::new_unchecked(jl_alloc_svec_uninit(n));
-        target.data_from_ptr(svec, Private)
+        unsafe {
+            let svec = NonNull::new_unchecked(jl_alloc_svec_uninit(n));
+            target.data_from_ptr(svec, Private)
+        }
     }
 
     /// Copy an existing `SimpleVector`.
@@ -193,7 +197,8 @@ unsafe impl<'scope> Typecheck for SimpleVector<'scope> {
     #[inline]
     fn typecheck(t: DataType) -> bool {
         // Safety: can only be called from a thread known to Julia
-        t == DataType::simplevector_type(unsafe { &Unrooted::new() })
+        let unrooted = unsafe { Unrooted::new() };
+        t == DataType::simplevector_type(&unrooted)
     }
 }
 

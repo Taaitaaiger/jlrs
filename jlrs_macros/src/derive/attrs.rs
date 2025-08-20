@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use itertools::Itertools as _;
-use syn::{parse_quote, spanned::Spanned as _, Token};
+use syn::{Token, parse_quote, spanned::Spanned as _};
 
 pub struct JlrsTypeAttrs {
     pub julia_type: Option<String>,

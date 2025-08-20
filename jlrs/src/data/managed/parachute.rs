@@ -21,13 +21,13 @@ use std::{
 
 use fnv::FnvHasher;
 
-use super::{private::ManagedPriv, Managed};
+use super::{Managed, private::ManagedPriv};
 use crate::{
     data::{
         managed::{datatype::DataType, module::Module, symbol::Symbol, value::Value},
         types::foreign_type::{ForeignType, OpaqueType},
     },
-    memory::target::{unrooted::Unrooted, Target},
+    memory::target::{Target, unrooted::Unrooted},
     prelude::LocalScope,
     private::Private,
 };

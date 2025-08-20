@@ -1,6 +1,6 @@
 #[macro_use]
 extern crate criterion;
-use criterion::{black_box, Criterion};
+use criterion::{Criterion, black_box};
 use jlrs::{
     memory::{gc::Gc, scope::Scope, target::frame::GcFrame},
     prelude::{Call, JlrsResult, Value},
@@ -29,7 +29,7 @@ fn call_0_unchecked(frame: &mut GcFrame, c: &mut Criterion, func: Value) -> Jlrs
 fn call_0(frame: &mut GcFrame, c: &mut Criterion, func: Value) -> JlrsResult<()> {
     frame.scope(|frame| {
         c.bench_function("call_0", |b| {
-            b.iter(|| black_box(unsafe { func.call(black_box(&frame, [])) }))
+            b.iter(|| black_box(unsafe { func.call(&frame, black_box([])) }))
         });
         Ok(())
     })
@@ -54,7 +54,7 @@ fn call_1(frame: &mut GcFrame, c: &mut Criterion, func: Value) -> JlrsResult<()>
     frame.scope(|mut frame| {
         let v = Value::new(&mut frame, 0usize);
         c.bench_function("call_1", |b| {
-            b.iter(|| black_box(unsafe { func.call(black_box(&frame), v) }))
+            b.iter(|| black_box(unsafe { func.call(&frame, black_box([v])) }))
         });
         Ok(())
     })

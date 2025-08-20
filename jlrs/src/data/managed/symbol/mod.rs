@@ -21,7 +21,7 @@ use crate::{
     error::{JlrsError, JlrsResult},
     gc_safe::{GcSafeOnceLock, GcSafeRwLock},
     impl_julia_typecheck,
-    memory::target::{unrooted::Unrooted, Target, TargetException, TargetResult},
+    memory::target::{Target, TargetException, TargetResult, unrooted::Unrooted},
     private::Private,
 };
 

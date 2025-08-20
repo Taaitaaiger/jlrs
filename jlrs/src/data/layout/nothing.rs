@@ -6,8 +6,8 @@ use super::is_bits::IsBits;
 use crate::{
     convert::{ccall_types::CCallReturn, into_julia::IntoJulia, unbox::Unbox},
     data::managed::{
-        datatype::{DataType, DataTypeData},
         Managed,
+        datatype::{DataType, DataTypeData},
     },
     impl_julia_typecheck, impl_valid_layout,
     memory::target::Target,

@@ -38,7 +38,7 @@ unsafe impl lock_api::RawMutex for RawGcSafeFairMutex {
 
     #[inline]
     unsafe fn unlock(&self) {
-        self.inner.unlock()
+        unsafe { self.inner.unlock() }
     }
 
     #[inline]
@@ -50,12 +50,12 @@ unsafe impl lock_api::RawMutex for RawGcSafeFairMutex {
 unsafe impl lock_api::RawMutexFair for RawGcSafeFairMutex {
     #[inline]
     unsafe fn unlock_fair(&self) {
-        self.inner.unlock_fair()
+        unsafe { self.inner.unlock_fair() }
     }
 
     #[inline]
     unsafe fn bump(&self) {
-        self.inner.bump()
+        unsafe { self.inner.bump() }
     }
 }
 

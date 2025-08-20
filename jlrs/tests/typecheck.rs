@@ -15,7 +15,7 @@ mod tests {
     use super::util::JULIA;
 
     macro_rules! impl_typecheck_test {
-        ($name:ident, $invalid_name:ident, $t:ty, $val:expr) => {
+        ($name:ident, $invalid_name:ident, $t:ty, $val:expr_2021) => {
             fn $name() {
                 JULIA.with(|handle| {
                     handle.borrow_mut().with_stack(|mut stack| {

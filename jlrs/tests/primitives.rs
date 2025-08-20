@@ -208,7 +208,7 @@ mod tests {
     }
 
     macro_rules! cannot_cast_wrong_type {
-        ($name:ident, $val:expr, $from:ty, $to:ty) => {
+        ($name:ident, $val:expr_2021, $from:ty, $to:ty) => {
             fn $name() {
                 JULIA.with(|handle| {
                     handle.borrow_mut().with_stack(|mut stack| {

@@ -1,6 +1,6 @@
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse_quote, Type};
+use syn::{Type, parse_quote};
 
 pub fn convert_to_constant_bytes(s: String) -> TokenStream {
     let bytes = s.as_bytes();

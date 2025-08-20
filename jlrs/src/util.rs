@@ -25,7 +25,7 @@ pub(crate) type UvAsyncSendFn = unsafe extern "C" fn(handle: *mut c_void) -> c_i
     ),
     link(name = "libuv-2", kind = "raw-dylib")
 )]
-extern "C" {
+unsafe extern "C" {
     pub fn uv_async_send(async_: *mut c_void) -> ::std::os::raw::c_int;
 }
 
@@ -36,16 +36,18 @@ pub(crate) unsafe fn uv_async_send_func() -> UvAsyncSendFn {
 
 #[cfg(not(any(windows, target_os = "windows", feature = "windows")))]
 pub(crate) unsafe fn uv_async_send_func() -> UvAsyncSendFn {
-    static UV_ASYNC_SEND: AtomicPtr<c_void> = AtomicPtr::new(null_mut());
-    let mut func = UV_ASYNC_SEND.load(Ordering::Relaxed);
+    unsafe {
+        static UV_ASYNC_SEND: AtomicPtr<c_void> = AtomicPtr::new(null_mut());
+        let mut func = UV_ASYNC_SEND.load(Ordering::Relaxed);
 
-    if func.is_null() {
-        func = load_uv_async_send_func(&UV_ASYNC_SEND);
+        if func.is_null() {
+            func = load_uv_async_send_func(&UV_ASYNC_SEND);
+        }
+
+        assert!(!func.is_null());
+
+        std::mem::transmute::<_, UvAsyncSendFn>(func)
     }
-
-    assert!(!func.is_null());
-
-    std::mem::transmute::<_, UvAsyncSendFn>(func)
 }
 
 #[inline(never)]

@@ -7,7 +7,7 @@ use jlrs::prelude::*;
 // Add two 32-bit signed integers, it can be called from Julia with:
 // `ccall((:add, "libccall"), Int32, (Int32, Int32), a, b)` where `a` and `b` are `Int32`s.
 // Note that you can write this function and use it from Julia *without* jlrs.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn add(a: i32, b: i32) -> i32 {
     a + b
 }
@@ -15,12 +15,14 @@ pub unsafe extern "C" fn add(a: i32, b: i32) -> i32 {
 // Increment every element in an array of `f64`s, it can be called from Julia with:
 // `ccall((:incr_array, "libccall"), Cvoid, (Array{Float64},), arr)`  where `arr` is an
 // `Array{Float64}`.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn incr_array(mut arr: TypedArray<f64>) {
-    let mut arr = arr.bits_data_mut();
+    unsafe {
+        let mut arr = arr.bits_data_mut();
 
-    for x in arr.as_mut_slice() {
-        *x += 1.0;
+        for x in arr.as_mut_slice() {
+            *x += 1.0;
+        }
     }
 }
 

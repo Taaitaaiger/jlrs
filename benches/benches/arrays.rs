@@ -1,6 +1,6 @@
 use std::ptr::NonNull;
 
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, criterion_group, criterion_main};
 use jlrs::{
     memory::{gc::Gc, target::frame::GcFrame},
     prelude::*,
@@ -33,7 +33,7 @@ fn construct_array_1d_unrooted2(frame: &mut GcFrame, c: &mut Criterion) {
 #[inline(never)]
 fn construct_array_2d_err_unrooted(frame: &mut GcFrame, c: &mut Criterion) {
     c.bench_function("Array<f64,2>_err_unrooted", |b| {
-        b.iter(|| TypedArray::<f64>::new(&frame, (16, usize::MAX / 2)).unwrap_err())
+        b.iter(|| TypedArray::<f64>::new(&frame, [16, usize::MAX / 2]).unwrap_err())
     });
 }
 
@@ -47,14 +47,14 @@ fn construct_array_1d_unchecked_unrooted(frame: &mut GcFrame, c: &mut Criterion)
 #[inline(never)]
 fn construct_array_2d_unrooted(frame: &mut GcFrame, c: &mut Criterion) {
     c.bench_function("Array<f64,2>_unrooted", |b| {
-        b.iter(|| TypedArray::<f64>::new(&frame, (4, 4)))
+        b.iter(|| TypedArray::<f64>::new(&frame, [4, 4]))
     });
 }
 
 #[inline(never)]
 fn construct_array_2d_unchecked_unrooted(frame: &mut GcFrame, c: &mut Criterion) {
     c.bench_function("Array<f64,2>_unchecked_unrooted", |b| {
-        b.iter(|| unsafe { TypedArray::<f64>::new_unchecked(&frame, (4, 4)) })
+        b.iter(|| unsafe { TypedArray::<f64>::new_unchecked(&frame, [4, 4]) })
     });
 }
 
@@ -63,21 +63,21 @@ fn construct_array_2d_unchecked_unrooted2(frame: &mut GcFrame, c: &mut Criterion
     jlrs::define_fast_array_key!(pub Foo, f32, 2);
 
     c.bench_function("Array<f64,2>_unchecked_unrooted2", |b| {
-        b.iter(|| unsafe { Foo::new_unchecked(&frame, (4, 4)) })
+        b.iter(|| unsafe { Foo::new_unchecked(&frame, [4, 4]) })
     });
 }
 
 #[inline(never)]
 fn construct_array_3d_unrooted(frame: &mut GcFrame, c: &mut Criterion) {
     c.bench_function("Array<f64,3>_unrooted", |b| {
-        b.iter(|| TypedArray::<f64>::new(&frame, (4, 2, 2)))
+        b.iter(|| TypedArray::<f64>::new(&frame, [4, 2, 2]))
     });
 }
 
 #[inline(never)]
 fn construct_array_3d_unchecked_unrooted(frame: &mut GcFrame, c: &mut Criterion) {
     c.bench_function("Array<f64,3>_unchecked_unrooted", |b| {
-        b.iter(|| unsafe { TypedArray::<f64>::new_unchecked(&frame, (4, 2, 2)) })
+        b.iter(|| unsafe { TypedArray::<f64>::new_unchecked(&frame, [4, 2, 2]) })
     });
 }
 
@@ -98,14 +98,14 @@ fn construct_array_3d_arrdim_unchecked_unrooted(frame: &mut GcFrame, c: &mut Cri
 #[inline(never)]
 fn construct_array_4d_unrooted(frame: &mut GcFrame, c: &mut Criterion) {
     c.bench_function("Array<f64,4>_unrooted", |b| {
-        b.iter(|| TypedRankedArray::<f64, 4>::new(&frame, (2, 2, 2, 2)))
+        b.iter(|| TypedRankedArray::<f64, 4>::new(&frame, [2, 2, 2, 2]))
     });
 }
 
 #[inline(never)]
 fn construct_array_4d_unchecked_unrooted(frame: &mut GcFrame, c: &mut Criterion) {
     c.bench_function("Array<f64,4>_unchecked_unrooted", |b| {
-        b.iter(|| unsafe { TypedArray::<f64>::new_unchecked(&frame, (2, 2, 2, 2)) })
+        b.iter(|| unsafe { TypedArray::<f64>::new_unchecked(&frame, [2, 2, 2, 2]) })
     });
 }
 

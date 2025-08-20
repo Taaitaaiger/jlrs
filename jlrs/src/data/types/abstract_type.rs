@@ -7,11 +7,11 @@ use std::marker::PhantomData;
 use super::construct_type::{ConstructType, TypeVarEnv};
 use crate::{
     data::managed::{
+        Managed,
         datatype::DataType,
         type_var::TypeVar,
         union_all::UnionAll,
         value::{Value, ValueData},
-        Managed,
     },
     inline_static_ref,
     memory::{scope::LocalScopeExt, target::Target},
@@ -23,7 +23,7 @@ use crate::{
 pub unsafe trait AbstractType: ConstructType {}
 
 macro_rules! impl_construct_julia_type_abstract {
-    ($ty:ty, $path:expr) => {
+    ($ty:ty, $path:expr_2021) => {
         unsafe impl ConstructType for $ty {
             type Static = $ty;
 
@@ -63,7 +63,7 @@ macro_rules! impl_construct_julia_type_abstract {
 }
 
 macro_rules! impl_construct_julia_type_abstract_using {
-    ($ty:ty, $path:expr) => {
+    ($ty:ty, $path:expr_2021) => {
         unsafe impl ConstructType for $ty {
             type Static = $ty;
 
@@ -1011,13 +1011,14 @@ unsafe impl<T: ConstructType> ConstructType for Enum<T> {
             let ty_param = T::construct_type(&mut frame);
 
             // Validate bound
-            if let Ok(tvar) = ty_param.cast::<TypeVar>() {
-                unsafe {
+            match ty_param.cast::<TypeVar>() {
+                Ok(tvar) => unsafe {
                     let ub = tvar.upper_bound(&frame).as_value();
                     assert!(ub.subtype(Integer::construct_type(&mut frame)));
+                },
+                _ => {
+                    assert!(ty_param.subtype(Integer::construct_type(&mut frame)));
                 }
-            } else {
-                assert!(ty_param.subtype(Integer::construct_type(&mut frame)));
             }
 
             let params = [ty_param];
@@ -1043,13 +1044,14 @@ unsafe impl<T: ConstructType> ConstructType for Enum<T> {
             let ty_param = T::construct_type_with_env(&mut frame, env);
 
             // Validate bound
-            if let Ok(tvar) = ty_param.cast::<TypeVar>() {
-                unsafe {
+            match ty_param.cast::<TypeVar>() {
+                Ok(tvar) => unsafe {
                     let ub = tvar.upper_bound(&frame).as_value();
                     assert!(ub.subtype(Integer::construct_type_with_env(&mut frame, env)));
+                },
+                _ => {
+                    assert!(ty_param.subtype(Integer::construct_type_with_env(&mut frame, env)));
                 }
-            } else {
-                assert!(ty_param.subtype(Integer::construct_type_with_env(&mut frame, env)));
             }
 
             let params = [ty_param];

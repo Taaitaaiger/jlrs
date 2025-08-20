@@ -3,34 +3,36 @@
 use jlrs::{prelude::*, runtime::handle::ccall::throw_exception, weak_handle};
 
 // This function returns `nothing` if a < b, throws an `AssertionError` otherwise.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn assert_less_than(a: i32, b: i32) {
-    match weak_handle!() {
-        Ok(handle) => {
-            let res = handle.local_scope::<_, 2>(|mut frame| {
-                if a >= b {
-                    let msg = JuliaString::new(&mut frame, "a is larger than b").as_value();
+    unsafe {
+        match weak_handle!() {
+            Ok(handle) => {
+                let res = handle.local_scope::<_, 2>(|mut frame| {
+                    if a >= b {
+                        let msg = JuliaString::new(&mut frame, "a is larger than b").as_value();
 
-                    let leaked = Module::core(&frame)
-                        .global(&frame, "AssertionError")
-                        .expect("AssertionError does not exist in Core")
-                        .as_value()
-                        .call(&mut frame, [msg])
-                        .unwrap()
-                        .leak();
+                        let leaked = Module::core(&frame)
+                            .global(&frame, "AssertionError")
+                            .expect("AssertionError does not exist in Core")
+                            .as_value()
+                            .call(&mut frame, [msg])
+                            .unwrap()
+                            .leak();
 
-                    return Err(leaked);
+                        return Err(leaked);
+                    }
+
+                    Ok(())
+                });
+
+                // Safe: there are no pendings drops.
+                if let Err(exc) = res {
+                    throw_exception(exc)
                 }
-
-                Ok(())
-            });
-
-            // Safe: there are no pendings drops.
-            if let Err(exc) = res {
-                throw_exception(exc)
             }
+            Err(_) => panic!("Not called from Julia"),
         }
-        Err(_) => panic!("Not called from Julia"),
     }
 }
 

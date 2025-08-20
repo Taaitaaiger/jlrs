@@ -4,8 +4,8 @@ use jlrs::{
             array::{ArrayRet, RankedArrayRet, TypedArrayRet, TypedRankedArrayRet},
             ccall_ref::{CCallRef, CCallRefRet},
             value::{
-                typed::{TypedValue, TypedValueRet},
                 ValueRet,
+                typed::{TypedValue, TypedValueRet},
             },
         },
         types::{

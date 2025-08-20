@@ -13,10 +13,10 @@ use jl_sys::jl_gc_alloc_typed;
 use parking_lot::Mutex;
 
 use super::{
+    Managed, Weak,
     module::JlrsCore,
     private::ManagedPriv,
     value::{Value, ValueData, ValueRet, WeakValue},
-    Managed, Weak,
 };
 use crate::{
     call::Call,
@@ -31,7 +31,7 @@ use crate::{
         gc::gc_safe,
         get_tls,
         scope::LocalScopeExt,
-        target::{unrooted::Unrooted, TargetResult},
+        target::{TargetResult, unrooted::Unrooted},
     },
     prelude::{DataType, JlrsResult, Target, TargetType},
     private::Private,
@@ -104,21 +104,25 @@ where
     }
 
     unsafe fn notify(self) {
-        let func = uv_async_send_func();
-        let cond = self.unwrap_non_null(Private).as_ref().cond;
-        let handle_ref = cond.ptr().cast::<*mut c_void>().as_ref();
-        let handle = *handle_ref;
+        unsafe {
+            let func = uv_async_send_func();
+            let cond = self.unwrap_non_null(Private).as_ref().cond;
+            let handle_ref = cond.ptr().cast::<*mut c_void>().as_ref();
+            let handle = *handle_ref;
 
-        func(handle);
+            func(handle);
+        }
     }
 
     unsafe fn set_join_handle(self, handle: JoinHandle<JlrsResult<()>>) {
-        let layout = self
-            .unwrap_non_null(Private)
-            .cast::<BackgroundTaskLayout<T>>()
-            .as_ref();
-        let mut guard = layout.thread_handle.lock();
-        *guard = Some(handle);
+        unsafe {
+            let layout = self
+                .unwrap_non_null(Private)
+                .cast::<BackgroundTaskLayout<T>>()
+                .as_ref();
+            let mut guard = layout.thread_handle.lock();
+            *guard = Some(handle);
+        }
     }
 }
 
@@ -286,14 +290,13 @@ where
 
     fn fetch(&self) -> JlrsResult<T::Layout> {
         // This blocks Julia
-        if let Some(x) = self.thread_handle.lock().take() {
-            match unsafe { gc_safe(|| x.join()) } {
+        match self.thread_handle.lock().take() {
+            Some(x) => match unsafe { gc_safe(|| x.join()) } {
                 Ok(Ok(_)) => Ok(self.atomic.clone()),
                 Ok(Err(e)) => Err(e)?,
                 Err(_e) => Err(JlrsError::exception("background task panicked"))?,
-            }
-        } else {
-            Err(JlrsError::exception("already joined"))?
+            },
+            _ => Err(JlrsError::exception("already joined"))?,
         }
     }
 }
@@ -349,14 +352,16 @@ where
     T: 'static + HasLayout<'static, 'static>,
     T::Layout: IsBits + Clone + CCallReturn,
 {
-    let res = handle
-        .unwrap_non_null(Private)
-        .as_ref()
-        .fetch()
-        .return_or_throw();
+    unsafe {
+        let res = handle
+            .unwrap_non_null(Private)
+            .as_ref()
+            .fetch()
+            .return_or_throw();
 
-    let unrooted = Unrooted::new();
-    Value::try_new_with::<T, _, _>(&unrooted, res)
-        .return_or_throw()
-        .leak()
+        let unrooted = Unrooted::new();
+        Value::try_new_with::<T, _, _>(&unrooted, res)
+            .return_or_throw()
+            .leak()
+    }
 }

@@ -6,7 +6,7 @@ use jl_sys::jl_atexit_hook;
 
 use super::IsActive;
 use crate::{
-    memory::scope::{private::LocalScopePriv, LocalScope},
+    memory::scope::{LocalScope, private::LocalScopePriv},
     runtime::state::set_exit,
 };
 

@@ -344,7 +344,7 @@ pub trait Call<'data>: private::CallPriv {
     where
         Tgt: Target<'target>,
     {
-        self.call(target, [])
+        unsafe { self.call(target, []) }
     }
 
     /// Call a function with one argument.
@@ -367,7 +367,7 @@ pub trait Call<'data>: private::CallPriv {
     where
         Tgt: Target<'target>,
     {
-        self.call(target, [arg0])
+        unsafe { self.call(target, [arg0]) }
     }
 
     /// Call a function with two arguments.
@@ -391,7 +391,7 @@ pub trait Call<'data>: private::CallPriv {
     where
         Tgt: Target<'target>,
     {
-        self.call(target, [arg0, arg1])
+        unsafe { self.call(target, [arg0, arg1]) }
     }
 
     /// Call a function with three arguments.
@@ -416,7 +416,7 @@ pub trait Call<'data>: private::CallPriv {
     where
         Tgt: Target<'target>,
     {
-        self.call(target, [arg0, arg1, arg2])
+        unsafe { self.call(target, [arg0, arg1, arg2]) }
     }
 
     /// Call a function with an arbitrary number arguments.
@@ -503,27 +503,29 @@ impl<'data> Call<'data> for WithKeywords<'_, 'data> {
         V: Values<'value, 'data, N>,
         Tgt: Target<'target>,
     {
-        let func = kwcall_function(&target);
+        unsafe {
+            let func = kwcall_function(&target);
 
-        let values = args.into_extended_pointers_with_start(
-            [
-                self.keywords().unwrap(Private),
-                self.function().unwrap(Private),
-            ],
-            Private,
-        );
-        let values = values.as_ref();
+            let values = args.into_extended_pointers_with_start(
+                [
+                    self.keywords().unwrap(Private),
+                    self.function().unwrap(Private),
+                ],
+                Private,
+            );
+            let values = values.as_ref();
 
-        let res = jl_call(func, values.as_ptr() as *mut _, values.len() as _);
-        let exc = jl_exception_occurred();
+            let res = jl_call(func, values.as_ptr() as *mut _, values.len() as _);
+            let exc = jl_exception_occurred();
 
-        let res = if exc.is_null() {
-            Ok(NonNull::new_unchecked(res))
-        } else {
-            Err(NonNull::new_unchecked(exc))
-        };
+            let res = if exc.is_null() {
+                Ok(NonNull::new_unchecked(res))
+            } else {
+                Err(NonNull::new_unchecked(exc))
+            };
 
-        target.result_from_ptr(res, Private)
+            target.result_from_ptr(res, Private)
+        }
     }
 
     #[inline]
@@ -536,19 +538,21 @@ impl<'data> Call<'data> for WithKeywords<'_, 'data> {
         V: Values<'value, 'data, N>,
         Tgt: Target<'target>,
     {
-        let func = kwcall_function(&target);
+        unsafe {
+            let func = kwcall_function(&target);
 
-        let values = args.into_extended_pointers_with_start(
-            [
-                self.keywords().unwrap(Private),
-                self.function().unwrap(Private),
-            ],
-            Private,
-        );
-        let values = values.as_ref();
+            let values = args.into_extended_pointers_with_start(
+                [
+                    self.keywords().unwrap(Private),
+                    self.function().unwrap(Private),
+                ],
+                Private,
+            );
+            let values = values.as_ref();
 
-        let res = jlrs_call_unchecked(func, values.as_ptr() as *mut _, values.len() as _);
-        target.data_from_ptr(NonNull::new_unchecked(res), Private)
+            let res = jlrs_call_unchecked(func, values.as_ptr() as *mut _, values.len() as _);
+            target.data_from_ptr(NonNull::new_unchecked(res), Private)
+        }
     }
 }
 

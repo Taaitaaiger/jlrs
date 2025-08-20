@@ -1,6 +1,6 @@
 use syn::{
-    parse_quote, punctuated::Punctuated, FnArg, GenericArgument, Ident, PatType, Path,
-    PathArguments, ReturnType, Type, TypePath,
+    FnArg, GenericArgument, Ident, PatType, Path, PathArguments, ReturnType, Type, TypePath,
+    parse_quote, punctuated::Punctuated,
 };
 
 use super::module_item::generics::GenericEnvironment;

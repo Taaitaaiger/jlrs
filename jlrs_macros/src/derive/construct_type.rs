@@ -1,6 +1,6 @@
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{spanned::Spanned, Token};
+use syn::{Token, spanned::Spanned};
 
 use super::attrs::JlrsTypeAttrs;
 
@@ -9,7 +9,10 @@ pub fn impl_construct_type(ast: &syn::DeriveInput) -> syn::Result<TokenStream> {
 
     let mut attrs = JlrsTypeAttrs::parse(ast);
     let Some(jl_type) = attrs.julia_type.take() else {
-        return Err(syn::Error::new(ast.span(), "ConstructType can only be derived if the corresponding Julia type is set with #[julia_type = \"Main.MyModule.Submodule.StructType\"]"));
+        return Err(syn::Error::new(
+            ast.span(),
+            "ConstructType can only be derived if the corresponding Julia type is set with #[julia_type = \"Main.MyModule.Submodule.StructType\"]",
+        ));
     };
 
     let lifetimes = ast.generics.lifetimes().map(|_| -> syn::LifetimeParam {

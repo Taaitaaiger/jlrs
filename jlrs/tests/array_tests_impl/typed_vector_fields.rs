@@ -1,7 +1,7 @@
 #[cfg(feature = "local-rt")]
 pub(crate) mod tests {
     use jlrs::{
-        data::managed::array::{dimensions::Dims, How, TypedVector},
+        data::managed::array::{How, TypedVector, dimensions::Dims},
         prelude::*,
     };
 

@@ -1,4 +1,4 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, black_box, criterion_group, criterion_main};
 use jlrs::{
     memory::{gc::Gc, target::frame::GcFrame},
     prelude::*,
@@ -160,11 +160,11 @@ fn set_ranked_array_1d_set_bits(frame: &mut GcFrame, c: &mut Criterion) {
 #[inline(never)]
 fn access_array_2d_index_bits(frame: &mut GcFrame, c: &mut Criterion) {
     frame.scope(|mut frame| {
-        let arr = TypedArray::<f64>::new(&mut frame, (4, 4)).unwrap();
+        let arr = TypedArray::<f64>::new(&mut frame, [4, 4]).unwrap();
         let accessor = unsafe { arr.bits_data() };
 
         c.bench_function("Array<f64,2>_access_index", |b| {
-            b.iter(|| black_box(accessor[(2, 3)]))
+            b.iter(|| black_box(accessor[[2, 3]]))
         });
     })
 }
@@ -172,11 +172,11 @@ fn access_array_2d_index_bits(frame: &mut GcFrame, c: &mut Criterion) {
 #[inline(never)]
 fn access_ranked_array_2d_index_bits(frame: &mut GcFrame, c: &mut Criterion) {
     frame.scope(|mut frame| {
-        let arr = TypedMatrix::<f64>::new(&mut frame, (4, 4)).unwrap();
+        let arr = TypedMatrix::<f64>::new(&mut frame, [4, 4]).unwrap();
         let accessor = unsafe { arr.bits_data() };
 
         c.bench_function("TypedMatrix<f64>_access_index", |b| {
-            b.iter(|| black_box(accessor[(2, 3)]))
+            b.iter(|| black_box(accessor[[2, 3]]))
         });
     })
 }
@@ -184,11 +184,11 @@ fn access_ranked_array_2d_index_bits(frame: &mut GcFrame, c: &mut Criterion) {
 #[inline(never)]
 fn set_array_2d_index_bits(frame: &mut GcFrame, c: &mut Criterion) {
     frame.scope(|mut frame| {
-        let mut arr = TypedArray::<f64>::new(&mut frame, (4, 4)).unwrap();
+        let mut arr = TypedArray::<f64>::new(&mut frame, [4, 4]).unwrap();
         let mut accessor = unsafe { arr.bits_data_mut() };
 
         c.bench_function("Array<f64,2>_set_index", |b| {
-            b.iter(|| black_box(accessor[(2, 2)] = 1.0))
+            b.iter(|| black_box(accessor[[2, 2]] = 1.0))
         });
     })
 }
@@ -196,11 +196,11 @@ fn set_array_2d_index_bits(frame: &mut GcFrame, c: &mut Criterion) {
 #[inline(never)]
 fn set_ranked_array_2d_index_bits(frame: &mut GcFrame, c: &mut Criterion) {
     frame.scope(|mut frame| {
-        let mut arr = TypedMatrix::<f64>::new(&mut frame, (4, 4)).unwrap();
+        let mut arr = TypedMatrix::<f64>::new(&mut frame, [4, 4]).unwrap();
         let mut accessor = unsafe { arr.bits_data_mut() };
 
         c.bench_function("TypedMatrix<f64>_set_index", |b| {
-            b.iter(|| black_box(accessor[(2, 2)] = 1.0))
+            b.iter(|| black_box(accessor[[2, 2]] = 1.0))
         });
     })
 }
@@ -208,11 +208,11 @@ fn set_ranked_array_2d_index_bits(frame: &mut GcFrame, c: &mut Criterion) {
 #[inline(never)]
 fn access_array_2d_get_bits(frame: &mut GcFrame, c: &mut Criterion) {
     frame.scope(|mut frame| {
-        let arr = TypedArray::<f64>::new(&mut frame, (4, 4)).unwrap();
+        let arr = TypedArray::<f64>::new(&mut frame, [4, 4]).unwrap();
         let accessor = unsafe { arr.bits_data() };
 
         c.bench_function("Array<f64,2>_access_get", |b| {
-            b.iter(|| black_box(accessor.get((2, 3))))
+            b.iter(|| black_box(accessor.get([2, 3])))
         });
     })
 }
@@ -220,11 +220,11 @@ fn access_array_2d_get_bits(frame: &mut GcFrame, c: &mut Criterion) {
 #[inline(never)]
 fn access_ranked_array_2d_get_bits(frame: &mut GcFrame, c: &mut Criterion) {
     frame.scope(|mut frame| {
-        let arr = TypedMatrix::<f64>::new(&mut frame, (4, 4)).unwrap();
+        let arr = TypedMatrix::<f64>::new(&mut frame, [4, 4]).unwrap();
         let accessor = unsafe { arr.bits_data() };
 
         c.bench_function("TypedMatrix<f64>_access_get", |b| {
-            b.iter(|| black_box(accessor.get((2, 3))))
+            b.iter(|| black_box(accessor.get([2, 3])))
         });
     })
 }
@@ -232,11 +232,11 @@ fn access_ranked_array_2d_get_bits(frame: &mut GcFrame, c: &mut Criterion) {
 #[inline(never)]
 fn set_array_2d_set_bits(frame: &mut GcFrame, c: &mut Criterion) {
     frame.scope(|mut frame| {
-        let mut arr = TypedArray::<f64>::new(&mut frame, (4, 4)).unwrap();
+        let mut arr = TypedArray::<f64>::new(&mut frame, [4, 4]).unwrap();
         let mut accessor = unsafe { arr.bits_data_mut() };
 
         c.bench_function("Array<f64,2>_set_set", |b| {
-            b.iter(|| black_box(accessor.set((2, 2), 1.0)))
+            b.iter(|| black_box(accessor.set([2, 2], 1.0)))
         });
     })
 }
@@ -244,11 +244,11 @@ fn set_array_2d_set_bits(frame: &mut GcFrame, c: &mut Criterion) {
 #[inline(never)]
 fn set_ranked_array_2d_set_bits(frame: &mut GcFrame, c: &mut Criterion) {
     frame.scope(|mut frame| {
-        let mut arr = TypedMatrix::<f64>::new(&mut frame, (4, 4)).unwrap();
+        let mut arr = TypedMatrix::<f64>::new(&mut frame, [4, 4]).unwrap();
         let mut accessor = unsafe { arr.bits_data_mut() };
 
         c.bench_function("TypedMatrix<f64>_set_set", |b| {
-            b.iter(|| black_box(accessor.set((2, 2), 1.0)))
+            b.iter(|| black_box(accessor.set([2, 2], 1.0)))
         });
     })
 }
@@ -256,7 +256,7 @@ fn set_ranked_array_2d_set_bits(frame: &mut GcFrame, c: &mut Criterion) {
 #[inline(never)]
 fn access_array_2d_index_arr_bits(frame: &mut GcFrame, c: &mut Criterion) {
     frame.scope(|mut frame| {
-        let arr = TypedArray::<f64>::new(&mut frame, (4, 4)).unwrap();
+        let arr = TypedArray::<f64>::new(&mut frame, [4, 4]).unwrap();
         let accessor = unsafe { arr.bits_data() };
 
         c.bench_function("Array<f64,2>_access_arr_index", |b| {
@@ -268,7 +268,7 @@ fn access_array_2d_index_arr_bits(frame: &mut GcFrame, c: &mut Criterion) {
 #[inline(never)]
 fn access_ranked_array_2d_index_arr_bits(frame: &mut GcFrame, c: &mut Criterion) {
     frame.scope(|mut frame| {
-        let arr = TypedMatrix::<f64>::new(&mut frame, (4, 4)).unwrap();
+        let arr = TypedMatrix::<f64>::new(&mut frame, [4, 4]).unwrap();
         let accessor = unsafe { arr.bits_data() };
 
         c.bench_function("TypedMatrix<f64>_access_arr_index", |b| {
@@ -280,7 +280,7 @@ fn access_ranked_array_2d_index_arr_bits(frame: &mut GcFrame, c: &mut Criterion)
 #[inline(never)]
 fn set_array_2d_index_arr_bits(frame: &mut GcFrame, c: &mut Criterion) {
     frame.scope(|mut frame| {
-        let mut arr = TypedArray::<f64>::new(&mut frame, (4, 4)).unwrap();
+        let mut arr = TypedArray::<f64>::new(&mut frame, [4, 4]).unwrap();
         let mut accessor = unsafe { arr.bits_data_mut() };
 
         c.bench_function("Array<f64,2>_set_arr_index", |b| {
@@ -292,7 +292,7 @@ fn set_array_2d_index_arr_bits(frame: &mut GcFrame, c: &mut Criterion) {
 #[inline(never)]
 fn set_ranked_array_2d_index_arr_bits(frame: &mut GcFrame, c: &mut Criterion) {
     frame.scope(|mut frame| {
-        let mut arr = TypedMatrix::<f64>::new(&mut frame, (4, 4)).unwrap();
+        let mut arr = TypedMatrix::<f64>::new(&mut frame, [4, 4]).unwrap();
         let mut accessor = unsafe { arr.bits_data_mut() };
 
         c.bench_function("TypedMatrix<f64>_set_arr_index", |b| {
@@ -304,7 +304,7 @@ fn set_ranked_array_2d_index_arr_bits(frame: &mut GcFrame, c: &mut Criterion) {
 #[inline(never)]
 fn access_array_2d_get_arr_bits(frame: &mut GcFrame, c: &mut Criterion) {
     frame.scope(|mut frame| {
-        let arr = TypedArray::<f64>::new(&mut frame, (4, 4)).unwrap();
+        let arr = TypedArray::<f64>::new(&mut frame, [4, 4]).unwrap();
         let accessor = unsafe { arr.bits_data() };
 
         c.bench_function("Array<f64,2>_access_arr_get", |b| {
@@ -316,7 +316,7 @@ fn access_array_2d_get_arr_bits(frame: &mut GcFrame, c: &mut Criterion) {
 #[inline(never)]
 fn access_ranked_array_2d_get_arr_bits(frame: &mut GcFrame, c: &mut Criterion) {
     frame.scope(|mut frame| {
-        let arr = TypedMatrix::<f64>::new(&mut frame, (4, 4)).unwrap();
+        let arr = TypedMatrix::<f64>::new(&mut frame, [4, 4]).unwrap();
         let accessor = unsafe { arr.bits_data() };
 
         c.bench_function("TypedMatrix<f64>_access_arr_get", |b| {
@@ -328,7 +328,7 @@ fn access_ranked_array_2d_get_arr_bits(frame: &mut GcFrame, c: &mut Criterion) {
 #[inline(never)]
 fn set_array_2d_set_arr_bits(frame: &mut GcFrame, c: &mut Criterion) {
     frame.scope(|mut frame| {
-        let mut arr = TypedArray::<f64>::new(&mut frame, (4, 4)).unwrap();
+        let mut arr = TypedArray::<f64>::new(&mut frame, [4, 4]).unwrap();
         let mut accessor = unsafe { arr.bits_data_mut() };
 
         c.bench_function("Array<f64,2>_set_arr_set", |b| {
@@ -340,7 +340,7 @@ fn set_array_2d_set_arr_bits(frame: &mut GcFrame, c: &mut Criterion) {
 #[inline(never)]
 fn set_ranked_array_2d_set_arr_bits(frame: &mut GcFrame, c: &mut Criterion) {
     frame.scope(|mut frame| {
-        let mut arr = TypedMatrix::<f64>::new(&mut frame, (4, 4)).unwrap();
+        let mut arr = TypedMatrix::<f64>::new(&mut frame, [4, 4]).unwrap();
         let mut accessor = unsafe { arr.bits_data_mut() };
 
         c.bench_function("TypedMatrix<f64>_set_arr_set", |b| {

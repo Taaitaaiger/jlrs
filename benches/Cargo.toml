@@ -2,7 +2,7 @@
 name = "benches"
 version = "0.0.0"
 publish = false
-edition = "2021"
+edition = "2024"
 
 [features]
 lto = ["jlrs/lto"]
@@ -12,10 +12,10 @@ jlrs = { version = "0.22", path = "../jlrs", features = ["full"] }
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["html_reports", "async"] }
-tokio ={ version = "1", features = ["rt"]}
+tokio = { version = "1", features = ["rt"]}
 
 [target.'cfg(unix)'.dev-dependencies]
-pprof = { version = "0.14", features = ["flamegraph", "criterion"] }
+pprof = { version = "0.15", features = ["flamegraph", "criterion"] }
 
 [profile.bench]
 debug = true

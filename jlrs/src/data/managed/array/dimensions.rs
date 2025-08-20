@@ -21,7 +21,7 @@ use jl_sys::{
 };
 use jlrs_macros::julia_version;
 
-use super::{sized_dim_tuple, unsized_dim_tuple, ArrayData};
+use super::{ArrayData, sized_dim_tuple, unsized_dim_tuple};
 use crate::{
     data::{
         managed::{datatype::DataTypeData, private::ManagedPriv as _},
@@ -144,20 +144,22 @@ pub unsafe trait Dims: Sized + Debug {
     ///
     /// Safety: `dim_index` must be in-bounds of `self`.
     unsafe fn index_of_unchecked<D: Dims>(&self, dim_index: &D) -> usize {
-        // Assert that the indices are compatible
-        let _: () = <(Self, D) as CompatibleIndices<Self, D>>::ASSERT_COMPATIBLE;
+        unsafe {
+            // Assert that the indices are compatible
+            let _: () = <(Self, D) as CompatibleIndices<Self, D>>::ASSERT_COMPATIBLE;
 
-        let rank = self.rank();
-        if rank == 0 {
-            return 0;
+            let rank = self.rank();
+            if rank == 0 {
+                return 0;
+            }
+
+            let init = dim_index.n_elements_unchecked(rank - 1);
+            let idx = (0..rank - 1).rev().fold(init, |idx_acc, dim| {
+                idx_acc * self.n_elements_unchecked(dim) + dim_index.n_elements_unchecked(dim)
+            });
+
+            idx
         }
-
-        let init = dim_index.n_elements_unchecked(rank - 1);
-        let idx = (0..rank - 1).rev().fold(init, |idx_acc, dim| {
-            idx_acc * self.n_elements_unchecked(dim) + dim_index.n_elements_unchecked(dim)
-        });
-
-        idx
     }
 
     /// Returns the rank of `self`.
@@ -232,7 +234,7 @@ unsafe impl<const N: usize> Dims for [usize; N] {
 
     #[inline]
     unsafe fn n_elements_unchecked(&self, dimension: usize) -> usize {
-        *self.get_unchecked(dimension)
+        unsafe { *self.get_unchecked(dimension) }
     }
 }
 
@@ -255,7 +257,7 @@ unsafe impl<const N: usize> Dims for &[usize; N] {
 
     #[inline]
     unsafe fn n_elements_unchecked(&self, dimension: usize) -> usize {
-        *self.get_unchecked(dimension)
+        unsafe { *self.get_unchecked(dimension) }
     }
 }
 
@@ -278,7 +280,7 @@ unsafe impl Dims for &[usize] {
 
     #[inline]
     unsafe fn n_elements_unchecked(&self, dimension: usize) -> usize {
-        *self.get_unchecked(dimension)
+        unsafe { *self.get_unchecked(dimension) }
     }
 }
 
@@ -308,7 +310,7 @@ unsafe impl<const N: isize> Dims for ArrayDimensions<'_, N> {
 
     #[inline]
     unsafe fn n_elements_unchecked(&self, dimension: usize) -> usize {
-        self.as_slice().get_unchecked(dimension).get().read()
+        unsafe { self.as_slice().get_unchecked(dimension).get().read() }
     }
 }
 
@@ -328,7 +330,7 @@ unsafe impl Dims for Dimensions {
 
     #[inline]
     unsafe fn n_elements_unchecked(&self, dimension: usize) -> usize {
-        *self.as_slice().get_unchecked(dimension)
+        unsafe { *self.as_slice().get_unchecked(dimension) }
     }
 }
 
@@ -401,25 +403,27 @@ pub unsafe trait DimsExt: Dims {
     where
         Tgt: Target<'target>,
     {
-        let array_type = array_type.unwrap(Private);
+        unsafe {
+            let array_type = array_type.unwrap(Private);
 
-        let arr = match Self::RANK {
-            1 => jl_alloc_array_1d(array_type, self.n_elements_unchecked(0)),
-            2 => jl_alloc_array_2d(
-                array_type,
-                self.n_elements_unchecked(0),
-                self.n_elements_unchecked(1),
-            ),
-            3 => jl_alloc_array_3d(
-                array_type,
-                self.n_elements_unchecked(0),
-                self.n_elements_unchecked(1),
-                self.n_elements_unchecked(2),
-            ),
-            _ => self.alloc_large(array_type, &target),
-        };
+            let arr = match Self::RANK {
+                1 => jl_alloc_array_1d(array_type, self.n_elements_unchecked(0)),
+                2 => jl_alloc_array_2d(
+                    array_type,
+                    self.n_elements_unchecked(0),
+                    self.n_elements_unchecked(1),
+                ),
+                3 => jl_alloc_array_3d(
+                    array_type,
+                    self.n_elements_unchecked(0),
+                    self.n_elements_unchecked(1),
+                    self.n_elements_unchecked(2),
+                ),
+                _ => self.alloc_large(array_type, &target),
+            };
 
-        Array::wrap_non_null(NonNull::new_unchecked(arr), Private).root(target)
+            Array::wrap_non_null(NonNull::new_unchecked(arr), Private).root(target)
+        }
     }
 
     #[cold]
@@ -453,12 +457,14 @@ pub unsafe trait DimsExt: Dims {
     where
         Tgt: Target<'target>,
     {
-        let slicer = self.to_slicer();
-        let slice = slicer.as_slice();
-        let len = slice.len();
-        let ptr = slice.as_ptr();
+        unsafe {
+            let slicer = self.to_slicer();
+            let slice = slicer.as_slice();
+            let len = slice.len();
+            let ptr = slice.as_ptr();
 
-        jl_alloc_array_nd(array_type, ptr as *mut _, len)
+            jl_alloc_array_nd(array_type, ptr as *mut _, len)
+        }
     }
 
     #[doc(hidden)]
@@ -469,17 +475,19 @@ pub unsafe trait DimsExt: Dims {
         array_type: Value,
         data: *mut c_void,
     ) -> ArrayData<'target, 'data, Tgt> {
-        let array_type = array_type.unwrap(Private);
+        unsafe {
+            let array_type = array_type.unwrap(Private);
 
-        let arr = match self.rank() {
-            1 => jl_ptr_to_array_1d(array_type, data, self.n_elements_unchecked(0), 0),
-            _ => target.local_scope::<_, 1>(|frame| {
-                let tuple = unsized_dim_tuple(frame, self);
-                jl_ptr_to_array(array_type, data, tuple.unwrap(Private), 0)
-            }),
-        };
+            let arr = match self.rank() {
+                1 => jl_ptr_to_array_1d(array_type, data, self.n_elements_unchecked(0), 0),
+                _ => target.local_scope::<_, 1>(|frame| {
+                    let tuple = unsized_dim_tuple(frame, self);
+                    jl_ptr_to_array(array_type, data, tuple.unwrap(Private), 0)
+                }),
+            };
 
-        target.data_from_ptr(NonNull::new_unchecked(arr), Private)
+            target.data_from_ptr(NonNull::new_unchecked(arr), Private)
+        }
     }
 
     #[doc(hidden)]
@@ -567,26 +575,28 @@ pub unsafe trait RankedDims: Dims {
     where
         Tgt: Target<'target>,
     {
-        let _: () = Self::ASSERT_RANKED;
-        let array_type = array_type.unwrap(Private);
+        unsafe {
+            let _: () = Self::ASSERT_RANKED;
+            let array_type = array_type.unwrap(Private);
 
-        let arr = match Self::RANK {
-            1 => jl_alloc_array_1d(array_type, self.n_elements_unchecked(0)),
-            2 => jl_alloc_array_2d(
-                array_type,
-                self.n_elements_unchecked(0),
-                self.n_elements_unchecked(1),
-            ),
-            3 => jl_alloc_array_3d(
-                array_type,
-                self.n_elements_unchecked(0),
-                self.n_elements_unchecked(1),
-                self.n_elements_unchecked(2),
-            ),
-            _ => self.alloc_large(array_type, &target),
-        };
+            let arr = match Self::RANK {
+                1 => jl_alloc_array_1d(array_type, self.n_elements_unchecked(0)),
+                2 => jl_alloc_array_2d(
+                    array_type,
+                    self.n_elements_unchecked(0),
+                    self.n_elements_unchecked(1),
+                ),
+                3 => jl_alloc_array_3d(
+                    array_type,
+                    self.n_elements_unchecked(0),
+                    self.n_elements_unchecked(1),
+                    self.n_elements_unchecked(2),
+                ),
+                _ => self.alloc_large(array_type, &target),
+            };
 
-        Array::wrap_non_null(NonNull::new_unchecked(arr), Private).root(target)
+            Array::wrap_non_null(NonNull::new_unchecked(arr), Private).root(target)
+        }
     }
 
     #[cold]
@@ -621,13 +631,15 @@ pub unsafe trait RankedDims: Dims {
     where
         Tgt: Target<'target>,
     {
-        let _: () = Self::ASSERT_RANKED;
-        let slicer = self.to_slicer();
-        let slice = slicer.as_slice();
-        let len = slice.len();
-        let ptr = slice.as_ptr();
+        unsafe {
+            let _: () = Self::ASSERT_RANKED;
+            let slicer = self.to_slicer();
+            let slice = slicer.as_slice();
+            let len = slice.len();
+            let ptr = slice.as_ptr();
 
-        jl_alloc_array_nd(array_type, ptr as *mut _, len)
+            jl_alloc_array_nd(array_type, ptr as *mut _, len)
+        }
     }
 
     #[doc(hidden)]
@@ -638,19 +650,21 @@ pub unsafe trait RankedDims: Dims {
         array_type: Value,
         data: *mut c_void,
     ) -> ArrayData<'target, 'data, Tgt> {
-        let _: () = Self::ASSERT_RANKED;
+        unsafe {
+            let _: () = Self::ASSERT_RANKED;
 
-        let array_type = array_type.unwrap(Private);
+            let array_type = array_type.unwrap(Private);
 
-        let arr = match Self::RANK {
-            1 => jl_ptr_to_array_1d(array_type, data, self.n_elements_unchecked(0), 0),
-            _ => target.local_scope::<_, 1>(|frame| {
-                let tuple = sized_dim_tuple(frame, self);
-                jl_ptr_to_array(array_type, data, tuple.unwrap(Private), 0)
-            }),
-        };
+            let arr = match Self::RANK {
+                1 => jl_ptr_to_array_1d(array_type, data, self.n_elements_unchecked(0), 0),
+                _ => target.local_scope::<_, 1>(|frame| {
+                    let tuple = sized_dim_tuple(frame, self);
+                    jl_ptr_to_array(array_type, data, tuple.unwrap(Private), 0)
+                }),
+            };
 
-        target.data_from_ptr(NonNull::new_unchecked(arr), Private)
+            target.data_from_ptr(NonNull::new_unchecked(arr), Private)
+        }
     }
 
     #[doc(hidden)]
@@ -762,8 +776,8 @@ impl Dimensions {
     #[inline]
     pub fn as_slice(&self) -> &[usize] {
         match self {
-            Dimensions::Few(ref v) => &v[1..v[0] as usize + 1],
-            Dimensions::Many(ref v) => &v[1..],
+            Dimensions::Few(v) => &v[1..v[0] as usize + 1],
+            Dimensions::Many(v) => &v[1..],
         }
     }
 }

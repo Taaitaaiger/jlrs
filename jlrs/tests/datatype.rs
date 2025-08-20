@@ -216,11 +216,13 @@ mod tests {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
                 stack.scope(|frame| {
-                    assert!(Value::array_int32_type(&frame)
-                        .cast::<DataType>()
-                        .unwrap()
-                        .instance()
-                        .is_none());
+                    assert!(
+                        Value::array_int32_type(&frame)
+                            .cast::<DataType>()
+                            .unwrap()
+                            .instance()
+                            .is_none()
+                    );
 
                     assert!(DataType::nothing_type(&frame).instance().is_some());
                 })

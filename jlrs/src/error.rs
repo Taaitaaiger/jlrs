@@ -6,9 +6,9 @@ use thiserror::Error;
 
 use crate::{
     data::managed::{
+        RefRet, Ret,
         array::dimensions::Dimensions,
         value::{Value, ValueRet, WeakValue},
-        RefRet, Ret,
     },
     prelude::{Managed, ManagedWeak, Target, TargetType, ValueData},
 };
@@ -188,9 +188,11 @@ impl<'scope, V> WeakJuliaResultExt<'scope, V> for WeakJuliaResult<'scope, 'stati
     where
         V: ManagedWeak<'scope, 'static>,
     {
-        match self {
-            Ok(v) => Ok(v.into_weak().root(target)),
-            Err(e) => Err(e.root(target)),
+        unsafe {
+            match self {
+                Ok(v) => Ok(v.into_weak().root(target)),
+                Err(e) => Err(e.root(target)),
+            }
         }
     }
 
@@ -198,9 +200,11 @@ impl<'scope, V> WeakJuliaResultExt<'scope, V> for WeakJuliaResult<'scope, 'stati
         self,
         target: Tgt,
     ) -> JuliaResultDataU<'target, 'static, V, Tgt> {
-        match self {
-            Ok(v) => Ok(v),
-            Err(e) => Err(e.root(target)),
+        unsafe {
+            match self {
+                Ok(v) => Ok(v),
+                Err(e) => Err(e.root(target)),
+            }
         }
     }
 }
@@ -331,7 +335,9 @@ pub enum AccessError {
 /// Data instantiation errors.
 #[derive(Debug, Error, Clone)]
 pub enum InstantiationError {
-    #[error("NamedTuples must have an equal number of keys and values, got {n_names} keys and {n_values} values")]
+    #[error(
+        "NamedTuples must have an equal number of keys and values, got {n_names} keys and {n_values} values"
+    )]
     NamedTupleSizeMismatch { n_names: usize, n_values: usize },
     #[error("expected a shape for {vec_size} elements, got a shape for {dim_size} elements")]
     ArraySizeMismatch { dim_size: usize, vec_size: usize },

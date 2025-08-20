@@ -11,7 +11,7 @@ use std::{
     cell::{Cell, UnsafeCell},
     ffi::c_void,
     fmt,
-    ptr::{null_mut, NonNull},
+    ptr::{NonNull, null_mut},
 };
 
 use jl_sys::{jl_gc_mark_queue_objarray, jl_sym_t, jl_tagged_gensym, jl_value_t, jlrs_gc_wb};
@@ -19,11 +19,11 @@ use jl_sys::{jl_gc_mark_queue_objarray, jl_sym_t, jl_tagged_gensym, jl_value_t, 
 use crate::{
     call::Call,
     data::{
-        managed::{module::Module, private::ManagedPriv, symbol::Symbol, value::Value, Managed},
+        managed::{Managed, module::Module, private::ManagedPriv, symbol::Symbol, value::Value},
         types::foreign_type::{ForeignType, OpaqueType},
     },
     gc_safe::GcSafeOnceLock,
-    memory::{target::unrooted::Unrooted, PTls},
+    memory::{PTls, target::unrooted::Unrooted},
     prelude::{LocalScope, Target},
     private::Private,
 };
@@ -133,14 +133,16 @@ impl Stack {
     // Safety: `root` must point to data that hasn't been freed yet.
     #[inline]
     pub(crate) unsafe fn push_root(&self, root: NonNull<jl_value_t>) {
-        {
-            // We can only get here while the GC isn't running, so there are
-            // no active borrows.
-            let slots = &mut *self.slots.get();
-            slots.push(Cell::new(root.cast().as_ptr()));
-        }
+        unsafe {
+            {
+                // We can only get here while the GC isn't running, so there are
+                // no active borrows.
+                let slots = &mut *self.slots.get();
+                slots.push(Cell::new(root.cast().as_ptr()));
+            }
 
-        jlrs_gc_wb(self as *const _ as *mut _, root.as_ptr().cast());
+            jlrs_gc_wb(self as *const _ as *mut _, root.as_ptr().cast());
+        }
     }
 
     // Reserve a slot on the stack.
@@ -149,12 +151,14 @@ impl Stack {
     // is popped from the stack.
     #[inline]
     pub(crate) unsafe fn reserve_slot(&self) -> usize {
-        // We can only get here while the GC isn't running, so there are
-        // no active borrows.
-        let slots = &mut *self.slots.get();
-        let offset = slots.len();
-        slots.push(Cell::new(null_mut()));
-        offset
+        unsafe {
+            // We can only get here while the GC isn't running, so there are
+            // no active borrows.
+            let slots = &mut *self.slots.get();
+            let offset = slots.len();
+            slots.push(Cell::new(null_mut()));
+            offset
+        }
     }
 
     // Grow the stack capacity by at least `additional` slots
@@ -171,11 +175,13 @@ impl Stack {
     // Set the root at `offset`
     #[inline]
     pub(crate) unsafe fn set_root(&self, offset: usize, root: NonNull<jl_value_t>) {
-        // We can only get here while the GC isn't running, so there are
-        // no active borrows.
-        let slots = &*self.slots.get();
-        slots[offset].set(root.cast().as_ptr());
-        jlrs_gc_wb(self as *const _ as *mut _, root.as_ptr().cast());
+        unsafe {
+            // We can only get here while the GC isn't running, so there are
+            // no active borrows.
+            let slots = &*self.slots.get();
+            slots[offset].set(root.cast().as_ptr());
+            jlrs_gc_wb(self as *const _ as *mut _, root.as_ptr().cast());
+        }
     }
 
     // Pop roots from the stack, the new length is `offset`.
@@ -183,11 +189,13 @@ impl Stack {
     // Safety: must be called when a frame is popped from the stack.
     #[inline]
     pub(crate) unsafe fn pop_roots(&self, offset: usize) {
-        // We can only get here while the GC isn't running, so there are
-        // no active borrows.
-        let slots = &mut *self.slots.get();
-        slots.truncate(offset);
-        slots.shrink_to(offset);
+        unsafe {
+            // We can only get here while the GC isn't running, so there are
+            // no active borrows.
+            let slots = &mut *self.slots.get();
+            slots.truncate(offset);
+            slots.shrink_to(offset);
+        }
     }
 
     // Returns the size of the stack
@@ -209,8 +217,10 @@ impl Stack {
         allow(unused)
     )]
     pub(crate) unsafe fn alloc() -> *mut Self {
-        let global = Unrooted::new();
-        let stack = Value::new(global, Stack::default());
-        stack.ptr().cast().as_ptr()
+        unsafe {
+            let global = Unrooted::new();
+            let stack = Value::new(global, Stack::default());
+            stack.ptr().cast().as_ptr()
+        }
     }
 }

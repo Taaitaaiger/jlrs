@@ -17,7 +17,7 @@ mod tests {
         prelude::*,
     };
 
-    use super::derive_util::{derive_impls::*, JULIA_DERIVE};
+    use super::derive_util::{JULIA_DERIVE, derive_impls::*};
     fn derive_bits_type_bool() {
         JULIA_DERIVE.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
@@ -453,15 +453,17 @@ mod tests {
                     let jl_val = Value::new(&mut frame, rs_val.clone());
 
                     unsafe {
-                        assert!(Module::base(&frame)
-                            .global(&frame, "typeof")
-                            .unwrap()
-                            .as_managed()
-                            .call(&mut frame, [jl_val])
-                            .unwrap()
-                            .cast::<DataType>()
-                            .unwrap()
-                            .is::<BitsUInt8TupleInt32TupleInt16UInt16>());
+                        assert!(
+                            Module::base(&frame)
+                                .global(&frame, "typeof")
+                                .unwrap()
+                                .as_managed()
+                                .call(&mut frame, [jl_val])
+                                .unwrap()
+                                .cast::<DataType>()
+                                .unwrap()
+                                .is::<BitsUInt8TupleInt32TupleInt16UInt16>()
+                        );
                     }
 
                     let first = jl_val.get_nth_field(&mut frame, 0).unwrap();
@@ -474,9 +476,11 @@ mod tests {
                     );
 
                     assert!(jl_val.is::<BitsUInt8TupleInt32TupleInt16UInt16>());
-                    assert!(jl_val
-                        .unbox::<BitsUInt8TupleInt32TupleInt16UInt16>()
-                        .is_ok());
+                    assert!(
+                        jl_val
+                            .unbox::<BitsUInt8TupleInt32TupleInt16UInt16>()
+                            .is_ok()
+                    );
                 })
             })
         })
@@ -493,15 +497,17 @@ mod tests {
                     let v2 = Value::new(&mut frame, 2i32);
                     let jl_val = constr.call(&mut frame, [v2]).unwrap();
 
-                    assert!(Module::base(&frame)
-                        .global(&frame, "typeof")
-                        .unwrap()
-                        .as_managed()
-                        .call(&mut frame, [jl_val])
-                        .unwrap()
-                        .cast::<DataType>()
-                        .unwrap()
-                        .is::<SingleVariant>());
+                    assert!(
+                        Module::base(&frame)
+                            .global(&frame, "typeof")
+                            .unwrap()
+                            .as_managed()
+                            .call(&mut frame, [jl_val])
+                            .unwrap()
+                            .cast::<DataType>()
+                            .unwrap()
+                            .is::<SingleVariant>()
+                    );
 
                     assert!(jl_val.is::<SingleVariant>());
                     assert!(jl_val.unbox::<SingleVariant>().is_ok());
@@ -522,15 +528,17 @@ mod tests {
                     let v2 = Value::new(&mut frame, 2i32);
                     let jl_val = constr.call(&mut frame, [v2]).unwrap();
 
-                    assert!(Module::base(&frame)
-                        .global(&frame, "typeof")
-                        .unwrap()
-                        .as_managed()
-                        .call(&mut frame, [jl_val])
-                        .unwrap()
-                        .cast::<DataType>()
-                        .unwrap()
-                        .is::<SizeAlignMismatch>());
+                    assert!(
+                        Module::base(&frame)
+                            .global(&frame, "typeof")
+                            .unwrap()
+                            .as_managed()
+                            .call(&mut frame, [jl_val])
+                            .unwrap()
+                            .cast::<DataType>()
+                            .unwrap()
+                            .is::<SizeAlignMismatch>()
+                    );
 
                     let second = jl_val.get_nth_field(&mut frame, 0).unwrap();
                     assert_eq!(second.unbox::<i32>().unwrap(), 2);
@@ -575,15 +583,17 @@ mod tests {
                     let v1 = Value::new(&mut frame, 1i8);
                     let jl_val = constr.call(&mut frame, [v1]).unwrap();
 
-                    assert!(Module::base(&frame)
-                        .global(&frame, "typeof")
-                        .unwrap()
-                        .as_managed()
-                        .call(&mut frame, [jl_val])
-                        .unwrap()
-                        .cast::<DataType>()
-                        .unwrap()
-                        .is::<NonBitsUnion>());
+                    assert!(
+                        Module::base(&frame)
+                            .global(&frame, "typeof")
+                            .unwrap()
+                            .as_managed()
+                            .call(&mut frame, [jl_val])
+                            .unwrap()
+                            .cast::<DataType>()
+                            .unwrap()
+                            .is::<NonBitsUnion>()
+                    );
 
                     let first = jl_val.get_nth_field(&mut frame, 0).unwrap();
                     assert_eq!(first.unbox::<i8>().unwrap(), 1);
@@ -607,15 +617,17 @@ mod tests {
                     let s = JuliaString::new(&mut frame, "foo");
                     let jl_val = constr.call(&mut frame, [s.as_value()]).unwrap();
 
-                    assert!(Module::base(&frame)
-                        .global(&frame, "typeof")
-                        .unwrap()
-                        .as_managed()
-                        .call(&mut frame, [jl_val])
-                        .unwrap()
-                        .cast::<DataType>()
-                        .unwrap()
-                        .is::<WithString>());
+                    assert!(
+                        Module::base(&frame)
+                            .global(&frame, "typeof")
+                            .unwrap()
+                            .as_managed()
+                            .call(&mut frame, [jl_val])
+                            .unwrap()
+                            .cast::<DataType>()
+                            .unwrap()
+                            .is::<WithString>()
+                    );
 
                     let first = jl_val.get_nth_field(&mut frame, 0).unwrap();
                     assert_eq!(first.unbox::<String>().unwrap().unwrap(), "foo");
@@ -639,15 +651,17 @@ mod tests {
                     let v1 = Value::new(&mut frame, 1i32);
                     let jl_val = constr.call(&mut frame, [v1]).unwrap();
 
-                    assert!(Module::base(&frame)
-                        .global(&frame, "typeof")
-                        .unwrap()
-                        .as_managed()
-                        .call(&mut frame, [jl_val])
-                        .unwrap()
-                        .cast::<DataType>()
-                        .unwrap()
-                        .is::<WithGenericT<i32>>());
+                    assert!(
+                        Module::base(&frame)
+                            .global(&frame, "typeof")
+                            .unwrap()
+                            .as_managed()
+                            .call(&mut frame, [jl_val])
+                            .unwrap()
+                            .cast::<DataType>()
+                            .unwrap()
+                            .is::<WithGenericT<i32>>()
+                    );
 
                     let first = jl_val.get_nth_field(&mut frame, 0).unwrap();
                     assert_eq!(first.unbox::<i32>().unwrap(), 1);
@@ -678,15 +692,17 @@ mod tests {
 
                     let jl_val = constr.call(&mut frame, [wgt]).unwrap();
 
-                    assert!(Module::base(&frame)
-                        .global(&frame, "typeof")
-                        .unwrap()
-                        .as_managed()
-                        .call(&mut frame, [jl_val])
-                        .unwrap()
-                        .cast::<DataType>()
-                        .unwrap()
-                        .is::<WithGenericUnionAll>());
+                    assert!(
+                        Module::base(&frame)
+                            .global(&frame, "typeof")
+                            .unwrap()
+                            .as_managed()
+                            .call(&mut frame, [jl_val])
+                            .unwrap()
+                            .cast::<DataType>()
+                            .unwrap()
+                            .is::<WithGenericUnionAll>()
+                    );
 
                     let first = jl_val.get_nth_field(&mut frame, 0).unwrap();
                     assert!(first.unbox::<WithGenericT<i32>>().is_ok());
@@ -717,15 +733,17 @@ mod tests {
 
                     let jl_val = constr.call(&mut frame, [wgt]).unwrap();
 
-                    assert!(Module::base(&frame)
-                        .global(&frame, "typeof")
-                        .unwrap()
-                        .as_managed()
-                        .call(&mut frame, [jl_val])
-                        .unwrap()
-                        .cast::<DataType>()
-                        .unwrap()
-                        .is::<WithNestedGenericT<i32>>());
+                    assert!(
+                        Module::base(&frame)
+                            .global(&frame, "typeof")
+                            .unwrap()
+                            .as_managed()
+                            .call(&mut frame, [jl_val])
+                            .unwrap()
+                            .cast::<DataType>()
+                            .unwrap()
+                            .is::<WithNestedGenericT<i32>>()
+                    );
 
                     let first = jl_val.get_nth_field(&mut frame, 0).unwrap();
                     assert!(first.unbox::<WithGenericT<i32>>().is_ok());
@@ -758,15 +776,17 @@ mod tests {
 
                     let jl_val = constr.call(&mut frame, [wgt]).unwrap();
 
-                    assert!(Module::base(&frame)
-                        .global(&frame, "typeof")
-                        .unwrap()
-                        .as_managed()
-                        .call(&mut frame, [jl_val])
-                        .unwrap()
-                        .cast::<DataType>()
-                        .unwrap()
-                        .is::<WithPropagatedLifetime>());
+                    assert!(
+                        Module::base(&frame)
+                            .global(&frame, "typeof")
+                            .unwrap()
+                            .as_managed()
+                            .call(&mut frame, [jl_val])
+                            .unwrap()
+                            .cast::<DataType>()
+                            .unwrap()
+                            .is::<WithPropagatedLifetime>()
+                    );
 
                     let first = jl_val.get_nth_field(&mut frame, 0).unwrap();
                     assert!(first.unbox::<WithGenericT<Option<WeakModule>>>().is_ok());
@@ -806,20 +826,24 @@ mod tests {
 
                     let jl_val = constr.call(&mut frame, [a]).unwrap();
 
-                    assert!(Module::base(&frame)
-                        .global(&frame, "typeof")
-                        .unwrap()
-                        .as_managed()
-                        .call(&mut frame, [jl_val])
-                        .unwrap()
-                        .cast::<DataType>()
-                        .unwrap()
-                        .is::<WithPropagatedLifetimes>());
+                    assert!(
+                        Module::base(&frame)
+                            .global(&frame, "typeof")
+                            .unwrap()
+                            .as_managed()
+                            .call(&mut frame, [jl_val])
+                            .unwrap()
+                            .cast::<DataType>()
+                            .unwrap()
+                            .is::<WithPropagatedLifetimes>()
+                    );
 
                     let first = jl_val.get_nth_field(&mut frame, 0).unwrap();
-                    assert!(first
-                        .unbox::<WithGenericT<Tuple2<i32, WithGenericT<Option<WeakArray>>>>>()
-                        .is_ok());
+                    assert!(
+                        first
+                            .unbox::<WithGenericT<Tuple2<i32, WithGenericT<Option<WeakArray>>>>>()
+                            .is_ok()
+                    );
 
                     assert!(jl_val.is::<WithPropagatedLifetimes>());
                     assert!(jl_val.unbox::<WithPropagatedLifetimes>().is_ok());
@@ -847,15 +871,17 @@ mod tests {
 
                     let jl_val = constr.call(&mut frame, [wgt]).unwrap();
 
-                    assert!(Module::base(&frame)
-                        .global(&frame, "typeof")
-                        .unwrap()
-                        .as_managed()
-                        .call(&mut frame, [jl_val])
-                        .unwrap()
-                        .cast::<DataType>()
-                        .unwrap()
-                        .is::<WithSetGeneric>());
+                    assert!(
+                        Module::base(&frame)
+                            .global(&frame, "typeof")
+                            .unwrap()
+                            .as_managed()
+                            .call(&mut frame, [jl_val])
+                            .unwrap()
+                            .cast::<DataType>()
+                            .unwrap()
+                            .is::<WithSetGeneric>()
+                    );
 
                     let first = jl_val.get_nth_field(&mut frame, 0).unwrap();
                     assert!(first.unbox::<WithGenericT<i64>>().is_ok());
@@ -892,15 +918,17 @@ mod tests {
 
                     let jl_val = constr.call(&mut frame, [v2]).unwrap();
 
-                    assert!(Module::base(&frame)
-                        .global(&frame, "typeof")
-                        .unwrap()
-                        .as_managed()
-                        .call(&mut frame, [jl_val])
-                        .unwrap()
-                        .cast::<DataType>()
-                        .unwrap()
-                        .is::<WithSetGenericTuple>());
+                    assert!(
+                        Module::base(&frame)
+                            .global(&frame, "typeof")
+                            .unwrap()
+                            .as_managed()
+                            .call(&mut frame, [jl_val])
+                            .unwrap()
+                            .cast::<DataType>()
+                            .unwrap()
+                            .is::<WithSetGenericTuple>()
+                    );
 
                     let first = jl_val.get_nth_field(&mut frame, 0).unwrap();
                     first.unbox::<Tuple1<WithGenericT<i64>>>().unwrap();
@@ -927,15 +955,17 @@ mod tests {
                     let v1 = Value::new(&mut frame, 1i64);
                     let jl_val = wvt_constr.call(&mut frame, [v1]).unwrap();
 
-                    assert!(Module::base(&frame)
-                        .global(&frame, "typeof")
-                        .unwrap()
-                        .as_managed()
-                        .call(&mut frame, [jl_val])
-                        .unwrap()
-                        .cast::<DataType>()
-                        .unwrap()
-                        .is::<WithValueType>());
+                    assert!(
+                        Module::base(&frame)
+                            .global(&frame, "typeof")
+                            .unwrap()
+                            .as_managed()
+                            .call(&mut frame, [jl_val])
+                            .unwrap()
+                            .cast::<DataType>()
+                            .unwrap()
+                            .is::<WithValueType>()
+                    );
 
                     let first = jl_val.get_nth_field(&mut frame, 0).unwrap();
                     assert!(first.unbox::<i64>().is_ok());

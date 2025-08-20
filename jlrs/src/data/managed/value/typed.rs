@@ -26,8 +26,8 @@ use std::{
 use jl_sys::jl_value_t;
 
 use super::{
-    tracked::{Tracked, TrackedMut},
     Value, ValueData, WeakValue,
+    tracked::{Tracked, TrackedMut},
 };
 use crate::{
     convert::{
@@ -36,7 +36,7 @@ use crate::{
     },
     data::{
         layout::valid_layout::{ValidField, ValidLayout},
-        managed::{datatype::DataType, private::ManagedPriv, Managed, Weak},
+        managed::{Managed, Weak, datatype::DataType, private::ManagedPriv},
         types::{
             abstract_type::AnyType,
             construct_type::{ArrayTypeConstructor, ConstantIsize, ConstructType},
@@ -137,7 +137,7 @@ impl<'scope, 'data, U: ConstructType> TypedValue<'scope, 'data, U> {
     pub unsafe fn from_value_unchecked(
         value: Value<'scope, 'data>,
     ) -> TypedValue<'scope, 'data, U> {
-        TypedValue::<U>::wrap_non_null(value.unwrap_non_null(Private), Private)
+        unsafe { TypedValue::<U>::wrap_non_null(value.unwrap_non_null(Private), Private) }
     }
 }
 
@@ -159,7 +159,7 @@ impl<'scope, 'data, U: ValidLayout + ConstructType> TypedValue<'scope, 'data, U>
     pub unsafe fn track_exclusive<'tracked>(
         &'tracked mut self,
     ) -> JlrsResult<TrackedMut<'tracked, 'scope, 'data, U>> {
-        self.deref_mut().track_exclusive()
+        unsafe { self.deref_mut().track_exclusive() }
     }
 }
 
@@ -181,7 +181,7 @@ impl<'scope, 'data, U: ConstructType> TypedValue<'scope, 'data, U> {
     pub unsafe fn track_exclusive_as<'tracked, V: ValidLayout>(
         &'tracked mut self,
     ) -> JlrsResult<TrackedMut<'tracked, 'scope, 'data, V>> {
-        self.deref_mut().track_exclusive()
+        unsafe { self.deref_mut().track_exclusive() }
     }
 }
 
@@ -211,7 +211,7 @@ impl<U: ConstructType + ValidLayout + Send> TypedValueUnbound<U> {
     /// See [`Value::track_shared_unbound`] for more information.
     #[inline]
     pub unsafe fn track_shared_unbound(self) -> JlrsResult<Tracked<'static, 'static, 'static, U>> {
-        self.as_value().track_shared_unbound()
+        unsafe { self.as_value().track_shared_unbound() }
     }
 
     /// Track `self` mutably.
@@ -221,7 +221,7 @@ impl<U: ConstructType + ValidLayout + Send> TypedValueUnbound<U> {
     pub unsafe fn track_exclusive_unbound(
         self,
     ) -> JlrsResult<TrackedMut<'static, 'static, 'static, U>> {
-        self.as_value().track_exclusive_unbound()
+        unsafe { self.as_value().track_exclusive_unbound() }
     }
 }
 
@@ -233,7 +233,7 @@ impl<U: ConstructType> TypedValueUnbound<U> {
     pub unsafe fn track_shared_unbound_as<V: ValidLayout + Send>(
         self,
     ) -> JlrsResult<Tracked<'static, 'static, 'static, V>> {
-        self.as_value().track_shared_unbound()
+        unsafe { self.as_value().track_shared_unbound() }
     }
 
     /// Track `self` mutably.
@@ -243,7 +243,7 @@ impl<U: ConstructType> TypedValueUnbound<U> {
     pub unsafe fn track_exclusive_unbound_as<V: ValidLayout + Send>(
         self,
     ) -> JlrsResult<TrackedMut<'static, 'static, 'static, V>> {
-        self.as_value().track_exclusive_unbound()
+        unsafe { self.as_value().track_exclusive_unbound() }
     }
 }
 

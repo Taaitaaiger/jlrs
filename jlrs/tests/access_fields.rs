@@ -34,12 +34,13 @@ mod tests {
                         .call(&mut frame, [])
                         .unwrap();
 
-                    assert!(res
-                        .field_accessor()
-                        .field(1)
-                        .unwrap()
-                        .access::<EmptyUnion>()
-                        .is_err());
+                    assert!(
+                        res.field_accessor()
+                            .field(1)
+                            .unwrap()
+                            .access::<EmptyUnion>()
+                            .is_err()
+                    );
                 })
             });
         })
@@ -230,11 +231,12 @@ mod tests {
                     let out = func.call(&mut frame, [array.as_value(), idx]).unwrap_err();
 
                     let field_names = out.field_names();
-                    assert!(out
-                        .get_field(&mut frame, field_names[1])
-                        .unwrap()
-                        .get_nth_field(&mut frame, 123)
-                        .is_err());
+                    assert!(
+                        out.get_field(&mut frame, field_names[1])
+                            .unwrap()
+                            .get_nth_field(&mut frame, 123)
+                            .is_err()
+                    );
                 })
             });
         });
@@ -771,14 +773,16 @@ mod tests {
                     }
 
                     {
-                        assert!(value
-                            .field_accessor()
-                            .field("tuples")
-                            .unwrap()
-                            .field("double")
-                            .unwrap()
-                            .field([1, 1])
-                            .is_err());
+                        assert!(
+                            value
+                                .field_accessor()
+                                .field("tuples")
+                                .unwrap()
+                                .field("double")
+                                .unwrap()
+                                .field([1, 1])
+                                .is_err()
+                        );
                     }
 
                     {
@@ -925,26 +929,30 @@ mod tests {
                     }
 
                     {
-                        assert!(value
-                            .field_accessor()
-                            .field("arrays")
-                            .unwrap()
-                            .field("u8array")
-                            .unwrap()
-                            .field("wrongkind")
-                            .is_err());
+                        assert!(
+                            value
+                                .field_accessor()
+                                .field("arrays")
+                                .unwrap()
+                                .field("u8array")
+                                .unwrap()
+                                .field("wrongkind")
+                                .is_err()
+                        );
                     }
 
                     {
                         let sym = "wrongkind".to_symbol(&frame);
-                        assert!(value
-                            .field_accessor()
-                            .field("arrays")
-                            .unwrap()
-                            .field("u8array")
-                            .unwrap()
-                            .field(sym)
-                            .is_err());
+                        assert!(
+                            value
+                                .field_accessor()
+                                .field("arrays")
+                                .unwrap()
+                                .field("u8array")
+                                .unwrap()
+                                .field(sym)
+                                .is_err()
+                        );
                     }
 
                     {

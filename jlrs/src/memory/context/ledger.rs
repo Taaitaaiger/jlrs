@@ -42,105 +42,107 @@ pub(crate) struct Ledger {
 }
 
 pub(crate) unsafe fn init_ledger() {
-    LEDGER.get_or_init(|| {
-        let unrooted = Unrooted::new();
-        let module = Module::jlrs_core(&unrooted);
+    unsafe {
+        LEDGER.get_or_init(|| {
+            let unrooted = Unrooted::new();
+            let module = Module::jlrs_core(&unrooted);
 
-        let module = module.submodule(unrooted, "Ledger").unwrap().as_managed();
+            let module = module.submodule(unrooted, "Ledger").unwrap().as_managed();
 
-        let api_version = *module
-            .global(unrooted, "API_VERSION_FN")
-            .unwrap()
-            .as_value()
-            .data_ptr()
-            .cast::<Option<unsafe extern "C" fn() -> usize>>()
-            .as_ref()
-            .as_ref()
-            .unwrap();
+            let api_version = *module
+                .global(unrooted, "API_VERSION_FN")
+                .unwrap()
+                .as_value()
+                .data_ptr()
+                .cast::<Option<unsafe extern "C" fn() -> usize>>()
+                .as_ref()
+                .as_ref()
+                .unwrap();
 
-        let is_borrowed_shared = *module
-            .global(unrooted, "IS_BORROWED_SHARED")
-            .unwrap()
-            .as_value()
-            .data_ptr()
-            .cast::<Option<unsafe extern "C" fn(*const c_void) -> LedgerResult>>()
-            .as_ref()
-            .as_ref()
-            .unwrap();
+            let is_borrowed_shared = *module
+                .global(unrooted, "IS_BORROWED_SHARED")
+                .unwrap()
+                .as_value()
+                .data_ptr()
+                .cast::<Option<unsafe extern "C" fn(*const c_void) -> LedgerResult>>()
+                .as_ref()
+                .as_ref()
+                .unwrap();
 
-        let is_borrowed_exclusive = *module
-            .global(unrooted, "IS_BORROWED_EXCLUSIVE")
-            .unwrap()
-            .as_value()
-            .data_ptr()
-            .cast::<Option<unsafe extern "C" fn(*const c_void) -> LedgerResult>>()
-            .as_ref()
-            .as_ref()
-            .unwrap();
+            let is_borrowed_exclusive = *module
+                .global(unrooted, "IS_BORROWED_EXCLUSIVE")
+                .unwrap()
+                .as_value()
+                .data_ptr()
+                .cast::<Option<unsafe extern "C" fn(*const c_void) -> LedgerResult>>()
+                .as_ref()
+                .as_ref()
+                .unwrap();
 
-        let is_borrowed = *module
-            .global(unrooted, "IS_BORROWED")
-            .unwrap()
-            .as_value()
-            .data_ptr()
-            .cast::<Option<unsafe extern "C" fn(*const c_void) -> LedgerResult>>()
-            .as_ref()
-            .as_ref()
-            .unwrap();
+            let is_borrowed = *module
+                .global(unrooted, "IS_BORROWED")
+                .unwrap()
+                .as_value()
+                .data_ptr()
+                .cast::<Option<unsafe extern "C" fn(*const c_void) -> LedgerResult>>()
+                .as_ref()
+                .as_ref()
+                .unwrap();
 
-        let try_borrow_shared = *module
-            .global(unrooted, "BORROW_SHARED")
-            .unwrap()
-            .as_value()
-            .data_ptr()
-            .cast::<Option<unsafe extern "C" fn(ptr: *const c_void) -> LedgerResult>>()
-            .as_ref()
-            .as_ref()
-            .unwrap();
+            let try_borrow_shared = *module
+                .global(unrooted, "BORROW_SHARED")
+                .unwrap()
+                .as_value()
+                .data_ptr()
+                .cast::<Option<unsafe extern "C" fn(ptr: *const c_void) -> LedgerResult>>()
+                .as_ref()
+                .as_ref()
+                .unwrap();
 
-        let try_borrow_exclusive = *module
-            .global(unrooted, "BORROW_EXCLUSIVE")
-            .unwrap()
-            .as_value()
-            .data_ptr()
-            .cast::<Option<unsafe extern "C" fn(ptr: *const c_void) -> LedgerResult>>()
-            .as_ref()
-            .as_ref()
-            .unwrap();
+            let try_borrow_exclusive = *module
+                .global(unrooted, "BORROW_EXCLUSIVE")
+                .unwrap()
+                .as_value()
+                .data_ptr()
+                .cast::<Option<unsafe extern "C" fn(ptr: *const c_void) -> LedgerResult>>()
+                .as_ref()
+                .as_ref()
+                .unwrap();
 
-        let unborrow_shared = *module
-            .global(unrooted, "UNBORROW_SHARED")
-            .unwrap()
-            .as_value()
-            .data_ptr()
-            .cast::<Option<unsafe extern "C" fn(ptr: *const c_void) -> LedgerResult>>()
-            .as_ref()
-            .as_ref()
-            .unwrap();
+            let unborrow_shared = *module
+                .global(unrooted, "UNBORROW_SHARED")
+                .unwrap()
+                .as_value()
+                .data_ptr()
+                .cast::<Option<unsafe extern "C" fn(ptr: *const c_void) -> LedgerResult>>()
+                .as_ref()
+                .as_ref()
+                .unwrap();
 
-        let unborrow_exclusive = *module
-            .global(unrooted, "UNBORROW_EXCLUSIVE")
-            .unwrap()
-            .as_value()
-            .data_ptr()
-            .cast::<Option<unsafe extern "C" fn(ptr: *const c_void) -> LedgerResult>>()
-            .as_ref()
-            .as_ref()
-            .unwrap();
+            let unborrow_exclusive = *module
+                .global(unrooted, "UNBORROW_EXCLUSIVE")
+                .unwrap()
+                .as_value()
+                .data_ptr()
+                .cast::<Option<unsafe extern "C" fn(ptr: *const c_void) -> LedgerResult>>()
+                .as_ref()
+                .as_ref()
+                .unwrap();
 
-        Ledger {
-            api_version,
-            is_borrowed_shared,
-            is_borrowed_exclusive,
-            is_borrowed,
-            try_borrow_shared,
-            try_borrow_exclusive,
-            unborrow_shared,
-            unborrow_exclusive,
-        }
-    });
+            Ledger {
+                api_version,
+                is_borrowed_shared,
+                is_borrowed_exclusive,
+                is_borrowed,
+                try_borrow_shared,
+                try_borrow_exclusive,
+                unborrow_shared,
+                unborrow_exclusive,
+            }
+        });
 
-    assert_eq!(Ledger::api_version(), API_VERSION);
+        assert_eq!(Ledger::api_version(), API_VERSION);
+    }
 }
 
 impl Ledger {

@@ -1,8 +1,8 @@
-use quote::{format_ident, ToTokens};
-use syn::{parse_quote, Expr, Ident, ItemFn, Result};
+use quote::{ToTokens, format_ident};
+use syn::{Expr, Ident, ItemFn, Result, parse_quote};
 
 use super::{
-    init_fn::InitFn, item_with_attrs::ItemWithAttrs, override_module_fragment, ModuleItem,
+    ModuleItem, init_fn::InitFn, item_with_attrs::ItemWithAttrs, override_module_fragment,
 };
 use crate::JuliaModule;
 

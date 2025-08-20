@@ -8,18 +8,18 @@ use jl_sys::jlrs_gc_safe_enter;
 #[cfg(feature = "multi-rt")]
 use crate::runtime::handle::mt_handle::MtHandle;
 use crate::{
+    InstallJlrsCore,
     error::{JlrsError, RuntimeError},
     memory::{get_tls, stack_frame::StackFrame},
     prelude::JlrsResult,
     runtime::{
-        builder::{init_runtime, Builder},
+        builder::{Builder, init_runtime},
         executor::Executor,
         handle::async_handle::{
-            cancellation_token::CancellationToken, on_main_thread, AsyncHandle,
+            AsyncHandle, cancellation_token::CancellationToken, on_main_thread,
         },
         state::{can_init, set_exit},
     },
-    InstallJlrsCore,
 };
 
 /// A `Builder` for an async runtime.
@@ -251,13 +251,13 @@ pub(crate) fn run_main<T: 'static + Send, R: Executor<N>, const N: usize>(
 #[cfg(feature = "multi-rt")]
 mod mt_impl {
     use std::{
-        panic::{catch_unwind, AssertUnwindSafe},
+        panic::{AssertUnwindSafe, catch_unwind},
         thread,
     };
 
     use jl_sys::jl_atexit_hook;
 
-    use super::super::{init_runtime, Builder};
+    use super::super::{Builder, init_runtime};
     use crate::{
         error::{JlrsError, RuntimeError},
         memory::{gc::gc_safe, stack_frame::StackFrame},
@@ -266,10 +266,10 @@ mod mt_impl {
             executor::Executor,
             handle::{
                 async_handle::{
-                    cancellation_token::CancellationToken, channel::channel, on_main_thread,
-                    AsyncHandle,
+                    AsyncHandle, cancellation_token::CancellationToken, channel::channel,
+                    on_main_thread,
                 },
-                mt_handle::{wait_loop, MtHandle, EXIT_LOCK},
+                mt_handle::{EXIT_LOCK, MtHandle, wait_loop},
                 wait,
             },
             state::{can_init, set_exit},

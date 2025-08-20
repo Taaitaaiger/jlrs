@@ -4,19 +4,19 @@ use std::{marker::PhantomData, ptr::NonNull};
 
 use jl_sys::{jl_new_typevar, jl_tvar_t, jl_tvar_type, jlrs_tvar_lb, jlrs_tvar_name, jlrs_tvar_ub};
 
-use super::{value::ValueData, Weak};
+use super::{Weak, value::ValueData};
 use crate::{
     catch::{catch_exceptions, unwrap_exc},
     convert::to_symbol::ToSymbol,
     data::managed::{
+        Managed,
         datatype::DataType,
         private::ManagedPriv,
         symbol::Symbol,
         value::{Value, WeakValue},
-        Managed,
     },
     impl_julia_typecheck,
-    memory::target::{unrooted::Unrooted, Target, TargetResult},
+    memory::target::{Target, TargetResult, unrooted::Unrooted},
     private::Private,
 };
 
@@ -75,11 +75,13 @@ impl<'scope> TypeVar<'scope> {
         Tgt: Target<'target>,
         N: ToSymbol,
     {
-        let name = name.to_symbol_priv(Private);
-        let lb = lower_bound.unwrap_or_else(|| Value::bottom_type(&target));
-        let ub = upper_bound.unwrap_or_else(|| DataType::any_type(&target).as_value());
-        let tvar = jl_new_typevar(name.unwrap(Private), lb.unwrap(Private), ub.unwrap(Private));
-        target.data_from_ptr(NonNull::new_unchecked(tvar), Private)
+        unsafe {
+            let name = name.to_symbol_priv(Private);
+            let lb = lower_bound.unwrap_or_else(|| Value::bottom_type(&target));
+            let ub = upper_bound.unwrap_or_else(|| DataType::any_type(&target).as_value());
+            let tvar = jl_new_typevar(name.unwrap(Private), lb.unwrap(Private), ub.unwrap(Private));
+            target.data_from_ptr(NonNull::new_unchecked(tvar), Private)
+        }
     }
 
     /// Returns `true` if one of the bounds has an indirect type parameter.

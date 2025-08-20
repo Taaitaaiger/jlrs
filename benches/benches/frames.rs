@@ -1,4 +1,4 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, black_box, criterion_group, criterion_main};
 use jlrs::{
     prelude::*, runtime::handle::local_handle::LocalHandle, weak_handle, weak_handle_unchecked,
 };
@@ -21,7 +21,9 @@ fn create_weak_handle(c: &mut Criterion) {
 fn create_weak_handle_unchecked(c: &mut Criterion) {
     c.bench_function("create_weak_handle_unchecked", |b| {
         b.iter(|| {
-            let _ = black_box(unsafe { weak_handle_unchecked!() });
+            unsafe {
+                let _ = black_box(weak_handle_unchecked!());
+            };
         })
     });
 }

@@ -7,7 +7,7 @@
 
 use std::{
     marker::PhantomData,
-    ptr::{null_mut, NonNull},
+    ptr::{NonNull, null_mut},
     sync::atomic::{AtomicPtr, Ordering},
 };
 
@@ -19,39 +19,21 @@ use super::{
     types::{construct_type::ConstructType, typecheck::Typecheck},
 };
 use crate::{
-    data::managed::{module::Module, value::ValueUnbound, Managed},
+    data::managed::{Managed, module::Module, value::ValueUnbound},
     gc_safe::GcSafeOnceLock,
-    memory::{target::Target, PTls},
+    memory::{PTls, target::Target},
     prelude::{Symbol, Value},
     private::Private,
 };
 
-#[rustversion::before(1.85)]
-type CacheImpl = GcSafeOnceLock<Cache<()>>;
-#[rustversion::since(1.85)]
 type CacheImpl = Cache<()>;
 
-#[rustversion::before(1.85)]
-static CACHE: CacheImpl = CacheImpl::new();
-#[rustversion::since(1.85)]
 static CACHE: CacheImpl = CacheImpl::new(());
 
-#[rustversion::before(1.85)]
-pub(crate) unsafe fn init_static_data_cache() {
-    CACHE.set(Default::default()).ok();
-}
-
-#[rustversion::since(1.85)]
-pub(crate) unsafe fn init_static_data_cache() {}
-
-#[rustversion::before(1.85)]
 pub(crate) unsafe fn mark_static_data_cache(ptls: PTls, full: bool) {
-    CACHE.get().map(|cache| cache.mark(ptls, full));
-}
-
-#[rustversion::since(1.85)]
-pub(crate) unsafe fn mark_static_data_cache(ptls: PTls, full: bool) {
-    CACHE.mark(ptls, full);
+    unsafe {
+        CACHE.mark(ptls, full);
+    }
 }
 
 struct StaticDataInner<T>(ValueUnbound, PhantomData<T>);
@@ -103,48 +85,50 @@ where
     where
         Tgt: Target<'target>,
     {
-        // If multiple threads try to initialize the global, only one calls the init code and
-        // the others are parked. We call jlrs_gc_safe_enter to allow the GC to run while a
-        // thread is parked, and immediately transition back once we regain control.
-        let global = self.global.get_or_init(|| {
-            let split_path = self.path.split('.').collect::<Vec<_>>();
-            let n_parts = split_path.len();
+        unsafe {
+            // If multiple threads try to initialize the global, only one calls the init code and
+            // the others are parked. We call jlrs_gc_safe_enter to allow the GC to run while a
+            // thread is parked, and immediately transition back once we regain control.
+            let global = self.global.get_or_init(|| {
+                let split_path = self.path.split('.').collect::<Vec<_>>();
+                let n_parts = split_path.len();
 
-            let mut module = match split_path[0] {
-                "Main" => Module::main(target),
-                "Base" => Module::base(target),
-                "Core" => Module::core(target),
-                pkg => Module::package_root_module(target, pkg).unwrap(),
-            };
+                let mut module = match split_path[0] {
+                    "Main" => Module::main(target),
+                    "Base" => Module::base(target),
+                    "Core" => Module::core(target),
+                    pkg => Module::package_root_module(target, pkg).unwrap(),
+                };
 
-            if n_parts == 1 {
-                let global = module.leak().as_value().cast::<T>().unwrap();
-                return StaticDataInner(global.as_value(), PhantomData);
-            }
+                if n_parts == 1 {
+                    let global = module.leak().as_value().cast::<T>().unwrap();
+                    return StaticDataInner(global.as_value(), PhantomData);
+                }
 
-            for i in 1..n_parts - 1 {
-                module = module
-                    .submodule(target, split_path[i])
+                for i in 1..n_parts - 1 {
+                    module = module
+                        .submodule(target, split_path[i])
+                        .unwrap()
+                        .as_managed();
+                }
+
+                let global = module
+                    .global(target, split_path[n_parts - 1])
                     .unwrap()
-                    .as_managed();
-            }
+                    .leak()
+                    .as_value()
+                    .cast::<T>()
+                    .unwrap();
 
-            let global = module
-                .global(target, split_path[n_parts - 1])
-                .unwrap()
-                .leak()
-                .as_value()
-                .cast::<T>()
-                .unwrap();
+                CACHE.get_unchecked().write(|cache| {
+                    cache.roots_mut().insert(global.as_value());
+                });
 
-            CACHE.get_unchecked().write(|cache| {
-                cache.roots_mut().insert(global.as_value());
+                return StaticDataInner(global.as_value(), PhantomData);
             });
 
-            return StaticDataInner(global.as_value(), PhantomData);
-        });
-
-        global.0.cast_unchecked()
+            global.0.cast_unchecked()
+        }
     }
 }
 
@@ -312,11 +296,13 @@ where
     where
         Tgt: Target<'target>,
     {
-        let ptr = self.global.load(Ordering::Relaxed);
-        if ptr.is_null() {
-            self.eval(target)
-        } else {
-            T::wrap_non_null(NonNull::new_unchecked(ptr), Private)
+        unsafe {
+            let ptr = self.global.load(Ordering::Relaxed);
+            if ptr.is_null() {
+                self.eval(target)
+            } else {
+                T::wrap_non_null(NonNull::new_unchecked(ptr), Private)
+            }
         }
     }
 
@@ -327,20 +313,22 @@ where
     where
         Tgt: Target<'target>,
     {
-        let v = Value::eval_string(target, self.path)
-            .unwrap()
-            .leak()
-            .as_value()
-            .cast::<T>()
-            .unwrap();
+        unsafe {
+            let v = Value::eval_string(target, self.path)
+                .unwrap()
+                .leak()
+                .as_value()
+                .cast::<T>()
+                .unwrap();
 
-        CACHE.get_unchecked().write(|cache| {
-            cache.roots_mut().insert(v.as_value());
-        });
+            CACHE.get_unchecked().write(|cache| {
+                cache.roots_mut().insert(v.as_value());
+            });
 
-        let ptr = v.unwrap(Private);
-        self.global.store(ptr, Ordering::Relaxed);
-        T::wrap_non_null(NonNull::new_unchecked(ptr), Private)
+            let ptr = v.unwrap(Private);
+            self.global.store(ptr, Ordering::Relaxed);
+            T::wrap_non_null(NonNull::new_unchecked(ptr), Private)
+        }
     }
 }
 
@@ -399,12 +387,12 @@ where
 /// Define a static global
 #[macro_export]
 macro_rules! define_static_global {
-    ($(#[$meta:meta])* $vis:vis $ty:ident, $type:ty, $path:expr) => {
+    ($(#[$meta:meta])* $vis:vis $ty:ident, $type:ty, $path:expr_2021) => {
         $(#[$meta])*
         $vis static $name: $crate::data::static_data::StaticGlobal<$type> =
             $crate::data::static_data::StaticGlobal::new($path);
     };
-    ($(#[$meta:meta])* $vis:vis $name:ident, $path:expr) => {
+    ($(#[$meta:meta])* $vis:vis $name:ident, $path:expr_2021) => {
         $(#[$meta])*
         $vis static $name: $crate::data::static_data::StaticGlobal<
             $crate::data::managed::value::ValueUnbound,
@@ -415,7 +403,7 @@ macro_rules! define_static_global {
 /// Define a static ref
 #[macro_export]
 macro_rules! define_static_ref {
-    ($(#[$meta:meta])* $vis:vis $name:ident, $type:ty, $path:expr) => {
+    ($(#[$meta:meta])* $vis:vis $name:ident, $type:ty, $path:expr_2021) => {
         $(#[$meta])*
         $vis static $name: $crate::data::static_data::StaticRef<$type> =
             $crate::data::static_data::StaticRef::new($path);
@@ -425,7 +413,7 @@ macro_rules! define_static_ref {
 /// Define a static symbol
 #[macro_export]
 macro_rules! define_static_symbol_ref {
-    ($(#[$meta:meta])+ $vis:vis $name:ident, $sym:expr) => {
+    ($(#[$meta:meta])+ $vis:vis $name:ident, $sym:expr_2021) => {
         $(#[$meta])+
         $vis static $name: $crate::data::static_data::StaticSymbolRef =
             $crate::data::static_data::StaticSymbolRef::new($sym);
@@ -435,23 +423,17 @@ macro_rules! define_static_symbol_ref {
 /// Use a previously defined static global
 #[macro_export]
 macro_rules! static_global {
-    ($name:ident, $target:expr) => {{
-        $name.get_or_init(&$target)
-    }};
+    ($name:ident, $target:expr_2021) => {{ $name.get_or_init(&$target) }};
 }
 /// Use a previously defined static ref
 #[macro_export]
 macro_rules! static_ref {
-    ($name:ident, $target:expr) => {{
-        $name.get_or_init(&$target)
-    }};
+    ($name:ident, $target:expr_2021) => {{ $name.get_or_init(&$target) }};
 }
 /// Use a previously defined static ref
 #[macro_export]
 macro_rules! static_symbol_ref {
-    ($name:ident, $target:expr) => {{
-        $name.get_or_init(&$target)
-    }};
+    ($name:ident, $target:expr_2021) => {{ $name.get_or_init(&$target) }};
 }
 
 pub use define_static_global;
@@ -467,11 +449,11 @@ pub use static_symbol_ref;
 /// `{ define_static_global!(NAME, T, path); static_global!(NAME, target) }`
 #[macro_export]
 macro_rules! inline_static_global {
-    ($(#[$meta:meta])* $name:ident, $type:ty, $path:expr, $target:expr) => {{
+    ($(#[$meta:meta])* $name:ident, $type:ty, $path:expr_2021, $target:expr_2021) => {{
         $crate::data::static_data::define_static_global!($(#[$meta])* $name, $type, $path);
         $crate::data::static_data::static_global!($name, $target)
     }};
-    ($(#[$meta:meta])* $name:ident, $path:expr, $target:expr) => {{
+    ($(#[$meta:meta])* $name:ident, $path:expr_2021, $target:expr_2021) => {{
         $crate::data::static_data::define_static_global!($(#[$meta])* $name, $path);
         $crate::data::static_data::static_global!($name, $target)
     }};
@@ -483,7 +465,7 @@ macro_rules! inline_static_global {
 /// `{ define_static_ref!(NAME, T, path); static_ref!(NAME, target) }`
 #[macro_export]
 macro_rules! inline_static_ref {
-    ($(#[$meta:meta])* $name:ident, $type:ty, $path:expr, $target:expr) => {{
+    ($(#[$meta:meta])* $name:ident, $type:ty, $path:expr_2021, $target:expr_2021) => {{
         $crate::data::static_data::define_static_ref!($(#[$meta])* $name, $type, $path);
         $crate::data::static_data::static_ref!($name, $target)
     }};
@@ -495,7 +477,7 @@ macro_rules! inline_static_ref {
 /// `{ define_static_ref!(NAME, T, path); static_ref!(NAME, target) }`
 #[macro_export]
 macro_rules! inline_static_symbol_ref {
-    ($(#[$meta:meta])* $name:ident, $sym:expr, $target:expr) => {{
+    ($(#[$meta:meta])* $name:ident, $sym:expr_2021, $target:expr_2021) => {{
         $crate::data::static_data::define_static_symbol_ref!($(#[$meta])* $name, $sym);
         $crate::data::static_data::static_symbol_ref!($name, $target)
     }};

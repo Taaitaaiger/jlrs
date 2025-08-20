@@ -28,8 +28,7 @@ impl<C: Default> Default for Cache<C> {
 }
 
 impl<C> Cache<C> {
-    #[rustversion::attr(since(1.85), const)]
-    pub(crate) fn new(cache: C) -> Self {
+    pub(crate) const fn new(cache: C) -> Self {
         let inner = GcSafeRwLock::new(CacheInner {
             cache,
             roots: Roots::new(),
@@ -39,7 +38,6 @@ impl<C> Cache<C> {
     }
 
     #[inline(always)]
-    #[rustversion::since(1.85)]
     pub(crate) fn get_unchecked(&self) -> &Self {
         self
     }
@@ -60,14 +58,16 @@ impl<C> Cache<C> {
 
     #[inline]
     pub(crate) unsafe fn mark(&self, ptls: PTls, full: bool) {
-        // We need a write guard because `Roots::mark` needs a mutable reference
-        // If a collection is triggered while this lock is held, a deadlock will occur.
-        let mut write_guard = self
-            .inner
-            .try_write()
-            .expect("Could not lock cache, this is a bug in jlrs");
+        unsafe {
+            // We need a write guard because `Roots::mark` needs a mutable reference
+            // If a collection is triggered while this lock is held, a deadlock will occur.
+            let mut write_guard = self
+                .inner
+                .try_write()
+                .expect("Could not lock cache, this is a bug in jlrs");
 
-        write_guard.roots.mark(ptls, full);
+            write_guard.roots.mark(ptls, full);
+        }
     }
 }
 
@@ -111,19 +111,10 @@ impl Roots {
         self.dirty |= self.data.insert(data.unwrap(Private));
     }
 
-    #[rustversion::since(1.85)]
     const fn new() -> Self {
         let hasher = fnv::FnvBuildHasher::new();
         Roots {
             data: FnvHashSet::with_hasher(hasher),
-            dirty: false,
-        }
-    }
-
-    #[rustversion::before(1.85)]
-    fn new() -> Self {
-        Roots {
-            data: FnvHashSet::default(),
             dirty: false,
         }
     }

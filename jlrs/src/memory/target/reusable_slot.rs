@@ -78,8 +78,10 @@ impl<'target, S: SlotRef> ReusableSlot<'target, S> {
         self,
         ptr: NonNull<T::Wraps>,
     ) -> T {
-        self.slot.set(ptr.cast(), Private);
-        T::wrap_non_null(ptr, Private)
+        unsafe {
+            self.slot.set(ptr.cast(), Private);
+            T::wrap_non_null(ptr, Private)
+        }
     }
 
     #[inline]
@@ -87,7 +89,9 @@ impl<'target, S: SlotRef> ReusableSlot<'target, S> {
         &'t mut self,
         ptr: NonNull<T::Wraps>,
     ) -> Weak<'target, 'data, T> {
-        self.slot.set(ptr.cast(), Private);
-        Weak::<T>::wrap(ptr)
+        unsafe {
+            self.slot.set(ptr.cast(), Private);
+            Weak::<T>::wrap(ptr)
+        }
     }
 }

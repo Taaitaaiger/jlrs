@@ -7,12 +7,12 @@ use jl_sys::{
     jl_atomicerror_type, jl_bool_type, jl_boundserror_type, jl_char_type, jl_const_type,
     jl_datatype_t, jl_datatype_type, jl_emptytuple_type, jl_errorexception_type, jl_expr_type,
     jl_field_index, jl_float16_type, jl_float32_type, jl_float64_type, jl_floatingpoint_type,
-    jl_function_type, jl_has_free_typevars, jl_initerror_type, jl_int16_type, jl_int32_type,
-    jl_int64_type, jl_int8_type, jl_loaderror_type, jl_methoderror_type, jl_module_type,
+    jl_function_type, jl_has_free_typevars, jl_initerror_type, jl_int8_type, jl_int16_type,
+    jl_int32_type, jl_int64_type, jl_loaderror_type, jl_methoderror_type, jl_module_type,
     jl_new_structv, jl_nothing_type, jl_number_type, jl_signed_type, jl_simplevector_type,
     jl_string_type, jl_symbol_type, jl_task_type, jl_tvar_type, jl_typeerror_type, jl_typename_str,
-    jl_typename_type, jl_typeofbottom_type, jl_uint16_type, jl_uint32_type, jl_uint64_type,
-    jl_uint8_type, jl_undefvarerror_type, jl_unionall_type, jl_uniontype_type, jl_vararg_type,
+    jl_typename_type, jl_typeofbottom_type, jl_uint8_type, jl_uint16_type, jl_uint32_type,
+    jl_uint64_type, jl_undefvarerror_type, jl_unionall_type, jl_uniontype_type, jl_vararg_type,
     jl_voidpointer_type, jlrs_datatype_align, jlrs_datatype_first_ptr, jlrs_datatype_has_layout,
     jlrs_datatype_instance, jlrs_datatype_layout, jlrs_datatype_nfields, jlrs_datatype_parameters,
     jlrs_datatype_size, jlrs_datatype_super, jlrs_datatype_typename, jlrs_datatype_zeroinit,
@@ -21,20 +21,20 @@ use jl_sys::{
 };
 use jlrs_macros::julia_version;
 
-use super::{type_name::TypeName, value::ValueData, Weak};
+use super::{Weak, type_name::TypeName, value::ValueData};
 use crate::{
     convert::to_symbol::ToSymbol,
     data::{
         managed::{
-            private::ManagedPriv, simple_vector::SimpleVector, symbol::Symbol, type_var::TypeVar,
-            union_all::UnionAll, value::Value, Managed,
+            Managed, private::ManagedPriv, simple_vector::SimpleVector, symbol::Symbol,
+            type_var::TypeVar, union_all::UnionAll, value::Value,
         },
         types::{construct_type::TypeVarEnv, typecheck::Typecheck},
     },
     impl_julia_typecheck,
     memory::{
         scope::LocalScopeExt,
-        target::{unrooted::Unrooted, Target, TargetResult},
+        target::{Target, TargetResult, unrooted::Unrooted},
     },
     private::Private,
 };
@@ -105,12 +105,14 @@ impl<'scope> DataType<'scope> {
     /// Safety: `idx` must be in-bounds and the parameter must not be a null pointer.
     #[inline]
     pub unsafe fn parameter_unchecked(self, idx: usize) -> Value<'scope, 'static> {
-        let unrooted = Unrooted::new();
-        self.parameters()
-            .data()
-            .get(unrooted, idx)
-            .unwrap_unchecked()
-            .as_value()
+        unsafe {
+            let unrooted = Unrooted::new();
+            self.parameters()
+                .data()
+                .get(unrooted, idx)
+                .unwrap_unchecked()
+                .as_value()
+        }
     }
 
     /// Returns `true` if this type has free type parameters.
@@ -146,12 +148,14 @@ impl<'scope> DataType<'scope> {
     /// Safety: `idx` must be in-bounds.
     #[inline]
     pub unsafe fn field_type_unchecked(self, idx: usize) -> Value<'scope, 'static> {
-        let unrooted = Unrooted::new();
-        self.field_types()
-            .data()
-            .get(unrooted, idx)
-            .unwrap_unchecked()
-            .as_value()
+        unsafe {
+            let unrooted = Unrooted::new();
+            self.field_types()
+                .data()
+                .get(unrooted, idx)
+                .unwrap_unchecked()
+                .as_value()
+        }
     }
 
     /// Returns the field names of this type.
@@ -358,7 +362,7 @@ impl<'scope> DataType<'scope> {
     /// function.
     #[inline]
     pub unsafe fn field_size_unchecked(self, idx: usize) -> u32 {
-        jlrs_field_size(self.unwrap(Private), idx as _)
+        unsafe { jlrs_field_size(self.unwrap(Private), idx as _) }
     }
 
     /// Returns the offset where the field at position `idx` is stored.
@@ -379,7 +383,7 @@ impl<'scope> DataType<'scope> {
     /// function.
     #[inline]
     pub unsafe fn field_offset_unchecked(self, idx: usize) -> u32 {
-        jlrs_field_offset(self.unwrap(Private), idx as _)
+        unsafe { jlrs_field_offset(self.unwrap(Private), idx as _) }
     }
 
     /// Returns true if the field at position `idx` is stored as a pointer.
@@ -399,7 +403,7 @@ impl<'scope> DataType<'scope> {
     /// function.
     #[inline]
     pub unsafe fn is_pointer_field_unchecked(self, idx: usize) -> bool {
-        jlrs_field_isptr(self.unwrap(Private), idx as _) != 0
+        unsafe { jlrs_field_isptr(self.unwrap(Private), idx as _) != 0 }
     }
 
     /// Returns true if the field at position `idx` is an atomic field.
@@ -420,21 +424,23 @@ impl<'scope> DataType<'scope> {
     /// function.
     #[inline]
     pub unsafe fn is_atomic_field_unchecked(self, idx: usize) -> bool {
-        /*
-            const uint32_t *atomicfields = st->name->atomicfields;
-            if (atomicfields != NULL) {
-                if (atomicfields[i / 32] & (1 << (i % 32)))
-                    return 1;
+        unsafe {
+            /*
+                const uint32_t *atomicfields = st->name->atomicfields;
+                if (atomicfields != NULL) {
+                    if (atomicfields[i / 32] & (1 << (i % 32)))
+                        return 1;
+                }
+                return 0;
+            */
+            let atomicfields = self.type_name().atomicfields();
+            if atomicfields.is_null() {
+                return false;
             }
-            return 0;
-        */
-        let atomicfields = self.type_name().atomicfields();
-        if atomicfields.is_null() {
-            return false;
-        }
 
-        let isatomic = (*atomicfields.add(idx / 32)) & (1 << (idx % 32));
-        isatomic != 0
+            let isatomic = (*atomicfields.add(idx / 32)) & (1 << (idx % 32));
+            isatomic != 0
+        }
     }
 
     /// Returns true if the field at position `idx` is a constant field.
@@ -455,29 +461,31 @@ impl<'scope> DataType<'scope> {
     /// function.
     #[inline]
     pub unsafe fn is_const_field_unchecked(self, idx: usize) -> bool {
-        /*
-        jl_typename_t *tn = st->name;
-        if (!tn->mutabl)
-            return 1;
-        const uint32_t *constfields = tn->constfields;
-        if (constfields != NULL) {
-            if (constfields[i / 32] & (1 << (i % 32)))
+        unsafe {
+            /*
+            jl_typename_t *tn = st->name;
+            if (!tn->mutabl)
                 return 1;
-        }
-        return 0;
-        */
-        let tn = self.type_name();
-        if !tn.is_mutable() {
-            return true;
-        }
+            const uint32_t *constfields = tn->constfields;
+            if (constfields != NULL) {
+                if (constfields[i / 32] & (1 << (i % 32)))
+                    return 1;
+            }
+            return 0;
+            */
+            let tn = self.type_name();
+            if !tn.is_mutable() {
+                return true;
+            }
 
-        let constfields = tn.constfields();
-        if constfields.is_null() {
-            return false;
-        }
+            let constfields = tn.constfields();
+            if constfields.is_null() {
+                return false;
+            }
 
-        let isconst = (*constfields.add(idx / 32)) & (1 << (idx % 32));
-        isconst != 0
+            let isconst = (*constfields.add(idx / 32)) & (1 << (idx % 32));
+            isconst != 0
+        }
     }
 
     /// Create a new instance of this `DataType`, using `values` to set the fields.
@@ -499,14 +507,16 @@ impl<'scope> DataType<'scope> {
         Tgt: Target<'target>,
         V: AsRef<[Value<'value, 'data>]>,
     {
-        let values = values.as_ref();
-        let value = jl_new_structv(
-            self.unwrap(Private),
-            values.as_ptr() as *mut _,
-            values.len() as _,
-        );
+        unsafe {
+            let values = values.as_ref();
+            let value = jl_new_structv(
+                self.unwrap(Private),
+                values.as_ptr() as *mut _,
+                values.len() as _,
+            );
 
-        target.data_from_ptr(NonNull::new_unchecked(value), Private)
+            target.data_from_ptr(NonNull::new_unchecked(value), Private)
+        }
     }
 
     /// Returns `true` if this type has pointer fields.

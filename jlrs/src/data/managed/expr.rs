@@ -7,11 +7,11 @@ use jl_sys::{
 };
 
 use super::{
-    value::{Value, ValueData},
     Managed,
+    value::{Value, ValueData},
 };
 use crate::{
-    data::managed::{private::ManagedPriv, symbol::Symbol, Weak},
+    data::managed::{Weak, private::ManagedPriv, symbol::Symbol},
     impl_julia_typecheck,
     memory::target::{TargetResult, TargetType},
     prelude::Target,

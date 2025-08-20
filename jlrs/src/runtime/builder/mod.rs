@@ -28,7 +28,7 @@ use crate::runtime::executor::Executor;
 use crate::runtime::handle::local_handle::LocalHandle;
 #[cfg(feature = "multi-rt")]
 use crate::runtime::handle::mt_handle::MtHandle;
-use crate::{init_jlrs, InstallJlrsCore};
+use crate::{InstallJlrsCore, init_jlrs};
 
 /// Build a runtime.
 ///
@@ -210,9 +210,9 @@ mod mt_impl {
             memory::gc::gc_safe,
             prelude::JlrsResult,
             runtime::{
-                builder::{init_runtime, Builder},
+                builder::{Builder, init_runtime},
                 handle::{
-                    mt_handle::{wait_loop, MtHandle, EXIT_LOCK},
+                    mt_handle::{EXIT_LOCK, MtHandle, wait_loop},
                     wait,
                 },
                 state::{can_init, set_exit},
@@ -264,50 +264,56 @@ mod mt_impl {
 }
 
 unsafe fn init_runtime(options: &Builder) {
-    set_n_threads(options);
-    init_julia(options);
-    init_jlrs(&options.install_jlrs_core, true);
+    unsafe {
+        set_n_threads(options);
+        init_julia(options);
+        init_jlrs(&options.install_jlrs_core, true);
+    }
 }
 
 unsafe fn init_julia(options: &Builder) {
-    if let Some((bin_dir, image_path)) = options.image.as_ref() {
-        let julia_bindir_str = bin_dir.as_os_str().as_encoded_bytes();
-        let image_path_str = image_path.as_os_str().as_encoded_bytes();
+    unsafe {
+        if let Some((bin_dir, image_path)) = options.image.as_ref() {
+            let julia_bindir_str = bin_dir.as_os_str().as_encoded_bytes();
+            let image_path_str = image_path.as_os_str().as_encoded_bytes();
 
-        let bindir = CString::new(julia_bindir_str).unwrap();
-        let im_rel_path = CString::new(image_path_str).unwrap();
+            let bindir = CString::new(julia_bindir_str).unwrap();
+            let im_rel_path = CString::new(image_path_str).unwrap();
 
-        jl_init_with_image(bindir.as_ptr(), im_rel_path.as_ptr())
-    } else {
-        jl_init();
+            jl_init_with_image(bindir.as_ptr(), im_rel_path.as_ptr())
+        } else {
+            jl_init();
+        }
     }
 }
 
 unsafe fn set_n_threads(options: &Builder) {
-    if options.n_threadsi != 0 {
-        if options.n_threads == 0 {
+    unsafe {
+        if options.n_threadsi != 0 {
+            if options.n_threads == 0 {
+                jlrs_set_nthreads(-1);
+                jlrs_set_nthreadpools(2);
+                let perthread = Box::new([-1i16, options.n_threadsi as _]);
+                jlrs_set_nthreads_per_pool(Box::leak(perthread) as *const _);
+            } else {
+                let nthreads = options.n_threads as i16;
+                let nthreadsi = options.n_threadsi as i16;
+                jlrs_set_nthreads(nthreads + nthreadsi);
+                jlrs_set_nthreadpools(2);
+                let perthread = Box::new([nthreads, options.n_threadsi as _]);
+                jlrs_set_nthreads_per_pool(Box::leak(perthread) as *const _);
+            }
+        } else if options.n_threads == 0 {
             jlrs_set_nthreads(-1);
-            jlrs_set_nthreadpools(2);
-            let perthread = Box::new([-1i16, options.n_threadsi as _]);
+            jlrs_set_nthreadpools(1);
+            let perthread = Box::new(-1i16);
             jlrs_set_nthreads_per_pool(Box::leak(perthread) as *const _);
         } else {
-            let nthreads = options.n_threads as i16;
-            let nthreadsi = options.n_threadsi as i16;
-            jlrs_set_nthreads(nthreads + nthreadsi);
-            jlrs_set_nthreadpools(2);
-            let perthread = Box::new([nthreads, options.n_threadsi as _]);
+            let n_threads = options.n_threads as _;
+            jlrs_set_nthreads(n_threads);
+            jlrs_set_nthreadpools(1);
+            let perthread = Box::new(n_threads);
             jlrs_set_nthreads_per_pool(Box::leak(perthread) as *const _);
         }
-    } else if options.n_threads == 0 {
-        jlrs_set_nthreads(-1);
-        jlrs_set_nthreadpools(1);
-        let perthread = Box::new(-1i16);
-        jlrs_set_nthreads_per_pool(Box::leak(perthread) as *const _);
-    } else {
-        let n_threads = options.n_threads as _;
-        jlrs_set_nthreads(n_threads);
-        jlrs_set_nthreadpools(1);
-        let perthread = Box::new(n_threads);
-        jlrs_set_nthreads_per_pool(Box::leak(perthread) as *const _);
     }
 }

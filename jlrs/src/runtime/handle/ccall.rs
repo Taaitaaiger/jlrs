@@ -8,6 +8,7 @@
 use jl_sys::{jl_throw, unsized_local_scope};
 
 use crate::{
+    InstallJlrsCore,
     data::managed::{module::JlrsCore, private::ManagedPriv, value::ValueRet},
     init_jlrs,
     memory::{
@@ -19,7 +20,6 @@ use crate::{
     },
     private::Private,
     runtime::state::set_started_from_julia,
-    InstallJlrsCore,
 };
 
 /// Interact with Julia from a Rust function called through `ccall`. You should use
@@ -43,7 +43,7 @@ impl<'context> CCall<'context> {
     #[inline]
     #[deprecated = "Use weak_handle instead"]
     pub unsafe fn new(frame: &'context mut StackFrame<0>) -> Self {
-        CCall { frame: frame.pin() }
+        unsafe { CCall { frame: frame.pin() } }
     }
 
     /// Create a [`GcFrame`], call the given closure, and return its result.
@@ -68,12 +68,14 @@ impl<'context> CCall<'context> {
     where
         for<'scope> F: FnOnce(LocalGcFrame<'scope, N>) -> T,
     {
-        let mut local_frame = LocalFrame::new();
+        unsafe {
+            let mut local_frame = LocalFrame::new();
 
-        let pinned = local_frame.pin();
-        let res = func(LocalGcFrame::new(&pinned));
-        pinned.pop();
-        res
+            let pinned = local_frame.pin();
+            let res = func(LocalGcFrame::new(&pinned));
+            pinned.pop();
+            res
+        }
     }
 
     /// Create a new unsized local scope and call `func`.
@@ -85,11 +87,13 @@ impl<'context> CCall<'context> {
     where
         for<'inner> F: FnOnce(UnsizedLocalGcFrame<'inner>) -> T,
     {
-        let mut func = Some(func);
-        unsized_local_scope(size, |frame| {
-            let frame = UnsizedLocalGcFrame::new(frame);
-            func.take().unwrap()(frame)
-        })
+        unsafe {
+            let mut func = Some(func);
+            unsized_local_scope(size, |frame| {
+                let frame = UnsizedLocalGcFrame::new(frame);
+                func.take().unwrap()(frame)
+            })
+        }
     }
 }
 
@@ -104,15 +108,17 @@ impl<'context> CCall<'context> {
 /// returned to a `catch` block by jumping over intermediate stack frames.
 #[inline]
 pub unsafe fn throw_exception(exception: ValueRet) -> ! {
-    jl_throw(exception.ptr().as_ptr())
+    unsafe { jl_throw(exception.ptr().as_ptr()) }
 }
 
 #[doc(hidden)]
 #[inline]
 pub unsafe fn throw_borrow_exception() -> ! {
-    let unrooted = Unrooted::new();
-    let err = JlrsCore::borrow_error(&unrooted).instance().unwrap();
-    jl_throw(err.unwrap(Private))
+    unsafe {
+        let unrooted = Unrooted::new();
+        let err = JlrsCore::borrow_error(&unrooted).instance().unwrap();
+        jl_throw(err.unwrap(Private))
+    }
 }
 
 /// This function must be called before jlrs can be used. When the `julia_module` macro is
@@ -122,6 +128,8 @@ pub unsafe fn throw_borrow_exception() -> ! {
 /// by calling `JlrsCore.set_pool_size`.
 #[inline(never)]
 pub unsafe fn init_jlrs_wrapped(install_jlrs_core: &InstallJlrsCore) {
-    set_started_from_julia();
-    init_jlrs(install_jlrs_core, false);
+    unsafe {
+        set_started_from_julia();
+        init_jlrs(install_jlrs_core, false);
+    }
 }

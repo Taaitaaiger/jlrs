@@ -1,7 +1,7 @@
 use std::{fmt, marker::PhantomData};
 
 use super::IsActive;
-use crate::memory::scope::{private::LocalScopePriv, LocalScope};
+use crate::memory::scope::{LocalScope, private::LocalScopePriv};
 
 /// A handle that lets you call into Julia from a delegated task.
 pub struct DelegatedHandle {

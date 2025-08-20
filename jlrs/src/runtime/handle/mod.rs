@@ -26,14 +26,14 @@ pub trait IsActive: Sized {
 }
 
 pub(crate) fn notify(pair: &(Mutex<bool>, Condvar)) {
-    let (ref lock, ref cvar) = &pair;
+    let (lock, cvar) = &pair;
     let mut complete = lock.lock();
     *complete = true;
     cvar.notify_one();
 }
 
 pub(crate) fn wait(pair: &(Mutex<bool>, Condvar)) {
-    let (ref lock, ref cvar) = &pair;
+    let (lock, cvar) = &pair;
     let mut complete = lock.lock();
     if !*complete {
         cvar.wait(&mut complete);

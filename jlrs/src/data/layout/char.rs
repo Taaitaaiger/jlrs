@@ -43,7 +43,7 @@ impl Char {
     /// Safety: the `Char` must be a valid `char`.
     #[inline]
     pub unsafe fn try_as_char_unchecked(self) -> char {
-        char::from_u32_unchecked(self.0)
+        unsafe { char::from_u32_unchecked(self.0) }
     }
 }
 
@@ -64,7 +64,7 @@ unsafe impl Unbox for Char {
     type Output = Self;
     #[inline]
     unsafe fn unbox(value: Value) -> Char {
-        Char(jl_unbox_uint32(value.unwrap(Private).cast()))
+        unsafe { Char(jl_unbox_uint32(value.unwrap(Private).cast())) }
     }
 }
 
@@ -72,7 +72,7 @@ unsafe impl Unbox for char {
     type Output = Char;
     #[inline]
     unsafe fn unbox(value: Value) -> Char {
-        Char(jl_unbox_uint32(value.unwrap(Private).cast()))
+        unsafe { Char(jl_unbox_uint32(value.unwrap(Private).cast())) }
     }
 }
 

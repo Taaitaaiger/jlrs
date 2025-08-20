@@ -36,8 +36,10 @@ impl<'scope> AsyncGcFrame<'scope> {
 
     #[inline]
     pub(crate) unsafe fn nest_async<'inner>(&'inner mut self) -> (usize, AsyncGcFrame<'inner>) {
-        let (offset, frame) = self.nest();
-        (offset, AsyncGcFrame { frame: frame })
+        unsafe {
+            let (offset, frame) = self.nest();
+            (offset, AsyncGcFrame { frame: frame })
+        }
     }
 
     #[inline]

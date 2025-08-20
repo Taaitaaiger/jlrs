@@ -18,7 +18,7 @@ use parking_lot::{Condvar, Mutex};
 use self::manager::get_manager;
 #[cfg(feature = "async")]
 use super::async_handle::AsyncHandle;
-use super::{notify, weak_handle::WeakHandle, IsActive};
+use super::{IsActive, notify, weak_handle::WeakHandle};
 #[cfg(feature = "async")]
 use crate::runtime::executor::Executor;
 use crate::{
@@ -194,14 +194,16 @@ impl<'a, 'scope, 'env, E: Executor<N>, const N: usize> PoolBuilder<'a, 'scope, '
 #[inline(never)]
 #[cold]
 unsafe fn adopt_thread() {
-    let mut ptls = get_tls();
-    if ptls.is_null() {
-        let pgcstack = jl_adopt_thread();
-        ptls = jlrs_ptls_from_gcstack(pgcstack);
-    }
+    unsafe {
+        let mut ptls = get_tls();
+        if ptls.is_null() {
+            let pgcstack = jl_adopt_thread();
+            ptls = jlrs_ptls_from_gcstack(pgcstack);
+        }
 
-    jlrs_gc_safe_enter(ptls);
-    ADOPTED.set(true);
+        jlrs_gc_safe_enter(ptls);
+        ADOPTED.set(true);
+    }
 }
 
 pub(crate) fn wait_loop() {
@@ -223,29 +225,31 @@ pub(crate) fn wait_loop() {
 }
 
 unsafe fn drop_handle() {
-    let n_handles = N_HANDLES.fetch_sub(1, Ordering::Relaxed);
-    if n_handles == 1 {
-        let _ = std::thread::spawn(|| {
-            let pgcstack = jl_adopt_thread();
-            let ptls = jlrs_ptls_from_gcstack(pgcstack);
+    unsafe {
+        let n_handles = N_HANDLES.fetch_sub(1, Ordering::Relaxed);
+        if n_handles == 1 {
+            let _ = std::thread::spawn(|| {
+                let pgcstack = jl_adopt_thread();
+                let ptls = jlrs_ptls_from_gcstack(pgcstack);
 
-            set_pending_exit();
+                set_pending_exit();
 
-            let weak_handle = weak_handle_unchecked!();
-            let notify_main = JlrsCore::notify_main(&weak_handle);
+                let weak_handle = weak_handle_unchecked!();
+                let notify_main = JlrsCore::notify_main(&weak_handle);
 
-            if let Err(err) = notify_main.call(&weak_handle, []) {
-                weak_handle.local_scope::<_, 1>(|mut frame| {
-                    panic!(
-                        "unexpected error when calling JlrsCore.Threads.notify_main: {:?}",
-                        err.root(&mut frame)
-                    );
-                });
-            }
+                if let Err(err) = notify_main.call(&weak_handle, []) {
+                    weak_handle.local_scope::<_, 1>(|mut frame| {
+                        panic!(
+                            "unexpected error when calling JlrsCore.Threads.notify_main: {:?}",
+                            err.root(&mut frame)
+                        );
+                    });
+                }
 
-            jlrs_gc_safe_enter(ptls);
-            notify(&EXIT_LOCK);
-        })
-        .join();
+                jlrs_gc_safe_enter(ptls);
+                notify(&EXIT_LOCK);
+            })
+            .join();
+        }
     }
 }

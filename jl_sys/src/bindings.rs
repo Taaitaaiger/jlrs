@@ -11,7 +11,7 @@ pub mod globals {
         ),
         link(name = "libjulia", kind = "raw-dylib")
     )]
-    extern "C" {
+    unsafe extern "C" {
         pub static mut jl_typeofbottom_type: *mut crate::types::jl_datatype_t;
 
         pub static mut jl_datatype_type: *mut crate::types::jl_datatype_t;
@@ -232,7 +232,7 @@ pub mod functions {
         ),
         link(name = "libjulia", kind = "raw-dylib")
     )]
-    extern "C" {
+    unsafe extern "C" {
         pub fn jl_gc_enable(on: std::ffi::c_int) -> std::ffi::c_int;
 
         pub fn jl_gc_is_enabled() -> std::ffi::c_int;
@@ -325,7 +325,7 @@ pub mod functions {
         pub fn jl_svec_copy(a: *mut crate::types::jl_svec_t) -> *mut crate::types::jl_svec_t;
 
         pub fn jl_symbol_n(str: *const std::ffi::c_char, len: usize)
-            -> *mut crate::types::jl_sym_t;
+        -> *mut crate::types::jl_sym_t;
 
         pub fn jl_gensym() -> *mut crate::types::jl_sym_t;
 
@@ -679,7 +679,7 @@ pub mod functions {
 /// The jlrs_cc library is compiled by the build script and implements some missing functionality
 /// in C so we can keep type layouts opaque.
 pub mod jlrs_cc {
-    extern "C" {
+    unsafe extern "C" {
         pub fn jlrs_typeof(v: *mut crate::types::jl_value_t) -> *mut crate::types::jl_value_t;
 
         pub fn jlrs_gc_wb(parent: *mut std::ffi::c_void, ptr: *mut std::ffi::c_void);
@@ -951,7 +951,7 @@ pub mod jlrs_cc {
 ))]
 mod indirect {
     #[link(name = "libjulia", kind = "raw-dylib")]
-    extern "C" {
+    unsafe extern "C" {
         #![allow(unused)]
 
         // TODO: is this ok? It's unused, but compiling with BinaryBuilder complains

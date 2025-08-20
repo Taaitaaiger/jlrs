@@ -38,7 +38,9 @@ unsafe impl lock_api::RawRwLock for RawGcSafeRwLock {
 
     #[inline]
     unsafe fn unlock_shared(&self) {
-        self.inner.unlock_shared();
+        unsafe {
+            self.inner.unlock_shared();
+        }
     }
 
     #[inline]
@@ -62,36 +64,38 @@ unsafe impl lock_api::RawRwLock for RawGcSafeRwLock {
 
     #[inline]
     unsafe fn unlock_exclusive(&self) {
-        self.inner.unlock_exclusive();
+        unsafe {
+            self.inner.unlock_exclusive();
+        }
     }
 }
 
 unsafe impl lock_api::RawRwLockFair for RawGcSafeRwLock {
     #[inline]
     unsafe fn unlock_shared_fair(&self) {
-        self.inner.unlock_shared_fair()
+        unsafe { self.inner.unlock_shared_fair() }
     }
 
     #[inline]
     unsafe fn unlock_exclusive_fair(&self) {
-        self.inner.unlock_exclusive_fair()
+        unsafe { self.inner.unlock_exclusive_fair() }
     }
 
     #[inline]
     unsafe fn bump_shared(&self) {
-        self.inner.bump_shared()
+        unsafe { self.inner.bump_shared() }
     }
 
     #[inline]
     unsafe fn bump_exclusive(&self) {
-        self.inner.bump_exclusive()
+        unsafe { self.inner.bump_exclusive() }
     }
 }
 
 unsafe impl lock_api::RawRwLockDowngrade for RawGcSafeRwLock {
     #[inline]
     unsafe fn downgrade(&self) {
-        self.inner.downgrade()
+        unsafe { self.inner.downgrade() }
     }
 }
 
@@ -166,7 +170,7 @@ unsafe impl lock_api::RawRwLockUpgrade for RawGcSafeRwLock {
 
     #[inline]
     unsafe fn unlock_upgradable(&self) {
-        self.inner.unlock_upgradable()
+        unsafe { self.inner.unlock_upgradable() }
     }
 
     #[inline]
@@ -185,31 +189,31 @@ unsafe impl lock_api::RawRwLockUpgrade for RawGcSafeRwLock {
 
     #[inline]
     unsafe fn try_upgrade(&self) -> bool {
-        self.inner.try_upgrade()
+        unsafe { self.inner.try_upgrade() }
     }
 }
 
 unsafe impl lock_api::RawRwLockUpgradeFair for RawGcSafeRwLock {
     #[inline]
     unsafe fn unlock_upgradable_fair(&self) {
-        self.inner.unlock_upgradable_fair()
+        unsafe { self.inner.unlock_upgradable_fair() }
     }
 
     #[inline]
     unsafe fn bump_upgradable(&self) {
-        self.inner.bump_upgradable()
+        unsafe { self.inner.bump_upgradable() }
     }
 }
 
 unsafe impl lock_api::RawRwLockUpgradeDowngrade for RawGcSafeRwLock {
     #[inline]
     unsafe fn downgrade_upgradable(&self) {
-        self.inner.downgrade_upgradable()
+        unsafe { self.inner.downgrade_upgradable() }
     }
 
     #[inline]
     unsafe fn downgrade_to_upgradable(&self) {
-        self.inner.downgrade_to_upgradable()
+        unsafe { self.inner.downgrade_to_upgradable() }
     }
 }
 
@@ -226,11 +230,11 @@ unsafe impl lock_api::RawRwLockUpgradeTimed for RawGcSafeRwLock {
 
     #[inline]
     unsafe fn try_upgrade_until(&self, timeout: Instant) -> bool {
-        self.inner.try_upgrade_until(timeout)
+        unsafe { self.inner.try_upgrade_until(timeout) }
     }
 
     #[inline]
     unsafe fn try_upgrade_for(&self, timeout: Duration) -> bool {
-        self.inner.try_upgrade_for(timeout)
+        unsafe { self.inner.try_upgrade_for(timeout) }
     }
 }

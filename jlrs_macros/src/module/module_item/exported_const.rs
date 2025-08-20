@@ -1,7 +1,8 @@
 use quote::format_ident;
 use syn::{
+    Expr, Ident, ItemFn, Result, Token, Type,
     parse::{Parse, ParseStream},
-    parse_quote, Expr, Ident, ItemFn, Result, Token, Type,
+    parse_quote,
 };
 
 use super::init_fn::InitFn;

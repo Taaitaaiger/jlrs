@@ -1,4 +1,4 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, black_box, criterion_group, criterion_main};
 use jlrs::{
     data::managed::background_task::spawn_background_task, prelude::*, weak_handle_unchecked,
 };
@@ -25,7 +25,7 @@ fn bench_background_task(c: &mut Criterion) {
 
             b.iter(|| {
                 let task = spawn_background_task::<usize, _, _>(&mut output1, || Ok(1usize));
-                let _v = black_box(unsafe { func.call(&mut output2, [task.as_value(])).unwrap() });
+                let _v = black_box(unsafe { func.call(&mut output2, [task.as_value()]).unwrap() });
             })
         })
     });

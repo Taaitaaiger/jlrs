@@ -1,9 +1,9 @@
 use std::{
-    panic::{catch_unwind, resume_unwind, AssertUnwindSafe},
+    panic::{AssertUnwindSafe, catch_unwind, resume_unwind},
     sync::{
-        atomic::{AtomicUsize, Ordering},
-        mpsc::{channel as mpsc_channel, Sender},
         Arc,
+        atomic::{AtomicUsize, Ordering},
+        mpsc::{Sender, channel as mpsc_channel},
     },
     thread::{self, JoinHandle},
 };
@@ -19,8 +19,8 @@ use crate::{
         executor::Executor,
         handle::{
             async_handle::{
-                cancellation_token::CancellationToken, channel::channel, message::Message,
-                on_adopted_thread, AsyncHandle,
+                AsyncHandle, cancellation_token::CancellationToken, channel::channel,
+                message::Message, on_adopted_thread,
             },
             mt_handle::drop_handle,
         },

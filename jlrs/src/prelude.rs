@@ -28,8 +28,8 @@ pub use crate::{
     data::{
         layout::{bool::Bool, char::Char, nothing::Nothing},
         managed::{
+            Managed, ManagedWeak,
             array::{
-                data::accessor::{Accessor, AccessorMut, AccessorMut1D},
                 Array, ArrayData, ArrayResult, ConstructTypedArray, Matrix, MatrixData,
                 MatrixResult, RankedArray, RankedArrayData, RankedArrayResult, TypedArray,
                 TypedArrayData, TypedArrayResult, TypedMatrix, TypedMatrixData, TypedMatrixResult,
@@ -38,13 +38,13 @@ pub use crate::{
                 VectorAnyResult, VectorData, VectorResult, WeakArray, WeakMatrix, WeakRankedArray,
                 WeakTypedArray, WeakTypedMatrix, WeakTypedRankedArray, WeakTypedVector, WeakVector,
                 WeakVectorAny,
+                data::accessor::{Accessor, AccessorMut, AccessorMut1D},
             },
             datatype::{DataType, DataTypeData, DataTypeResult, WeakDataType},
             module::{Module, ModuleData, ModuleResult, WeakModule},
             string::{JuliaString, StringData, StringResult, WeakString},
             symbol::Symbol,
             value::{Value, ValueData, ValueResult, WeakValue},
-            Managed, ManagedWeak,
         },
     },
     define_fast_array_key, define_fast_key,
@@ -54,5 +54,5 @@ pub use crate::{
         target::{Target, TargetType},
     },
     named_tuple,
-    runtime::{handle::with_stack::WithStack, Runtime},
+    runtime::{Runtime, handle::with_stack::WithStack},
 };

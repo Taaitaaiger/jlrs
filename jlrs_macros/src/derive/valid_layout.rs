@@ -1,6 +1,6 @@
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{spanned::Spanned as _, Token};
+use syn::{Token, spanned::Spanned as _};
 
 use super::{attrs::JlrsTypeAttrs, is_enum, is_repr_c, is_repr_int};
 
@@ -59,7 +59,7 @@ pub fn impl_valid_layout(ast: &syn::DeriveInput) -> syn::Result<TokenStream> {
                 return Err(syn::Error::new(
                     ast.span(),
                     "ValidLayout can only be derived for structs.",
-                ))
+                ));
             }
         };
 
@@ -70,7 +70,7 @@ pub fn impl_valid_layout(ast: &syn::DeriveInput) -> syn::Result<TokenStream> {
                 return Err(syn::Error::new(
                     ast.span(),
                     "ValidLayout cannot be derived for tuple structs.",
-                ))
+                ));
             }
         };
 
