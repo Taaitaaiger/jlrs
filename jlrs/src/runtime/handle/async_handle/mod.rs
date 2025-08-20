@@ -37,7 +37,6 @@ use crate::{
         future::{wake_task, GcUnsafeFuture},
         task::{sleep, AsyncTask, PersistentTask, Register},
     },
-    convert::into_jlrs_result::IntoJlrsResult,
     error::IOError,
     memory::{
         gc::gc_unsafe_with,
@@ -73,7 +72,7 @@ pub struct AsyncHandle {
 
 impl AsyncHandle {
     /// Prepare to send a new async task.
-    pub fn task<A>(&self, task: A) -> Dispatch<Message, A::Output>
+    pub fn task<A>(&self, task: A) -> Dispatch<'_, Message, A::Output>
     where
         A: AsyncTask,
     {
@@ -86,7 +85,7 @@ impl AsyncHandle {
     }
 
     /// Prepare to register a task.
-    pub fn register_task<R>(&self) -> Dispatch<Message, JlrsResult<()>>
+    pub fn register_task<R>(&self) -> Dispatch<'_, Message, JlrsResult<()>>
     where
         R: Register,
     {
@@ -99,7 +98,7 @@ impl AsyncHandle {
     }
 
     /// Prepare to send a new blocking task.
-    pub fn blocking_task<T, F>(&self, task: F) -> Dispatch<Message, T>
+    pub fn blocking_task<T, F>(&self, task: F) -> Dispatch<'_, Message, T>
     where
         for<'base> F: 'static + Send + FnOnce(GcFrame<'base>) -> T,
         T: Send + 'static,
@@ -113,7 +112,7 @@ impl AsyncHandle {
     }
 
     /// Prepare to send a new persistent task.
-    pub fn persistent<P>(&self, task: P) -> Dispatch<Message, JlrsResult<PersistentHandle<P>>>
+    pub fn persistent<P>(&self, task: P) -> Dispatch<'_, Message, JlrsResult<PersistentHandle<P>>>
     where
         P: PersistentTask,
     {
@@ -150,7 +149,10 @@ impl AsyncHandle {
         }
     }
 
-    pub(crate) unsafe fn include<P>(&self, path: P) -> JlrsResult<Dispatch<Message, JlrsResult<()>>>
+    pub(crate) unsafe fn include<P>(
+        &self,
+        path: P,
+    ) -> JlrsResult<Dispatch<'_, Message, JlrsResult<()>>>
     where
         P: AsRef<Path>,
     {
@@ -168,14 +170,16 @@ impl AsyncHandle {
         Ok(dispatch)
     }
 
-    pub(crate) unsafe fn using(&self, module_name: String) -> Dispatch<Message, JlrsResult<()>> {
+    pub(crate) unsafe fn using(
+        &self,
+        module_name: String,
+    ) -> Dispatch<'_, Message, JlrsResult<()>> {
         let (sender, receiver) = oneshot_channel();
         let pending_task = BlockingTask::new(
             move |mut frame| unsafe {
                 let cmd = format!("using {}", module_name);
-                Value::eval_string(&mut frame, cmd)
-                    .map(|_| ())
-                    .into_jlrs_result()
+                Value::eval_string(&mut frame, cmd)?;
+                Ok(())
             },
             sender,
         );
@@ -184,7 +188,7 @@ impl AsyncHandle {
         Dispatch::new(msg, &self.sender, receiver)
     }
 
-    pub(crate) fn error_color(&self, enable: bool) -> Dispatch<Message, ()> {
+    pub(crate) fn error_color(&self, enable: bool) -> Dispatch<'_, Message, ()> {
         let (sender, receiver) = oneshot_channel();
         let pending_task = SetErrorColorTask::new(enable, sender);
         let msg = MessageInner::ErrorColor(Box::new(pending_task)).wrap();
@@ -506,7 +510,7 @@ unsafe fn set_custom_fns() {
         let handle = weak_handle_unchecked!();
 
         let cmd = CStr::from_bytes_with_nul_unchecked(b"const JlrsThreads = JlrsCore.Threads\0");
-        handle.local_scope::<2>(|mut frame| {
+        handle.local_scope::<_, 2>(|mut frame| {
             Value::eval_cstring(&mut frame, cmd).expect("using JlrsCore threw an exception");
 
             let wake_rust = Value::new(&mut frame, wake_task as *mut c_void);

@@ -129,7 +129,7 @@ unsafe fn init_foreign<T: ForeignType>() -> DataType<'static> {
 
     unsafe {
         let unrooted = Unrooted::new();
-        let dt = unrooted.local_scope::<1>(|mut frame| {
+        let dt = unrooted.local_scope::<_, 1>(|mut frame| {
             let sym = Symbol::new(&frame, name.as_str());
             let module = Module::main(&frame);
             let dt = <T as OpaqueType>::create_type(&mut frame, sym, module);

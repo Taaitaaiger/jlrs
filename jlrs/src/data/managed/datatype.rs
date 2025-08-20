@@ -561,7 +561,7 @@ impl DataType<'_> {
     {
         let svec = env.to_svec();
         let tvars = svec.data();
-        target.with_local_scope::<1>(|target, mut frame| {
+        target.with_local_scope::<_, 1>(|target, mut frame| {
             let mut reusable_slot = frame.reusable_slot();
             unsafe {
                 let mut out = self.root(&mut reusable_slot).as_value();

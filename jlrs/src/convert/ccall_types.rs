@@ -148,7 +148,7 @@ unsafe impl<T: CCallReturn> CCallReturn for JlrsResult<T> {
                 Ok(t) => t,
                 Err(e) => {
                     let handle = weak_handle_unchecked!();
-                    let e = handle.local_scope::<1>(|mut frame| {
+                    let e = handle.local_scope::<_, 1>(|mut frame| {
                         let msg = JuliaString::new(&mut frame, format!("{}", e)).as_value();
                         let err = JlrsCore::jlrs_error(&frame)
                             .as_value()

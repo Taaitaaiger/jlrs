@@ -68,6 +68,22 @@
 
 - `Module::global_unchecked` can return `None` if the global value doesn't exist.
 
+- `Module::function` has been removed, use `Module::global` instead.
+
+- `LocalReturning` and `Returning` have been removed, a scope's output type has been moved to the scope methods. All kinds of scopes are covered by traits: `LocalScope`, `LocalScopeExt`, `Scope`, and `AsyncScope` are all unsafe and sealed traits.
+
+- The managed type `Function` has been removed, there is now an abstract type constructor `Function` instead.
+
+- Julia arrays can no longer be indexed with tuples, use arrays instead.
+
+- `TryCatchFuture` has been removed.
+
+- `IntoJlrsResult` has been removed in favor of supporting the `?` operator by implementing conversions from `Value` to `JlrsError` and `Box<JlrsError>`.
+
+- A custom `NamedTuple` type has been added, the `named_tuple` macro has been moved to the new `jlrs::data::managed::named_tuple` module and now returns a `JlrsResult<NamedTuple>`. `ProvideKeywords::provide_keywords` now requires an instance of `NamedTuple` to be passed. Several methods to access named tuples, and create new named tuple that extend an existing one have been added. The old `Typecheck` placeholder has been removed in favor of the new `NamedTuple` type.
+
+- `Call::call0`, `Call::call1`, `Call::call2`, and `Call::call3` have been deprecated in favor of using `Call::call`.
+
 ## v0.21
 
 - Support generating bindings for Julia enums with integer base types in combination with JlrsCore.Reflect and the `Enum` derive macro.

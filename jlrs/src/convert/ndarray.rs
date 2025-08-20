@@ -17,15 +17,11 @@ fn into_shape<'scope, 'data, T, A: Accessor<'scope, 'data, T, N>, const N: isize
     let array = a.array();
     let dims = array.dimensions();
     let slice = dims.as_slice();
-    if N == 1 || slice.len() == 1 {
-        let slice = unsafe { &[slice[0].dims_cell.get()][..] };
-        slice.into_dimension().f()
-    } else {
-        let n = slice.len();
-        let ptr = slice.as_ptr().cast::<usize>();
-        let slice = unsafe { std::slice::from_raw_parts(ptr, n) };
-        slice.into_dimension().f()
-    }
+
+    let n = slice.len();
+    let ptr = slice.as_ptr().cast::<usize>();
+    let slice = unsafe { std::slice::from_raw_parts(ptr, n) };
+    slice.into_dimension().f()
 }
 
 /// Trait to borrow Julia arrays with inline data as `ndarray`'s `ArrayView`.

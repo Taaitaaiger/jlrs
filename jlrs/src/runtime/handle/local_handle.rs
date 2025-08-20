@@ -6,13 +6,13 @@ use jl_sys::jl_atexit_hook;
 
 use super::IsActive;
 use crate::{
-    memory::scope::{LocalReturning, LocalScope},
+    memory::scope::{private::LocalScopePriv, LocalScope},
     runtime::state::set_exit,
 };
 
 /// A handle that lets you call into Julia from the current thread.
 ///
-/// An `LocalHandle` can be created by calling [`Builder::start_local`]. Julia exits when this
+/// A `LocalHandle` can be created by calling [`Builder::start_local`]. Julia exits when this
 /// handle is dropped.
 ///
 /// [`Builder::start_local`]: crate::runtime::builder::Builder::start_local
@@ -45,10 +45,5 @@ impl fmt::Debug for LocalHandle {
 
 impl IsActive for LocalHandle {}
 
-impl<'ctx> LocalReturning<'ctx> for LocalHandle {
-    fn returning<T>(&mut self) -> &mut impl LocalScope<'ctx, T> {
-        self
-    }
-}
-
-impl<'ctx, T> LocalScope<'ctx, T> for LocalHandle {}
+impl LocalScopePriv for LocalHandle {}
+unsafe impl LocalScope for LocalHandle {}

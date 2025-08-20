@@ -20,28 +20,27 @@ mod tests {
     fn empty_union_field() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| unsafe {
-                        let mut tys = [Value::new(&mut frame, 0usize)];
-                        let res = Module::main(&frame)
-                            .submodule(&frame, "JlrsTests")?
-                            .as_managed()
-                            .global(&frame, "WithEmpty")?
-                            .as_managed()
-                            .apply_type(&mut frame, &mut tys)
-                            .into_jlrs_result()?
-                            .call0(&mut frame)
-                            .into_jlrs_result()?;
+                stack.scope(|mut frame| unsafe {
+                    let mut tys = [Value::new(&mut frame, 0usize)];
+                    let res = Module::main(&frame)
+                        .submodule(&frame, "JlrsTests")
+                        .unwrap()
+                        .as_managed()
+                        .global(&frame, "WithEmpty")
+                        .unwrap()
+                        .as_managed()
+                        .apply_type(&mut frame, &mut tys)
+                        .unwrap()
+                        .call(&mut frame, [])
+                        .unwrap();
 
-                        assert!(res
-                            .field_accessor()
-                            .field(1)?
-                            .access::<EmptyUnion>()
-                            .is_err());
-                        Ok(())
-                    })
-                    .unwrap();
+                    assert!(res
+                        .field_accessor()
+                        .field(1)
+                        .unwrap()
+                        .access::<EmptyUnion>()
+                        .is_err());
+                })
             });
         })
     }
@@ -49,31 +48,28 @@ mod tests {
     fn access_tuple_fields() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| unsafe {
-                        // Returns (1, 2, 3) as Tuple{UInt32, UInt16, Int64}
-                        let func = Module::main(&frame)
-                            .submodule(&frame, "JlrsTests")?
-                            .as_managed()
-                            .function(&frame, "inlinetuple")?
-                            .as_managed();
-                        let tup = func.call0(&mut frame).unwrap();
+                stack.scope(|mut frame| unsafe {
+                    // Returns (1, 2, 3) as Tuple{UInt32, UInt16, Int64}
+                    let func = Module::main(&frame)
+                        .submodule(&frame, "JlrsTests")
+                        .unwrap()
+                        .as_managed()
+                        .global(&frame, "inlinetuple")
+                        .unwrap()
+                        .as_managed();
+                    let tup = func.call(&mut frame, []).unwrap();
 
-                        assert!(tup.is::<Tuple>());
-                        assert_eq!(tup.n_fields(), 3);
-                        let v1 = tup.get_nth_field(&mut frame, 0)?;
-                        let v2 = tup.get_nth_field(&mut frame, 1)?;
-                        let output = frame.output();
-                        let v3 = frame.scope(|_| tup.get_nth_field(output, 2))?;
+                    assert!(tup.is::<Tuple>());
+                    assert_eq!(tup.n_fields(), 3);
+                    let v1 = tup.get_nth_field(&mut frame, 0).unwrap();
+                    let v2 = tup.get_nth_field(&mut frame, 1).unwrap();
+                    let output = frame.output();
+                    let v3 = frame.scope(|_| tup.get_nth_field(output, 2)).unwrap();
 
-                        assert!(v1.is::<u32>());
-                        assert!(v2.is::<u16>());
-                        assert!(v3.is::<i64>());
-
-                        Ok(())
-                    })
-                    .unwrap();
+                    assert!(v1.is::<u32>());
+                    assert!(v2.is::<u16>());
+                    assert!(v3.is::<i64>());
+                })
             })
         })
     }
@@ -81,21 +77,18 @@ mod tests {
     fn cannot_access_oob_tuple_field() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| unsafe {
-                        // Returns (1, 2, 3) as Tuple{UInt32, UInt16, Int64}
-                        let func = Module::main(&frame)
-                            .submodule(&frame, "JlrsTests")?
-                            .as_managed()
-                            .function(&frame, "inlinetuple")?
-                            .as_managed();
-                        let tup = func.call0(&mut frame).unwrap();
-                        assert!(tup.get_nth_field(&mut frame, 3).is_err());
-
-                        Ok(())
-                    })
-                    .unwrap();
+                stack.scope(|mut frame| unsafe {
+                    // Returns (1, 2, 3) as Tuple{UInt32, UInt16, Int64}
+                    let func = Module::main(&frame)
+                        .submodule(&frame, "JlrsTests")
+                        .unwrap()
+                        .as_managed()
+                        .global(&frame, "inlinetuple")
+                        .unwrap()
+                        .as_managed();
+                    let tup = func.call(&mut frame, []).unwrap();
+                    assert!(tup.get_nth_field(&mut frame, 3).is_err());
+                })
             })
         })
     }
@@ -103,21 +96,18 @@ mod tests {
     fn access_non_pointer_tuple_field_must_alloc() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| unsafe {
-                        // Returns (1, 2, 3) as Tuple{UInt32, UInt16, Int64}
-                        let func = Module::main(&frame)
-                            .submodule(&frame, "JlrsTests")?
-                            .as_managed()
-                            .function(&frame, "inlinetuple")?
-                            .as_managed();
-                        let tup = func.call0(&mut frame).unwrap();
-                        assert!(tup.get_nth_field_ref(2).is_err());
-
-                        Ok(())
-                    })
-                    .unwrap();
+                stack.scope(|mut frame| unsafe {
+                    // Returns (1, 2, 3) as Tuple{UInt32, UInt16, Int64}
+                    let func = Module::main(&frame)
+                        .submodule(&frame, "JlrsTests")
+                        .unwrap()
+                        .as_managed()
+                        .global(&frame, "inlinetuple")
+                        .unwrap()
+                        .as_managed();
+                    let tup = func.call(&mut frame, []).unwrap();
+                    assert!(tup.get_nth_field_ref(2).is_err());
+                })
             })
         })
     }
@@ -125,38 +115,35 @@ mod tests {
     fn access_mutable_struct_fields() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| unsafe {
-                        //mutable struct MutableStruct
-                        //  x
-                        //  y::UInt64
-                        //end
-                        let func = Module::main(&frame)
-                            .submodule(&frame, "JlrsTests")?
-                            .as_managed()
-                            .global(&frame, "MutableStruct")?
-                            .as_managed();
+                stack.scope(|mut frame| unsafe {
+                    //mutable struct MutableStruct
+                    //  x
+                    //  y::UInt64
+                    //end
+                    let func = Module::main(&frame)
+                        .submodule(&frame, "JlrsTests")
+                        .unwrap()
+                        .as_managed()
+                        .global(&frame, "MutableStruct")
+                        .unwrap()
+                        .as_managed();
 
-                        let x = Value::new(&mut frame, 2.0f32);
-                        let y = Value::new(&mut frame, 3u64);
+                    let x = Value::new(&mut frame, 2.0f32);
+                    let y = Value::new(&mut frame, 3u64);
 
-                        let mut_struct = func.call(&mut frame, &mut [x, y]).into_jlrs_result()?;
-                        assert!(mut_struct.is::<Mutable>());
+                    let mut_struct = func.call(&mut frame, &mut [x, y]).unwrap();
+                    assert!(mut_struct.is::<Mutable>());
 
-                        assert!(mut_struct.get_field(&mut frame, "x").is_ok());
-                        let x_val = mut_struct.get_field_ref("x");
-                        assert!(x_val.is_ok());
-                        {
-                            assert!(x_val.unwrap().unwrap().as_managed().is::<f32>());
-                        }
-                        let output = frame.output();
-                        let _ = frame.scope(|_| mut_struct.get_field(output, "y"))?;
-                        assert!(mut_struct.get_field_ref("y").is_err());
-
-                        Ok(())
-                    })
-                    .unwrap();
+                    assert!(mut_struct.get_field(&mut frame, "x").is_ok());
+                    let x_val = mut_struct.get_field_ref("x");
+                    assert!(x_val.is_ok());
+                    {
+                        assert!(x_val.unwrap().unwrap().as_managed().is::<f32>());
+                    }
+                    let output = frame.output();
+                    let _ = frame.scope(|_| mut_struct.get_field(output, "y")).unwrap();
+                    assert!(mut_struct.get_field_ref("y").is_err());
+                })
             })
         })
     }
@@ -164,29 +151,27 @@ mod tests {
     fn cannot_access_unknown_mutable_struct_field() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| unsafe {
-                        //mutable struct MutableStruct
-                        //  x
-                        //  y::UInt64
-                        //end
-                        let func = Module::main(&frame)
-                            .submodule(&frame, "JlrsTests")?
-                            .as_managed()
-                            .global(&frame, "MutableStruct")?
-                            .as_managed();
+                stack.scope(|mut frame| unsafe {
+                    //mutable struct MutableStruct
+                    //  x
+                    //  y::UInt64
+                    //end
+                    let func = Module::main(&frame)
+                        .submodule(&frame, "JlrsTests")
+                        .unwrap()
+                        .as_managed()
+                        .global(&frame, "MutableStruct")
+                        .unwrap()
+                        .as_managed();
 
-                        let x = Value::new(&mut frame, 2.0f32);
-                        let y = Value::new(&mut frame, 3u64);
+                    let x = Value::new(&mut frame, 2.0f32);
+                    let y = Value::new(&mut frame, 3u64);
 
-                        let mut_struct = func.call(&mut frame, &mut [x, y]).into_jlrs_result()?;
-                        assert!(mut_struct.is::<Mutable>());
+                    let mut_struct = func.call(&mut frame, &mut [x, y]).unwrap();
+                    assert!(mut_struct.is::<Mutable>());
 
-                        assert!(mut_struct.get_field(&mut frame, "z").is_err());
-                        Ok(())
-                    })
-                    .unwrap();
+                    assert!(mut_struct.get_field(&mut frame, "z").is_err());
+                })
             })
         })
     }
@@ -195,15 +180,15 @@ mod tests {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
                 let oob_idx = stack
-                    .returning::<JlrsResult<_>>()
                     .scope(|mut frame| unsafe {
                         let idx = Value::new(&mut frame, 4usize);
                         let data = vec![1.0f64, 2., 3.];
                         let array = TypedArray::<f64>::from_vec_unchecked(&mut frame, data, 3);
                         let func = Module::base(&frame)
-                            .function(&frame, "getindex")?
+                            .global(&frame, "getindex")
+                            .unwrap()
                             .as_managed();
-                        let out = func.call2(&mut frame, array.as_value(), idx).unwrap_err();
+                        let out = func.call(&mut frame, [array.as_value(), idx]).unwrap_err();
 
                         assert_eq!(out.datatype_name(), "BoundsError");
 
@@ -213,10 +198,12 @@ mod tests {
                         let f1: String = field_names[1].as_string().unwrap();
                         assert_eq!(f1, "i");
 
-                        out.get_field_ref("a")?;
+                        out.get_field_ref("a").unwrap();
 
-                        out.get_field(&mut frame, field_names[1])?
-                            .get_nth_field(&mut frame, 0)?
+                        out.get_field(&mut frame, field_names[1])
+                            .unwrap()
+                            .get_nth_field(&mut frame, 0)
+                            .unwrap()
                             .unbox::<isize>()
                     })
                     .unwrap();
@@ -229,27 +216,26 @@ mod tests {
     fn access_bounds_error_fields_oob() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| unsafe {
-                        let idx = Value::new(&mut frame, 4usize);
-                        let data = vec![1.0f64, 2., 3.];
-                        let array =
-                            TypedArray::<f64>::from_vec(&mut frame, data, 3)?.into_jlrs_result()?;
+                stack.scope(|mut frame| unsafe {
+                    let idx = Value::new(&mut frame, 4usize);
+                    let data = vec![1.0f64, 2., 3.];
+                    let array = TypedArray::<f64>::from_vec(&mut frame, data, 3)
+                        .unwrap()
+                        .unwrap();
 
-                        let func = Module::base(&frame)
-                            .function(&frame, "getindex")?
-                            .as_managed();
-                        let out = func.call2(&mut frame, array.as_value(), idx).unwrap_err();
+                    let func = Module::base(&frame)
+                        .global(&frame, "getindex")
+                        .unwrap()
+                        .as_managed();
+                    let out = func.call(&mut frame, [array.as_value(), idx]).unwrap_err();
 
-                        let field_names = out.field_names();
-                        assert!(out
-                            .get_field(&mut frame, field_names[1])?
-                            .get_nth_field(&mut frame, 123)
-                            .is_err());
-                        Ok(())
-                    })
-                    .unwrap();
+                    let field_names = out.field_names();
+                    assert!(out
+                        .get_field(&mut frame, field_names[1])
+                        .unwrap()
+                        .get_nth_field(&mut frame, 123)
+                        .is_err());
+                })
             });
         });
     }
@@ -257,29 +243,26 @@ mod tests {
     fn access_bounds_error_fields_output() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| unsafe {
-                        let idx = Value::new(&mut frame, 4usize);
-                        let data = vec![1.0f64, 2., 3.];
-                        let ty = DataType::float64_type(&frame);
-                        let array =
-                            Array::from_vec_for_unchecked(&mut frame, ty.as_value(), data, 3);
-                        let func = Module::base(&frame)
-                            .function(&frame, "getindex")?
-                            .as_managed();
-                        let out = func.call2(&mut frame, array.as_value(), idx).unwrap_err();
+                stack.scope(|mut frame| unsafe {
+                    let idx = Value::new(&mut frame, 4usize);
+                    let data = vec![1.0f64, 2., 3.];
+                    let ty = DataType::float64_type(&frame);
+                    let array = Array::from_vec_for_unchecked(&mut frame, ty.as_value(), data, 3);
+                    let func = Module::base(&frame)
+                        .global(&frame, "getindex")
+                        .unwrap()
+                        .as_managed();
+                    let out = func.call(&mut frame, [array.as_value(), idx]).unwrap_err();
 
-                        let field_names = out.field_names();
-                        let output = frame.output();
-                        let _ = frame.scope(|mut frame| {
-                            let field = out.get_field(&mut frame, field_names[1])?;
+                    let field_names = out.field_names();
+                    let output = frame.output();
+                    let _ = frame
+                        .scope(|mut frame| {
+                            let field = out.get_field(&mut frame, field_names[1]).unwrap();
                             field.get_nth_field(output, 0)
-                        })?;
-
-                        Ok(())
-                    })
-                    .unwrap();
+                        })
+                        .unwrap();
+                })
             });
         });
     }
@@ -287,28 +270,25 @@ mod tests {
     fn access_bounds_error_fields_output_oob() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| unsafe {
-                        let idx = Value::new(&mut frame, 4usize);
-                        let data = vec![1.0f64, 2., 3.];
-                        let array = TypedArray::<f64>::from_vec_unchecked(&mut frame, data, 3);
-                        let func = Module::base(&frame)
-                            .function(&frame, "getindex")?
-                            .as_managed();
-                        let out = func.call2(&mut frame, array.as_value(), idx).unwrap_err();
+                stack.scope(|mut frame| unsafe {
+                    let idx = Value::new(&mut frame, 4usize);
+                    let data = vec![1.0f64, 2., 3.];
+                    let array = TypedArray::<f64>::from_vec_unchecked(&mut frame, data, 3);
+                    let func = Module::base(&frame)
+                        .global(&frame, "getindex")
+                        .unwrap()
+                        .as_managed();
+                    let out = func.call(&mut frame, [array.as_value(), idx]).unwrap_err();
 
-                        let field_names = out.field_names();
-                        let output = frame.output();
-                        let _ = frame
-                            .scope(|mut frame| {
-                                let field = out.get_field(&mut frame, field_names[1])?;
-                                field.get_nth_field(output, 123)
-                            })
-                            .unwrap_err();
-                        Ok(())
-                    })
-                    .unwrap();
+                    let field_names = out.field_names();
+                    let output = frame.output();
+                    let _ = frame
+                        .scope(|mut frame| {
+                            let field = out.get_field(&mut frame, field_names[1]).unwrap();
+                            field.get_nth_field(output, 123)
+                        })
+                        .unwrap_err();
+                })
             });
         });
     }
@@ -316,22 +296,134 @@ mod tests {
     fn access_nested_field() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| unsafe {
-                        let value = Value::eval_string(&mut frame, MIXED_BAG_JL)
-                            .into_jlrs_result()?
-                            .cast::<Module>()?
-                            .global(&frame, "mixedbag")?
-                            .as_managed();
+                stack.scope(|mut frame| unsafe {
+                    let value = Value::eval_string(&mut frame, MIXED_BAG_JL)
+                        .unwrap()
+                        .cast::<Module>()
+                        .unwrap()
+                        .global(&frame, "mixedbag")
+                        .unwrap()
+                        .as_managed();
+
+                    {
+                        let field = value
+                            .field_accessor()
+                            .field("mutabl")
+                            .unwrap()
+                            .field("mutable_unions")
+                            .unwrap()
+                            .field("bits_union")
+                            .unwrap()
+                            .access::<i32>()
+                            .unwrap();
+
+                        assert_eq!(field, 3);
+                    }
+
+                    {
+                        let field = value
+                            .field_accessor()
+                            .field("mutabl")
+                            .unwrap()
+                            .field("mutable_unions")
+                            .unwrap()
+                            .atomic_field("atomic_union", Ordering::Relaxed)
+                            .unwrap()
+                            .access::<i64>()
+                            .unwrap();
+
+                        assert_eq!(field, 5);
+                    }
+
+                    {
+                        let field = value
+                            .field_accessor()
+                            .field("mutabl")
+                            .unwrap()
+                            .field("mutable_unions")
+                            .unwrap()
+                            .field("normal_union")
+                            .unwrap()
+                            .access::<Nothing>()
+                            .unwrap();
+
+                        assert_eq!(field, Nothing);
+                    }
+
+                    {
+                        let field = value
+                            .field_accessor()
+                            .field("mutabl")
+                            .unwrap()
+                            .field("immutable_unions")
+                            .unwrap()
+                            .field("bits_union")
+                            .unwrap()
+                            .access::<i64>()
+                            .unwrap();
+
+                        assert_eq!(field, 7);
+                    }
+
+                    {
+                        let field = value
+                            .field_accessor()
+                            .field("mutabl")
+                            .unwrap()
+                            .field("immutable_unions")
+                            .unwrap()
+                            .field("normal_union")
+                            .unwrap()
+                            .access::<WeakModule>()
+                            .unwrap();
+
+                        assert_eq!(field.as_managed(), Module::main(&frame));
+                    }
+
+                    {
+                        {
+                            let field = value
+                                .field_accessor()
+                                .field("mutabl")
+                                .unwrap()
+                                .field("atomics")
+                                .unwrap()
+                                .field("i8")
+                                .unwrap()
+                                .access::<i8>()
+                                .unwrap();
+
+                            assert_eq!(field, 1);
+                        }
 
                         {
                             let field = value
                                 .field_accessor()
-                                .field("mutabl")?
-                                .field("mutable_unions")?
-                                .field("bits_union")?
-                                .access::<i32>()?;
+                                .field("mutabl")
+                                .unwrap()
+                                .field("atomics")
+                                .unwrap()
+                                .atomic_field("i16", Ordering::Acquire)
+                                .unwrap()
+                                .access::<i16>()
+                                .unwrap();
+
+                            assert_eq!(field, 2);
+                        }
+
+                        {
+                            let field = value
+                                .field_accessor()
+                                .field("mutabl")
+                                .unwrap()
+                                .field("atomics")
+                                .unwrap()
+                                .field("i24")
+                                .unwrap()
+                                .field(0)
+                                .unwrap()
+                                .access::<i8>()
+                                .unwrap();
 
                             assert_eq!(field, 3);
                         }
@@ -339,169 +431,48 @@ mod tests {
                         {
                             let field = value
                                 .field_accessor()
-                                .field("mutabl")?
-                                .field("mutable_unions")?
-                                .atomic_field("atomic_union", Ordering::Relaxed)?
-                                .access::<i64>()?;
+                                .field("mutabl")
+                                .unwrap()
+                                .field("atomics")
+                                .unwrap()
+                                .field("i48")
+                                .unwrap()
+                                .field(2)
+                                .unwrap()
+                                .access::<i8>()
+                                .unwrap();
 
-                            assert_eq!(field, 5);
+                            assert_eq!(field, 8);
                         }
 
                         {
                             let field = value
                                 .field_accessor()
-                                .field("mutabl")?
-                                .field("mutable_unions")?
-                                .field("normal_union")?
-                                .access::<Nothing>()?;
+                                .field("mutabl")
+                                .unwrap()
+                                .field("atomics")
+                                .unwrap()
+                                .field("i72")
+                                .unwrap()
+                                .field(1)
+                                .unwrap()
+                                .access::<i8>()
+                                .unwrap();
 
-                            assert_eq!(field, Nothing);
+                            assert_eq!(field, 13);
                         }
 
                         {
                             let field = value
                                 .field_accessor()
-                                .field("mutabl")?
-                                .field("immutable_unions")?
-                                .field("bits_union")?
-                                .access::<i64>()?;
-
-                            assert_eq!(field, 7);
-                        }
-
-                        {
-                            let field = value
-                                .field_accessor()
-                                .field("mutabl")?
-                                .field("immutable_unions")?
-                                .field("normal_union")?
-                                .access::<WeakModule>()?;
-
-                            assert_eq!(field.as_managed(), Module::main(&frame));
-                        }
-
-                        {
-                            {
-                                let field = value
-                                    .field_accessor()
-                                    .field("mutabl")?
-                                    .field("atomics")?
-                                    .field("i8")?
-                                    .access::<i8>()?;
-
-                                assert_eq!(field, 1);
-                            }
-
-                            {
-                                let field = value
-                                    .field_accessor()
-                                    .field("mutabl")?
-                                    .field("atomics")?
-                                    .atomic_field("i16", Ordering::Acquire)?
-                                    .access::<i16>()?;
-
-                                assert_eq!(field, 2);
-                            }
-
-                            {
-                                let field = value
-                                    .field_accessor()
-                                    .field("mutabl")?
-                                    .field("atomics")?
-                                    .field("i24")?
-                                    .field(0)?
-                                    .access::<i8>()?;
-
-                                assert_eq!(field, 3);
-                            }
-
-                            {
-                                let field = value
-                                    .field_accessor()
-                                    .field("mutabl")?
-                                    .field("atomics")?
-                                    .field("i48")?
-                                    .field(2)?
-                                    .access::<i8>()?;
-
-                                assert_eq!(field, 8);
-                            }
-
-                            {
-                                let field = value
-                                    .field_accessor()
-                                    .field("mutabl")?
-                                    .field("atomics")?
-                                    .field("i72")?
-                                    .field(1)?
-                                    .access::<i8>()?;
-
-                                assert_eq!(field, 13);
-                            }
-
-                            {
-                                let field = value
-                                    .field_accessor()
-                                    .field("mutabl")?
-                                    .field("atomics")?
-                                    .field("ptr")?
-                                    .access::<WeakModule>()?;
-
-                                assert_eq!(field.as_managed(), Module::main(&frame));
-                            }
-
-                            {
-                                let field = value
-                                    .field_accessor()
-                                    .field("mutabl")?
-                                    .field("atomics")?
-                                    .field("wrapped_ptr")?
-                                    .field((0,))?
-                                    .access::<WeakModule>()?;
-
-                                assert_eq!(field.as_managed(), Module::base(&frame));
-                            }
-                        }
-
-                        {
-                            let field = value
-                                .field_accessor()
-                                .field("mutabl")?
-                                .field("number")?
-                                .access::<f64>()?;
-
-                            assert_eq!(field, 3.0);
-                        }
-
-                        {
-                            let field = value
-                                .field_accessor()
-                                .field("immutabl")?
-                                .field("mutable_unions")?
-                                .field("bits_union")?
-                                .access::<i32>()?;
-
-                            assert_eq!(field, -3);
-                        }
-
-                        {
-                            let field = value
-                                .field_accessor()
-                                .field("immutabl")?
-                                .field("mutable_unions")?
-                                .atomic_field("atomic_union", Ordering::Relaxed)?
-                                .access::<i64>()?;
-
-                            assert_eq!(field, -5);
-                        }
-
-                        {
-                            let field = value
-                                .field_accessor()
-                                .field("immutabl")?
-                                .field("mutable_unions")?
-                                .field("normal_union")?
-                                .access::<WeakModule>()?;
+                                .field("mutabl")
+                                .unwrap()
+                                .field("atomics")
+                                .unwrap()
+                                .field("ptr")
+                                .unwrap()
+                                .access::<WeakModule>()
+                                .unwrap();
 
                             assert_eq!(field.as_managed(), Module::main(&frame));
                         }
@@ -509,318 +480,502 @@ mod tests {
                         {
                             let field = value
                                 .field_accessor()
-                                .field("immutabl")?
-                                .field("immutable_unions")?
-                                .field("bits_union")?
-                                .access::<i64>()?;
-
-                            assert_eq!(field, -7);
-                        }
-
-                        {
-                            let field = value
-                                .field_accessor()
-                                .field("immutabl")?
-                                .field("immutable_unions")?
-                                .field("normal_union")?
-                                .access::<Nothing>()?;
-
-                            assert_eq!(field, Nothing);
-                        }
-
-                        {
-                            {
-                                let field = value
-                                    .field_accessor()
-                                    .field("immutabl")?
-                                    .field("atomics")?
-                                    .field("i8")?
-                                    .access::<i8>()?;
-
-                                assert_eq!(field, -1);
-                            }
-
-                            {
-                                let field = value
-                                    .field_accessor()
-                                    .field("immutabl")?
-                                    .field("atomics")?
-                                    .atomic_field("i16", Ordering::Acquire)?
-                                    .access::<i16>()?;
-
-                                assert_eq!(field, -2);
-                            }
-
-                            {
-                                let field = value
-                                    .field_accessor()
-                                    .field("immutabl")?
-                                    .field("atomics")?
-                                    .field("i24")?
-                                    .field(0)?
-                                    .access::<i8>()?;
-
-                                assert_eq!(field, -3);
-                            }
-
-                            {
-                                let field = value
-                                    .field_accessor()
-                                    .field("immutabl")?
-                                    .field("atomics")?
-                                    .field("i48")?
-                                    .field(2)?
-                                    .access::<i8>()?;
-
-                                assert_eq!(field, -8);
-                            }
-
-                            {
-                                let field = value
-                                    .field_accessor()
-                                    .field("immutabl")?
-                                    .field("atomics")?
-                                    .field("i72")?
-                                    .field(1)?
-                                    .access::<i8>()?;
-
-                                assert_eq!(field, -13);
-                            }
-
-                            {
-                                let field = value
-                                    .field_accessor()
-                                    .field("immutabl")?
-                                    .field("atomics")?
-                                    .field("ptr")?
-                                    .access::<WeakModule>()?;
-
-                                assert_eq!(field.as_managed(), Module::main(&frame));
-                            }
-
-                            {
-                                let field = value
-                                    .field_accessor()
-                                    .field("immutabl")?
-                                    .field("atomics")?
-                                    .field("wrapped_ptr")?
-                                    .field((0,))?
-                                    .access::<WeakModule>()?;
-
-                                assert_eq!(field.as_managed(), Module::base(&frame));
-                            }
-                        }
-                        {
-                            let field = value
-                                .field_accessor()
-                                .field("immutabl")?
-                                .field("number")?
-                                .access::<i16>()?;
-
-                            assert_eq!(field, -3);
-                        }
-
-                        {
-                            let field = value
-                                .field_accessor()
-                                .field("tuples")?
-                                .field("empty")?
-                                .access::<Tuple0>()?;
-
-                            assert_eq!(field, Tuple0());
-                        }
-
-                        {
-                            let field = value
-                                .field_accessor()
-                                .field("tuples")?
-                                .field("single")?
-                                .field(0)?
-                                .access::<i32>()?;
-
-                            assert_eq!(field, 1);
-                        }
-
-                        {
-                            let s = JuliaString::new(&mut frame, "double");
-                            let field = value
-                                .field_accessor()
-                                .field("tuples")?
-                                .field(s)?
-                                .field(1)?
-                                .access::<i64>()?;
-
-                            assert_eq!(field, -4);
-                        }
-
-                        {
-                            let s = "double".to_symbol(&frame);
-                            let field = value
-                                .field_accessor()
-                                .field("tuples")?
-                                .field(s)?
-                                .field(1)?
-                                .access::<i64>()?;
-
-                            assert_eq!(field, -4);
-                        }
-
-                        {
-                            assert!(value
-                                .field_accessor()
-                                .field("tuples")?
-                                .field("double")?
-                                .field((1, 1))
-                                .is_err());
-                        }
-
-                        {
-                            let field = value
-                                .field_accessor()
-                                .field("tuples")?
-                                .field("abstract")?
-                                .field(1)?
-                                .access::<f64>()?;
-
-                            assert_eq!(field, 4.0);
-                        }
-
-                        {
-                            let field = value
-                                .field_accessor()
-                                .field("arrays")?
-                                .field("u8vec")?
-                                .field(1)?
-                                .access::<u8>()?;
-
-                            assert_eq!(field, 2);
-                        }
-
-                        {
-                            let field = value
-                                .field_accessor()
-                                .field("arrays")?
-                                .field("unionvec")?
-                                .field(0)?
-                                .access::<u8>()?;
-
-                            assert_eq!(field, 1);
-                        }
-
-                        {
-                            let field = value
-                                .field_accessor()
-                                .field("arrays")?
-                                .field("unionvec")?
-                                .field(1)?
-                                .access::<u16>()?;
-
-                            assert_eq!(field, 2);
-                        }
-
-                        {
-                            let field = value
-                                .field_accessor()
-                                .field("arrays")?
-                                .field("wrappervec")?
-                                .field(1)?
-                                .access::<WeakModule>()?;
+                                .field("mutabl")
+                                .unwrap()
+                                .field("atomics")
+                                .unwrap()
+                                .field("wrapped_ptr")
+                                .unwrap()
+                                .field([0])
+                                .unwrap()
+                                .access::<WeakModule>()
+                                .unwrap();
 
                             assert_eq!(field.as_managed(), Module::base(&frame));
                         }
+                    }
+
+                    {
+                        let field = value
+                            .field_accessor()
+                            .field("mutabl")
+                            .unwrap()
+                            .field("number")
+                            .unwrap()
+                            .access::<f64>()
+                            .unwrap();
+
+                        assert_eq!(field, 3.0);
+                    }
+
+                    {
+                        let field = value
+                            .field_accessor()
+                            .field("immutabl")
+                            .unwrap()
+                            .field("mutable_unions")
+                            .unwrap()
+                            .field("bits_union")
+                            .unwrap()
+                            .access::<i32>()
+                            .unwrap();
+
+                        assert_eq!(field, -3);
+                    }
+
+                    {
+                        let field = value
+                            .field_accessor()
+                            .field("immutabl")
+                            .unwrap()
+                            .field("mutable_unions")
+                            .unwrap()
+                            .atomic_field("atomic_union", Ordering::Relaxed)
+                            .unwrap()
+                            .access::<i64>()
+                            .unwrap();
+
+                        assert_eq!(field, -5);
+                    }
+
+                    {
+                        let field = value
+                            .field_accessor()
+                            .field("immutabl")
+                            .unwrap()
+                            .field("mutable_unions")
+                            .unwrap()
+                            .field("normal_union")
+                            .unwrap()
+                            .access::<WeakModule>()
+                            .unwrap();
+
+                        assert_eq!(field.as_managed(), Module::main(&frame));
+                    }
+
+                    {
+                        let field = value
+                            .field_accessor()
+                            .field("immutabl")
+                            .unwrap()
+                            .field("immutable_unions")
+                            .unwrap()
+                            .field("bits_union")
+                            .unwrap()
+                            .access::<i64>()
+                            .unwrap();
+
+                        assert_eq!(field, -7);
+                    }
+
+                    {
+                        let field = value
+                            .field_accessor()
+                            .field("immutabl")
+                            .unwrap()
+                            .field("immutable_unions")
+                            .unwrap()
+                            .field("normal_union")
+                            .unwrap()
+                            .access::<Nothing>()
+                            .unwrap();
+
+                        assert_eq!(field, Nothing);
+                    }
+
+                    {
+                        {
+                            let field = value
+                                .field_accessor()
+                                .field("immutabl")
+                                .unwrap()
+                                .field("atomics")
+                                .unwrap()
+                                .field("i8")
+                                .unwrap()
+                                .access::<i8>()
+                                .unwrap();
+
+                            assert_eq!(field, -1);
+                        }
 
                         {
                             let field = value
                                 .field_accessor()
-                                .field("arrays")?
-                                .field("ptrvec")?
-                                .field(1)?
-                                .field(0)?
-                                .access::<f32>()?;
+                                .field("immutabl")
+                                .unwrap()
+                                .field("atomics")
+                                .unwrap()
+                                .atomic_field("i16", Ordering::Acquire)
+                                .unwrap()
+                                .access::<i16>()
+                                .unwrap();
 
-                            assert_eq!(field, 2.0);
+                            assert_eq!(field, -2);
                         }
 
                         {
                             let field = value
                                 .field_accessor()
-                                .field("arrays")?
-                                .field("inlinedptrvec")?
-                                .field(2)?
-                                .field(0)?
-                                .access::<u16>()?;
+                                .field("immutabl")
+                                .unwrap()
+                                .field("atomics")
+                                .unwrap()
+                                .field("i24")
+                                .unwrap()
+                                .field(0)
+                                .unwrap()
+                                .access::<i8>()
+                                .unwrap();
 
-                            assert_eq!(field, 5);
+                            assert_eq!(field, -3);
                         }
 
                         {
                             let field = value
                                 .field_accessor()
-                                .field("arrays")?
-                                .field("inlinedptrvec")?
-                                .field(1)?
-                                .field("mut_f32")?
-                                .field("a")?
-                                .access::<f32>()?;
+                                .field("immutabl")
+                                .unwrap()
+                                .field("atomics")
+                                .unwrap()
+                                .field("i48")
+                                .unwrap()
+                                .field(2)
+                                .unwrap()
+                                .access::<i8>()
+                                .unwrap();
 
-                            assert_eq!(field, 4.0);
+                            assert_eq!(field, -8);
                         }
 
                         {
                             let field = value
                                 .field_accessor()
-                                .field("arrays")?
-                                .field("u8array")?
-                                .field((1, 1))?
-                                .access::<u8>()?;
+                                .field("immutabl")
+                                .unwrap()
+                                .field("atomics")
+                                .unwrap()
+                                .field("i72")
+                                .unwrap()
+                                .field(1)
+                                .unwrap()
+                                .access::<i8>()
+                                .unwrap();
 
-                            assert_eq!(field, 4);
-                        }
-
-                        {
-                            assert!(value
-                                .field_accessor()
-                                .field("arrays")?
-                                .field("u8array")?
-                                .field("wrongkind")
-                                .is_err());
-                        }
-
-                        {
-                            let sym = "wrongkind".to_symbol(&frame);
-                            assert!(value
-                                .field_accessor()
-                                .field("arrays")?
-                                .field("u8array")?
-                                .field(sym)
-                                .is_err());
+                            assert_eq!(field, -13);
                         }
 
                         {
                             let field = value
                                 .field_accessor()
-                                .field("arrays")?
-                                .field("inlinedptrarray")?
-                                .field((1, 0))?
-                                .field(1)?
-                                .field(0)?
-                                .access::<f32>()?;
+                                .field("immutabl")
+                                .unwrap()
+                                .field("atomics")
+                                .unwrap()
+                                .field("ptr")
+                                .unwrap()
+                                .access::<WeakModule>()
+                                .unwrap();
 
-                            assert_eq!(field, 6.0);
+                            assert_eq!(field.as_managed(), Module::main(&frame));
                         }
 
                         {
                             let field = value
                                 .field_accessor()
-                                .field("nonexistent")?
-                                .access::<WeakValue>();
+                                .field("immutabl")
+                                .unwrap()
+                                .field("atomics")
+                                .unwrap()
+                                .field("wrapped_ptr")
+                                .unwrap()
+                                .field(0)
+                                .unwrap()
+                                .access::<WeakModule>()
+                                .unwrap();
 
-                            assert!(field.is_err());
+                            assert_eq!(field.as_managed(), Module::base(&frame));
                         }
+                    }
+                    {
+                        let field = value
+                            .field_accessor()
+                            .field("immutabl")
+                            .unwrap()
+                            .field("number")
+                            .unwrap()
+                            .access::<i16>()
+                            .unwrap();
 
-                        Ok(())
-                    })
-                    .unwrap();
+                        assert_eq!(field, -3);
+                    }
+
+                    {
+                        let field = value
+                            .field_accessor()
+                            .field("tuples")
+                            .unwrap()
+                            .field("empty")
+                            .unwrap()
+                            .access::<Tuple0>()
+                            .unwrap();
+
+                        assert_eq!(field, Tuple0());
+                    }
+
+                    {
+                        let field = value
+                            .field_accessor()
+                            .field("tuples")
+                            .unwrap()
+                            .field("single")
+                            .unwrap()
+                            .field(0)
+                            .unwrap()
+                            .access::<i32>()
+                            .unwrap();
+
+                        assert_eq!(field, 1);
+                    }
+
+                    {
+                        let s = JuliaString::new(&mut frame, "double");
+                        let field = value
+                            .field_accessor()
+                            .field("tuples")
+                            .unwrap()
+                            .field(s)
+                            .unwrap()
+                            .field(1)
+                            .unwrap()
+                            .access::<i64>()
+                            .unwrap();
+
+                        assert_eq!(field, -4);
+                    }
+
+                    {
+                        let s = "double".to_symbol(&frame);
+                        let field = value
+                            .field_accessor()
+                            .field("tuples")
+                            .unwrap()
+                            .field(s)
+                            .unwrap()
+                            .field(1)
+                            .unwrap()
+                            .access::<i64>()
+                            .unwrap();
+
+                        assert_eq!(field, -4);
+                    }
+
+                    {
+                        assert!(value
+                            .field_accessor()
+                            .field("tuples")
+                            .unwrap()
+                            .field("double")
+                            .unwrap()
+                            .field([1, 1])
+                            .is_err());
+                    }
+
+                    {
+                        let field = value
+                            .field_accessor()
+                            .field("tuples")
+                            .unwrap()
+                            .field("abstract")
+                            .unwrap()
+                            .field(1)
+                            .unwrap()
+                            .access::<f64>()
+                            .unwrap();
+
+                        assert_eq!(field, 4.0);
+                    }
+
+                    {
+                        let field = value
+                            .field_accessor()
+                            .field("arrays")
+                            .unwrap()
+                            .field("u8vec")
+                            .unwrap()
+                            .field(1)
+                            .unwrap()
+                            .access::<u8>()
+                            .unwrap();
+
+                        assert_eq!(field, 2);
+                    }
+
+                    {
+                        let field = value
+                            .field_accessor()
+                            .field("arrays")
+                            .unwrap()
+                            .field("unionvec")
+                            .unwrap()
+                            .field(0)
+                            .unwrap()
+                            .access::<u8>()
+                            .unwrap();
+
+                        assert_eq!(field, 1);
+                    }
+
+                    {
+                        let field = value
+                            .field_accessor()
+                            .field("arrays")
+                            .unwrap()
+                            .field("unionvec")
+                            .unwrap()
+                            .field(1)
+                            .unwrap()
+                            .access::<u16>()
+                            .unwrap();
+
+                        assert_eq!(field, 2);
+                    }
+
+                    {
+                        let field = value
+                            .field_accessor()
+                            .field("arrays")
+                            .unwrap()
+                            .field("wrappervec")
+                            .unwrap()
+                            .field(1)
+                            .unwrap()
+                            .access::<WeakModule>()
+                            .unwrap();
+
+                        assert_eq!(field.as_managed(), Module::base(&frame));
+                    }
+
+                    {
+                        let field = value
+                            .field_accessor()
+                            .field("arrays")
+                            .unwrap()
+                            .field("ptrvec")
+                            .unwrap()
+                            .field(1)
+                            .unwrap()
+                            .field(0)
+                            .unwrap()
+                            .access::<f32>()
+                            .unwrap();
+
+                        assert_eq!(field, 2.0);
+                    }
+
+                    {
+                        let field = value
+                            .field_accessor()
+                            .field("arrays")
+                            .unwrap()
+                            .field("inlinedptrvec")
+                            .unwrap()
+                            .field(2)
+                            .unwrap()
+                            .field(0)
+                            .unwrap()
+                            .access::<u16>()
+                            .unwrap();
+
+                        assert_eq!(field, 5);
+                    }
+
+                    {
+                        let field = value
+                            .field_accessor()
+                            .field("arrays")
+                            .unwrap()
+                            .field("inlinedptrvec")
+                            .unwrap()
+                            .field(1)
+                            .unwrap()
+                            .field("mut_f32")
+                            .unwrap()
+                            .field("a")
+                            .unwrap()
+                            .access::<f32>()
+                            .unwrap();
+
+                        assert_eq!(field, 4.0);
+                    }
+
+                    {
+                        let field = value
+                            .field_accessor()
+                            .field("arrays")
+                            .unwrap()
+                            .field("u8array")
+                            .unwrap()
+                            .field([1, 1])
+                            .unwrap()
+                            .access::<u8>()
+                            .unwrap();
+
+                        assert_eq!(field, 4);
+                    }
+
+                    {
+                        assert!(value
+                            .field_accessor()
+                            .field("arrays")
+                            .unwrap()
+                            .field("u8array")
+                            .unwrap()
+                            .field("wrongkind")
+                            .is_err());
+                    }
+
+                    {
+                        let sym = "wrongkind".to_symbol(&frame);
+                        assert!(value
+                            .field_accessor()
+                            .field("arrays")
+                            .unwrap()
+                            .field("u8array")
+                            .unwrap()
+                            .field(sym)
+                            .is_err());
+                    }
+
+                    {
+                        let field = value
+                            .field_accessor()
+                            .field("arrays")
+                            .unwrap()
+                            .field("inlinedptrarray")
+                            .unwrap()
+                            .field([1, 0])
+                            .unwrap()
+                            .field(1)
+                            .unwrap()
+                            .field(0)
+                            .unwrap()
+                            .access::<f32>()
+                            .unwrap();
+
+                        assert_eq!(field, 6.0);
+                    }
+
+                    {
+                        let field = value
+                            .field_accessor()
+                            .field("nonexistent")
+                            .unwrap()
+                            .access::<WeakValue>();
+
+                        assert!(field.is_err());
+                    }
+                })
             })
         })
     }

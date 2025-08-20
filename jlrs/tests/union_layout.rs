@@ -8,23 +8,22 @@ mod tests {
     fn ptr_union_fields_access_something() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|frame| unsafe {
-                        let field = Module::main(&frame)
-                            .submodule(&frame, "JlrsTests")?
-                            .as_managed()
-                            .global(&frame, "has_module")?
-                            .as_value()
-                            .field_accessor()
-                            .field("a")?
-                            .access::<WeakValue>()?;
+                stack.scope(|frame| unsafe {
+                    let field = Module::main(&frame)
+                        .submodule(&frame, "JlrsTests")
+                        .unwrap()
+                        .as_managed()
+                        .global(&frame, "has_module")
+                        .unwrap()
+                        .as_value()
+                        .field_accessor()
+                        .field("a")
+                        .unwrap()
+                        .access::<WeakValue>()
+                        .unwrap();
 
-                        assert!(field.as_value().is::<Module>());
-
-                        Ok(())
-                    })
-                    .unwrap();
+                    assert!(field.as_value().is::<Module>());
+                })
             })
         })
     }
@@ -32,21 +31,20 @@ mod tests {
     fn ptr_union_fields_nothing_is_not_null() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|frame| unsafe {
-                        let _field = Module::main(&frame)
-                            .submodule(&frame, "JlrsTests")?
-                            .as_managed()
-                            .global(&frame, "has_nothing")?
-                            .as_value()
-                            .field_accessor()
-                            .field("a")?
-                            .access::<Nothing>()?;
-
-                        Ok(())
-                    })
-                    .unwrap();
+                stack.scope(|frame| unsafe {
+                    let _field = Module::main(&frame)
+                        .submodule(&frame, "JlrsTests")
+                        .unwrap()
+                        .as_managed()
+                        .global(&frame, "has_nothing")
+                        .unwrap()
+                        .as_value()
+                        .field_accessor()
+                        .field("a")
+                        .unwrap()
+                        .access::<Nothing>()
+                        .unwrap();
+                })
             })
         })
     }

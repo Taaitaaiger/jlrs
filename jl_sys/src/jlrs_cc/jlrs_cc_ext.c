@@ -35,7 +35,7 @@ extern "C"
         return res;
     }
 
-    jl_value_t *jlrs_call_unchecked(jl_function_t *f, jl_value_t **args, uint32_t nargs)
+    jl_value_t *jlrs_call_unchecked(jl_value_t *f, jl_value_t **args, uint32_t nargs)
     {
         jl_value_t *v;
         jl_task_t *ct = jl_current_task;

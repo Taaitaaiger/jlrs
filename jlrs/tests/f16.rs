@@ -12,20 +12,17 @@ mod tests {
     fn one_minus_one_equals_zero() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| unsafe {
-                        let one = Value::new(&mut frame, f16::ONE);
-                        let func = Module::base(&frame).function(&mut frame, "-")?;
-                        let res = func
-                            .call2(&mut frame, one, one)
-                            .into_jlrs_result()?
-                            .unbox::<f16>()?;
+                stack.scope(|mut frame| unsafe {
+                    let one = Value::new(&mut frame, f16::ONE);
+                    let func = Module::base(&frame).global(&mut frame, "-").unwrap();
+                    let res = func
+                        .call(&mut frame, [one, one])
+                        .unwrap()
+                        .unbox::<f16>()
+                        .unwrap();
 
-                        assert_eq!(res, f16::ZERO);
-                        Ok(())
-                    })
-                    .unwrap();
+                    assert_eq!(res, f16::ZERO);
+                })
             });
         });
     }

@@ -8,26 +8,24 @@ mod tests {
     fn call0_exception_is_caught() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| unsafe {
-                        let func = Module::main(&frame)
-                            .submodule(&frame, "JlrsTests")?
-                            .as_managed()
-                            .function(&frame, "throws_exception")?
-                            .as_managed();
+                stack.scope(|mut frame| unsafe {
+                    let func = Module::main(&frame)
+                        .submodule(&frame, "JlrsTests")
+                        .unwrap()
+                        .as_managed()
+                        .global(&frame, "throws_exception")
+                        .unwrap()
+                        .as_managed();
 
-                        let mut f = || func.call_unchecked(&mut frame, []);
+                    let mut f = || func.call_unchecked(&mut frame, []);
 
-                        let mut exc = false;
-                        let res = catch_exceptions(&mut f, |_e| {
-                            exc = true;
-                        });
-                        assert!(exc);
-                        assert!(res.is_err());
-                        Ok(())
-                    })
-                    .unwrap();
+                    let mut exc = false;
+                    let res = catch_exceptions(&mut f, |_e| {
+                        exc = true;
+                    });
+                    assert!(exc);
+                    assert!(res.is_err());
+                });
             });
         });
     }

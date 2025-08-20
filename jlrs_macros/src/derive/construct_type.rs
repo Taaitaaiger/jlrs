@@ -70,7 +70,6 @@ pub fn impl_construct_type(ast: &syn::DeriveInput) -> syn::Result<TokenStream> {
 
         (Some(cacheable), construct_expr, construct_with_context_expr)
     } else {
-        // FIXME
         let param_names = ast.generics.type_params().map(|p| &p.ident);
         let n_names = ast.generics.type_params().count();
 
@@ -80,8 +79,7 @@ pub fn impl_construct_type(ast: &syn::DeriveInput) -> syn::Result<TokenStream> {
         let construct_expr = syn::parse_quote! {
             <Tgt as ::jlrs::memory::scope::LocalScopeExt<
                 'target,
-                ::jlrs::data::managed::value::ValueData<'target, 'static, Tgt>
-            >>::with_local_scope::<#n_slots>(target, |target, mut frame| {
+            >>::with_local_scope::<_, #n_slots>(target, |target, mut frame| {
 
                 if #n_names == 0 {
                     return base_type.root(target);
@@ -108,8 +106,7 @@ pub fn impl_construct_type(ast: &syn::DeriveInput) -> syn::Result<TokenStream> {
         let construct_with_context_expr = syn::parse_quote! {
             <Tgt as ::jlrs::memory::scope::LocalScopeExt<
                 'target,
-                ::jlrs::data::managed::value::ValueData<'target, 'static, Tgt>
-            >>::with_local_scope::<#n_slots>(target, |target, mut frame| {
+            >>::with_local_scope::<_, #n_slots>(target, |target, mut frame| {
                 if #n_names == 0 {
                     return base_type.root(target);
                 }

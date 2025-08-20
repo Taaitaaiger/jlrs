@@ -63,9 +63,9 @@ fn alias_info_fragment(info: &ExportedAlias) -> Expr {
     let ty = &info.ty;
 
     parse_quote! {
-        frame.local_scope::<2>(move |mut frame| {
+        frame.local_scope::<_, 2>(move |mut frame| {
             let value = <#ty as ::jlrs::data::types::construct_type::ConstructType>::construct_type(&mut frame);
-            module.set_const(&mut frame, #name, value).into_jlrs_result().unwrap();
+            module.set_const(&mut frame, #name, value).unwrap();
         })
     }
 }

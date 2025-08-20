@@ -29,7 +29,7 @@ fn call_0_unchecked(frame: &mut GcFrame, c: &mut Criterion, func: Value) -> Jlrs
 fn call_0(frame: &mut GcFrame, c: &mut Criterion, func: Value) -> JlrsResult<()> {
     frame.scope(|frame| {
         c.bench_function("call_0", |b| {
-            b.iter(|| black_box(unsafe { func.call0(black_box(&frame)) }))
+            b.iter(|| black_box(unsafe { func.call(black_box(&frame, [])) }))
         });
         Ok(())
     })
@@ -54,7 +54,7 @@ fn call_1(frame: &mut GcFrame, c: &mut Criterion, func: Value) -> JlrsResult<()>
     frame.scope(|mut frame| {
         let v = Value::new(&mut frame, 0usize);
         c.bench_function("call_1", |b| {
-            b.iter(|| black_box(unsafe { func.call1(black_box(&frame), v) }))
+            b.iter(|| black_box(unsafe { func.call(black_box(&frame), v) }))
         });
         Ok(())
     })
@@ -79,7 +79,7 @@ fn call_2(frame: &mut GcFrame, c: &mut Criterion, func: Value) -> JlrsResult<()>
     frame.scope(|mut frame| {
         let v = Value::new(&mut frame, 0usize);
         c.bench_function("call_2", |b| {
-            b.iter(|| black_box(unsafe { func.call2(black_box(&frame), v, v) }))
+            b.iter(|| black_box(unsafe { func.call(black_box(&frame), [v, v]) }))
         });
         Ok(())
     })
@@ -104,7 +104,7 @@ fn call_3(frame: &mut GcFrame, c: &mut Criterion, func: Value) -> JlrsResult<()>
     frame.scope(|mut frame| {
         let v = Value::new(&mut frame, 0usize);
         c.bench_function("call_3", |b| {
-            b.iter(|| unsafe { func.call3(black_box(&frame), v, v, v) })
+            b.iter(|| unsafe { func.call(black_box(&frame), [v, v, v]) })
         });
         Ok(())
     })

@@ -7,19 +7,15 @@ pub(crate) mod tests {
     fn typed_array_new_rank0() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| {
-                        let dt = DataType::float32_type(&frame).as_value();
-                        let arr = TypedArray::<f32>::new(&mut frame, []);
-                        assert!(arr.is_ok());
+                stack.scope(|mut frame| {
+                    let dt = DataType::float32_type(&frame).as_value();
+                    let arr = TypedArray::<f32>::new(&mut frame, []);
+                    assert!(arr.is_ok());
 
-                        let arr = arr.unwrap();
-                        assert_eq!(arr.n_dims(), 0);
-                        assert_eq!(arr.element_type(), dt);
-                        Ok(())
-                    })
-                    .unwrap();
+                    let arr = arr.unwrap();
+                    assert_eq!(arr.n_dims(), 0);
+                    assert_eq!(arr.element_type(), dt);
+                });
             });
         });
     }
@@ -27,19 +23,15 @@ pub(crate) mod tests {
     fn typed_array_new() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| {
-                        let dt = DataType::float32_type(&frame).as_value();
-                        let arr = TypedArray::<f32>::new(&mut frame, (1, 2));
-                        assert!(arr.is_ok());
+                stack.scope(|mut frame| {
+                    let dt = DataType::float32_type(&frame).as_value();
+                    let arr = TypedArray::<f32>::new(&mut frame, [1, 2]);
+                    assert!(arr.is_ok());
 
-                        let arr = arr.unwrap();
-                        assert_eq!(arr.n_dims(), 2);
-                        assert_eq!(arr.element_type(), dt);
-                        Ok(())
-                    })
-                    .unwrap();
+                    let arr = arr.unwrap();
+                    assert_eq!(arr.n_dims(), 2);
+                    assert_eq!(arr.element_type(), dt);
+                });
             });
         });
     }
@@ -47,16 +39,12 @@ pub(crate) mod tests {
     fn typed_array_new_unchecked() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| {
-                        let dt = DataType::float32_type(&frame).as_value();
-                        let arr = unsafe { TypedArray::<f32>::new_unchecked(&mut frame, (1, 2)) };
-                        assert_eq!(arr.n_dims(), 2);
-                        assert_eq!(arr.element_type(), dt);
-                        Ok(())
-                    })
-                    .unwrap();
+                stack.scope(|mut frame| {
+                    let dt = DataType::float32_type(&frame).as_value();
+                    let arr = unsafe { TypedArray::<f32>::new_unchecked(&mut frame, [1, 2]) };
+                    assert_eq!(arr.n_dims(), 2);
+                    assert_eq!(arr.element_type(), dt);
+                });
             });
         });
     }
@@ -64,23 +52,19 @@ pub(crate) mod tests {
     fn typed_array_from_slice() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| {
-                        let dt = DataType::float32_type(&frame).as_value();
-                        let mut data = vec![1f32, 2f32];
-                        let data = data.as_mut_slice();
-                        let arr = TypedArray::<f32>::from_slice(&mut frame, data, (1, 2));
-                        assert!(arr.is_ok());
-                        let arr = arr.unwrap();
-                        assert!(arr.is_ok());
-                        let arr = arr.unwrap();
+                stack.scope(|mut frame| {
+                    let dt = DataType::float32_type(&frame).as_value();
+                    let mut data = vec![1f32, 2f32];
+                    let data = data.as_mut_slice();
+                    let arr = TypedArray::<f32>::from_slice(&mut frame, data, [1, 2]);
+                    assert!(arr.is_ok());
+                    let arr = arr.unwrap();
+                    assert!(arr.is_ok());
+                    let arr = arr.unwrap();
 
-                        assert_eq!(arr.n_dims(), 2);
-                        assert_eq!(arr.element_type(), dt);
-                        Ok(())
-                    })
-                    .unwrap();
+                    assert_eq!(arr.n_dims(), 2);
+                    assert_eq!(arr.element_type(), dt);
+                });
             });
         });
     }
@@ -88,23 +72,19 @@ pub(crate) mod tests {
     fn typed_array_from_slice_rank0() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| {
-                        let dt = DataType::float32_type(&frame).as_value();
-                        let mut data = vec![1f32];
-                        let data = data.as_mut_slice();
-                        let arr = TypedArray::<f32>::from_slice(&mut frame, data, []);
-                        assert!(arr.is_ok());
-                        let arr = arr.unwrap();
-                        assert!(arr.is_ok());
-                        let arr = arr.unwrap();
+                stack.scope(|mut frame| {
+                    let dt = DataType::float32_type(&frame).as_value();
+                    let mut data = vec![1f32];
+                    let data = data.as_mut_slice();
+                    let arr = TypedArray::<f32>::from_slice(&mut frame, data, []);
+                    assert!(arr.is_ok());
+                    let arr = arr.unwrap();
+                    assert!(arr.is_ok());
+                    let arr = arr.unwrap();
 
-                        assert_eq!(arr.n_dims(), 0);
-                        assert_eq!(arr.element_type(), dt);
-                        Ok(())
-                    })
-                    .unwrap();
+                    assert_eq!(arr.n_dims(), 0);
+                    assert_eq!(arr.element_type(), dt);
+                });
             });
         });
     }
@@ -112,17 +92,12 @@ pub(crate) mod tests {
     fn typed_array_from_slice_size_err() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| {
-                        let mut data = vec![1f32, 2f32];
-                        let data = data.as_mut_slice();
-                        let arr = TypedArray::<f32>::from_slice(&mut frame, data, (2, 2));
-                        assert!(arr.is_err());
-
-                        Ok(())
-                    })
-                    .unwrap();
+                stack.scope(|mut frame| {
+                    let mut data = vec![1f32, 2f32];
+                    let data = data.as_mut_slice();
+                    let arr = TypedArray::<f32>::from_slice(&mut frame, data, [2, 2]);
+                    assert!(arr.is_err());
+                });
             });
         });
     }
@@ -130,21 +105,17 @@ pub(crate) mod tests {
     fn typed_array_from_slice_unchecked() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| {
-                        let dt = DataType::float32_type(&frame).as_value();
-                        let mut data = vec![1f32, 2f32];
-                        let data = data.as_mut_slice();
-                        let arr = unsafe {
-                            TypedArray::<f32>::from_slice_unchecked(&mut frame, data, (1, 2))
-                        };
+                stack.scope(|mut frame| {
+                    let dt = DataType::float32_type(&frame).as_value();
+                    let mut data = vec![1f32, 2f32];
+                    let data = data.as_mut_slice();
+                    let arr = unsafe {
+                        TypedArray::<f32>::from_slice_unchecked(&mut frame, data, [1, 2])
+                    };
 
-                        assert_eq!(arr.n_dims(), 2);
-                        assert_eq!(arr.element_type(), dt);
-                        Ok(())
-                    })
-                    .unwrap();
+                    assert_eq!(arr.n_dims(), 2);
+                    assert_eq!(arr.element_type(), dt);
+                });
             });
         });
     }
@@ -152,22 +123,18 @@ pub(crate) mod tests {
     fn typed_array_from_vec() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| {
-                        let dt = DataType::float32_type(&frame).as_value();
-                        let data = vec![1f32, 2f32];
-                        let arr = TypedArray::<f32>::from_vec(&mut frame, data, (1, 2));
-                        assert!(arr.is_ok());
-                        let arr = arr.unwrap();
-                        assert!(arr.is_ok());
-                        let arr = arr.unwrap();
+                stack.scope(|mut frame| {
+                    let dt = DataType::float32_type(&frame).as_value();
+                    let data = vec![1f32, 2f32];
+                    let arr = TypedArray::<f32>::from_vec(&mut frame, data, [1, 2]);
+                    assert!(arr.is_ok());
+                    let arr = arr.unwrap();
+                    assert!(arr.is_ok());
+                    let arr = arr.unwrap();
 
-                        assert_eq!(arr.n_dims(), 2);
-                        assert_eq!(arr.element_type(), dt);
-                        Ok(())
-                    })
-                    .unwrap();
+                    assert_eq!(arr.n_dims(), 2);
+                    assert_eq!(arr.element_type(), dt);
+                });
             });
         });
     }
@@ -175,16 +142,11 @@ pub(crate) mod tests {
     fn typed_array_from_vec_size_err() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| {
-                        let data = vec![1f32, 2f32];
-                        let arr = TypedArray::<f32>::from_vec(&mut frame, data, (2, 2));
-                        assert!(arr.is_err());
-
-                        Ok(())
-                    })
-                    .unwrap();
+                stack.scope(|mut frame| {
+                    let data = vec![1f32, 2f32];
+                    let arr = TypedArray::<f32>::from_vec(&mut frame, data, [2, 2]);
+                    assert!(arr.is_err());
+                });
             });
         });
     }
@@ -192,20 +154,15 @@ pub(crate) mod tests {
     fn typed_array_from_vec_unchecked() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| {
-                        let dt = DataType::float32_type(&frame).as_value();
-                        let data = vec![1f32, 2f32];
-                        let arr = unsafe {
-                            TypedArray::<f32>::from_vec_unchecked(&mut frame, data, (1, 2))
-                        };
+                stack.scope(|mut frame| {
+                    let dt = DataType::float32_type(&frame).as_value();
+                    let data = vec![1f32, 2f32];
+                    let arr =
+                        unsafe { TypedArray::<f32>::from_vec_unchecked(&mut frame, data, [1, 2]) };
 
-                        assert_eq!(arr.n_dims(), 2);
-                        assert_eq!(arr.element_type(), dt);
-                        Ok(())
-                    })
-                    .unwrap();
+                    assert_eq!(arr.n_dims(), 2);
+                    assert_eq!(arr.element_type(), dt);
+                });
             });
         });
     }
@@ -213,23 +170,19 @@ pub(crate) mod tests {
     fn typed_array_from_slice_cloned() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| {
-                        let dt = DataType::float32_type(&frame).as_value();
-                        let mut data = vec![1f32, 2f32];
-                        let data = data.as_mut_slice();
-                        let arr = TypedArray::<f32>::from_slice_cloned(&mut frame, data, (1, 2));
-                        assert!(arr.is_ok());
-                        let arr = arr.unwrap();
-                        assert!(arr.is_ok());
-                        let arr = arr.unwrap();
+                stack.scope(|mut frame| {
+                    let dt = DataType::float32_type(&frame).as_value();
+                    let mut data = vec![1f32, 2f32];
+                    let data = data.as_mut_slice();
+                    let arr = TypedArray::<f32>::from_slice_cloned(&mut frame, data, [1, 2]);
+                    assert!(arr.is_ok());
+                    let arr = arr.unwrap();
+                    assert!(arr.is_ok());
+                    let arr = arr.unwrap();
 
-                        assert_eq!(arr.n_dims(), 2);
-                        assert_eq!(arr.element_type(), dt);
-                        Ok(())
-                    })
-                    .unwrap();
+                    assert_eq!(arr.n_dims(), 2);
+                    assert_eq!(arr.element_type(), dt);
+                });
             });
         });
     }
@@ -237,17 +190,12 @@ pub(crate) mod tests {
     fn typed_array_from_slice_cloned_size_err() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| {
-                        let mut data = vec![1f32, 2f32];
-                        let data = data.as_mut_slice();
-                        let arr = TypedArray::<f32>::from_slice_cloned(&mut frame, data, (2, 2));
-                        assert!(arr.is_err());
-
-                        Ok(())
-                    })
-                    .unwrap();
+                stack.scope(|mut frame| {
+                    let mut data = vec![1f32, 2f32];
+                    let data = data.as_mut_slice();
+                    let arr = TypedArray::<f32>::from_slice_cloned(&mut frame, data, [2, 2]);
+                    assert!(arr.is_err());
+                });
             });
         });
     }
@@ -255,21 +203,17 @@ pub(crate) mod tests {
     fn typed_array_from_slice_cloned_unchecked() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| {
-                        let dt = DataType::float32_type(&frame).as_value();
-                        let mut data = vec![1f32, 2f32];
-                        let data = data.as_mut_slice();
-                        let arr = unsafe {
-                            TypedArray::<f32>::from_slice_cloned_unchecked(&mut frame, data, (1, 2))
-                        };
+                stack.scope(|mut frame| {
+                    let dt = DataType::float32_type(&frame).as_value();
+                    let mut data = vec![1f32, 2f32];
+                    let data = data.as_mut_slice();
+                    let arr = unsafe {
+                        TypedArray::<f32>::from_slice_cloned_unchecked(&mut frame, data, [1, 2])
+                    };
 
-                        assert_eq!(arr.n_dims(), 2);
-                        assert_eq!(arr.element_type(), dt);
-                        Ok(())
-                    })
-                    .unwrap();
+                    assert_eq!(arr.n_dims(), 2);
+                    assert_eq!(arr.element_type(), dt);
+                });
             });
         });
     }

@@ -66,7 +66,7 @@ pub trait Gc: private::GcPriv {
                 .submodule(&global, "GC")
                 .expect("No GC module in Base")
                 .as_managed()
-                .function(&global, "enable_logging")
+                .global(&global, "enable_logging")
                 .expect("No enable_logging function in GC")
                 .as_managed()
         };
@@ -78,7 +78,7 @@ pub trait Gc: private::GcPriv {
         };
 
         // Safety: GC.enable_logging is safe to call.
-        unsafe { func.call1(&global, arg) }.expect("GC.enable_logging threw an exception");
+        unsafe { func.call(&global, [arg]) }.expect("GC.enable_logging threw an exception");
     }
 
     /// Returns `true` if the GC is enabled.

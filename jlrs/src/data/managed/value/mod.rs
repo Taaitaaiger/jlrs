@@ -46,74 +46,13 @@ macro_rules! count {
         2
     };
     ($name:expr => $value:expr, $($rest:tt)+) => {
-        count!(2, $($rest)+)
+        $crate::count!(2, $($rest)+)
     };
     ($n:expr, $name:expr => $value:expr) => {
         $n + 1
     };
     ($n:expr, $name:expr => $value:expr, $($rest:tt)+) => {
-        count!($n + 1, $($rest)+)
-    };
-}
-
-/// Create a new named tuple. You will need a named tuple to call functions with keyword
-/// arguments.
-///
-/// Example:
-///
-/// ```
-/// # use jlrs::prelude::*;
-/// # fn main() {
-/// # let mut julia = Builder::new().start_local().unwrap();
-/// // Three slots; two for the inputs and one for the output.
-/// julia.local_scope::<3>(|mut frame| {
-///     // Create the two arguments, each value requires one slot
-///     let i = Value::new(&mut frame, 2u64);
-///     let j = Value::new(&mut frame, 1u32);
-///
-///     let _nt = named_tuple!(&mut frame, "i" => i, "j" => j);
-/// });
-/// # }
-/// ```
-#[macro_export]
-macro_rules! named_tuple {
-    ($frame:expr, $name:expr => $value:expr) => {
-        {
-            let name = $crate::convert::to_symbol::ToSymbol::to_symbol(&$name, &$frame);
-            $crate::data::managed::value::Value::new_named_tuple($frame, &[(name, $value)])
-        }
-    };
-    ($frame:expr, $name:expr => $value:expr, $($rest:tt)+) => {
-        {
-            const N: usize = $crate::count!($($rest)+);
-            let mut pairs: [::std::mem::MaybeUninit::<($crate::data::managed::symbol::Symbol, $crate::data::managed::value::Value)>; N] = [::std::mem::MaybeUninit::uninit(); N];
-            let name = $crate::convert::to_symbol::ToSymbol::to_symbol(&$name, &$frame);
-
-            pairs[0].write((name, $value));
-            $crate::named_tuple!($frame, 1, &mut pairs, $($rest)+)
-        }
-    };
-    ($frame:expr, $i:expr, $pairs:expr, $name:expr => $value:expr, $($rest:tt)+) => {
-        {
-            let name = $crate::convert::to_symbol::ToSymbol::to_symbol(&$name, &$frame);
-            $pairs[$i].write((name, $value));
-            named_tuple!($frame, $i + 1, $pairs, $($rest)+)
-        }
-    };
-    ($frame:expr, $i:expr, $pairs:expr, $name:expr => $value:expr) => {
-        {
-            let name = $crate::convert::to_symbol::ToSymbol::to_symbol(&$name, &$frame);
-            $pairs[$i].write((name, $value));
-
-            let pairs: &[($crate::data::managed::symbol::Symbol, $crate::data::managed::value::Value); N] = unsafe {
-                ::std::mem::transmute::<
-                    &[::std::mem::MaybeUninit::<($crate::data::managed::symbol::Symbol, $crate::data::managed::value::Value)>; N],
-                    &[($crate::data::managed::symbol::Symbol, $crate::data::managed::value::Value); N]
-                >($pairs)
-            };
-
-            $crate::data::managed::value::Value::new_named_tuple($frame, pairs)
-        }
+        $crate::count!($n + 1, $($rest)+)
     };
 }
 
@@ -149,13 +88,13 @@ use crate::{
     data::{
         layout::{
             is_bits::IsBits,
-            tuple::NTuple,
             typed_layout::HasLayout,
             valid_layout::{ValidField, ValidLayout},
         },
         managed::{
             datatype::DataType,
             module::Module,
+            named_tuple::NamedTuple,
             private::ManagedPriv,
             symbol::Symbol,
             union::Union,
@@ -163,10 +102,7 @@ use crate::{
             value::tracked::{Tracked, TrackedMut},
             Managed,
         },
-        types::{
-            construct_type::ConstructType,
-            typecheck::{NamedTuple, Typecheck},
-        },
+        types::{construct_type::ConstructType, typecheck::Typecheck},
     },
     error::{AccessError, JlrsError, JlrsResult, TypeError, CANNOT_DISPLAY_TYPE},
     memory::{
@@ -321,7 +257,7 @@ impl Value<'_, '_> {
             let _: () = assert!(!L::IS_REF);
         }
 
-        target.with_local_scope::<1>(|target, mut frame| {
+        target.with_local_scope::<_, 1>(|target, mut frame| {
             let ty = Ty::construct_type(&mut frame);
             let ty_dt = ty.cast::<DataType>()?;
 
@@ -352,47 +288,6 @@ impl Value<'_, '_> {
             std::ptr::write(ptr.cast::<L>(), layout);
             Ok(target.data_from_ptr(NonNull::new_unchecked(ptr), Private))
         })
-    }
-
-    /// Create a new named tuple, you should use the `named_tuple` macro rather than this method.
-    pub fn new_named_tuple<'target, 'value, 'data, Tgt, const N: usize>(
-        target: Tgt,
-        pairs: &[(Symbol<'value>, Value<'value, 'data>); N],
-    ) -> ValueData<'target, 'data, Tgt>
-    where
-        Tgt: Target<'target>,
-    {
-        unsafe {
-            target
-                .with_local_scope::<1>(|target, mut frame| -> JlrsResult<_> {
-                    // Safety: this method can only be called from a thread known to Julia. The
-                    // unchecked methods are used because it can be guaranteed they won't throw
-                    // an exception for the given arguments.
-                    let field_names = pairs.map(|(sym, _)| sym.as_value());
-
-                    let names = NTuple::<Symbol, N>::construct_type(&frame)
-                        .as_value()
-                        .cast::<DataType>()?
-                        .instantiate_unchecked(&mut frame, &field_names);
-
-                    let values = pairs.map(|(_, val)| val);
-                    let field_types = values.map(|val| val.datatype().as_value());
-
-                    let field_types = DataType::anytuple_type(&frame)
-                        .as_value()
-                        .apply_type_unchecked(&frame, &field_types)
-                        .as_value();
-
-                    let ty = UnionAll::namedtuple_type(&frame)
-                        .as_value()
-                        .apply_type_unchecked(&frame, &[names, field_types])
-                        .as_value()
-                        .cast_unchecked::<DataType>();
-
-                    Ok(ty.instantiate_unchecked(target, values))
-                })
-                .unwrap()
-        }
     }
 
     /// Apply the given types to `self`.
@@ -523,7 +418,7 @@ impl Value<'_, '_> {
     /// # use jlrs::prelude::*;
     /// # fn main() {
     /// # let mut julia = Builder::new().start_local().unwrap();
-    /// julia.local_scope::<1>(|mut frame| {
+    /// julia.local_scope::<_, 1>(|mut frame| {
     ///     let i = Value::new(&mut frame, 2u64);
     ///     assert!(i.is::<u64>());
     /// });
@@ -827,7 +722,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
         self,
         target: &Tgt,
     ) -> JlrsResult<TypedValue<'scope, 'data, T>> {
-        target.with_local_scope::<1>(|_, mut frame| {
+        target.with_local_scope::<_, 1>(|_, mut frame| {
             let ty = T::construct_type(&mut frame);
             if self.isa(ty) {
                 unsafe { Ok(TypedValue::<T>::from_value_unchecked(self)) }
@@ -1575,23 +1470,6 @@ impl<'scope> Value<'scope, 'static> {
 
 impl<'data> Call<'data> for Value<'_, 'data> {
     #[inline]
-    unsafe fn call0<'target, Tgt>(self, target: Tgt) -> ValueResult<'target, 'data, Tgt>
-    where
-        Tgt: Target<'target>,
-    {
-        let res = jl_call0(self.unwrap(Private));
-        let exc = jl_exception_occurred();
-
-        let res = if exc.is_null() {
-            Ok(NonNull::new_unchecked(res))
-        } else {
-            Err(NonNull::new_unchecked(exc))
-        };
-
-        target.result_from_ptr(res, Private)
-    }
-
-    #[inline]
     unsafe fn call_unchecked<'target, 'value, V, Tgt, const N: usize>(
         self,
         target: Tgt,
@@ -1611,81 +1489,6 @@ impl<'data> Call<'data> for Value<'_, 'data> {
     }
 
     #[inline]
-    unsafe fn call1<'target, Tgt>(
-        self,
-        target: Tgt,
-        arg0: Value<'_, 'data>,
-    ) -> ValueResult<'target, 'data, Tgt>
-    where
-        Tgt: Target<'target>,
-    {
-        let res = jl_call1(self.unwrap(Private), arg0.unwrap(Private));
-        let exc = jl_exception_occurred();
-
-        let res = if exc.is_null() {
-            Ok(NonNull::new_unchecked(res))
-        } else {
-            Err(NonNull::new_unchecked(exc))
-        };
-
-        target.result_from_ptr(res, Private)
-    }
-
-    #[inline]
-    unsafe fn call2<'target, Tgt>(
-        self,
-        target: Tgt,
-        arg0: Value<'_, 'data>,
-        arg1: Value<'_, 'data>,
-    ) -> ValueResult<'target, 'data, Tgt>
-    where
-        Tgt: Target<'target>,
-    {
-        let res = jl_call2(
-            self.unwrap(Private),
-            arg0.unwrap(Private),
-            arg1.unwrap(Private),
-        );
-        let exc = jl_exception_occurred();
-
-        let res = if exc.is_null() {
-            Ok(NonNull::new_unchecked(res))
-        } else {
-            Err(NonNull::new_unchecked(exc))
-        };
-
-        target.result_from_ptr(res, Private)
-    }
-
-    #[inline]
-    unsafe fn call3<'target, Tgt>(
-        self,
-        target: Tgt,
-        arg0: Value<'_, 'data>,
-        arg1: Value<'_, 'data>,
-        arg2: Value<'_, 'data>,
-    ) -> ValueResult<'target, 'data, Tgt>
-    where
-        Tgt: Target<'target>,
-    {
-        let res = jl_call3(
-            self.unwrap(Private),
-            arg0.unwrap(Private),
-            arg1.unwrap(Private),
-            arg2.unwrap(Private),
-        );
-        let exc = jl_exception_occurred();
-
-        let res = if exc.is_null() {
-            Ok(NonNull::new_unchecked(res))
-        } else {
-            Err(NonNull::new_unchecked(exc))
-        };
-
-        target.result_from_ptr(res, Private)
-    }
-
-    #[inline]
     unsafe fn call<'target, 'value, V, Tgt, const N: usize>(
         self,
         target: Tgt,
@@ -1697,11 +1500,48 @@ impl<'data> Call<'data> for Value<'_, 'data> {
     {
         let args = args.as_slice(Private);
         let n = args.len();
-        let res = jl_call(
-            self.unwrap(Private),
-            args.as_ptr() as *const _ as *mut _,
-            n as _,
-        );
+
+        let res = match N {
+            0 => jl_call0(self.unwrap(Private)),
+            1 => jl_call1(self.unwrap(Private), args[0].unwrap(Private)),
+            2 => jl_call2(
+                self.unwrap(Private),
+                args[0].unwrap(Private),
+                args[1].unwrap(Private),
+            ),
+            3 => jl_call3(
+                self.unwrap(Private),
+                args[0].unwrap(Private),
+                args[1].unwrap(Private),
+                args[2].unwrap(Private),
+            ),
+            usize::MAX => match n {
+                0 => jl_call0(self.unwrap(Private)),
+                1 => jl_call1(self.unwrap(Private), args[0].unwrap(Private)),
+                2 => jl_call2(
+                    self.unwrap(Private),
+                    args[0].unwrap(Private),
+                    args[1].unwrap(Private),
+                ),
+                3 => jl_call3(
+                    self.unwrap(Private),
+                    args[0].unwrap(Private),
+                    args[1].unwrap(Private),
+                    args[2].unwrap(Private),
+                ),
+                _ => jl_call(
+                    self.unwrap(Private),
+                    args.as_ptr() as *const _ as *mut _,
+                    n as _,
+                ),
+            },
+            _ => jl_call(
+                self.unwrap(Private),
+                args.as_ptr() as *const _ as *mut _,
+                n as _,
+            ),
+        };
+
         let exc = jl_exception_occurred();
 
         let res = if exc.is_null() {
@@ -1716,15 +1556,8 @@ impl<'data> Call<'data> for Value<'_, 'data> {
 
 impl<'value, 'data> ProvideKeywords<'value, 'data> for Value<'value, 'data> {
     #[inline]
-    fn provide_keywords(
-        self,
-        kws: Value<'value, 'data>,
-    ) -> JlrsResult<WithKeywords<'value, 'data>> {
-        if !kws.is::<NamedTuple>() {
-            let ty = kws.datatype().display_string_or(CANNOT_DISPLAY_TYPE);
-            Err(TypeError::NotANamedTuple { ty })?
-        }
-        Ok(WithKeywords::new(self, kws))
+    fn provide_keywords(self, kws: NamedTuple<'value, 'data>) -> WithKeywords<'value, 'data> {
+        WithKeywords::new(self, kws)
     }
 }
 

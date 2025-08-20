@@ -33,7 +33,7 @@ fn value_new_usize_reusable_slot(frame: &mut GcFrame, c: &mut Criterion) -> Jlrs
 
 #[inline(never)]
 fn value_new_usize_local_reusable_slot(frame: &mut GcFrame, c: &mut Criterion) -> JlrsResult<()> {
-    frame.local_scope::<1>(|mut frame| {
+    frame.local_scope::<_, 1>(|mut frame| {
         let mut output = frame.reusable_slot();
         let mut output = NonNull::from(&mut output);
 

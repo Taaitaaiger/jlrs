@@ -43,17 +43,16 @@ mod tests {
             let jlrs = j.borrow();
 
             jlrs
-                .local_scope::<3>(|mut frame| -> JlrsResult<_> {
+                .local_scope::<_, 3>(|mut frame| -> JlrsResult<_> {
                     let add_ptr = Value::new(&mut frame, add as *mut std::ffi::c_void);
 
                     unsafe {
                         let func = Value::eval_string(
                             &mut frame,
                             "addfunc(add_ptr::Ptr{Cvoid})::Int = ccall(add_ptr, Int32, (Int32, Int32), 1, 2)"
-                        ).into_jlrs_result()?;
+                        )?;
 
-                        let output = func.call1(&mut frame, add_ptr)
-                            .into_jlrs_result()?
+                        let output = func.call(&mut frame, [add_ptr])?
                             .unbox::<isize>()?;
 
                         assert_eq!(output, 3);
@@ -68,7 +67,7 @@ mod tests {
         JULIA.with(|j| {
             let jlrs = j.borrow();
 
-            jlrs.local_scope::<3>(|mut frame| -> JlrsResult<_> {
+            jlrs.local_scope::<_, 3>(|mut frame| -> JlrsResult<_> {
                 // Cast the function to a void pointer
                 let incr_array_ptr = Value::new(&mut frame, incr_array as *mut std::ffi::c_void);
 
@@ -78,13 +77,13 @@ mod tests {
                     let func = Value::eval_string(
                         &mut frame,
                         "incrarray(incr_array_ptr::Ptr{Cvoid}, arr::Array{Float64, 1}) = ccall(incr_array_ptr, Cvoid, (Array{Float64, 1},), arr)"
-                    ).into_jlrs_result()?;
+                    )?;
 
                     let data  = vec![1.0f64, 2.0, 3.0];
                     let array = TypedArray::<f64>::from_vec_unchecked(&mut frame, data, 3);
 
                     // Call the function and unbox the result.
-                    let output = func.call2(&frame, incr_array_ptr, array.as_value());
+                    let output = func.call(&frame, [incr_array_ptr, array.as_value()]);
                     assert!(output.is_ok());
 
                     {

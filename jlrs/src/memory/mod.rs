@@ -25,7 +25,7 @@
 //! # fn main() {
 //! let mut julia = Builder::new().start_local().unwrap();
 //! // One slot is used
-//! julia.local_scope::<1>(|mut frame| {
+//! julia.local_scope::<_, 1>(|mut frame| {
 //!     // This data is guaranteed to live at least until we leave this scope
 //!     let i = Value::new(&mut frame, 1u64);
 //! });
@@ -43,11 +43,11 @@
 //! # use jlrs::prelude::*;
 //! # fn main() {
 //! let mut julia = Builder::new().start_local().unwrap();
-//! julia.local_scope::<1>(|mut frame| {
+//! julia.local_scope::<_, 1>(|mut frame| {
 //!     let i = Value::new(&mut frame, 1u64);
 //!
 //!     // One slot is used
-//!     frame.local_scope::<1>(|mut frame| {
+//!     frame.local_scope::<_, 1>(|mut frame| {
 //!         let j = Value::new(&mut frame, 2u64);
 //!         // j can't be returned from this scope, but i can.
 //!         i
@@ -67,11 +67,11 @@
 //! let mut julia = Builder::new().start_local().unwrap();
 //!
 //! // One slot is used to create an output
-//! julia.local_scope::<1>(|mut frame| {
+//! julia.local_scope::<_, 1>(|mut frame| {
 //!     let output = frame.output();
 //!
 //!     // This frame uses no slots, the output was reserved in advance
-//!     frame.local_scope::<0>(|_| Value::new(output, 2u64));
+//!     frame.local_scope::<_, 0>(|_| Value::new(output, 2u64));
 //! });
 //! # }
 //! ```

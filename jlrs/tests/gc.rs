@@ -18,16 +18,12 @@ mod tests {
             assert!(handle.gc_interface().gc_is_enabled());
 
             handle.with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|frame| {
-                        frame.enable_gc(false);
-                        assert!(!frame.gc_is_enabled());
-                        frame.enable_gc(true);
-                        assert!(frame.gc_is_enabled());
-                        Ok(())
-                    })
-                    .unwrap()
+                stack.scope(|frame| {
+                    frame.enable_gc(false);
+                    assert!(!frame.gc_is_enabled());
+                    frame.enable_gc(true);
+                    assert!(frame.gc_is_enabled());
+                })
             });
         })
     }
@@ -41,16 +37,11 @@ mod tests {
             handle.gc_interface().gc_collect(GcCollection::Full);
 
             handle.with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|frame| {
-                        frame.gc_collect(GcCollection::Auto);
-                        frame.gc_collect(GcCollection::Incremental);
-                        frame.gc_collect(GcCollection::Full);
-
-                        Ok(())
-                    })
-                    .unwrap()
+                stack.scope(|frame| {
+                    frame.gc_collect(GcCollection::Auto);
+                    frame.gc_collect(GcCollection::Incremental);
+                    frame.gc_collect(GcCollection::Full);
+                })
             });
         });
     }
@@ -61,13 +52,9 @@ mod tests {
             handle.gc_interface().gc_safepoint();
 
             handle.with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|frame| {
-                        frame.gc_safepoint();
-                        Ok(())
-                    })
-                    .unwrap()
+                stack.scope(|frame| {
+                    frame.gc_safepoint();
+                })
             })
         })
     }

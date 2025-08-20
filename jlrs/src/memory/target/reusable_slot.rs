@@ -14,10 +14,10 @@
 //! # fn main() {
 //! let mut julia = Builder::new().start_local().unwrap();
 //!
-//! julia.local_scope::<1>(|mut frame| {
+//! julia.local_scope::<_, 1>(|mut frame| {
 //!     let reusable_slot = frame.reusable_slot();
 //!
-//!     let _v = frame.local_scope::<0>(|_| {
+//!     let _v = frame.local_scope::<_, 0>(|_| {
 //!         // The reusable slot has been allocated in the parent
 //!         // scope's frame, so by using it as a target the
 //!         // result can be returned from this subscope.
@@ -32,10 +32,10 @@
 //! # fn main() {
 //! let mut julia = Builder::new().start_local().unwrap();
 //!
-//! julia.local_scope::<1>(|mut frame| {
+//! julia.local_scope::<_, 1>(|mut frame| {
 //!     let mut reusable_slot = frame.reusable_slot();
 //!
-//!     let _v = frame.local_scope::<0>(|_| {
+//!     let _v = frame.local_scope::<_, 0>(|_| {
 //!         // This data can be used until you leave the parent scope,
 //!         // it will be rooted until the reusable slot is used again.
 //!         Value::new(&mut reusable_slot, 2u64)

@@ -1,7 +1,7 @@
 use std::{fmt, marker::PhantomData};
 
 use super::IsActive;
-use crate::memory::scope::{LocalReturning, LocalScope};
+use crate::memory::scope::{private::LocalScopePriv, LocalScope};
 
 /// A handle that lets you call into Julia from a delegated task.
 pub struct DelegatedHandle {
@@ -24,10 +24,5 @@ impl fmt::Debug for DelegatedHandle {
 
 impl IsActive for DelegatedHandle {}
 
-impl<'ctx> LocalReturning<'ctx> for DelegatedHandle {
-    fn returning<T>(&mut self) -> &mut impl LocalScope<'ctx, T> {
-        self
-    }
-}
-
-impl<'ctx, T> LocalScope<'ctx, T> for DelegatedHandle {}
+impl LocalScopePriv for DelegatedHandle {}
+unsafe impl LocalScope for DelegatedHandle {}

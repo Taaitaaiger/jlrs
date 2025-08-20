@@ -24,7 +24,7 @@ use crate::{
     },
     gc_safe::GcSafeOnceLock,
     memory::{target::unrooted::Unrooted, PTls},
-    prelude::{IntoJlrsResult, LocalScope, Target},
+    prelude::{LocalScope, Target},
     private::Private,
 };
 
@@ -109,25 +109,22 @@ impl Stack {
             let lock_fn = module.global(tgt, "lock_init_lock").unwrap().as_value();
             let unlock_fn = module.global(tgt, "unlock_init_lock").unwrap().as_value();
 
-            lock_fn.call0(tgt).unwrap();
+            lock_fn.call(tgt, []).unwrap();
 
             if module.global(tgt, sym).is_ok() {
-                unlock_fn.call0(tgt).unwrap();
+                unlock_fn.call(tgt, []).unwrap();
                 return;
             }
 
             // Safety: create_foreign_type is called with the correct arguments, the new type is
             // rooted until the constant has been set, and we've just checked if JlrsCore.Stack
             // already exists.
-            tgt.local_scope::<2>(|mut frame| {
+            tgt.local_scope::<_, 2>(|mut frame| {
                 let dt = <Self as OpaqueType>::create_type(&mut frame, sym, module);
-                module
-                    .set_const(&mut frame, sym, dt.as_value())
-                    .into_jlrs_result()
-                    .unwrap();
+                module.set_const(&mut frame, sym, dt.as_value()).unwrap();
             });
 
-            unlock_fn.call0(tgt).unwrap();
+            unlock_fn.call(tgt, []).unwrap();
         };
     }
 

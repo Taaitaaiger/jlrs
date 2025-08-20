@@ -75,7 +75,7 @@ where
 {
     fn new<'target, Tgt: Target<'target>>(target: Tgt) -> BackgroundTaskData<'target, T, Tgt> {
         unsafe {
-            target.with_local_scope::<2>(|target, mut frame| {
+            target.with_local_scope::<_, 2>(|target, mut frame| {
                 let cond =
                     inline_static_ref!(ASYNC_CONDITION, DataType, "Base.AsyncCondition", &frame);
                 let cond = cond.as_value().call_unchecked(&mut frame, []);
@@ -163,7 +163,7 @@ where
     where
         Tgt: Target<'target>,
     {
-        target.with_local_scope::<1>(|target, mut frame| unsafe {
+        target.with_local_scope::<_, 1>(|target, mut frame| unsafe {
             let t = T::construct_type(&mut frame);
             let bgtask_ua = JlrsCore::background_task(&target);
             bgtask_ua.apply_types_unchecked(target, [t])
@@ -177,7 +177,7 @@ where
     where
         Tgt: Target<'target>,
     {
-        target.with_local_scope::<1>(|target, mut frame| unsafe {
+        target.with_local_scope::<_, 1>(|target, mut frame| unsafe {
             let t = T::construct_type(&mut frame);
             let bgtask_ua = JlrsCore::background_task(&target);
             bgtask_ua.apply_types_unchecked(target, [t])
@@ -319,7 +319,7 @@ where
     unsafe impl<L> Send for Sendable<L> {}
 
     unsafe {
-        target.with_local_scope::<1>(|target, mut frame| {
+        target.with_local_scope::<_, 1>(|target, mut frame| {
             let task = BackgroundTask::new(&mut frame);
             let task_ref = Sendable(task.as_weak().leak());
 

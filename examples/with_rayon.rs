@@ -22,7 +22,7 @@ fn main() {
                     .map_with(handle, |mt_handle, v| {
                         // Don't yield while an `ActiveHandle` exists
                         mt_handle.with(|active_handle| {
-                            active_handle.local_scope::<1>(|mut frame| {
+                            active_handle.local_scope::<_, 1>(|mut frame| {
                                 let val = Value::new(&mut frame, *v);
                                 val.unbox::<i32>().unwrap() + 1
                             })

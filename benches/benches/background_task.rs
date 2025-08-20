@@ -19,13 +19,13 @@ fn bench_background_task(c: &mut Criterion) {
                 .as_value()
         };
 
-        handle.local_scope::<2>(|mut frame| {
+        handle.local_scope::<_, 2>(|mut frame| {
             let mut output1 = frame.output();
             let mut output2 = frame.output();
 
             b.iter(|| {
                 let task = spawn_background_task::<usize, _, _>(&mut output1, || Ok(1usize));
-                let _v = black_box(unsafe { func.call1(&mut output2, task.as_value()).unwrap() });
+                let _v = black_box(unsafe { func.call(&mut output2, [task.as_value(])).unwrap() });
             })
         })
     });

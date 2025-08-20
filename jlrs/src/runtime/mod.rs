@@ -17,7 +17,7 @@ use crate::{
     call::Call,
     data::managed::module::JlrsCore,
     error::{IOError, JlrsResult},
-    prelude::{IntoJlrsResult, JuliaString, LocalScope, Managed, Module, Target, Value},
+    prelude::{JuliaString, LocalScope, Managed, Module, Target, Value},
     weak_handle_unchecked,
 };
 
@@ -206,7 +206,7 @@ unsafe fn set_error_color(enable: bool) {
         };
 
         JlrsCore::set_error_color(&handle)
-            .call1(&handle, enable)
+            .call(&handle, [enable])
             .ok();
     };
 }
@@ -216,14 +216,14 @@ unsafe fn include<P: AsRef<Path>>(path: P) -> JlrsResult<()> {
     if path.as_ref().exists() {
         unsafe {
             let handle = weak_handle_unchecked!();
-            return handle.local_scope::<2>(|mut frame| {
+            return handle.local_scope::<_, 2>(|mut frame| {
                 let path_jl_str = JuliaString::new(&mut frame, path.as_ref().to_string_lossy());
                 Module::main(&frame)
-                    .function(&frame, "include")?
+                    .global(&frame, "include")?
                     .as_managed()
-                    .call1(&mut frame, path_jl_str.as_value())
-                    .into_jlrs_result()
-                    .map(|_| ())
+                    .call(&mut frame, [path_jl_str.as_value()])?;
+
+                Ok(())
             });
         }
     }
@@ -236,11 +236,10 @@ unsafe fn include<P: AsRef<Path>>(path: P) -> JlrsResult<()> {
 // safety: must only be called from a thread that can call into Julia
 unsafe fn using<S: AsRef<str>>(module_name: S) -> JlrsResult<()> {
     unsafe {
-        weak_handle_unchecked!().local_scope::<1>(|mut frame| {
+        weak_handle_unchecked!().local_scope::<_, 1>(|mut frame| {
             let cmd = format!("using {}", module_name.as_ref());
-            Value::eval_string(&mut frame, cmd)
-                .map(|_| ())
-                .into_jlrs_result()
+            Value::eval_string(&mut frame, cmd)?;
+            Ok(())
         })
     }
 }

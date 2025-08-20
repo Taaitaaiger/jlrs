@@ -27,7 +27,7 @@ mod tests {
             let blocking_recv = r
                 .as_ref()
                 .blocking_task(|mut frame| -> JlrsResult<()> {
-                    Value::eval_string(&mut frame, ASYNC_TESTS_JL).into_jlrs_result()?;
+                    Value::eval_string(&mut frame, ASYNC_TESTS_JL)?;
                     Ok(())
                 })
                 .try_dispatch()
@@ -76,7 +76,7 @@ mod tests {
                 Module::main(&frame)
                     .submodule(&frame, "AsyncTests")?
                     .as_managed()
-                    .function(&frame, "complexfunc")?
+                    .global(&frame, "complexfunc")?
                     .as_value()
                     .call_async(&mut frame, [dims, iters])
                     .await
@@ -216,26 +216,6 @@ mod tests {
         assert_eq!(receiver.blocking_recv().unwrap().unwrap(), 30_000_006.0);
     }
 
-    // /*
-    // #[test]
-    // fn test_nesting_call_dynamic_task() {
-    //     let julia = JULIA.get_or_init(init);
-
-    //    let receiver =
-
-    //     julia
-    //         .task(
-    //             NestingTaskAsyncDynamicCallFrame {
-    //                 dims: 6,
-    //                 iters: 5_000_000,
-    //             },
-    //         )
-    //         .try_dispatch().ok()
-    //         .unwrap();
-
-    //     assert_eq!(receiver.blocking_recv().unwrap().unwrap(), 30_000_006.0);
-    // }
-    // */
     #[test]
     fn test_persistent() {
         let julia = JULIA.get_or_init(init);
@@ -249,50 +229,36 @@ mod tests {
             .unwrap()
             .unwrap();
 
-        //     let handle = julia
-        //         .persistent(AccumulatorTask { init_value: 5.0 })
-        //         .try_dispatch()
-        //         .ok()
-        //         .expect("Cannot send task")
-        //         .blocking_recv()
-        //         .unwrap()
-        //         .unwrap();
+        let handle = julia
+            .persistent(AccumulatorTask { init_value: 5.0 })
+            .try_dispatch()
+            .ok()
+            .expect("Cannot send task")
+            .blocking_recv()
+            .unwrap()
+            .unwrap();
 
-        //     let res = handle
-        //         .call(7.0)
-        //         .try_dispatch()
-        //         .ok()
-        //         .unwrap()
-        //         .blocking_recv()
-        //         .unwrap()
-        //         .unwrap();
+        let res = handle
+            .call(7.0)
+            .try_dispatch()
+            .ok()
+            .unwrap()
+            .blocking_recv()
+            .unwrap()
+            .unwrap();
 
-        //     assert_eq!(res, 12.0);
+        assert_eq!(res, 12.0);
 
-        //     let res = handle
-        //         .call(12.0)
-        //         .try_dispatch()
-        //         .ok()
-        //         .unwrap()
-        //         .blocking_recv()
-        //         .unwrap()
-        //         .unwrap();
+        let res = handle
+            .call(12.0)
+            .try_dispatch()
+            .ok()
+            .unwrap()
+            .blocking_recv()
+            .unwrap()
+            .unwrap();
 
-        //     assert_eq!(res, 24.0);
-        //     // let handle = {
-        //     //     let (handle_sender, handle_receiver) = crossbeam_channel::bounded(1);
-
-        //     //     handle_receiver
-        //     //         .blocking_recv()
-        //     //         .expect("Channel was closed")
-        //     //         .expect("Cannot init task")
-        //     // };
-
-        //     // handle.try_call(7.0.clone()).unwrap();
-        //     // assert_eq!(receiver.blocking_recv().unwrap().unwrap(), 12.0);
-
-        //     // handle.try_call(12.0).unwrap();
-        //     // assert_eq!(receiver.blocking_recv().unwrap().unwrap(), 24.0);
+        assert_eq!(res, 24.0);
     }
 
     #[test]

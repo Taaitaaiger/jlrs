@@ -33,14 +33,10 @@ fn main() {
                         .as_managed()
                         // the same holds true for the function: the module is never reloaded so it's
                         // globally rooted
-                        .function(&frame, "complexfunc")?
+                        .global(&frame, "complexfunc")?
                         .as_managed()
                         // Call the function with the two arguments it takes
-                        .call2(&mut frame, dim, iters)
-                        // If you don't want to use the exception, it can be converted to a `JlrsError`
-                        // In this case the error message will contain the message that calling
-                        // `display` in Julia would show
-                        .into_jlrs_result()?
+                        .call(&mut frame, [dim, iters])?
                         // The function that was called returns a `Float64`, which can be unboxed as `f64`
                         .unbox::<f64>()
                 }

@@ -1,7 +1,7 @@
 #[cfg(feature = "local-rt")]
 pub(crate) mod tests {
     use jlrs::{
-        data::managed::array::{data::accessor::AccessorMut1D, TypedVector},
+        data::managed::array::{data::accessor::AccessorMut1D, dimensions::Dims, TypedVector},
         prelude::*,
     };
 
@@ -17,14 +17,20 @@ pub(crate) mod tests {
                             .unwrap()
                             .unwrap();
 
+                    let a2 = arr.clone();
+                    let dims = a2.dimensions();
+
                     assert_eq!(arr.length(), 2);
+                    assert_eq!(dims.size(), 2);
                     let success = arr.bits_data_mut().grow_end(&frame, 1);
                     assert!(success.is_ok());
                     assert_eq!(arr.length(), 3);
+                    assert_eq!(dims.size(), 3);
 
                     let success = arr.bits_data_mut().grow_end(&frame, 5);
                     assert!(success.is_ok());
                     assert_eq!(arr.length(), 8);
+                    assert_eq!(dims.size(), 8);
 
                     {
                         let accessor = arr.bits_data();

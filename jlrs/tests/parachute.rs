@@ -20,17 +20,13 @@ mod tests {
     fn create_parachute() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| {
-                        let data = vec![1usize, 2usize];
-                        let mut parachute = data.attach_parachute(&mut frame);
-                        assert_eq!(parachute.len(), 2);
-                        parachute.push(3);
-                        assert_eq!(parachute.len(), 3);
-                        Ok(())
-                    })
-                    .unwrap();
+                stack.scope(|mut frame| {
+                    let data = vec![1usize, 2usize];
+                    let mut parachute = data.attach_parachute(&mut frame);
+                    assert_eq!(parachute.len(), 2);
+                    parachute.push(3);
+                    assert_eq!(parachute.len(), 3);
+                })
             });
         });
     }

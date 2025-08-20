@@ -291,8 +291,8 @@ pub mod ccall_ref;
 pub mod datatype;
 pub mod delegated_task;
 pub mod expr;
-pub mod function;
 pub mod module;
+pub mod named_tuple;
 pub mod parachute;
 pub mod simple_vector;
 pub mod string;
@@ -402,7 +402,7 @@ pub trait Managed<'scope, 'data>: private::ManagedPriv<'scope, 'data> {
 
         let s = unsafe {
             JlrsCore::value_string(&global)
-                .call1(&global, self.as_value())
+                .call(&global, [self.as_value()])
                 .map_err(|e| e.as_value().error_string_or(CANNOT_DISPLAY_VALUE))
                 .map_err(|e| JlrsError::exception(format!("JlrsCore.valuestring failed: {}", e)))?
                 .as_value()
@@ -426,7 +426,7 @@ pub trait Managed<'scope, 'data>: private::ManagedPriv<'scope, 'data> {
 
         let s = unsafe {
             JlrsCore::error_string(&global)
-                .call1(&global, self.as_value())
+                .call(&global, [self.as_value()])
                 .map_err(|e| {
                     JlrsError::exception(format!(
                         "JlrsCore.errorstring failed, {:?}",
@@ -450,7 +450,7 @@ pub trait Managed<'scope, 'data>: private::ManagedPriv<'scope, 'data> {
             .global(unrooted, "showerror")
             .unwrap()
             .as_value();
-        showerror.call2(unrooted, stderr, self.as_value()).ok();
+        showerror.call(unrooted, [stderr, self.as_value()]).ok();
     }
 
     /// Convert `self` to its display string, i.e. the string that is shown by calling

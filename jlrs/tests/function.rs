@@ -9,23 +9,21 @@ mod tests {
     fn extend_lifetime() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| {
-                        let output = frame.output();
+                stack.scope(|mut frame| {
+                    let output = frame.output();
 
-                        frame
-                            .scope(|frame| {
-                                let func = unsafe {
-                                    Module::base(&frame).function(&frame, "+")?.as_managed()
-                                };
-                                JlrsResult::Ok(func.root(output))
-                            })
-                            .unwrap();
-
-                        Ok(())
-                    })
-                    .unwrap();
+                    frame
+                        .scope(|frame| {
+                            let func = unsafe {
+                                Module::base(&frame)
+                                    .global(&frame, "+")
+                                    .unwrap()
+                                    .as_managed()
+                            };
+                            JlrsResult::Ok(func.root(output))
+                        })
+                        .unwrap();
+                })
             })
         })
     }
@@ -33,21 +31,17 @@ mod tests {
     fn has_datatype() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|frame| {
-                        let func_ty = unsafe {
-                            Module::base(&frame)
-                                .function(&frame, "+")?
-                                .as_managed()
-                                .datatype()
-                        };
+                stack.scope(|frame| {
+                    let func_ty = unsafe {
+                        Module::base(&frame)
+                            .global(&frame, "+")
+                            .unwrap()
+                            .as_managed()
+                            .datatype()
+                    };
 
-                        assert_eq!(func_ty.name(), "#+");
-
-                        Ok(())
-                    })
-                    .unwrap();
+                    assert_eq!(func_ty.name(), "#+");
+                })
             })
         })
     }

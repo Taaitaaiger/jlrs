@@ -41,7 +41,7 @@ pub fn impl_opaque_type(ast: &syn::DeriveInput) -> syn::Result<TokenStream> {
                 Tgt: ::jlrs::memory::target::Target<'target>,
             {
                 use ::jlrs::memory::scope::LocalScopeExt as _;
-                target.with_local_scope::<2>(
+                target.with_local_scope::<_, 2>(
                     |target, mut frame| unsafe {
                         let mut output = frame.output();
                         let tvars = ::jlrs::data::managed::simple_vector::SimpleVector::with_capacity_uninit(&mut frame, #n_params);
@@ -61,7 +61,7 @@ pub fn impl_opaque_type(ast: &syn::DeriveInput) -> syn::Result<TokenStream> {
                 Tgt: ::jlrs::memory::target::Target<'target>,
             {
                 use ::jlrs::memory::scope::LocalScopeExt as _;
-                target.with_local_scope::<2>(
+                target.with_local_scope::<_, 2>(
                     |target, mut frame| unsafe {
                         let mut output = frame.output();
                         let types = ::jlrs::data::managed::simple_vector::SimpleVector::with_capacity_uninit(&mut frame, #n_params);
@@ -179,7 +179,7 @@ fn type_var_iter<'a>(
             let name = name.to_string();
             parse_quote! {
                 {
-                    (&mut output).with_local_scope::<1>(|target, mut frame| {
+                    (&mut output).with_local_scope::<_, 1>(|target, mut frame| {
                         let upper_bound = <#supertype as ::jlrs::data::types::construct_type::ConstructType>::construct_type(&mut frame);
                         ::jlrs::data::managed::type_var::TypeVar::new(target, #name, None, Some(upper_bound))
                             .expect("Could not create tvar")
@@ -195,7 +195,7 @@ fn type_var_iter<'a>(
             let name = name.to_string();
             parse_quote! {
                 {
-                    (&mut output).with_local_scope::<2>(|target, mut frame| {
+                    (&mut output).with_local_scope::<_, 2>(|target, mut frame| {
                         let lower_bound = <#subtype as ::jlrs::data::types::construct_type::ConstructType>::construct_type(&mut frame);
                         let upper_bound = <#supertype as ::jlrs::data::types::construct_type::ConstructType>::construct_type(&mut frame);
                         ::jlrs::data::managed::type_var::TypeVar::new(target, #name, Some(lower_bound), Some(upper_bound))
@@ -208,7 +208,7 @@ fn type_var_iter<'a>(
             let name = name.to_string();
             parse_quote! {
                 {
-                    (&mut output).with_local_scope::<1>(|target, mut frame| {
+                    (&mut output).with_local_scope::<_, 1>(|target, mut frame| {
                         let lower_bound = <#subtype as ::jlrs::data::types::construct_type::ConstructType>::construct_type(&mut frame);
                         ::jlrs::data::managed::type_var::TypeVar::new(target, #name, Some(lower_bound), None)
                             .expect("Could not create tvar")

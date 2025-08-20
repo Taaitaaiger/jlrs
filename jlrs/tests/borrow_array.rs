@@ -10,15 +10,13 @@ mod tests {
         let mut data = vec![1u64, 2, 3, 4];
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                let unboxed = stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| {
-                        let array = TypedArray::<u64>::from_slice(&mut frame, &mut data, 4)?
-                            .into_jlrs_result()?;
-                        assert!(array.contains::<u64>());
-                        unsafe { Ok(array.bits_data().to_copied_array()) }
-                    })
-                    .unwrap();
+                let unboxed = stack.scope(|mut frame| {
+                    let array = TypedArray::<u64>::from_slice(&mut frame, &mut data, 4)
+                        .unwrap()
+                        .unwrap();
+                    assert!(array.contains::<u64>());
+                    unsafe { array.bits_data().to_copied_array() }
+                });
 
                 let (data, dims) = unboxed.splat();
                 assert_eq!(dims.rank(), 1);
@@ -33,24 +31,25 @@ mod tests {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
                 let unboxed = stack
-                    .returning::<JlrsResult<_>>()
                     .scope(|mut frame| unsafe {
                         let output = frame.output();
-                        let array = frame.returning::<JlrsResult<_>>().scope(|mut frame| {
+                        let array = frame.scope(|mut frame| {
                             let borrowed = &mut data;
-                            let arr = TypedArray::<u64>::from_slice(&mut frame, borrowed, 4)?
-                                .into_jlrs_result()?;
-                            Ok(arr.root(output))
-                        })?;
+                            let arr = TypedArray::<u64>::from_slice(&mut frame, borrowed, 4)
+                                .unwrap()
+                                .unwrap();
+                            arr.root(output)
+                        });
 
                         // uncommenting the next line must lead to a compilation error due to multiple
                         // mutable borrows:
                         // let _reborrowed = &mut data[0];
 
                         Module::base(&frame)
-                            .function(&frame, "sum")?
+                            .global(&frame, "sum")
+                            .unwrap()
                             .as_managed()
-                            .call1(&mut frame, array.as_value())
+                            .call(&mut frame, [array.as_value()])
                             .unwrap()
                             .unbox::<u64>()
                     })

@@ -65,7 +65,7 @@ pub unsafe fn catch_exceptions<T, E>(
         jlrs_catch_tag_t::Exception => {
             let ptr = NonNull::new_unchecked(res.error.cast());
             let unrooted = Unrooted::new();
-            unrooted.local_scope::<1>(|frame| {
+            unrooted.local_scope::<_, 1>(|frame| {
                 // Root the exception because we're not in an actual catch block.
                 let v = Value::wrap_non_null(ptr, Private).root(frame);
                 Err(exception_handler(v))

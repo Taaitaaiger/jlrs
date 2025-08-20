@@ -49,7 +49,7 @@ where
     }
 
     /// Prepare to call the persistent task with the provided input.
-    pub fn call(&self, input: P::Input) -> Dispatch<PersistentMessage<P>, P::Output> {
+    pub fn call(&self, input: P::Input) -> Dispatch<'_, PersistentMessage<P>, P::Output> {
         let (sender, receiver) = oneshot_channel();
         let msg = PersistentMessage {
             msg: Box::new(CallPersistentTask {

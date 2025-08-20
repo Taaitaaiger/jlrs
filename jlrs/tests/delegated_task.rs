@@ -9,13 +9,13 @@ mod delegated_task {
     };
 
     fn delegated_task(handle: &LocalHandle) {
-        handle.local_scope::<2>(|mut frame| {
+        handle.local_scope::<_, 2>(|mut frame| {
             let data = ();
 
             let delegated = spawn_delegated_task(
                 &mut frame,
                 |handle, _data| {
-                    handle.local_scope::<0>(|frame| Ok(Value::new(&frame, 1isize).leak()))
+                    handle.local_scope::<_, 0>(|frame| Ok(Value::new(&frame, 1isize).leak()))
                 },
                 data,
             );
@@ -29,8 +29,7 @@ mod delegated_task {
                     .global(&frame, "fetch")
                     .unwrap()
                     .as_value()
-                    .call1(&mut frame, delegated.as_value())
-                    .into_jlrs_result()
+                    .call(&mut frame, [delegated.as_value()])
                     .unwrap()
                     .unbox::<isize>()
                     .unwrap()

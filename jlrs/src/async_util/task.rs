@@ -1,3 +1,5 @@
+//! Traits to implement async and persistent tasks.
+
 use std::{future::Future, time::Duration};
 
 use crate::{
@@ -7,14 +9,20 @@ use crate::{
     prelude::{AsyncGcFrame, JlrsResult, Target, Value},
 };
 
+/// Register a task.
+///
+/// Some tasks require additional code to be loaded. This trait can be impemented to take care of
+/// such initialization.
 pub trait Register: 'static + Send {
+    /// Perform the operations necessary to create new tasks.
     fn register(frame: AsyncGcFrame) -> impl Future<Output = JlrsResult<()>>;
 }
 
-/// Async task
+/// An async task.
 ///
 /// Any type that implements this trait can be sent to the async runtime where its `run` method
-/// will be called. This trait is implemented for all `AsyncFnOnce(AsyncGcFrame) -> T`.
+/// will be called. This trait is implemented for all implementations of
+/// `AsyncFnOnce(AsyncGcFrame) -> T` as long as the trait bounds are respected.
 pub trait AsyncTask: 'static + Send {
     /// The return type of `run`.
     type Output: 'static + Send;
@@ -37,7 +45,7 @@ where
 
 /// Persistent task
 ///
-/// Unlike an [`AsyncTask`], which is executed once, a persistent task is initialized and then
+/// Unlike an [`AsyncTask`] which is executed once, a persistent task is initialized and then
 /// provides a handle to call `run`. A persistent task has a state, which is returned by `init`,
 /// which is provided every time `run` is called in addition to the input data.
 pub trait PersistentTask: 'static + Send {
@@ -92,7 +100,7 @@ pub trait PersistentTask: 'static + Send {
 
 /// Sleep for `duration`.
 ///
-/// This function calls `Base.sleep`. If `duration` is less than 1ms this function returns
+/// This function calls `Base.sleep`. If `duration` is less than 1ms this function may return
 /// immediately.
 pub fn sleep<'scope, 'data, Tgt: Target<'scope>>(target: &Tgt, duration: Duration) {
     unsafe {
@@ -102,13 +110,13 @@ pub fn sleep<'scope, 'data, Tgt: Target<'scope>>(target: &Tgt, duration: Duratio
         }
 
         // Is rooted when sleep is called.
-        target.with_local_scope::<1>(|target, mut frame| {
+        target.with_local_scope::<_, 1>(|target, mut frame| {
             let secs = duration.as_millis() as usize as f64 / 1000.;
             let secs = Value::new(&mut frame, secs);
 
             let func: Value<'_, '_> =
                 inline_static_ref!(SLEEP, Value<'static, 'static>, "Base.sleep", target);
-            func.call1(target, secs).expect("sleep threw an exception");
+            func.call(target, [secs]).expect("sleep threw an exception");
         })
     }
 }

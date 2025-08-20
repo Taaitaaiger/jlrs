@@ -16,17 +16,13 @@ mod tests {
             fn $test_name() {
                 JULIA.with(|handle| {
                     handle.borrow_mut().with_stack(|mut stack| {
-                        stack
-                            .returning::<JlrsResult<_>>()
-                            .scope(|frame| unsafe {
-                                let val: $type = $val;
-                                assert_eq!(
-                                    <$type as Unbox>::unbox(val.into_julia(&frame).as_value()),
-                                    $val
-                                );
-                                Ok(())
-                            })
-                            .unwrap();
+                        stack.scope(|frame| unsafe {
+                            let val: $type = $val;
+                            assert_eq!(
+                                <$type as Unbox>::unbox(val.into_julia(&frame).as_value()),
+                                $val
+                            );
+                        });
                     });
                 });
             }

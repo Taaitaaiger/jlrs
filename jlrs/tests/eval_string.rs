@@ -8,13 +8,9 @@ mod tests {
     fn eval_string(string: &str, with_result: impl for<'f> FnOnce(JuliaResult<'f, 'static>)) {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| {
-                        with_result(unsafe { Value::eval_string(&mut frame, string) });
-                        Ok(())
-                    })
-                    .unwrap();
+                stack.scope(|mut frame| {
+                    with_result(unsafe { Value::eval_string(&mut frame, string) });
+                })
             });
         });
     }
@@ -46,18 +42,15 @@ mod tests {
         });
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| unsafe {
-                        let func = Module::main(&frame)
-                            .function(&frame, "increase")?
-                            .as_managed();
-                        let twelve = Value::new(&mut frame, 12i32);
-                        let result = func.call1(&mut frame, twelve);
-                        assert_eq!(result.unwrap().unbox::<i32>().unwrap(), 13i32);
-                        Ok(())
-                    })
-                    .unwrap();
+                stack.scope(|mut frame| unsafe {
+                    let func = Module::main(&frame)
+                        .global(&frame, "increase")
+                        .unwrap()
+                        .as_managed();
+                    let twelve = Value::new(&mut frame, 12i32);
+                    let result = func.call(&mut frame, [twelve]);
+                    assert_eq!(result.unwrap().unbox::<i32>().unwrap(), 13i32);
+                })
             });
         });
     }
@@ -65,18 +58,14 @@ mod tests {
     fn print_error() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| unsafe {
-                        Value::eval_string(
-                            &mut frame,
-                            "ErrorException(\"This is an expected message\")",
-                        )
-                        .unwrap()
-                        .print_error();
-                        Ok(())
-                    })
-                    .unwrap();
+                stack.scope(|mut frame| unsafe {
+                    Value::eval_string(
+                        &mut frame,
+                        "ErrorException(\"This is an expected message\")",
+                    )
+                    .unwrap()
+                    .print_error();
+                })
             });
         });
     }

@@ -31,7 +31,7 @@ extern "C"
     jl_datatype_t *jlrs_dimtuple_type(size_t rank);
     jl_value_t *jlrs_tuple_of(jl_value_t **values, size_t n);
 
-    jl_value_t *jlrs_call_unchecked(jl_function_t *f, jl_value_t **args, uint32_t nargs);
+    jl_value_t *jlrs_call_unchecked(jl_value_t *f, jl_value_t **args, uint32_t nargs);
 
     int jlrs_datatype_has_layout(jl_datatype_t *t);
 

@@ -1,4 +1,4 @@
-//! Julia function arguments
+//! Julia function arguments.
 //!
 //! Calling some functions requires adding one or more additional arguments before the provided
 //! arguments. Functions that require this take the arguments as an implementation of [`Values`],

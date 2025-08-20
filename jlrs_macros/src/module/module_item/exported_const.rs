@@ -84,10 +84,10 @@ fn const_info_fragment(info: &ExportedConst) -> Expr {
     let ty = &info.ty;
 
     parse_quote! {
-        frame.local_scope::<2>(move |mut frame| {
+        frame.local_scope::<_, 2>(move |mut frame| {
             let v: #ty = #name;
             let value = ::jlrs::data::managed::value::Value::new(&mut frame, v);
-            module.set_const(&mut frame, #rename, value).into_jlrs_result().unwrap();
+            module.set_const(&mut frame, #rename, value).unwrap();
         })
     }
 }

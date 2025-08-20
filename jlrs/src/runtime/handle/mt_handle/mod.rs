@@ -25,7 +25,7 @@ use crate::{
     call::Call,
     data::managed::module::JlrsCore,
     error::CANNOT_DISPLAY_VALUE,
-    memory::{gc::gc_unsafe, get_tls, scope::LocalReturning},
+    memory::{gc::gc_unsafe, get_tls},
     prelude::{LocalScope, Managed},
     runtime::state::{set_exit, set_pending_exit},
     weak_handle_unchecked,
@@ -132,12 +132,6 @@ impl<'ctx> ActiveHandle<'ctx> {
 
 impl IsActive for ActiveHandle<'_> {}
 
-impl<'ctx> LocalReturning<'ctx> for ActiveHandle<'ctx> {
-    fn returning<T>(&mut self) -> &mut impl LocalScope<'ctx, T> {
-        self
-    }
-}
-
 /// Thread pool builder
 #[cfg(feature = "async-rt")]
 pub struct PoolBuilder<'a, 'scope, 'env, E: Executor<N>, const N: usize> {
@@ -216,8 +210,8 @@ pub(crate) fn wait_loop() {
         let wait_main = JlrsCore::wait_main(&weak_handle);
 
         // Start waiting
-        if let Err(err) = wait_main.call0(&weak_handle) {
-            let err = weak_handle.local_scope::<1>(|mut frame| {
+        if let Err(err) = wait_main.call(&weak_handle, []) {
+            let err = weak_handle.local_scope::<_, 1>(|mut frame| {
                 err.root(&mut frame).error_string_or(CANNOT_DISPLAY_VALUE)
             });
 
@@ -240,8 +234,8 @@ unsafe fn drop_handle() {
             let weak_handle = weak_handle_unchecked!();
             let notify_main = JlrsCore::notify_main(&weak_handle);
 
-            if let Err(err) = notify_main.call0(&weak_handle) {
-                weak_handle.local_scope::<1>(|mut frame| {
+            if let Err(err) = notify_main.call(&weak_handle, []) {
+                weak_handle.local_scope::<_, 1>(|mut frame| {
                     panic!(
                         "unexpected error when calling JlrsCore.Threads.notify_main: {:?}",
                         err.root(&mut frame)

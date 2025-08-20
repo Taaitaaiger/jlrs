@@ -13,7 +13,7 @@ mod tests {
 
     unsafe extern "C" fn uses_scope(array: TypedArray<f64>) -> bool {
         match weak_handle!() {
-            Ok(handle) => handle.local_scope::<1>(|mut frame| {
+            Ok(handle) => handle.local_scope::<_, 1>(|mut frame| {
                 let _ = Value::new(&mut frame, 0usize);
                 let borrowed = array.inline_data();
                 borrowed[1] == 1.0
@@ -25,26 +25,22 @@ mod tests {
     fn ccall_with_array() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| unsafe {
-                        let fn_ptr =
-                            Value::new(&mut frame, doesnt_use_scope as *mut std::ffi::c_void);
-                        let mut arr_data = vec![0.0f64, 1.0f64];
-                        let arr =
-                            TypedArray::<f64>::from_slice_unchecked(&mut frame, &mut arr_data, 2);
-                        let func = Module::main(&frame)
-                            .submodule(&frame, "JlrsTests")?
-                            .as_managed()
-                            .function(&frame, "callrustwitharr")?
-                            .as_managed();
+                stack.scope(|mut frame| unsafe {
+                    let fn_ptr = Value::new(&mut frame, doesnt_use_scope as *mut std::ffi::c_void);
+                    let mut arr_data = vec![0.0f64, 1.0f64];
+                    let arr = TypedArray::<f64>::from_slice_unchecked(&mut frame, &mut arr_data, 2);
+                    let func = Module::main(&frame)
+                        .submodule(&frame, "JlrsTests")
+                        .unwrap()
+                        .as_managed()
+                        .global(&frame, "callrustwitharr")
+                        .unwrap()
+                        .as_managed();
 
-                        let out = func.call2(&mut frame, fn_ptr, arr.as_value()).unwrap();
-                        let ok = out.unbox::<bool>()?.as_bool();
-                        assert!(ok);
-                        Ok(())
-                    })
-                    .unwrap();
+                    let out = func.call(&mut frame, [fn_ptr, arr.as_value()]).unwrap();
+                    let ok = out.unbox::<bool>().unwrap().as_bool();
+                    assert!(ok);
+                })
             })
         })
     }
@@ -52,25 +48,22 @@ mod tests {
     fn ccall_with_array_and_scope() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| unsafe {
-                        let fn_ptr = Value::new(&mut frame, uses_scope as *mut std::ffi::c_void);
-                        let mut arr_data = vec![0.0f64, 1.0f64];
-                        let arr =
-                            TypedArray::<f64>::from_slice_unchecked(&mut frame, &mut arr_data, 2);
-                        let func = Module::main(&frame)
-                            .submodule(&frame, "JlrsTests")?
-                            .as_managed()
-                            .function(&frame, "callrustwitharr")?
-                            .as_managed();
+                stack.scope(|mut frame| unsafe {
+                    let fn_ptr = Value::new(&mut frame, uses_scope as *mut std::ffi::c_void);
+                    let mut arr_data = vec![0.0f64, 1.0f64];
+                    let arr = TypedArray::<f64>::from_slice_unchecked(&mut frame, &mut arr_data, 2);
+                    let func = Module::main(&frame)
+                        .submodule(&frame, "JlrsTests")
+                        .unwrap()
+                        .as_managed()
+                        .global(&frame, "callrustwitharr")
+                        .unwrap()
+                        .as_managed();
 
-                        let out = func.call2(&mut frame, fn_ptr, arr.as_value()).unwrap();
-                        let ok = out.unbox::<bool>()?.as_bool();
-                        assert!(ok);
-                        Ok(())
-                    })
-                    .unwrap();
+                    let out = func.call(&mut frame, [fn_ptr, arr.as_value()]).unwrap();
+                    let ok = out.unbox::<bool>().unwrap().as_bool();
+                    assert!(ok);
+                })
             })
         })
     }

@@ -50,7 +50,7 @@ pub struct AbstractTypecheck<A: AbstractType>(PhantomData<A>);
 
 unsafe impl<A: AbstractType> Typecheck for AbstractTypecheck<A> {
     fn typecheck(t: DataType) -> bool {
-        t.unrooted_target().local_scope::<1>(|mut frame| {
+        t.unrooted_target().local_scope::<_, 1>(|mut frame| {
             let ty = A::construct_type(&mut frame);
             t.as_value().subtype(ty)
         })
@@ -200,16 +200,6 @@ unsafe impl Typecheck for TypeType {
                     .cast_unchecked::<DataType>()
                     .type_name()
         }
-    }
-}
-
-/// A typecheck that can be used in combination with `DataType::is`. This method returns true if
-/// a value of this type is a named tuple.
-pub struct NamedTuple;
-unsafe impl Typecheck for NamedTuple {
-    #[inline]
-    fn typecheck(t: DataType) -> bool {
-        unsafe { t.type_name() == TypeName::of_namedtuple(&Unrooted::new()) }
     }
 }
 

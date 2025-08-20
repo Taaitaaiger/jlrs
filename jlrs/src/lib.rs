@@ -301,12 +301,12 @@
 //!
 //! // Local scopes can be created without creating a stack, but you need to provide the exact
 //! // number of slots you need.
-//! julia.local_scope::<1>(|mut frame| {
+//! julia.local_scope::<_, 1>(|mut frame| {
 //!     // We root one value in this frame, so the required capacity of this local scope is 1.
 //!     let _v = Value::new(&mut frame, 1usize);
 //!
 //!     // Because there is only one slot available, uncommenting the next line would cause a
-//!     // panic unless we changed `local_scope::<1>` to `local_scope::<2>`.
+//!     // panic unless we changed `local_scope::<_, 1>` to `local_scope::<_, 2>`.
 //!     // let _v2 = Value::new(&mut frame, 2usize);
 //! })
 //! # }
@@ -327,7 +327,7 @@
 //! # fn main() {
 //! let mut julia = Builder::new().start_local().unwrap();
 //!
-//! julia.local_scope::<1>(|mut frame| {
+//! julia.local_scope::<_, 1>(|mut frame| {
 //!     // We root one value in this frame, so the required capacity of this local scope is 1.
 //!     let v = Value::new(&mut frame, 1.0f32);
 //!
@@ -351,7 +351,7 @@
 //! // This scope contains a fallible operation. Whenever the return type is a `Result` and the
 //! // `?` operator is used, the closure typically has to be annotated with its return type.
 //! julia
-//!     .local_scope::<4>(|mut frame| -> JlrsResult<()> {
+//!     .local_scope::<_, 4>(|mut frame| -> JlrsResult<()> {
 //!         let v1 = Value::new(&mut frame, 1.0f32); // 1
 //!         let v2 = Value::new(&mut frame, 2.0f32); // 2
 //!
@@ -374,8 +374,7 @@
 //!         // multithreading and affect how you must access certain global variables. Adding two
 //!         // numbers is not an issue.
 //!         let v3 = unsafe {
-//!             func.call(&mut frame, [v1, v2]) // 4
-//!                 .into_jlrs_result()?
+//!             func.call(&mut frame, [v1, v2])? // 4
 //!         };
 //!
 //!         let unboxed = v3.unbox::<f32>().expect("not a Float32");
@@ -399,7 +398,7 @@
 //! let mut julia = Builder::new().start_local().unwrap();
 //!
 //! julia
-//!     .local_scope::<5>(|mut frame| -> JlrsResult<()> {
+//!     .local_scope::<_, 5>(|mut frame| -> JlrsResult<()> {
 //!         let v1 = Value::new(&mut frame, 1.0f32); // 1
 //!         let v2 = Value::new(&mut frame, 2.0f32); // 2
 //!         let v3 = Value::new(&mut frame, 3.0f32); // 3
@@ -407,8 +406,7 @@
 //!         let v3 = unsafe {
 //!             Module::base(&frame)
 //!                 .global(&mut frame, "+")? // 4
-//!                 .call(&mut frame, [v1, v2, v3]) // 5
-//!                 .into_jlrs_result()?
+//!                 .call(&mut frame, [v1, v2, v3])? // 5
 //!         };
 //!
 //!         let unboxed = v3.unbox::<f32>()?;
@@ -435,7 +433,7 @@
 //!         .expect("LinearAlgebra package does not exist");
 //! }
 //!
-//! julia.local_scope::<1>(|mut frame| {
+//! julia.local_scope::<_, 1>(|mut frame| {
 //!     let lin_alg = Module::package_root_module(&frame, "LinearAlgebra");
 //!     assert!(lin_alg.is_some());
 //!
@@ -473,7 +471,7 @@
 //!         // use in that closure provides the same functionality as the local runtime's
 //!         // `LocalHandle`.
 //!         mt_handle.with(|handle| {
-//!             handle.local_scope::<1>(|mut frame| unsafe {
+//!             handle.local_scope::<_, 1>(|mut frame| unsafe {
 //!                 let _v = Value::new(&mut frame, 1);
 //!             })
 //!         })
@@ -481,7 +479,7 @@
 //!
 //!     let t2 = mt_handle.spawn(move |mut mt_handle| {
 //!         mt_handle.with(|handle| {
-//!             handle.local_scope::<1>(|mut frame| unsafe {
+//!             handle.local_scope::<_, 1>(|mut frame| unsafe {
 //!                 let _v = Value::new(&mut frame, 2);
 //!             })
 //!         })
@@ -582,8 +580,7 @@
 //!         // The runtime can switch to other tasks while awaiting the result.
 //!         // Safety: adding two numbers is safe.
 //!         unsafe { func.call_async(&mut frame, [a, b]) }
-//!             .await
-//!             .into_jlrs_result()?
+//!             .await?
 //!             .unbox::<u64>()
 //!     }
 //! }
@@ -637,8 +634,7 @@
 //!
 //!         let func: Value = Module::base(&frame).global(&mut frame, "+")?;
 //!         unsafe { func.call_async(&mut frame, [a, b]) }
-//!             .await
-//!             .into_jlrs_result()?
+//!             .await?
 //!             .unbox::<u64>()
 //!     })
 //!     .try_dispatch()
@@ -689,8 +685,7 @@
 //!         // A `Vec` can be moved from Rust to Julia if the element type
 //!         // implements `IntoJulia`.
 //!         let data = vec![0usize; self.n_values];
-//!         let array =
-//!             TypedArray::from_vec(&mut frame, data, self.n_values)?.into_jlrs_result()?;
+//!         let array = TypedArray::from_vec(&mut frame, data, self.n_values)??;
 //!
 //!         Ok(AccumulatorTaskState { array, offset: 0 })
 //!     }
@@ -714,9 +709,8 @@
 //!
 //!         unsafe {
 //!             Module::base(&frame)
-//!                 .function(&mut frame, "sum")?
-//!                 .call1(&mut frame, state.array.as_value())
-//!                 .into_jlrs_result()?
+//!                 .global(&mut frame, "sum")?
+//!                 .call(&mut frame, [state.array.as_value()])?
 //!                 .unbox::<usize>()
 //!         }
 //!     }
@@ -822,7 +816,7 @@
 //! # let mut julia = Builder::new().start_local().unwrap();
 //!
 //! julia
-//!     .local_scope::<3>(|mut frame| -> JlrsResult<_> {
+//!     .local_scope::<_, 3>(|mut frame| -> JlrsResult<_> {
 //!         unsafe {
 //!             // Cast the function to a void pointer
 //!             let call_me_val = Value::new(&mut frame, call_me as *mut std::ffi::c_void);
@@ -831,14 +825,10 @@
 //!             let func = Value::eval_string(
 //!                 &mut frame,
 //!                 "myfunc(callme::Ptr{Cvoid})::Int = ccall(callme, Int, (Bool,), true)",
-//!             )
-//!             .into_jlrs_result()?;
+//!             )?;
 //!
 //!             // Call the function and unbox the result.
-//!             let result = func
-//!                 .call1(&mut frame, call_me_val)
-//!                 .into_jlrs_result()?
-//!                 .unbox::<isize>()?;
+//!             let result = func.call(&mut frame, [call_me_val])?.unbox::<isize>()?;
 //!
 //!             assert_eq!(result, 1);
 //!             Ok(())
@@ -968,7 +958,6 @@
 //! [`Unrooted`]: crate::memory::target::unrooted::Unrooted
 //! [`GcFrame`]: crate::memory::target::frame::GcFrame
 //! [`Module`]: crate::data::managed::module::Module
-//! [`Function`]: crate::data::managed::function::Function
 //! [`Value`]: crate::data::managed::value::Value
 //! [`Call`]: crate::call::Call
 //! [`Value::eval_string`]: crate::data::managed::value::Value::eval_string
@@ -978,7 +967,6 @@
 //! [`Module::main`]: crate::data::managed::module::Module::main
 //! [`Module::base`]: crate::data::managed::module::Module::base
 //! [`Module::core`]: crate::data::managed::module::Module::core
-//! [`Module::function`]: crate::data::managed::module::Module::function
 //! [`Module::global`]: crate::data::managed::module::Module::global
 //! [`Module::submodule`]: crate::data::managed::module::Module::submodule
 //! [`IntoJulia`]: crate::convert::into_julia::IntoJulia
