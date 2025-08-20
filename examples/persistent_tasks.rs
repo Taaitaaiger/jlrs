@@ -11,8 +11,7 @@ impl Register for AccumulatorTask {
     // creating the mutable MutFloat64 type in the Main module.
     async fn register<'frame>(mut frame: AsyncGcFrame<'frame>) -> JlrsResult<()> {
         unsafe {
-            Value::eval_string(&mut frame, "mutable struct MutFloat64 v::Float64 end")
-                .into_jlrs_result()?;
+            Value::eval_string(&mut frame, "mutable struct MutFloat64 v::Float64 end")?;
         }
         Ok(())
     }
@@ -46,18 +45,18 @@ impl PersistentTask for AccumulatorTask {
     ) -> JlrsResult<Self::State<'frame>> {
         unsafe {
             let output = frame.output();
-            frame
-                .scope(|mut frame| -> JlrsResult<_> {
-                    // A nested scope is used to only root a single value in the frame provided to
-                    // init, rather than two.
-                    let func = Module::main(&frame)
-                        .global(&frame, "MutFloat64")?
-                        .as_value();
-                    let init_v = Value::new(&mut frame, self.init_value);
+            let state = frame.scope(|mut frame| -> JlrsResult<_> {
+                // A nested scope is used to only root a single value in the frame provided to
+                // init, rather than two.
+                let func = Module::main(&frame)
+                    .global(&frame, "MutFloat64")?
+                    .as_value();
+                let init_v = Value::new(&mut frame, self.init_value);
 
-                    Ok(func.call1(output, init_v))
-                })?
-                .into_jlrs_result()
+                Ok(func.call(output, [init_v]))
+            })??;
+
+            Ok(state)
         }
     }
 

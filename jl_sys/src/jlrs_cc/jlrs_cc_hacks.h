@@ -26,6 +26,10 @@ extern "C"
     char *jlrs_genericmemory_typetagdata(jl_genericmemory_t *m);
 #endif
 
+#if JULIA_VERSION_MINOR >= 12
+    jl_binding_partition_t *jlrs_declare_constant_val(jl_binding_t *b, jl_module_t *m, jl_sym_t *var, jl_value_t *val);
+#endif
+
 #ifdef __cplusplus
 }
 #endif

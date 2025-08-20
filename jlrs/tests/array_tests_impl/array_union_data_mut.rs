@@ -13,24 +13,16 @@ pub(crate) mod tests {
     fn union_data_mut() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| {
-                        unsafe {
-                            let arr = Value::eval_string(&mut frame, "Union{Int, Float64}[1 2.0]")
-                                .unwrap();
-                            let mut arr = arr
-                                .cast::<TypedArray<UnionTypeConstructor<isize, f64>>>()
-                                .unwrap();
-                            let accessor = arr.union_data_mut();
+                stack.scope(|mut frame| unsafe {
+                    let arr = Value::eval_string(&mut frame, "Union{Int, Float64}[1 2.0]").unwrap();
+                    let mut arr = arr
+                        .cast::<TypedArray<UnionTypeConstructor<isize, f64>>>()
+                        .unwrap();
+                    let accessor = arr.union_data_mut();
 
-                            assert_eq!(accessor.get::<isize, _>([0, 0]).unwrap().unwrap(), 1);
-                            assert_eq!(accessor.get::<f64, _>([0, 1]).unwrap().unwrap(), 2.0);
-                        }
-
-                        Ok(())
-                    })
-                    .unwrap();
+                    assert_eq!(accessor.get::<isize, _>([0, 0]).unwrap().unwrap(), 1);
+                    assert_eq!(accessor.get::<f64, _>([0, 1]).unwrap().unwrap(), 2.0);
+                })
             });
         });
     }
@@ -38,57 +30,41 @@ pub(crate) mod tests {
     fn union_data_mut_set() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| {
-                        unsafe {
-                            let arr = Value::eval_string(&mut frame, "Union{Int, Float64}[1 2.0]")
-                                .unwrap();
-                            let mut arr = arr
-                                .cast::<TypedArray<UnionTypeConstructor<isize, f64>>>()
-                                .unwrap();
-                            let mut accessor = arr.union_data_mut();
+                stack.scope(|mut frame| unsafe {
+                    let arr = Value::eval_string(&mut frame, "Union{Int, Float64}[1 2.0]").unwrap();
+                    let mut arr = arr
+                        .cast::<TypedArray<UnionTypeConstructor<isize, f64>>>()
+                        .unwrap();
+                    let mut accessor = arr.union_data_mut();
 
-                            assert!(accessor
-                                .set([0, 0], DataType::float64_type(&frame), 1.0f64)
-                                .is_ok());
-                            assert!(accessor
-                                .set([0, 1], DataType::int64_type(&frame), 2isize)
-                                .is_ok());
+                    assert!(accessor
+                        .set([0, 0], DataType::float64_type(&frame), 1.0f64)
+                        .is_ok());
+                    assert!(accessor
+                        .set([0, 1], DataType::int64_type(&frame), 2isize)
+                        .is_ok());
 
-                            assert_eq!(accessor.get::<f64, _>([0, 0]).unwrap().unwrap(), 1.0);
-                            assert_eq!(accessor.get::<isize, _>([0, 1]).unwrap().unwrap(), 2);
-                        }
-
-                        Ok(())
-                    })
-                    .unwrap();
+                    assert_eq!(accessor.get::<f64, _>([0, 0]).unwrap().unwrap(), 1.0);
+                    assert_eq!(accessor.get::<isize, _>([0, 1]).unwrap().unwrap(), 2);
+                })
             });
         });
     }
     fn union_data_mut_set_err() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| {
-                        unsafe {
-                            let arr = Value::eval_string(&mut frame, "Union{Int, Float64}[1 2.0]")
-                                .unwrap();
-                            let mut arr = arr
-                                .cast::<TypedArray<UnionTypeConstructor<isize, f64>>>()
-                                .unwrap();
-                            let mut accessor = arr.union_data_mut();
+                stack.scope(|mut frame| unsafe {
+                    let arr = Value::eval_string(&mut frame, "Union{Int, Float64}[1 2.0]").unwrap();
+                    let mut arr = arr
+                        .cast::<TypedArray<UnionTypeConstructor<isize, f64>>>()
+                        .unwrap();
+                    let mut accessor = arr.union_data_mut();
 
-                            assert!(accessor
-                                .set([0, 0], DataType::float32_type(&frame), 1.0f32)
-                                .unwrap()
-                                .is_err());
-                        }
-
-                        Ok(())
-                    })
-                    .unwrap();
+                    assert!(accessor
+                        .set([0, 0], DataType::float32_type(&frame), 1.0f32)
+                        .unwrap()
+                        .is_err());
+                })
             });
         });
     }
@@ -96,27 +72,19 @@ pub(crate) mod tests {
     fn union_data_mut_set_typed() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| {
-                        unsafe {
-                            let arr = Value::eval_string(&mut frame, "Union{Int, Float64}[1 2.0]")
-                                .unwrap();
-                            let mut arr = arr
-                                .cast::<TypedArray<UnionTypeConstructor<isize, f64>>>()
-                                .unwrap();
-                            let mut accessor = arr.union_data_mut();
+                stack.scope(|mut frame| unsafe {
+                    let arr = Value::eval_string(&mut frame, "Union{Int, Float64}[1 2.0]").unwrap();
+                    let mut arr = arr
+                        .cast::<TypedArray<UnionTypeConstructor<isize, f64>>>()
+                        .unwrap();
+                    let mut accessor = arr.union_data_mut();
 
-                            assert!(accessor.set_typed::<f64, _>([0, 0], 1.0).is_ok());
-                            assert!(accessor.set_typed::<isize, _>([0, 1], 2).is_ok());
+                    assert!(accessor.set_typed::<f64, _>([0, 0], 1.0).is_ok());
+                    assert!(accessor.set_typed::<isize, _>([0, 1], 2).is_ok());
 
-                            assert_eq!(accessor.get::<f64, _>([0, 0]).unwrap().unwrap(), 1.0);
-                            assert_eq!(accessor.get::<isize, _>([0, 1]).unwrap().unwrap(), 2);
-                        }
-
-                        Ok(())
-                    })
-                    .unwrap();
+                    assert_eq!(accessor.get::<f64, _>([0, 0]).unwrap().unwrap(), 1.0);
+                    assert_eq!(accessor.get::<isize, _>([0, 1]).unwrap().unwrap(), 2);
+                })
             });
         });
     }
@@ -124,23 +92,15 @@ pub(crate) mod tests {
     fn union_data_mut_set_typed_err() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| {
-                        unsafe {
-                            let arr = Value::eval_string(&mut frame, "Union{Int, Float64}[1 2.0]")
-                                .unwrap();
-                            let mut arr = arr
-                                .cast::<TypedArray<UnionTypeConstructor<isize, f64>>>()
-                                .unwrap();
-                            let mut accessor = arr.union_data_mut();
+                stack.scope(|mut frame| unsafe {
+                    let arr = Value::eval_string(&mut frame, "Union{Int, Float64}[1 2.0]").unwrap();
+                    let mut arr = arr
+                        .cast::<TypedArray<UnionTypeConstructor<isize, f64>>>()
+                        .unwrap();
+                    let mut accessor = arr.union_data_mut();
 
-                            assert!(accessor.set_typed::<f32, _>([0, 0], 1.0).unwrap().is_err());
-                        }
-
-                        Ok(())
-                    })
-                    .unwrap();
+                    assert!(accessor.set_typed::<f32, _>([0, 0], 1.0).unwrap().is_err());
+                })
             });
         });
     }
@@ -148,27 +108,19 @@ pub(crate) mod tests {
     fn union_data_mut_set_unchecked() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| {
-                        unsafe {
-                            let arr = Value::eval_string(&mut frame, "Union{Int, Float64}[1 2.0]")
-                                .unwrap();
-                            let mut arr = arr
-                                .cast::<TypedArray<UnionTypeConstructor<isize, f64>>>()
-                                .unwrap();
-                            let mut accessor = arr.union_data_mut();
+                stack.scope(|mut frame| unsafe {
+                    let arr = Value::eval_string(&mut frame, "Union{Int, Float64}[1 2.0]").unwrap();
+                    let mut arr = arr
+                        .cast::<TypedArray<UnionTypeConstructor<isize, f64>>>()
+                        .unwrap();
+                    let mut accessor = arr.union_data_mut();
 
-                            accessor.set_unchecked([0, 0], DataType::float64_type(&frame), 1.0f64);
-                            accessor.set_unchecked([0, 1], DataType::int64_type(&frame), 2isize);
+                    accessor.set_unchecked([0, 0], DataType::float64_type(&frame), 1.0f64);
+                    accessor.set_unchecked([0, 1], DataType::int64_type(&frame), 2isize);
 
-                            assert_eq!(accessor.get::<f64, _>([0, 0]).unwrap().unwrap(), 1.0);
-                            assert_eq!(accessor.get::<isize, _>([0, 1]).unwrap().unwrap(), 2);
-                        }
-
-                        Ok(())
-                    })
-                    .unwrap();
+                    assert_eq!(accessor.get::<f64, _>([0, 0]).unwrap().unwrap(), 1.0);
+                    assert_eq!(accessor.get::<isize, _>([0, 1]).unwrap().unwrap(), 2);
+                })
             });
         });
     }
@@ -176,27 +128,19 @@ pub(crate) mod tests {
     fn union_data_mut_set_typed_unchecked() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| {
-                        unsafe {
-                            let arr = Value::eval_string(&mut frame, "Union{Int, Float64}[1 2.0]")
-                                .unwrap();
-                            let mut arr = arr
-                                .cast::<TypedArray<UnionTypeConstructor<isize, f64>>>()
-                                .unwrap();
-                            let mut accessor = arr.union_data_mut();
+                stack.scope(|mut frame| unsafe {
+                    let arr = Value::eval_string(&mut frame, "Union{Int, Float64}[1 2.0]").unwrap();
+                    let mut arr = arr
+                        .cast::<TypedArray<UnionTypeConstructor<isize, f64>>>()
+                        .unwrap();
+                    let mut accessor = arr.union_data_mut();
 
-                            accessor.set_typed_unchecked([0, 0], 1.0f64);
-                            accessor.set_typed_unchecked([0, 1], 2isize);
+                    accessor.set_typed_unchecked([0, 0], 1.0f64);
+                    accessor.set_typed_unchecked([0, 1], 2isize);
 
-                            assert_eq!(accessor.get::<f64, _>([0, 0]).unwrap().unwrap(), 1.0);
-                            assert_eq!(accessor.get::<isize, _>([0, 1]).unwrap().unwrap(), 2);
-                        }
-
-                        Ok(())
-                    })
-                    .unwrap();
+                    assert_eq!(accessor.get::<f64, _>([0, 0]).unwrap().unwrap(), 1.0);
+                    assert_eq!(accessor.get::<isize, _>([0, 1]).unwrap().unwrap(), 2);
+                })
             });
         });
     }
@@ -204,25 +148,17 @@ pub(crate) mod tests {
     fn union_data_mut_set_value() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| {
-                        unsafe {
-                            let arr = Value::eval_string(&mut frame, "Union{Int, Float64}[1 2.0]")
-                                .unwrap();
-                            let mut arr = arr
-                                .cast::<TypedArray<UnionTypeConstructor<isize, f64>>>()
-                                .unwrap();
-                            let mut accessor = arr.union_data_mut();
+                stack.scope(|mut frame| unsafe {
+                    let arr = Value::eval_string(&mut frame, "Union{Int, Float64}[1 2.0]").unwrap();
+                    let mut arr = arr
+                        .cast::<TypedArray<UnionTypeConstructor<isize, f64>>>()
+                        .unwrap();
+                    let mut accessor = arr.union_data_mut();
 
-                            let v = Value::new(&mut frame, 1.0f64);
-                            assert!(accessor.set_value(&mut frame, [0, 0], v).unwrap().is_ok());
-                            assert_eq!(accessor.get::<f64, _>([0, 0]).unwrap().unwrap(), 1.0);
-                        }
-
-                        Ok(())
-                    })
-                    .unwrap();
+                    let v = Value::new(&mut frame, 1.0f64);
+                    assert!(accessor.set_value(&mut frame, [0, 0], v).unwrap().is_ok());
+                    assert_eq!(accessor.get::<f64, _>([0, 0]).unwrap().unwrap(), 1.0);
+                })
             });
         });
     }
@@ -230,24 +166,16 @@ pub(crate) mod tests {
     fn union_data_mut_set_value_err() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| {
-                        unsafe {
-                            let arr = Value::eval_string(&mut frame, "Union{Int, Float64}[1 2.0]")
-                                .unwrap();
-                            let mut arr = arr
-                                .cast::<TypedArray<UnionTypeConstructor<isize, f64>>>()
-                                .unwrap();
-                            let mut accessor = arr.union_data_mut();
+                stack.scope(|mut frame| unsafe {
+                    let arr = Value::eval_string(&mut frame, "Union{Int, Float64}[1 2.0]").unwrap();
+                    let mut arr = arr
+                        .cast::<TypedArray<UnionTypeConstructor<isize, f64>>>()
+                        .unwrap();
+                    let mut accessor = arr.union_data_mut();
 
-                            let v = Value::new(&mut frame, 1.0f32);
-                            assert!(accessor.set_value(&mut frame, [0, 0], v).unwrap().is_err());
-                        }
-
-                        Ok(())
-                    })
-                    .unwrap();
+                    let v = Value::new(&mut frame, 1.0f32);
+                    assert!(accessor.set_value(&mut frame, [0, 0], v).unwrap().is_err());
+                })
             });
         });
     }
@@ -255,25 +183,17 @@ pub(crate) mod tests {
     fn union_data_mut_set_value_unchecked() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| {
-                        unsafe {
-                            let arr = Value::eval_string(&mut frame, "Union{Int, Float64}[1 2.0]")
-                                .unwrap();
-                            let mut arr = arr
-                                .cast::<TypedArray<UnionTypeConstructor<isize, f64>>>()
-                                .unwrap();
-                            let mut accessor = arr.union_data_mut();
+                stack.scope(|mut frame| unsafe {
+                    let arr = Value::eval_string(&mut frame, "Union{Int, Float64}[1 2.0]").unwrap();
+                    let mut arr = arr
+                        .cast::<TypedArray<UnionTypeConstructor<isize, f64>>>()
+                        .unwrap();
+                    let mut accessor = arr.union_data_mut();
 
-                            let v = Value::new(&mut frame, 1.0f64);
-                            accessor.set_value_unchecked([0, 0], v);
-                            assert_eq!(accessor.get::<f64, _>([0, 0]).unwrap().unwrap(), 1.0);
-                        }
-
-                        Ok(())
-                    })
-                    .unwrap();
+                    let v = Value::new(&mut frame, 1.0f64);
+                    accessor.set_value_unchecked([0, 0], v);
+                    assert_eq!(accessor.get::<f64, _>([0, 0]).unwrap().unwrap(), 1.0);
+                })
             });
         });
     }
@@ -281,20 +201,12 @@ pub(crate) mod tests {
     fn try_union_data_mut() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| {
-                        unsafe {
-                            let arr = Value::eval_string(&mut frame, "Union{Int, Float64}[1 2.0]")
-                                .unwrap();
-                            let mut arr = arr.cast::<Array>().unwrap();
-                            let accessor = arr.try_union_data_mut();
-                            assert!(accessor.is_ok());
-                        }
-
-                        Ok(())
-                    })
-                    .unwrap();
+                stack.scope(|mut frame| unsafe {
+                    let arr = Value::eval_string(&mut frame, "Union{Int, Float64}[1 2.0]").unwrap();
+                    let mut arr = arr.cast::<Array>().unwrap();
+                    let accessor = arr.try_union_data_mut();
+                    assert!(accessor.is_ok());
+                })
             });
         });
     }
@@ -302,19 +214,12 @@ pub(crate) mod tests {
     fn try_union_data_mut_err() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| {
-                        unsafe {
-                            let arr = Value::eval_string(&mut frame, "Int[1 2]").unwrap();
-                            let mut arr = arr.cast::<Array>().unwrap();
-                            let accessor = arr.try_union_data_mut();
-                            assert!(accessor.is_err());
-                        }
-
-                        Ok(())
-                    })
-                    .unwrap();
+                stack.scope(|mut frame| unsafe {
+                    let arr = Value::eval_string(&mut frame, "Int[1 2]").unwrap();
+                    let mut arr = arr.cast::<Array>().unwrap();
+                    let accessor = arr.try_union_data_mut();
+                    assert!(accessor.is_err());
+                })
             });
         });
     }
@@ -322,24 +227,16 @@ pub(crate) mod tests {
     fn union_data_mut_unchecked() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| {
-                        unsafe {
-                            let arr = Value::eval_string(&mut frame, "Union{Int, Float64}[1 2.0]")
-                                .unwrap();
-                            let mut arr = arr
-                                .cast::<TypedArray<UnionTypeConstructor<isize, f64>>>()
-                                .unwrap();
-                            let accessor = arr.union_data_mut_unchecked();
+                stack.scope(|mut frame| unsafe {
+                    let arr = Value::eval_string(&mut frame, "Union{Int, Float64}[1 2.0]").unwrap();
+                    let mut arr = arr
+                        .cast::<TypedArray<UnionTypeConstructor<isize, f64>>>()
+                        .unwrap();
+                    let accessor = arr.union_data_mut_unchecked();
 
-                            assert_eq!(accessor.get::<isize, _>([0, 0]).unwrap().unwrap(), 1);
-                            assert_eq!(accessor.get::<f64, _>([0, 1]).unwrap().unwrap(), 2.0);
-                        }
-
-                        Ok(())
-                    })
-                    .unwrap();
+                    assert_eq!(accessor.get::<isize, _>([0, 0]).unwrap().unwrap(), 1);
+                    assert_eq!(accessor.get::<f64, _>([0, 1]).unwrap().unwrap(), 2.0);
+                })
             });
         });
     }

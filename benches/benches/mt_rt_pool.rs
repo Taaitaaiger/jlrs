@@ -75,7 +75,7 @@ fn use_local(handle: &mut MtHandle, c: &mut Criterion) {
     c.bench_function("use_local", |b| {
         b.iter(|| {
             black_box(handle.with(|active| {
-                active.local_scope::<1>(|frame| {
+                active.local_scope::<_, 1>(|frame| {
                     black_box(frame);
                 })
             }));

@@ -1,4 +1,11 @@
-//! Local and dynamic scopes
+//! Local, dynamic, and async scopes.
+//!
+//! All interactions with Julia must happen inside a scope. Inside a scope, a frame can be used
+//! to protect data from being garbage collected. The frame is dropped when the scope ends.
+//!
+//! A local scope is created on the stack, and can hold a definite number of roots. Dynamic and
+//! async scopes use a heap-allocated stack to store their frames, their frames can grow to any
+//! size. Async scopes support async operations, and are only used with the async runtime.
 
 use jl_sys::unsized_local_scope;
 
@@ -7,34 +14,16 @@ use super::target::{
     Target,
 };
 
-/// Set the return type of a local scope.
-pub trait LocalReturning<'ctx> {
-    /// Set the return type of the scope to `T`.
-    ///
-    /// This method can be used instead of setting the return type in the closure provided to a
-    /// scope.
-    fn returning<T>(&mut self) -> &mut impl LocalScope<'ctx, T>;
-}
-
-/// Set the return type of a scope.
-pub trait Returning<'ctx> {
-    /// Set the return type of the scope to `T`.
-    ///
-    /// This method can be used instead of setting the return type in the closure provided to a
-    /// scope.
-    fn returning<T>(&mut self) -> &mut impl Scope<'ctx, T>;
-}
-
-/// Create new local scopes.
-pub trait LocalScope<'a, T> {
+/// Create new local scopes, local scopes can store a prespecified number of roots.
+pub unsafe trait LocalScope: private::LocalScopePriv {
     /// Create a local scope with capacity for `N` roots and call `func`.
     #[inline]
-    fn local_scope<const N: usize>(
+    fn local_scope<T, const N: usize>(
         &self,
         func: impl for<'scope> FnOnce(LocalGcFrame<'scope, N>) -> T,
     ) -> T {
+        let mut local_frame = LocalFrame::new();
         unsafe {
-            let mut local_frame = LocalFrame::new();
             let pinned = local_frame.pin();
             let res = func(LocalGcFrame::new(&pinned));
             pinned.pop();
@@ -44,13 +33,13 @@ pub trait LocalScope<'a, T> {
 
     /// Create a local scope with capacity for `size` roots and call `func`.
     #[inline]
-    fn unsized_local_scope(
+    fn unsized_local_scope<T>(
         &self,
         size: usize,
         func: impl for<'scope> FnOnce(UnsizedLocalGcFrame<'scope>) -> T,
     ) -> T {
+        let mut func = Some(func);
         unsafe {
-            let mut func = Some(func);
             unsized_local_scope(size, |frame| {
                 let frame = UnsizedLocalGcFrame::new(frame);
                 func.take().unwrap()(frame)
@@ -59,19 +48,18 @@ pub trait LocalScope<'a, T> {
     }
 }
 
-/// Create new local scopes from a target.
-pub trait LocalScopeExt<'target, T>: LocalScope<'target, T> + Target<'target> {
-    /// Create a new local scope and call `func`.
+/// Create new local scopes from a target that propagate the target to the new scope.
+pub unsafe trait LocalScopeExt<'target>: Target<'target> {
+    /// Create a new local scope and call `func` with the target and new frame.
     ///
-    /// The `LocalGcFrame` has capacity for `N` roots, `self` is propagated to
-    /// the closure.
+    /// The `LocalGcFrame` has capacity for `N` roots.
     #[inline]
-    fn with_local_scope<const N: usize>(
+    fn with_local_scope<T, const N: usize>(
         self,
         func: impl for<'inner> FnOnce(Self, LocalGcFrame<'inner, N>) -> T,
     ) -> T {
+        let mut local_frame = LocalFrame::new();
         unsafe {
-            let mut local_frame = LocalFrame::new();
             let pinned = local_frame.pin();
             let res = func(self, LocalGcFrame::new(&pinned));
             pinned.pop();
@@ -79,19 +67,18 @@ pub trait LocalScopeExt<'target, T>: LocalScope<'target, T> + Target<'target> {
         }
     }
 
-    /// Create a new local scope and call `func`.
+    /// Create a new unsized local scope and call `func` with target and new frame.
     ///
-    /// The `LocalGcFrame` has capacity for `size` roots, `self` is propagated to
-    /// the closure.
-    #[inline]
-    fn with_unsized_local_scope(
+    /// The `UnsizedLocalGcFrame` has capacity for `size` roots.
+    fn with_unsized_local_scope<T>(
         self,
         size: usize,
         func: impl for<'scope> FnOnce(Self, UnsizedLocalGcFrame<'scope>) -> T,
     ) -> T {
+        let mut func = Some(func);
+        let mut self_container = Some(self);
+
         unsafe {
-            let mut func = Some(func);
-            let mut self_container = Some(self);
             unsized_local_scope(size, |frame| {
                 let frame = UnsizedLocalGcFrame::new(frame);
                 func.take().unwrap()(self_container.take().unwrap(), frame)
@@ -100,8 +87,22 @@ pub trait LocalScopeExt<'target, T>: LocalScope<'target, T> + Target<'target> {
     }
 }
 
-/// Create new scopes.
-pub trait Scope<'a, T>: LocalScope<'a, T> {
-    /// Create a new scope and call `func`.
-    fn scope(&mut self, func: impl for<'scope> FnOnce(GcFrame<'scope>) -> T) -> T;
+/// Create new dynamically-sized scopes.
+pub unsafe trait Scope: LocalScope {
+    /// Create a new dynamically-sized scope and call `func`.
+    fn scope<T>(&mut self, func: impl for<'scope> FnOnce(GcFrame<'scope>) -> T) -> T;
+}
+
+/// Create new dynamically-sized, async scopes.
+#[cfg(feature = "async")]
+pub unsafe trait AsyncScope: Scope {
+    /// An async version of [`Scope::scope`] that takes an async closure.
+    fn async_scope<T>(
+        &mut self,
+        func: impl for<'inner> AsyncFnOnce(crate::prelude::AsyncGcFrame<'inner>) -> T,
+    ) -> impl std::future::Future<Output = T>;
+}
+
+pub(crate) mod private {
+    pub trait LocalScopePriv {}
 }

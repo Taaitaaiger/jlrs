@@ -156,7 +156,7 @@ unsafe impl<T: IntoJulia + ConstructType> IntoJulia for *mut T {
     where
         Tgt: Target<'scope>,
     {
-        target.with_local_scope::<1>(|target, mut frame| {
+        target.with_local_scope::<_, 1>(|target, mut frame| {
             let ptr_ua = UnionAll::pointer_type(&frame);
             let inner_ty = T::construct_type(&mut frame);
 

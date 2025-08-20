@@ -10,21 +10,13 @@ pub(crate) mod tests {
     fn bits_data() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| {
-                        unsafe {
-                            let data = vec![1.0, 2.0];
-                            let arr =
-                                TypedArray::<f32>::from_vec_unchecked(&mut frame, data, (1, 2));
-                            let accessor = arr.bits_data();
-                            assert_eq!(accessor[[0, 0]], 1.0);
-                            assert_eq!(accessor[[0, 1]], 2.0);
-                        }
-
-                        Ok(())
-                    })
-                    .unwrap();
+                stack.scope(|mut frame| unsafe {
+                    let data = vec![1.0, 2.0];
+                    let arr = TypedArray::<f32>::from_vec_unchecked(&mut frame, data, [1, 2]);
+                    let accessor = arr.bits_data();
+                    assert_eq!(accessor[[0, 0]], 1.0);
+                    assert_eq!(accessor[[0, 1]], 2.0);
+                });
             });
         });
     }
@@ -32,22 +24,14 @@ pub(crate) mod tests {
     fn bits_data_get() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| {
-                        unsafe {
-                            let data = vec![1.0, 2.0];
-                            let arr =
-                                TypedArray::<f32>::from_vec_unchecked(&mut frame, data, (1, 2));
-                            let accessor = arr.bits_data();
-                            assert_eq!(accessor.get([0, 0]), Some(&1.0));
-                            assert_eq!(accessor.get([0, 1]), Some(&2.0));
-                            assert_eq!(accessor.get([1, 1]), None);
-                        }
-
-                        Ok(())
-                    })
-                    .unwrap();
+                stack.scope(|mut frame| unsafe {
+                    let data = vec![1.0, 2.0];
+                    let arr = TypedArray::<f32>::from_vec_unchecked(&mut frame, data, [1, 2]);
+                    let accessor = arr.bits_data();
+                    assert_eq!(accessor.get([0, 0]), Some(&1.0));
+                    assert_eq!(accessor.get([0, 1]), Some(&2.0));
+                    assert_eq!(accessor.get([1, 1]), None);
+                });
             });
         });
     }
@@ -55,20 +39,12 @@ pub(crate) mod tests {
     fn bits_data_as_slice() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| {
-                        unsafe {
-                            let data = vec![1.0, 2.0];
-                            let arr =
-                                TypedArray::<f32>::from_vec_unchecked(&mut frame, data, (1, 2));
-                            let accessor = arr.bits_data();
-                            assert_eq!(accessor.as_slice(), &[1.0, 2.0]);
-                        }
-
-                        Ok(())
-                    })
-                    .unwrap();
+                stack.scope(|mut frame| unsafe {
+                    let data = vec![1.0, 2.0];
+                    let arr = TypedArray::<f32>::from_vec_unchecked(&mut frame, data, [1, 2]);
+                    let accessor = arr.bits_data();
+                    assert_eq!(accessor.as_slice(), &[1.0, 2.0]);
+                });
             });
         });
     }
@@ -76,20 +52,12 @@ pub(crate) mod tests {
     fn bits_data_into_slice() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| {
-                        unsafe {
-                            let data = vec![1.0, 2.0];
-                            let arr =
-                                TypedArray::<f32>::from_vec_unchecked(&mut frame, data, (1, 2));
-                            let accessor = arr.bits_data();
-                            assert_eq!(accessor.into_slice(), &[1.0, 2.0]);
-                        }
-
-                        Ok(())
-                    })
-                    .unwrap();
+                stack.scope(|mut frame| unsafe {
+                    let data = vec![1.0, 2.0];
+                    let arr = TypedArray::<f32>::from_vec_unchecked(&mut frame, data, [1, 2]);
+                    let accessor = arr.bits_data();
+                    assert_eq!(accessor.into_slice(), &[1.0, 2.0]);
+                });
             });
         });
     }
@@ -97,21 +65,13 @@ pub(crate) mod tests {
     fn bits_data_get_unchecked() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| {
-                        unsafe {
-                            let data = vec![1.0, 2.0];
-                            let arr =
-                                TypedArray::<f32>::from_vec_unchecked(&mut frame, data, (1, 2));
-                            let accessor = arr.bits_data();
-                            assert_eq!(accessor.get_unchecked([0, 0]), &1.0);
-                            assert_eq!(accessor.get_unchecked([0, 1]), &2.0);
-                        }
-
-                        Ok(())
-                    })
-                    .unwrap();
+                stack.scope(|mut frame| unsafe {
+                    let data = vec![1.0, 2.0];
+                    let arr = TypedArray::<f32>::from_vec_unchecked(&mut frame, data, [1, 2]);
+                    let accessor = arr.bits_data();
+                    assert_eq!(accessor.get_unchecked([0, 0]), &1.0);
+                    assert_eq!(accessor.get_unchecked([0, 1]), &2.0);
+                });
             });
         });
     }
@@ -119,38 +79,30 @@ pub(crate) mod tests {
     fn bits_data_get_value() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| {
-                        unsafe {
-                            let data = vec![1.0, 2.0];
-                            let arr =
-                                TypedArray::<f32>::from_vec_unchecked(&mut frame, data, (1, 2));
-                            let accessor = arr.bits_data();
-                            assert_eq!(
-                                accessor
-                                    .get_value(&mut frame, [0, 0])
-                                    .unwrap()
-                                    .unwrap()
-                                    .unbox::<f32>()
-                                    .unwrap(),
-                                1.0
-                            );
-                            assert_eq!(
-                                accessor
-                                    .get_value(&mut frame, [0, 1])
-                                    .unwrap()
-                                    .unwrap()
-                                    .unbox::<f32>()
-                                    .unwrap(),
-                                2.0
-                            );
-                            assert!(accessor.get_value(&mut frame, [1, 1]).is_none());
-                        }
-
-                        Ok(())
-                    })
-                    .unwrap();
+                stack.scope(|mut frame| unsafe {
+                    let data = vec![1.0, 2.0];
+                    let arr = TypedArray::<f32>::from_vec_unchecked(&mut frame, data, [1, 2]);
+                    let accessor = arr.bits_data();
+                    assert_eq!(
+                        accessor
+                            .get_value(&mut frame, [0, 0])
+                            .unwrap()
+                            .unwrap()
+                            .unbox::<f32>()
+                            .unwrap(),
+                        1.0
+                    );
+                    assert_eq!(
+                        accessor
+                            .get_value(&mut frame, [0, 1])
+                            .unwrap()
+                            .unwrap()
+                            .unbox::<f32>()
+                            .unwrap(),
+                        2.0
+                    );
+                    assert!(accessor.get_value(&mut frame, [1, 1]).is_none());
+                });
             });
         });
     }
@@ -158,33 +110,25 @@ pub(crate) mod tests {
     fn bits_data_get_value_unchecked() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| {
-                        unsafe {
-                            let data = vec![1.0, 2.0];
-                            let arr =
-                                TypedArray::<f32>::from_vec_unchecked(&mut frame, data, (1, 2));
-                            let accessor = arr.bits_data();
-                            assert_eq!(
-                                accessor
-                                    .get_value_unchecked(&mut frame, [0, 0])
-                                    .unbox::<f32>()
-                                    .unwrap(),
-                                1.0
-                            );
-                            assert_eq!(
-                                accessor
-                                    .get_value_unchecked(&mut frame, [0, 1])
-                                    .unbox::<f32>()
-                                    .unwrap(),
-                                2.0
-                            );
-                        }
-
-                        Ok(())
-                    })
-                    .unwrap();
+                stack.scope(|mut frame| unsafe {
+                    let data = vec![1.0, 2.0];
+                    let arr = TypedArray::<f32>::from_vec_unchecked(&mut frame, data, [1, 2]);
+                    let accessor = arr.bits_data();
+                    assert_eq!(
+                        accessor
+                            .get_value_unchecked(&mut frame, [0, 0])
+                            .unbox::<f32>()
+                            .unwrap(),
+                        1.0
+                    );
+                    assert_eq!(
+                        accessor
+                            .get_value_unchecked(&mut frame, [0, 1])
+                            .unbox::<f32>()
+                            .unwrap(),
+                        2.0
+                    );
+                });
             });
         });
     }
@@ -193,7 +137,7 @@ pub(crate) mod tests {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
                 stack
-                .returning::<JlrsResult<_>>().scope(|mut frame| {
+                .scope(|mut frame| {
                     unsafe {
                         #[derive(ValidField, ValidLayout, IsBits, Debug, Clone, Typecheck, Unbox, PartialEq)]
                         #[jlrs(julia_type = "Main.ABDE")]
@@ -210,37 +154,26 @@ pub(crate) mod tests {
 
                         Value::eval_string(&frame, "struct ABDE{T} a::Int8 end").unwrap();
                         let data = vec![ABDE{a: 1}, ABDE{a: 2}];
-                        let arr = TypedArray::<ABDETypeConstructor<ConstantBool<true>>>::from_vec_unchecked(&mut frame, data, (1, 2));
+                        let arr = TypedArray::<ABDETypeConstructor<ConstantBool<true>>>::from_vec_unchecked(&mut frame, data, [1, 2]);
                         let accessor = arr.bits_data_with_layout();
                         assert_eq!(accessor[[0, 0]], ABDE{a: 1});
                         assert_eq!(accessor[[0, 1]], ABDE{a: 2});
                     }
-
-                    Ok(())
-                })
-                .unwrap();
-        });
+                });
+            });
         });
     }
 
     fn try_bits_data() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| {
-                        unsafe {
-                            let data = vec![1.0, 2.0];
-                            let arr =
-                                TypedArray::<f32>::from_vec_unchecked(&mut frame, data, (1, 2));
-                            let accessor = arr.try_bits_data::<f32>()?;
-                            assert_eq!(accessor[[0, 0]], 1.0);
-                            assert_eq!(accessor[[0, 1]], 2.0);
-                        }
-
-                        Ok(())
-                    })
-                    .unwrap();
+                stack.scope(|mut frame| unsafe {
+                    let data = vec![1.0, 2.0];
+                    let arr = TypedArray::<f32>::from_vec_unchecked(&mut frame, data, [1, 2]);
+                    let accessor = arr.try_bits_data::<f32>().unwrap();
+                    assert_eq!(accessor[[0, 0]], 1.0);
+                    assert_eq!(accessor[[0, 1]], 2.0);
+                });
             });
         });
     }
@@ -248,41 +181,25 @@ pub(crate) mod tests {
     fn try_bits_data_err() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| {
-                        unsafe {
-                            let data = vec![1.0, 2.0];
-                            let arr =
-                                TypedArray::<f32>::from_vec_unchecked(&mut frame, data, (1, 2));
-                            let accessor = arr.try_bits_data::<f64>();
-                            assert!(accessor.is_err());
-                        }
-
-                        Ok(())
-                    })
-                    .unwrap();
+                stack.scope(|mut frame| unsafe {
+                    let data = vec![1.0, 2.0];
+                    let arr = TypedArray::<f32>::from_vec_unchecked(&mut frame, data, [1, 2]);
+                    let accessor = arr.try_bits_data::<f64>();
+                    assert!(accessor.is_err());
+                });
             });
         });
     }
     fn bits_data_unchecked() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| {
-                        unsafe {
-                            let data = vec![1.0, 2.0];
-                            let arr =
-                                TypedArray::<f32>::from_vec_unchecked(&mut frame, data, (1, 2));
-                            let accessor = arr.bits_data_unchecked::<f32>();
-                            assert_eq!(accessor[[0, 0]], 1.0);
-                            assert_eq!(accessor[[0, 1]], 2.0);
-                        }
-
-                        Ok(())
-                    })
-                    .unwrap();
+                stack.scope(|mut frame| unsafe {
+                    let data = vec![1.0, 2.0];
+                    let arr = TypedArray::<f32>::from_vec_unchecked(&mut frame, data, [1, 2]);
+                    let accessor = arr.bits_data_unchecked::<f32>();
+                    assert_eq!(accessor[[0, 0]], 1.0);
+                    assert_eq!(accessor[[0, 1]], 2.0);
+                });
             });
         });
     }

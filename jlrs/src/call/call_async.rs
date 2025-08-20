@@ -1,10 +1,12 @@
+//! Call Julia functions as a new task.
+
 use std::future::Future;
 
 use super::{Call, ProvideKeywords, WithKeywords};
 use crate::{
     args::Values,
     async_util::future::JuliaFuture,
-    data::managed::{erase_scope_lifetime, function::Function, module::JlrsCore, Managed},
+    data::managed::{erase_scope_lifetime, module::JlrsCore},
     error::JuliaResult,
     memory::target::frame::AsyncGcFrame,
     prelude::Value,
@@ -22,9 +24,12 @@ pub trait CallAsync<'data>: Call<'data> {
     ///
     /// This task is spawned on the `:default` thread pool.
     ///
-    /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
-    /// correctness. More information can be found in the [`safety`] module. This method doesn't
-    /// check if any of the arguments is currently borrowed from Rust.
+    /// Safety: there is no way to distinguish between obviously safe functions like `+`, and
+    /// obviously unsafe ones like `unsafe_load` except through their names. If multithreading is
+    /// used, either via the multithreaded runtime or internally in Julia, potential thread-safety
+    /// issues must also be taken into account.
+    ///
+    /// More information can be found in the [`safety`] module.
     ///
     /// [`safety`]: crate::safety
     unsafe fn call_async<'target, 'value, V, const N: usize>(
@@ -41,9 +46,12 @@ pub trait CallAsync<'data>: Call<'data> {
     ///
     /// This task is spawned on the `:default` thread pool.
     ///
-    /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
-    /// correctness. More information can be found in the [`safety`] module. This method doesn't
-    /// check if any of the arguments is currently borrowed from Rust.
+    /// Safety: there is no way to distinguish between obviously safe functions like `+`, and
+    /// obviously unsafe ones like `unsafe_load` except through their names. If multithreading is
+    /// used, either via the multithreaded runtime or internally in Julia, potential thread-safety
+    /// issues must also be taken into account.
+    ///
+    /// More information can be found in the [`safety`] module.
     ///
     /// [`safety`]: crate::safety
     /// [`PersistentTask::init`]: crate::async_util::task::PersistentTask::init
@@ -62,9 +70,12 @@ pub trait CallAsync<'data>: Call<'data> {
     ///
     /// This task is spawned on the `:interactive` thread pool.
     ///
-    /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
-    /// correctness. More information can be found in the [`safety`] module. This method doesn't
-    /// check if any of the arguments is currently borrowed from Rust.
+    /// Safety: there is no way to distinguish between obviously safe functions like `+`, and
+    /// obviously unsafe ones like `unsafe_load` except through their names. If multithreading is
+    /// used, either via the multithreaded runtime or internally in Julia, potential thread-safety
+    /// issues must also be taken into account.
+    ///
+    /// More information can be found in the [`safety`] module.
     ///
     /// [`safety`]: crate::safety
     unsafe fn call_async_interactive<'target, 'value, V, const N: usize>(
@@ -81,9 +92,12 @@ pub trait CallAsync<'data>: Call<'data> {
     ///
     /// This task is spawned on the `:interactive` thread pool.
     ///
-    /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
-    /// correctness. More information can be found in the [`safety`] module. This method doesn't
-    /// check if any of the arguments is currently borrowed from Rust.
+    /// Safety: there is no way to distinguish between obviously safe functions like `+`, and
+    /// obviously unsafe ones like `unsafe_load` except through their names. If multithreading is
+    /// used, either via the multithreaded runtime or internally in Julia, potential thread-safety
+    /// issues must also be taken into account.
+    ///
+    /// More information can be found in the [`safety`] module.
     ///
     /// [`safety`]: crate::safety
     /// [`PersistentTask::init`]: crate::async_util::task::PersistentTask::init
@@ -155,56 +169,6 @@ impl<'data> CallAsync<'data> for Value<'_, 'data> {
     }
 }
 
-impl<'data> CallAsync<'data> for Function<'_, 'data> {
-    #[inline]
-    async unsafe fn call_async<'target, 'value, V, const N: usize>(
-        self,
-        frame: &mut AsyncGcFrame<'target>,
-        args: V,
-    ) -> JuliaResult<'target, 'data>
-    where
-        V: Values<'value, 'data, N>,
-    {
-        JuliaFuture::new(frame, erase_scope_lifetime(self.as_value()), args).await
-    }
-
-    #[inline]
-    async unsafe fn call_async_interactive<'target, 'value, V, const N: usize>(
-        self,
-        frame: &mut AsyncGcFrame<'target>,
-        args: V,
-    ) -> JuliaResult<'target, 'data>
-    where
-        V: Values<'value, 'data, N>,
-    {
-        JuliaFuture::new_interactive(frame, erase_scope_lifetime(self.as_value()), args).await
-    }
-
-    #[inline]
-    unsafe fn schedule_async_interactive<'target, 'value, V, const N: usize>(
-        self,
-        frame: &mut AsyncGcFrame<'target>,
-        args: V,
-    ) -> JuliaResult<'target, 'data, Value<'target, 'data>>
-    where
-        V: Values<'value, 'data, N>,
-    {
-        self.as_value().schedule_async_interactive(frame, args)
-    }
-
-    #[inline]
-    unsafe fn schedule_async<'target, 'value, V, const N: usize>(
-        self,
-        frame: &mut AsyncGcFrame<'target>,
-        args: V,
-    ) -> JuliaResult<'target, 'data, Value<'target, 'data>>
-    where
-        V: Values<'value, 'data, N>,
-    {
-        self.as_value().schedule_async(frame, args)
-    }
-}
-
 impl<'data> CallAsync<'data> for WithKeywords<'_, 'data> {
     #[inline]
     async unsafe fn call_async<'target, 'value, V, const N: usize>(
@@ -243,7 +207,6 @@ impl<'data> CallAsync<'data> for WithKeywords<'_, 'data> {
 
         let task = JlrsCore::interactive_call(&frame)
             .provide_keywords(self.keywords())
-            .expect("Keywords invalid")
             .call(&mut *frame, args.as_ref());
 
         match task {
@@ -265,7 +228,6 @@ impl<'data> CallAsync<'data> for WithKeywords<'_, 'data> {
 
         let task = JlrsCore::async_call(&frame)
             .provide_keywords(self.keywords())
-            .expect("Keywords invalid")
             .call(&mut *frame, args.as_ref());
 
         match task {

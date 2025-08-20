@@ -4,7 +4,10 @@ use std::{
 };
 
 use super::GcFrame;
-use crate::memory::context::stack::Stack;
+use crate::{
+    memory::{context::stack::Stack, scope::AsyncScope},
+    prelude::Scope,
+};
 
 /// A frame associated with an async scope.
 ///
@@ -19,23 +22,6 @@ pub struct AsyncGcFrame<'scope> {
 }
 
 impl<'scope> AsyncGcFrame<'scope> {
-    /// An async version of [`Scope::scope`] that takes an async closure.
-    ///
-    /// [`Scope::scope`]: crate::memory::scope::Scope::scope
-    #[inline]
-    pub async fn async_scope<T>(
-        &mut self,
-        func: impl for<'inner> AsyncFnOnce(AsyncGcFrame<'inner>) -> T,
-    ) -> T {
-        unsafe {
-            let stack = self.stack;
-            let (offset, nested) = self.nest_async();
-            let ret = func(nested).await;
-            stack.pop_roots(offset);
-            ret
-        }
-    }
-
     // Safety: only one base frame may exist per `Stack`
     #[inline]
     pub(crate) unsafe fn base(stack: &'scope Stack) -> AsyncGcFrame<'scope> {
@@ -73,5 +59,32 @@ impl<'scope> DerefMut for AsyncGcFrame<'scope> {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.frame
+    }
+}
+
+unsafe impl<'scope> Scope for AsyncGcFrame<'scope> {
+    fn scope<T>(&mut self, func: impl for<'inner> FnOnce(GcFrame<'inner>) -> T) -> T {
+        unsafe {
+            let (offset, nested) = self.nest();
+            let res = func(nested);
+            self.stack.pop_roots(offset);
+            res
+        }
+    }
+}
+
+unsafe impl<'scope> AsyncScope for AsyncGcFrame<'scope> {
+    #[inline]
+    async fn async_scope<T>(
+        &mut self,
+        func: impl for<'inner> AsyncFnOnce(AsyncGcFrame<'inner>) -> T,
+    ) -> T {
+        unsafe {
+            let stack = self.stack;
+            let (offset, nested) = self.nest_async();
+            let ret = func(nested).await;
+            stack.pop_roots(offset);
+            ret
+        }
     }
 }

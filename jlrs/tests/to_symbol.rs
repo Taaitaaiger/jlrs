@@ -9,13 +9,9 @@ mod tests {
     fn use_string_to_symbol() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| {
-                        assert!(Module::base(&frame).global(&mut frame, "+").is_ok());
-                        Ok(())
-                    })
-                    .unwrap();
+                stack.scope(|mut frame| {
+                    assert!(Module::base(&frame).global(&mut frame, "+").is_ok());
+                })
             });
         });
     }
@@ -23,14 +19,10 @@ mod tests {
     fn use_julia_string_to_symbol() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| {
-                        let plus = JuliaString::new(&mut frame, "+");
-                        assert!(Module::base(&frame).global(&mut frame, plus).is_ok());
-                        Ok(())
-                    })
-                    .unwrap();
+                stack.scope(|mut frame| {
+                    let plus = JuliaString::new(&mut frame, "+");
+                    assert!(Module::base(&frame).global(&mut frame, plus).is_ok());
+                })
             });
         });
     }
@@ -38,14 +30,10 @@ mod tests {
     fn use_symbol_to_symbol() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| {
-                        let plus = Symbol::new(&frame, "+");
-                        assert!(Module::base(&frame).global(&mut frame, plus).is_ok());
-                        Ok(())
-                    })
-                    .unwrap();
+                stack.scope(|mut frame| {
+                    let plus = Symbol::new(&frame, "+");
+                    assert!(Module::base(&frame).global(&mut frame, plus).is_ok());
+                })
             });
         });
     }

@@ -112,7 +112,7 @@ impl<'scope, 'data, U: ConstructType> TypedValue<'scope, 'data, U> {
         Tgt: Target<'target>,
     {
         unsafe {
-            target.local_scope::<1>(|mut frame| {
+            target.local_scope::<_, 1>(|mut frame| {
                 let ty = U::construct_type(&mut frame).as_value();
                 if value.isa(ty) {
                     Ok(TypedValue::<U>::wrap_non_null(

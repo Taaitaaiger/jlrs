@@ -12,7 +12,7 @@
 //! # fn main() {
 //! # let mut julia = Builder::new().start_local().unwrap();
 //!
-//! julia.local_scope::<9>(|mut frame| {
+//! julia.local_scope::<_, 9>(|mut frame| {
 //!     // Create a few Julia values
 //!     let i = Value::new(&mut frame, 2u64);
 //!     let j = Value::new(&mut frame, 1u32);
@@ -23,13 +23,12 @@
 //!         .global(&mut frame, "+")
 //!         .expect("Add function not found");
 //!
-//!     // Functions with 0, 1, 2, or 3 arguments can be called with `Call::call[n]`
-//!     let i_plus_j = unsafe { add_func.call2(&mut frame, i, j) };
+//!     let i_plus_j = unsafe { add_func.call(&mut frame, [i, j]) };
 //!     assert!(i_plus_j.is_ok());
 //!     assert_eq!(i_plus_j.unwrap().unbox::<u64>().expect("wrong type"), 3);
 //!
 //!     // The `+` function accepts any number of variables
-//!     let i_plus_j_plus_k = unsafe { add_func.call3(&mut frame, i, j, k) };
+//!     let i_plus_j_plus_k = unsafe { add_func.call(&mut frame, [i, j, k]) };
 //!     assert!(i_plus_j_plus_k.is_ok());
 //!     assert_eq!(
 //!         i_plus_j_plus_k.unwrap().unbox::<u64>().expect("wrong type"),
@@ -48,7 +47,7 @@
 //!     );
 //!
 //!     // Exception are caught
-//!     let sum_of_nothing = unsafe { add_func.call0(&mut frame) };
+//!     let sum_of_nothing = unsafe { add_func.call(&mut frame, []) };
 //!     assert!(sum_of_nothing.is_err());
 //!
 //!     // You can call the function without using a try-catch block with `Call::call_unchecked`
@@ -85,12 +84,12 @@
 //! # fn main() {
 //! # let mut julia = Builder::new().start_local().unwrap();
 //!
-//! julia.local_scope::<4>(|mut frame| {
+//! julia.local_scope::<_, 4>(|mut frame| {
 //!     let i = Value::new(&mut frame, 1isize);
 //!     let j = Value::new(&mut frame, 2isize);
 //!
 //!     // We can 't call `Int`s yet...
-//!     let i_plus_j = unsafe { i.call1(&mut frame, j) };
+//!     let i_plus_j = unsafe { i.call(&mut frame, [j]) };
 //!     assert!(i_plus_j.is_err());
 //!
 //!     unsafe {
@@ -99,7 +98,7 @@
 //!     }
 //!
 //!     // ... we can!
-//!     let i_plus_j = unsafe { i.call1(&mut frame, j) };
+//!     let i_plus_j = unsafe { i.call(&mut frame, [j]) };
 //!     assert!(i_plus_j.is_ok());
 //!
 //!     let i_plus_j = i_plus_j.unwrap().unbox::<isize>().expect("wrong type");
@@ -121,7 +120,7 @@
 //! # fn main() {
 //! # let mut julia = Builder::new().start_local().unwrap();
 //!
-//! julia.local_scope::<1>(|mut frame| {
+//! julia.local_scope::<_, 1>(|mut frame| {
 //!     let mut lin_alg = Module::package_root_module(&frame, "LinearAlgebra");
 //!     if lin_alg.is_none() {
 //!         unsafe {
@@ -148,7 +147,7 @@
 //! # fn main() {
 //! # let mut julia = Builder::new().start_local().unwrap();
 //!
-//! julia.local_scope::<5>(|mut frame| {
+//! julia.local_scope::<_, 5>(|mut frame| {
 //!     unsafe {
 //!         Value::eval_string(&frame, "my_kw_func(x; kw1=0, kw2=1) = x + kw1 + kw2")
 //!             .expect("unexpected exception");
@@ -156,17 +155,16 @@
 //!
 //!     let x = Value::new(&mut frame, 0isize);
 //!     let kw1 = Value::new(&mut frame, 3isize);
-//!     let kws = named_tuple!(&mut frame, "kw1" => kw1);
+//!     let kws = named_tuple!(&mut frame, "kw1" => kw1).unwrap();
 //!
 //!     // Access the function in the `Main` module and provide it with our keyword arguments:
 //!     let func = Module::main(&frame)
 //!         .global(&mut frame, "my_kw_func")
 //!         .expect("cannot find `my_kw_func` in `Main` module")
-//!         .provide_keywords(kws)
-//!         .expect("keywords must be a `NamedTuple`");
+//!         .provide_keywords(kws);
 //!
 //!     // Positional arguments are provided via `call[n]`:
-//!     let res = unsafe { func.call1(&mut frame, x).expect("unexpected exception") };
+//!     let res = unsafe { func.call(&mut frame, [x]).expect("unexpected exception") };
 //!     let unboxed = res.unbox::<isize>().expect("wrong type");
 //!
 //!     assert_eq!(unboxed, 4);
@@ -182,7 +180,7 @@
 //! # fn main() {
 //! # let mut julia = Builder::new().start_local().unwrap();
 //!
-//! julia.local_scope::<3>(|mut frame| {
+//! julia.local_scope::<_, 3>(|mut frame| {
 //!     unsafe {
 //!         Value::eval_string(&frame, "struct Foo a::Int; b::Int; Foo(a) = new(a, a); end")
 //!             .expect("unexpected exception");
@@ -193,7 +191,7 @@
 //!         .expect("Cannot find `Foo` in `Main` module");
 //!
 //!     let v = Value::new(&mut frame, 1isize);
-//!     let foo = unsafe { foo_ty.call1(&mut frame, v) };
+//!     let foo = unsafe { foo_ty.call(&mut frame, [v]) };
 //!
 //!     assert!(foo.is_ok());
 //! });
@@ -209,7 +207,7 @@
 //! # fn main() {
 //! # let mut julia = Builder::new().start_local().unwrap();
 //!
-//! julia.local_scope::<3>(|mut frame| {
+//! julia.local_scope::<_, 3>(|mut frame| {
 //!     unsafe {
 //!         Value::eval_string(&frame, "struct Foo{T} a::T; end").expect("unexpected exception");
 //!     }
@@ -219,7 +217,7 @@
 //!         .expect("Cannot find `Foo` in `Main` module");
 //!
 //!     let v = Value::new(&mut frame, 1isize);
-//!     let foo = unsafe { foo_ty.call1(&mut frame, v) };
+//!     let foo = unsafe { foo_ty.call(&mut frame, [v]) };
 //!
 //!     assert!(foo.is_ok());
 //! });
@@ -237,7 +235,7 @@
 //! # fn main() {
 //! # let mut julia = Builder::new().start_local().unwrap();
 //!
-//! julia.local_scope::<5>(|mut frame| {
+//! julia.local_scope::<_, 5>(|mut frame| {
 //!     unsafe {
 //!         Value::eval_string(&frame, "struct Foo{V,T} a::T; end").expect("unexpected exception");
 //!     }
@@ -262,7 +260,7 @@
 //!     };
 //!
 //!     let v = Value::new(&mut frame, 1isize);
-//!     let foo = unsafe { foo_ty.call1(&mut frame, v) };
+//!     let foo = unsafe { foo_ty.call(&mut frame, [v]) };
 //!
 //!     assert!(foo.is_ok());
 //! });
@@ -283,24 +281,24 @@ use jl_sys::{jl_call, jl_exception_occurred, jlrs_call_unchecked};
 use crate::{
     args::Values,
     data::managed::{
-        function::kwcall_function,
+        named_tuple::NamedTuple,
         private::ManagedPriv,
         value::{Value, ValueResult},
     },
-    error::JlrsResult,
     memory::target::Target,
     prelude::ValueData,
     private::Private,
+    util::kwcall_function,
 };
 
 /// A function and its keyword arguments.
 pub struct WithKeywords<'scope, 'data> {
     func: Value<'scope, 'data>,
-    keywords: Value<'scope, 'data>,
+    keywords: NamedTuple<'scope, 'data>,
 }
 
 impl<'scope, 'data> WithKeywords<'scope, 'data> {
-    pub(crate) fn new(func: Value<'scope, 'data>, keywords: Value<'scope, 'data>) -> Self {
+    pub(crate) fn new(func: Value<'scope, 'data>, keywords: NamedTuple<'scope, 'data>) -> Self {
         WithKeywords { func, keywords }
     }
 
@@ -310,55 +308,80 @@ impl<'scope, 'data> WithKeywords<'scope, 'data> {
     }
 
     /// Returns the keywords.
-    pub fn keywords(&self) -> Value<'scope, 'data> {
+    pub fn keywords(&self) -> NamedTuple<'scope, 'data> {
         self.keywords
     }
 }
 
 /// Call Julia functions.
 ///
-/// There are currently three types that implement this trait: [`Value`], [`Function`], and
-/// [`WithKeywords`]. Because `Value` implements this trait it's not necessary to cast it to a
-/// `Function` before calling it.
+/// There are two types that implement this trait: [`Value`] and [`WithKeywords`]. Any `Value`
+/// can be called, `WithKeywords` combines a function with its keyword arguments. If you call a
+/// value that isn't a function, an error is returned.
 ///
-/// All of these methods are unsafe, arbitrary Julia functions can't be checked for correctness.
+/// All of these methods are unsafe, there is no way to distinguish between obviously safe
+/// functions like `+`, and obviously unsafe ones like `unsafe_load` except through their names.
+/// If multithreading is used, either via the multithreaded runtime or internally in Julia,
+/// potential thread-safety issues must also be taken into account.
+///
 /// More information can be found in the [`safety`] module.
 ///
-/// [`Function`]: crate::data::managed::function::Function
 /// [`safety`]: crate::safety
 pub trait Call<'data>: private::CallPriv {
     /// Call a function with no arguments.
     ///
-    /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
-    /// correctness. More information can be found in the [`safety`] module.
+    /// Safety: there is no way to distinguish between obviously safe functions like `+`, and
+    /// obviously unsafe ones like `unsafe_load` except through their names. If multithreading is
+    /// used, either via the multithreaded runtime or internally in Julia, potential thread-safety
+    /// issues must also be taken into account.
+    ///
+    /// More information can be found in the [`safety`] module.
     ///
     /// [`safety`]: crate::safety
+    #[inline]
+    #[deprecated = "Use Call::call instead"]
     unsafe fn call0<'target, Tgt>(self, target: Tgt) -> ValueResult<'target, 'data, Tgt>
     where
-        Tgt: Target<'target>;
+        Tgt: Target<'target>,
+    {
+        self.call(target, [])
+    }
 
     /// Call a function with one argument.
     ///
-    /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
-    /// correctness. More information can be found in the [`safety`] module. This method doesn't
-    /// check if the argument is currently borrowed from Rust.
+    /// Safety: there is no way to distinguish between obviously safe functions like `+`, and
+    /// obviously unsafe ones like `unsafe_load` except through their names. If multithreading is
+    /// used, either via the multithreaded runtime or internally in Julia, potential thread-safety
+    /// issues must also be taken into account.
+    ///
+    /// More information can be found in the [`safety`] module.
     ///
     /// [`safety`]: crate::safety
+    #[inline]
+    #[deprecated = "Use Call::call instead"]
     unsafe fn call1<'target, Tgt>(
         self,
         target: Tgt,
         arg0: Value<'_, 'data>,
     ) -> ValueResult<'target, 'data, Tgt>
     where
-        Tgt: Target<'target>;
+        Tgt: Target<'target>,
+    {
+        self.call(target, [arg0])
+    }
 
     /// Call a function with two arguments.
     ///
-    /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
-    /// correctness. More information can be found in the [`safety`] module. This method doesn't
-    /// check if any of the arguments is currently borrowed from Rust.
+    /// Safety: there is no way to distinguish between obviously safe functions like `+`, and
+    /// obviously unsafe ones like `unsafe_load` except through their names. If multithreading is
+    /// used, either via the multithreaded runtime or internally in Julia, potential thread-safety
+    /// issues must also be taken into account.
+    ///
+    /// More information can be found in the [`safety`] module.
     ///
     /// [`safety`]: crate::safety
+    #[inline]
+    #[deprecated = "Use Call::call instead"]
     unsafe fn call2<'target, Tgt>(
         self,
         target: Tgt,
@@ -366,15 +389,23 @@ pub trait Call<'data>: private::CallPriv {
         arg1: Value<'_, 'data>,
     ) -> ValueResult<'target, 'data, Tgt>
     where
-        Tgt: Target<'target>;
+        Tgt: Target<'target>,
+    {
+        self.call(target, [arg0, arg1])
+    }
 
     /// Call a function with three arguments.
     ///
-    /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
-    /// correctness. More information can be found in the [`safety`] module. This method doesn't
-    /// check if any of the arguments is currently borrowed from Rust.
+    /// Safety: there is no way to distinguish between obviously safe functions like `+`, and
+    /// obviously unsafe ones like `unsafe_load` except through their names. If multithreading is
+    /// used, either via the multithreaded runtime or internally in Julia, potential thread-safety
+    /// issues must also be taken into account.
+    ///
+    /// More information can be found in the [`safety`] module.
     ///
     /// [`safety`]: crate::safety
+    #[inline]
+    #[deprecated = "Use Call::call instead"]
     unsafe fn call3<'target, Tgt>(
         self,
         target: Tgt,
@@ -383,13 +414,19 @@ pub trait Call<'data>: private::CallPriv {
         arg2: Value<'_, 'data>,
     ) -> ValueResult<'target, 'data, Tgt>
     where
-        Tgt: Target<'target>;
+        Tgt: Target<'target>,
+    {
+        self.call(target, [arg0, arg1, arg2])
+    }
 
     /// Call a function with an arbitrary number arguments.
     ///
-    /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
-    /// correctness. More information can be found in the [`safety`] module. This method doesn't
-    /// check if any of the arguments is currently borrowed from Rust.
+    /// Safety: there is no way to distinguish between obviously safe functions like `+`, and
+    /// obviously unsafe ones like `unsafe_load` except through their names. If multithreading is
+    /// used, either via the multithreaded runtime or internally in Julia, potential thread-safety
+    /// issues must also be taken into account.
+    ///
+    /// More information can be found in the [`safety`] module.
     ///
     /// [`safety`]: crate::safety
     unsafe fn call<'target, 'value, V, Tgt, const N: usize>(
@@ -430,23 +467,21 @@ pub trait ProvideKeywords<'value, 'data>: Call<'data> {
     /// # fn main() {
     /// # let mut julia = Builder::new().start_local().unwrap();
     /// julia
-    ///     .local_scope::<5>(|mut frame| unsafe {
+    ///     .local_scope::<_, 5>(|mut frame| unsafe {
     ///         // The code we evaluate is a simple function definition, which is safe.
     ///         let func = unsafe {
-    ///             Value::eval_string(&mut frame, "func(; a=3, b=4, c=5) = a + b + c") // 1
-    ///             .into_jlrs_result()?
+    ///             Value::eval_string(&mut frame, "func(; a=3, b=4, c=5) = a + b + c")? // 1
     ///         };
     ///
     ///         let a = Value::new(&mut frame, 1isize); // 2
     ///         let b = Value::new(&mut frame, 2isize); // 3
-    ///         let nt = named_tuple!(&mut frame, "a" => a, "b" => b); // 4
+    ///         let nt = named_tuple!(&mut frame, "a" => a, "b" => b).unwrap(); // 4
     ///
     ///         // Call the previously defined function. This function simply sums its three
     ///         // keyword arguments and has no side effects, so it's safe to call.
     ///         let res = unsafe {
-    ///             func.provide_keywords(nt)?
-    ///                 .call0(&mut frame) // 5
-    ///                 .into_jlrs_result()?
+    ///             func.provide_keywords(nt)
+    ///                 .call(&mut frame, [])? // 5
     ///                 .unbox::<isize>()?
     ///         };
     ///
@@ -454,60 +489,10 @@ pub trait ProvideKeywords<'value, 'data>: Call<'data> {
     ///         JlrsResult::Ok(())
     ///     }).unwrap();
     /// # }
-    fn provide_keywords(
-        self,
-        keywords: Value<'value, 'data>,
-    ) -> JlrsResult<WithKeywords<'value, 'data>>;
+    fn provide_keywords(self, keywords: NamedTuple<'value, 'data>) -> WithKeywords<'value, 'data>;
 }
 
 impl<'data> Call<'data> for WithKeywords<'_, 'data> {
-    #[inline]
-    unsafe fn call0<'target, Tgt>(self, target: Tgt) -> ValueResult<'target, 'data, Tgt>
-    where
-        Tgt: Target<'target>,
-    {
-        self.call(target, [])
-    }
-
-    #[inline]
-    unsafe fn call1<'target, Tgt>(
-        self,
-        target: Tgt,
-        arg0: Value<'_, 'data>,
-    ) -> ValueResult<'target, 'data, Tgt>
-    where
-        Tgt: Target<'target>,
-    {
-        self.call(target, [arg0])
-    }
-
-    #[inline]
-    unsafe fn call2<'target, Tgt>(
-        self,
-        target: Tgt,
-        arg0: Value<'_, 'data>,
-        arg1: Value<'_, 'data>,
-    ) -> ValueResult<'target, 'data, Tgt>
-    where
-        Tgt: Target<'target>,
-    {
-        self.call(target, [arg0, arg1])
-    }
-
-    #[inline]
-    unsafe fn call3<'target, Tgt>(
-        self,
-        target: Tgt,
-        arg0: Value<'_, 'data>,
-        arg1: Value<'_, 'data>,
-        arg2: Value<'_, 'data>,
-    ) -> ValueResult<'target, 'data, Tgt>
-    where
-        Tgt: Target<'target>,
-    {
-        self.call(target, [arg0, arg1, arg2])
-    }
-
     #[inline]
     unsafe fn call<'target, 'value, V, Tgt, const N: usize>(
         self,
@@ -569,9 +554,8 @@ impl<'data> Call<'data> for WithKeywords<'_, 'data> {
 
 mod private {
     use super::WithKeywords;
-    use crate::data::managed::{function::Function, value::Value};
+    use crate::data::managed::value::Value;
     pub trait CallPriv: Sized {}
     impl CallPriv for WithKeywords<'_, '_> {}
-    impl CallPriv for Function<'_, '_> {}
     impl CallPriv for Value<'_, '_> {}
 }

@@ -342,7 +342,7 @@ pub unsafe trait OpaqueType: Sized + Send + Sync + 'static {
             panic!("Type {} was not initialized", name.as_str().unwrap());
         }
 
-        target.with_local_scope::<3>(|target, mut frame| {
+        target.with_local_scope::<_, 3>(|target, mut frame| {
             let params = Self::variant_parameters(&mut frame);
             let params = params.data();
             let params_slice = params.as_atomic_slice().assume_immutable_non_null();
@@ -615,7 +615,7 @@ unsafe impl<T: ForeignType> OpaqueType for T {
             do_sweep::<T>(value.cast())
         }
 
-        target.with_local_scope::<1>(|target, mut frame| {
+        target.with_local_scope::<_, 1>(|target, mut frame| {
             let super_type = Self::super_type(&mut frame).unwrap(Private);
 
             let ty = jl_new_foreign_type(
@@ -696,7 +696,7 @@ where
         return target.data_from_ptr(ty.unwrap_non_null(Private), Private);
     }
 
-    target.with_local_scope::<2>(|target, mut frame| {
+    target.with_local_scope::<_, 2>(|target, mut frame| {
         let super_type = T::super_type(&mut frame);
         let parameters = T::type_parameters(&mut frame);
 
@@ -735,7 +735,7 @@ where
         return target.data_from_ptr(ty.unwrap_non_null(Private), Private);
     }
 
-    target.with_local_scope::<2>(|target, mut frame| {
+    target.with_local_scope::<_, 2>(|target, mut frame| {
         let super_type = T::super_type(&mut frame);
         let parameters = T::type_parameters(&mut frame);
 

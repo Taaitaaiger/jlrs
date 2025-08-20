@@ -671,16 +671,6 @@ pub mod functions {
             var: *mut crate::types::jl_sym_t,
             val: *mut crate::types::jl_value_t,
         );
-
-        // Added in Julia 1.12
-
-        #[cfg(not(any(julia_1_10, julia_1_11)))]
-        pub fn jl_declare_constant_val(
-            b: *mut crate::types::jl_binding_t,
-            m: *mut crate::types::jl_module_t,
-            var: *mut crate::types::jl_sym_t,
-            val: *mut crate::types::jl_value_t,
-        ) -> *mut crate::types::jl_binding_partition_t;
     }
 }
 
@@ -939,6 +929,16 @@ pub mod jlrs_cc {
         pub fn jlrs_set_nthreads_per_pool(nthreads_per_pool: *const i16);
 
         pub fn jlrs_init_missing_functions();
+
+        // Added in Julia 1.12
+
+        #[cfg(not(any(julia_1_10, julia_1_11)))]
+        pub fn jlrs_declare_constant_val(
+            b: *mut crate::types::jl_binding_t,
+            m: *mut crate::types::jl_module_t,
+            var: *mut crate::types::jl_sym_t,
+            val: *mut crate::types::jl_value_t,
+        ) -> *mut crate::types::jl_binding_partition_t;
     }
 }
 

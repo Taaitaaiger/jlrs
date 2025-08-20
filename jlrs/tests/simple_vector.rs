@@ -18,14 +18,10 @@ mod tests {
     fn create_simple_vector() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| {
-                        let svec = SimpleVector::with_capacity(&mut frame, 1);
-                        assert!(svec.as_value().is::<SimpleVector>());
-                        Ok(())
-                    })
-                    .unwrap();
+                stack.scope(|mut frame| {
+                    let svec = SimpleVector::with_capacity(&mut frame, 1);
+                    assert!(svec.as_value().is::<SimpleVector>());
+                })
             })
         })
     }
@@ -33,19 +29,15 @@ mod tests {
     fn set_simple_vector_contents() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| {
-                        let svec = unsafe { SimpleVector::with_capacity_uninit(&mut frame, 1) };
-                        let value = Value::new(&mut frame, 1usize);
+                stack.scope(|mut frame| {
+                    let svec = unsafe { SimpleVector::with_capacity_uninit(&mut frame, 1) };
+                    let value = Value::new(&mut frame, 1usize);
 
-                        unsafe {
-                            let data = svec.data();
-                            assert!(data.set(0, Some(value)).is_ok());
-                        }
-                        Ok(())
-                    })
-                    .unwrap();
+                    unsafe {
+                        let data = svec.data();
+                        assert!(data.set(0, Some(value)).is_ok());
+                    }
+                })
             })
         })
     }
@@ -53,19 +45,15 @@ mod tests {
     fn set_simple_vector_contents_unrestricted() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| {
-                        let svec = unsafe { SimpleVector::with_capacity_uninit(&mut frame, 1) };
-                        let value = Value::new(&mut frame, 1usize);
+                stack.scope(|mut frame| {
+                    let svec = unsafe { SimpleVector::with_capacity_uninit(&mut frame, 1) };
+                    let value = Value::new(&mut frame, 1usize);
 
-                        unsafe {
-                            let data = svec.data();
-                            assert!(data.set(0, Some(value)).is_ok());
-                        }
-                        Ok(())
-                    })
-                    .unwrap();
+                    unsafe {
+                        let data = svec.data();
+                        assert!(data.set(0, Some(value)).is_ok());
+                    }
+                })
             })
         })
     }
@@ -73,24 +61,20 @@ mod tests {
     fn typed_simple_vector_contents() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| {
-                        let svec = unsafe { SimpleVector::with_capacity_uninit(&mut frame, 1) };
-                        let sym = Symbol::new(&frame, "Foo");
+                stack.scope(|mut frame| {
+                    let svec = unsafe { SimpleVector::with_capacity_uninit(&mut frame, 1) };
+                    let sym = Symbol::new(&frame, "Foo");
 
-                        unsafe {
-                            let data = svec.data();
-                            assert!(data.set(0, Some(sym.as_value())).is_ok());
-                        }
+                    unsafe {
+                        let data = svec.data();
+                        assert!(data.set(0, Some(sym.as_value())).is_ok());
+                    }
 
-                        unsafe {
-                            let data = svec.typed_data_unchecked::<Symbol>();
-                            assert_eq!(data.as_atomic_slice().assume_immutable_non_null()[0], sym);
-                        }
-                        Ok(())
-                    })
-                    .unwrap();
+                    unsafe {
+                        let data = svec.typed_data_unchecked::<Symbol>();
+                        assert_eq!(data.as_atomic_slice().assume_immutable_non_null()[0], sym);
+                    }
+                })
             })
         })
     }
@@ -98,19 +82,15 @@ mod tests {
     fn set_simple_vector_contents_oob() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| {
-                        let svec = unsafe { SimpleVector::with_capacity_uninit(&mut frame, 1) };
-                        let value = Value::new(&mut frame, 1usize);
+                stack.scope(|mut frame| {
+                    let svec = unsafe { SimpleVector::with_capacity_uninit(&mut frame, 1) };
+                    let value = Value::new(&mut frame, 1usize);
 
-                        unsafe {
-                            let data = svec.data();
-                            assert!(data.set(1, Some(value)).is_err());
-                        }
-                        Ok(())
-                    })
-                    .unwrap();
+                    unsafe {
+                        let data = svec.data();
+                        assert!(data.set(1, Some(value)).is_err());
+                    }
+                })
             })
         })
     }
@@ -118,19 +98,15 @@ mod tests {
     fn set_simple_vector_contents_unrestricted_oob() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| {
-                        let svec = unsafe { SimpleVector::with_capacity_uninit(&mut frame, 1) };
-                        let value = Value::new(&mut frame, 1usize);
+                stack.scope(|mut frame| {
+                    let svec = unsafe { SimpleVector::with_capacity_uninit(&mut frame, 1) };
+                    let value = Value::new(&mut frame, 1usize);
 
-                        unsafe {
-                            let data = svec.data();
-                            assert!(data.set(1, Some(value)).is_err());
-                        }
-                        Ok(())
-                    })
-                    .unwrap();
+                    unsafe {
+                        let data = svec.data();
+                        assert!(data.set(1, Some(value)).is_err());
+                    }
+                })
             })
         })
     }
@@ -163,16 +139,10 @@ mod tests {
     fn root_ref() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| {
-                        let res =
-                            unsafe { SimpleVector::emptysvec(&frame).as_weak().root(&mut frame) };
-                        assert_eq!(res.len(), 0);
-
-                        Ok(())
-                    })
-                    .unwrap();
+                stack.scope(|mut frame| {
+                    let res = unsafe { SimpleVector::emptysvec(&frame).as_weak().root(&mut frame) };
+                    assert_eq!(res.len(), 0);
+                })
             })
         })
     }
@@ -180,24 +150,19 @@ mod tests {
     fn valid_layout() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|frame| {
-                        let res = SimpleVector::emptysvec(&frame);
-                        assert!(res.as_value().is::<SimpleVector>());
-                        assert!(WeakSimpleVector::valid_layout(
-                            res.as_value().datatype().as_value()
-                        ));
+                stack.scope(|frame| {
+                    let res = SimpleVector::emptysvec(&frame);
+                    assert!(res.as_value().is::<SimpleVector>());
+                    assert!(WeakSimpleVector::valid_layout(
+                        res.as_value().datatype().as_value()
+                    ));
 
-                        let value = DataType::unionall_type(&frame).as_value();
-                        assert!(!value.is::<SimpleVector>());
-                        assert!(!WeakSimpleVector::valid_layout(
-                            UnionAll::array_type(&frame).as_value()
-                        ));
-
-                        Ok(())
-                    })
-                    .unwrap();
+                    let value = DataType::unionall_type(&frame).as_value();
+                    assert!(!value.is::<SimpleVector>());
+                    assert!(!WeakSimpleVector::valid_layout(
+                        UnionAll::array_type(&frame).as_value()
+                    ));
+                })
             })
         })
     }
@@ -205,16 +170,11 @@ mod tests {
     fn debug_fmt() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|frame| {
-                        let res = SimpleVector::emptysvec(&frame);
-                        let fmt = format!("{:?}", res);
-                        assert_eq!(fmt, "svec()");
-
-                        Ok(())
-                    })
-                    .unwrap();
+                stack.scope(|frame| {
+                    let res = SimpleVector::emptysvec(&frame);
+                    let fmt = format!("{:?}", res);
+                    assert_eq!(fmt, "svec()");
+                })
             })
         })
     }

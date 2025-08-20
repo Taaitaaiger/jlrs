@@ -10,7 +10,7 @@ use jlrs::{
 fn run_background_task() {
     let rt = Builder::new().start_local().unwrap();
 
-    rt.local_scope::<2>(|mut frame| {
+    rt.local_scope::<_, 2>(|mut frame| {
         let bg_task = spawn_background_task::<usize, _, _>(&mut frame, || Ok(7usize));
 
         assert!(BackgroundTaskLayout::<usize>::valid_layout(
@@ -22,8 +22,7 @@ fn run_background_task() {
                 .global(&frame, "fetch")
                 .unwrap()
                 .as_value()
-                .call1(&mut frame, bg_task.as_value())
-                .into_jlrs_result()
+                .call(&mut frame, [bg_task.as_value()])
                 .unwrap()
                 .unbox::<usize>()
                 .unwrap()

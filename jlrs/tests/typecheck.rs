@@ -5,7 +5,10 @@ mod tests {
     use std::{ffi::c_void, ptr::null_mut};
 
     use jlrs::{
-        data::{managed::union_all::UnionAll, types::typecheck::*},
+        data::{
+            managed::{named_tuple::NamedTuple, union_all::UnionAll},
+            types::typecheck::*,
+        },
         prelude::*,
     };
 
@@ -16,15 +19,11 @@ mod tests {
             fn $name() {
                 JULIA.with(|handle| {
                     handle.borrow_mut().with_stack(|mut stack| {
-                        stack
-                            .returning::<JlrsResult<_>>()
-                            .scope(|mut frame| {
-                                let val: $t = $val;
-                                let v = Value::new(&mut frame, val);
-                                assert!(<$t as Typecheck>::typecheck(v.datatype()));
-                                Ok(())
-                            })
-                            .unwrap();
+                        stack.scope(|mut frame| {
+                            let val: $t = $val;
+                            let v = Value::new(&mut frame, val);
+                            assert!(<$t as Typecheck>::typecheck(v.datatype()));
+                        })
                     })
                 })
             }
@@ -32,15 +31,11 @@ mod tests {
             fn $invalid_name() {
                 JULIA.with(|handle| {
                     handle.borrow_mut().with_stack(|mut stack| {
-                        stack
-                            .returning::<JlrsResult<_>>()
-                            .scope(|mut frame| {
-                                let val: $t = $val;
-                                let v = Value::new(&mut frame, val);
-                                assert!(!<*mut $t as Typecheck>::typecheck(v.datatype()));
-                                Ok(())
-                            })
-                            .unwrap();
+                        stack.scope(|mut frame| {
+                            let val: $t = $val;
+                            let v = Value::new(&mut frame, val);
+                            assert!(!<*mut $t as Typecheck>::typecheck(v.datatype()));
+                        })
                     })
                 })
             }
@@ -157,17 +152,13 @@ mod tests {
     fn type_typecheck() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|frame| {
-                        assert!(Type::typecheck(DataType::datatype_type(&frame)));
-                        assert!(Type::typecheck(DataType::unionall_type(&frame)));
-                        assert!(Type::typecheck(DataType::uniontype_type(&frame)));
-                        assert!(Type::typecheck(DataType::typeofbottom_type(&frame)));
-                        assert!(!Type::typecheck(DataType::bool_type(&frame)));
-                        Ok(())
-                    })
-                    .unwrap();
+                stack.scope(|frame| {
+                    assert!(Type::typecheck(DataType::datatype_type(&frame)));
+                    assert!(Type::typecheck(DataType::unionall_type(&frame)));
+                    assert!(Type::typecheck(DataType::uniontype_type(&frame)));
+                    assert!(Type::typecheck(DataType::typeofbottom_type(&frame)));
+                    assert!(!Type::typecheck(DataType::bool_type(&frame)));
+                })
             })
         })
     }
@@ -175,14 +166,10 @@ mod tests {
     fn bits_typecheck() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|frame| {
-                        assert!(Bits::typecheck(DataType::bool_type(&frame)));
-                        assert!(!Bits::typecheck(DataType::datatype_type(&frame)));
-                        Ok(())
-                    })
-                    .unwrap();
+                stack.scope(|frame| {
+                    assert!(Bits::typecheck(DataType::bool_type(&frame)));
+                    assert!(!Bits::typecheck(DataType::datatype_type(&frame)));
+                })
             })
         })
     }
@@ -190,14 +177,10 @@ mod tests {
     fn abstract_typecheck() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|frame| {
-                        assert!(Abstract::typecheck(DataType::floatingpoint_type(&frame)));
-                        assert!(!Abstract::typecheck(DataType::datatype_type(&frame)));
-                        Ok(())
-                    })
-                    .unwrap();
+                stack.scope(|frame| {
+                    assert!(Abstract::typecheck(DataType::floatingpoint_type(&frame)));
+                    assert!(!Abstract::typecheck(DataType::datatype_type(&frame)));
+                })
             })
         })
     }
@@ -205,20 +188,17 @@ mod tests {
     fn abstract_ref_typecheck() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| unsafe {
-                        let args = [DataType::uint8_type(&frame).as_value()];
-                        let v = UnionAll::ref_type(&frame)
-                            .as_value()
-                            .apply_type_unchecked(&mut frame, args)
-                            .cast::<DataType>()?;
+                stack.scope(|mut frame| unsafe {
+                    let args = [DataType::uint8_type(&frame).as_value()];
+                    let v = UnionAll::ref_type(&frame)
+                        .as_value()
+                        .apply_type_unchecked(&mut frame, args)
+                        .cast::<DataType>()
+                        .unwrap();
 
-                        assert!(AbstractRef::typecheck(v));
-                        assert!(!AbstractRef::typecheck(DataType::bool_type(&frame)));
-                        Ok(())
-                    })
-                    .unwrap();
+                    assert!(AbstractRef::typecheck(v));
+                    assert!(!AbstractRef::typecheck(DataType::bool_type(&frame)));
+                })
             })
         })
     }
@@ -226,24 +206,21 @@ mod tests {
     fn vec_element_typecheck() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| unsafe {
-                        let value = Value::new(&mut frame, 0u8);
-                        let args = [DataType::uint8_type(&frame).as_value()];
-                        let vec_elem_ty = Module::base(&frame)
-                            .global(&mut frame, "VecElement")?
-                            .as_value()
-                            .apply_type_unchecked(&mut frame, args)
-                            .call(&mut frame, &mut [value])
-                            .into_jlrs_result()?
-                            .datatype();
+                stack.scope(|mut frame| unsafe {
+                    let value = Value::new(&mut frame, 0u8);
+                    let args = [DataType::uint8_type(&frame).as_value()];
+                    let vec_elem_ty = Module::base(&frame)
+                        .global(&mut frame, "VecElement")
+                        .unwrap()
+                        .as_value()
+                        .apply_type_unchecked(&mut frame, args)
+                        .call(&mut frame, &mut [value])
+                        .unwrap()
+                        .datatype();
 
-                        assert!(VecElement::typecheck(vec_elem_ty));
-                        assert!(!VecElement::typecheck(DataType::bool_type(&frame)));
-                        Ok(())
-                    })
-                    .unwrap();
+                    assert!(VecElement::typecheck(vec_elem_ty));
+                    assert!(!VecElement::typecheck(DataType::bool_type(&frame)));
+                })
             })
         })
     }
@@ -251,20 +228,17 @@ mod tests {
     fn type_type_typecheck() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| unsafe {
-                        let args = [DataType::uint8_type(&frame).as_value()];
-                        let ty = UnionAll::type_type(&frame)
-                            .as_value()
-                            .apply_type_unchecked(&mut frame, args)
-                            .cast::<DataType>()?;
+                stack.scope(|mut frame| unsafe {
+                    let args = [DataType::uint8_type(&frame).as_value()];
+                    let ty = UnionAll::type_type(&frame)
+                        .as_value()
+                        .apply_type_unchecked(&mut frame, args)
+                        .cast::<DataType>()
+                        .unwrap();
 
-                        assert!(TypeType::typecheck(ty));
-                        assert!(!TypeType::typecheck(DataType::bool_type(&frame)));
-                        Ok(())
-                    })
-                    .unwrap();
+                    assert!(TypeType::typecheck(ty));
+                    assert!(!TypeType::typecheck(DataType::bool_type(&frame)));
+                })
             })
         })
     }
@@ -272,17 +246,13 @@ mod tests {
     fn named_tuple_typecheck() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| {
-                        let a = Value::new(&mut frame, 1usize);
-                        let named_tuple = named_tuple!(&mut frame, "a" => a);
+                stack.scope(|mut frame| {
+                    let a = Value::new(&mut frame, 1usize);
+                    let named_tuple = named_tuple!(&mut frame, "a" => a).unwrap().as_value();
 
-                        assert!(NamedTuple::typecheck(named_tuple.datatype()));
-                        assert!(!NamedTuple::typecheck(DataType::bool_type(&frame)));
-                        Ok(())
-                    })
-                    .unwrap();
+                    assert!(NamedTuple::typecheck(named_tuple.datatype()));
+                    assert!(!NamedTuple::typecheck(DataType::bool_type(&frame)));
+                })
             })
         })
     }
@@ -290,14 +260,10 @@ mod tests {
     fn mutable_typecheck() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|frame| {
-                        assert!(Mutable::typecheck(DataType::datatype_type(&frame)));
-                        assert!(!Mutable::typecheck(DataType::bool_type(&frame)));
-                        Ok(())
-                    })
-                    .unwrap();
+                stack.scope(|frame| {
+                    assert!(Mutable::typecheck(DataType::datatype_type(&frame)));
+                    assert!(!Mutable::typecheck(DataType::bool_type(&frame)));
+                })
             })
         })
     }
@@ -305,15 +271,11 @@ mod tests {
     fn nothing_typecheck() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|frame| {
-                        let nothing = Value::nothing(&frame);
-                        assert!(Nothing::typecheck(nothing.datatype()));
-                        assert!(!Nothing::typecheck(DataType::bool_type(&frame)));
-                        Ok(())
-                    })
-                    .unwrap();
+                stack.scope(|frame| {
+                    let nothing = Value::nothing(&frame);
+                    assert!(Nothing::typecheck(nothing.datatype()));
+                    assert!(!Nothing::typecheck(DataType::bool_type(&frame)));
+                })
             })
         })
     }
@@ -321,14 +283,10 @@ mod tests {
     fn immutable_typecheck() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|frame| {
-                        assert!(Immutable::typecheck(DataType::bool_type(&frame)));
-                        assert!(!Immutable::typecheck(DataType::datatype_type(&frame)));
-                        Ok(())
-                    })
-                    .unwrap();
+                stack.scope(|frame| {
+                    assert!(Immutable::typecheck(DataType::bool_type(&frame)));
+                    assert!(!Immutable::typecheck(DataType::datatype_type(&frame)));
+                })
             })
         })
     }
@@ -336,17 +294,13 @@ mod tests {
     fn primitive_type_typecheck() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|frame| {
-                        assert!(PrimitiveType::typecheck(DataType::bool_type(&frame)));
-                        assert!(!PrimitiveType::typecheck(DataType::datatype_type(&frame)));
-                        assert!(!PrimitiveType::typecheck(DataType::floatingpoint_type(
-                            &frame
-                        )));
-                        Ok(())
-                    })
-                    .unwrap();
+                stack.scope(|frame| {
+                    assert!(PrimitiveType::typecheck(DataType::bool_type(&frame)));
+                    assert!(!PrimitiveType::typecheck(DataType::datatype_type(&frame)));
+                    assert!(!PrimitiveType::typecheck(DataType::floatingpoint_type(
+                        &frame
+                    )));
+                })
             })
         })
     }
@@ -354,15 +308,11 @@ mod tests {
     fn struct_type_typecheck() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|frame| {
-                        assert!(StructType::typecheck(DataType::datatype_type(&frame)));
-                        assert!(!StructType::typecheck(DataType::bool_type(&frame)));
-                        assert!(!StructType::typecheck(DataType::floatingpoint_type(&frame)));
-                        Ok(())
-                    })
-                    .unwrap();
+                stack.scope(|frame| {
+                    assert!(StructType::typecheck(DataType::datatype_type(&frame)));
+                    assert!(!StructType::typecheck(DataType::bool_type(&frame)));
+                    assert!(!StructType::typecheck(DataType::floatingpoint_type(&frame)));
+                })
             })
         })
     }
@@ -370,14 +320,10 @@ mod tests {
     fn singleton_typecheck() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|frame| {
-                        assert!(Singleton::typecheck(DataType::nothing_type(&frame)));
-                        assert!(!Singleton::typecheck(DataType::bool_type(&frame)));
-                        Ok(())
-                    })
-                    .unwrap();
+                stack.scope(|frame| {
+                    assert!(Singleton::typecheck(DataType::nothing_type(&frame)));
+                    assert!(!Singleton::typecheck(DataType::bool_type(&frame)));
+                })
             })
         })
     }
@@ -385,14 +331,10 @@ mod tests {
     fn string_typecheck() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|frame| {
-                        assert!(String::typecheck(DataType::string_type(&frame)));
-                        assert!(!String::typecheck(DataType::bool_type(&frame)));
-                        Ok(())
-                    })
-                    .unwrap();
+                stack.scope(|frame| {
+                    assert!(String::typecheck(DataType::string_type(&frame)));
+                    assert!(!String::typecheck(DataType::bool_type(&frame)));
+                })
             })
         })
     }
@@ -400,16 +342,12 @@ mod tests {
     fn pointer_typecheck() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| {
-                        let v: *mut u8 = null_mut();
-                        let value = Value::new(&mut frame, v);
-                        assert!(Pointer::typecheck(value.datatype()));
-                        assert!(!Pointer::typecheck(DataType::bool_type(&frame)));
-                        Ok(())
-                    })
-                    .unwrap();
+                stack.scope(|mut frame| {
+                    let v: *mut u8 = null_mut();
+                    let value = Value::new(&mut frame, v);
+                    assert!(Pointer::typecheck(value.datatype()));
+                    assert!(!Pointer::typecheck(DataType::bool_type(&frame)));
+                })
             })
         })
     }
@@ -417,16 +355,12 @@ mod tests {
     fn llvm_pointer_typecheck() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| unsafe {
-                        let cmd = "reinterpret(Core.LLVMPtr{UInt8,1}, 0)";
-                        let value = Value::eval_string(&mut frame, cmd).into_jlrs_result()?;
-                        assert!(LLVMPointer::typecheck(value.datatype()));
-                        assert!(!LLVMPointer::typecheck(DataType::bool_type(&frame)));
-                        Ok(())
-                    })
-                    .unwrap();
+                stack.scope(|mut frame| unsafe {
+                    let cmd = "reinterpret(Core.LLVMPtr{UInt8,1}, 0)";
+                    let value = Value::eval_string(&mut frame, cmd).unwrap();
+                    assert!(LLVMPointer::typecheck(value.datatype()));
+                    assert!(!LLVMPointer::typecheck(DataType::bool_type(&frame)));
+                })
             })
         })
     }
@@ -434,14 +368,10 @@ mod tests {
     fn concrete_typecheck() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|frame| {
-                        assert!(Concrete::typecheck(DataType::bool_type(&frame)));
-                        assert!(!Concrete::typecheck(DataType::floatingpoint_type(&frame)));
-                        Ok(())
-                    })
-                    .unwrap();
+                stack.scope(|frame| {
+                    assert!(Concrete::typecheck(DataType::bool_type(&frame)));
+                    assert!(!Concrete::typecheck(DataType::floatingpoint_type(&frame)));
+                })
             })
         })
     }

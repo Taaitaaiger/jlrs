@@ -59,47 +59,47 @@ pub fn takes_typed_ranked_array(a: TypedRankedArray<u32, 1>) -> usize {
 // Array return type
 pub unsafe fn returns_array(dt: DataType) -> ArrayRet {
     let weak_handle = weak_handle_unchecked!();
-    Array::new_for(weak_handle, dt.as_value(), (2, 2))
+    Array::new_for(weak_handle, dt.as_value(), [2, 2])
         .unwrap()
         .leak()
 }
 
 pub unsafe fn returns_rank0_array(dt: DataType) -> RankedArrayRet<0> {
     let weak_handle = weak_handle_unchecked!();
-    RankedArray::<0>::new_for(weak_handle, dt.as_value(), ())
+    RankedArray::<0>::new_for(weak_handle, dt.as_value(), [])
         .unwrap()
         .leak()
 }
 
 pub unsafe fn returns_rank1_array(dt: DataType) -> RankedArrayRet<1> {
     let weak_handle = weak_handle_unchecked!();
-    RankedArray::<1>::new_for(weak_handle, dt.as_value(), (2,))
+    RankedArray::<1>::new_for(weak_handle, dt.as_value(), [2])
         .unwrap()
         .leak()
 }
 
 pub unsafe fn returns_rank2_array(dt: DataType) -> RankedArrayRet<2> {
     let weak_handle = weak_handle_unchecked!();
-    RankedArray::<2>::new_for(weak_handle, dt.as_value(), (2, 2))
+    RankedArray::<2>::new_for(weak_handle, dt.as_value(), [2, 2])
         .unwrap()
         .leak()
 }
 
 pub unsafe fn returns_rank3_array(dt: DataType) -> RankedArrayRet<3> {
     let weak_handle = weak_handle_unchecked!();
-    RankedArray::<3>::new_for(weak_handle, dt.as_value(), (2, 2, 2))
+    RankedArray::<3>::new_for(weak_handle, dt.as_value(), [2, 2, 2])
         .unwrap()
         .leak()
 }
 
 pub unsafe fn returns_typed_array() -> TypedArrayRet<f32> {
     let weak_handle = weak_handle_unchecked!();
-    TypedArray::<f32>::new(weak_handle, (2, 2)).unwrap().leak()
+    TypedArray::<f32>::new(weak_handle, [2, 2]).unwrap().leak()
 }
 
 pub unsafe fn returns_typed_rank2_array() -> TypedRankedArrayRet<f32, 2> {
     let weak_handle = weak_handle_unchecked!();
-    TypedRankedArray::<f32, 2>::new(weak_handle, (2, 2))
+    TypedRankedArray::<f32, 2>::new(weak_handle, [2, 2])
         .unwrap()
         .leak()
 }

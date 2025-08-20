@@ -10,17 +10,16 @@ mod tests {
             fn $func() {
                 JULIA.with(|handle| {
                     handle.borrow_mut().with_stack(|mut stack| {
-                        stack
-                            .returning::<JlrsResult<_>>()
-                            .scope(|frame| {
-                                let v1 = Value::$func(&frame);
-                                let v2 = unsafe {
-                                    Module::core(&frame).global(&frame, $tyname)?.as_managed()
-                                };
-                                assert!(v1.datatype().as_value() == v2);
-                                Ok(())
-                            })
-                            .unwrap();
+                        stack.scope(|frame| {
+                            let v1 = Value::$func(&frame);
+                            let v2 = unsafe {
+                                Module::core(&frame)
+                                    .global(&frame, $tyname)
+                                    .unwrap()
+                                    .as_managed()
+                            };
+                            assert!(v1.datatype().as_value() == v2);
+                        })
                     });
                 });
             }
@@ -32,20 +31,19 @@ mod tests {
             fn $func() {
                 JULIA.with(|handle| {
                     handle.borrow_mut().with_stack(|mut stack| {
-                        stack
-                            .returning::<JlrsResult<_>>()
-                            .scope(|frame| {
-                                #[allow(unused_unsafe)]
-                                unsafe {
-                                    let v1 = Value::$func(&frame);
-                                    let v2 = unsafe {
-                                        Module::core(&frame).global(&frame, $tyname)?.as_managed()
-                                    };
-                                    assert!(v1.isa(v2));
-                                }
-                                Ok(())
-                            })
-                            .unwrap();
+                        stack.scope(|frame| {
+                            #[allow(unused_unsafe)]
+                            unsafe {
+                                let v1 = Value::$func(&frame);
+                                let v2 = unsafe {
+                                    Module::core(&frame)
+                                        .global(&frame, $tyname)
+                                        .unwrap()
+                                        .as_managed()
+                                };
+                                assert!(v1.isa(v2));
+                            }
+                        })
                     });
                 });
             }
@@ -57,20 +55,19 @@ mod tests {
             fn $func() {
                 JULIA.with(|handle| {
                     handle.borrow_mut().with_stack(|mut stack| {
-                        stack
-                            .returning::<JlrsResult<_>>()
-                            .scope(|frame| {
-                                #[allow(unused_unsafe)]
-                                unsafe {
-                                    let v1 = Value::$func(&frame);
-                                    let v2 = unsafe {
-                                        Module::core(&frame).global(&frame, $tyname)?.as_managed()
-                                    };
-                                    assert!(v1.subtype(v2));
-                                }
-                                Ok(())
-                            })
-                            .unwrap();
+                        stack.scope(|frame| {
+                            #[allow(unused_unsafe)]
+                            unsafe {
+                                let v1 = Value::$func(&frame);
+                                let v2 = unsafe {
+                                    Module::core(&frame)
+                                        .global(&frame, $tyname)
+                                        .unwrap()
+                                        .as_managed()
+                                };
+                                assert!(v1.subtype(v2));
+                            }
+                        })
                     });
                 });
             }
@@ -82,17 +79,16 @@ mod tests {
             fn $func() {
                 JULIA.with(|handle| {
                     handle.borrow_mut().with_stack(|mut stack| {
-                        stack
-                            .returning::<JlrsResult<_>>()
-                            .scope(|frame| {
-                                let v1 = UnionAll::$func(&frame);
-                                let v2 = unsafe {
-                                    Module::core(&frame).global(&frame, $tyname)?.as_managed()
-                                };
-                                assert!(v1.as_value() == v2);
-                                Ok(())
-                            })
-                            .unwrap();
+                        stack.scope(|frame| {
+                            let v1 = UnionAll::$func(&frame);
+                            let v2 = unsafe {
+                                Module::core(&frame)
+                                    .global(&frame, $tyname)
+                                    .unwrap()
+                                    .as_managed()
+                            };
+                            assert!(v1.as_value() == v2);
+                        })
                     });
                 });
             }
@@ -104,17 +100,16 @@ mod tests {
             fn $func() {
                 JULIA.with(|handle| {
                     handle.borrow_mut().with_stack(|mut stack| {
-                        stack
-                            .returning::<JlrsResult<_>>()
-                            .scope(|frame| {
-                                let v1 = UnionAll::$func(&frame);
-                                let v2 = unsafe {
-                                    Module::core(&frame).global(&frame, $tyname)?.as_managed()
-                                };
-                                assert!(v1.as_value().isa(v2));
-                                Ok(())
-                            })
-                            .unwrap();
+                        stack.scope(|frame| {
+                            let v1 = UnionAll::$func(&frame);
+                            let v2 = unsafe {
+                                Module::core(&frame)
+                                    .global(&frame, $tyname)
+                                    .unwrap()
+                                    .as_managed()
+                            };
+                            assert!(v1.as_value().isa(v2));
+                        })
                     });
                 });
             }
@@ -126,17 +121,16 @@ mod tests {
             fn $func() {
                 JULIA.with(|handle| {
                     handle.borrow_mut().with_stack(|mut stack| {
-                        stack
-                            .returning::<JlrsResult<_>>()
-                            .scope(|frame| {
-                                let v1 = DataType::$func(&frame);
-                                let v2 = unsafe {
-                                    Module::core(&frame).global(&frame, $tyname)?.as_managed()
-                                };
-                                assert!(v1.as_value().isa(v2));
-                                Ok(())
-                            })
-                            .unwrap();
+                        stack.scope(|frame| {
+                            let v1 = DataType::$func(&frame);
+                            let v2 = unsafe {
+                                Module::core(&frame)
+                                    .global(&frame, $tyname)
+                                    .unwrap()
+                                    .as_managed()
+                            };
+                            assert!(v1.as_value().isa(v2));
+                        })
                     });
                 });
             }

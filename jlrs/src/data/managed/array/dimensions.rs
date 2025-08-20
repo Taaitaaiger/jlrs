@@ -3,11 +3,11 @@
 //! See [`Dims`] for more information.
 
 use std::{
-    cell::Cell,
+    cell::UnsafeCell,
     ffi::c_void,
     fmt::{Debug, Display, Formatter, Result as FmtResult},
     marker::PhantomData,
-    mem::{ManuallyDrop, MaybeUninit},
+    mem::MaybeUninit,
     ptr::NonNull,
 };
 
@@ -45,8 +45,6 @@ use crate::{
 /// The following index types have a known rank at compile time:
 ///
 /// - `usize` (rank 1)
-///
-/// - `()`, `(usize,)`, ..., `(usize, usize, usize, usize)` (rank 0..=4)
 ///
 /// - `[usize; N]`, `&[usize; N]` (rank `N`)
 ///
@@ -218,119 +216,6 @@ unsafe impl Dims for usize {
     }
 }
 
-unsafe impl Dims for () {
-    const RANK: isize = 0;
-
-    type SlicingType<'s> = Self;
-
-    fn to_slicer<'s>(&'s self) -> Self::SlicingType<'s> {
-        *self
-    }
-
-    #[inline]
-    fn rank(&self) -> usize {
-        0
-    }
-
-    #[inline]
-    unsafe fn n_elements_unchecked(&self, _dimension: usize) -> usize {
-        0
-    }
-}
-
-unsafe impl Dims for (usize,) {
-    const RANK: isize = 1;
-
-    type SlicingType<'s> = [usize; 1];
-
-    fn to_slicer<'s>(&'s self) -> Self::SlicingType<'s> {
-        [self.0]
-    }
-
-    #[inline]
-    fn rank(&self) -> usize {
-        1
-    }
-
-    #[inline]
-    unsafe fn n_elements_unchecked(&self, _dimension: usize) -> usize {
-        self.0
-    }
-}
-
-unsafe impl Dims for (usize, usize) {
-    const RANK: isize = 2;
-
-    type SlicingType<'s> = [usize; 2];
-
-    fn to_slicer<'s>(&'s self) -> Self::SlicingType<'s> {
-        [self.0, self.1]
-    }
-
-    #[inline]
-    fn rank(&self) -> usize {
-        2
-    }
-
-    #[inline]
-    unsafe fn n_elements_unchecked(&self, dimension: usize) -> usize {
-        if dimension == 0 {
-            self.0
-        } else {
-            self.1
-        }
-    }
-}
-
-unsafe impl Dims for (usize, usize, usize) {
-    const RANK: isize = 3;
-
-    type SlicingType<'s> = [usize; 3];
-
-    fn to_slicer<'s>(&'s self) -> Self::SlicingType<'s> {
-        [self.0, self.1, self.2]
-    }
-
-    #[inline]
-    fn rank(&self) -> usize {
-        3
-    }
-
-    #[inline]
-    unsafe fn n_elements_unchecked(&self, dimension: usize) -> usize {
-        match dimension {
-            0 => self.0,
-            1 => self.1,
-            _ => self.2,
-        }
-    }
-}
-
-unsafe impl Dims for (usize, usize, usize, usize) {
-    const RANK: isize = 4;
-
-    type SlicingType<'s> = [usize; 4];
-
-    fn to_slicer<'s>(&'s self) -> Self::SlicingType<'s> {
-        [self.0, self.1, self.2, self.3]
-    }
-
-    #[inline]
-    fn rank(&self) -> usize {
-        4
-    }
-
-    #[inline]
-    unsafe fn n_elements_unchecked(&self, dimension: usize) -> usize {
-        match dimension {
-            0 => self.0,
-            1 => self.1,
-            2 => self.2,
-            _ => self.3,
-        }
-    }
-}
-
 unsafe impl<const N: usize> Dims for [usize; N] {
     const RANK: isize = N as isize;
 
@@ -423,11 +308,7 @@ unsafe impl<const N: isize> Dims for ArrayDimensions<'_, N> {
 
     #[inline]
     unsafe fn n_elements_unchecked(&self, dimension: usize) -> usize {
-        if N == 1 || self.rank() == 1 {
-            self.as_slice().get_unchecked(dimension).dims_cell.get()
-        } else {
-            self.as_slice().get_unchecked(dimension).dims_usize
-        }
+        self.as_slice().get_unchecked(dimension).get().read()
     }
 }
 
@@ -457,12 +338,6 @@ unsafe impl Dims for Dimensions {
 pub trait DimSlice {
     /// Convert `self` to a slice.
     fn as_slice(&self) -> &[usize];
-}
-
-impl DimSlice for () {
-    fn as_slice(&self) -> &[usize] {
-        &[]
-    }
 }
 
 impl<const N: usize> DimSlice for [usize; N] {
@@ -502,7 +377,7 @@ pub unsafe trait DimsExt: Dims {
         T: ConstructType,
         Tgt: Target<'target>,
     {
-        target.with_local_scope::<1>(|target, mut frame| {
+        target.with_local_scope::<_, 1>(|target, mut frame| {
             let n = self.rank();
             let elem_ty = T::construct_type(&mut frame);
             unsafe {
@@ -559,7 +434,7 @@ pub unsafe trait DimsExt: Dims {
     where
         Tgt: Target<'target>,
     {
-        target.local_scope::<1>(|mut frame| {
+        target.local_scope::<_, 1>(|mut frame| {
             let tuple = unsized_dim_tuple(&frame, self);
             tuple.root(&mut frame);
             jl_new_array(array_type, tuple.ptr().as_ptr())
@@ -598,7 +473,7 @@ pub unsafe trait DimsExt: Dims {
 
         let arr = match self.rank() {
             1 => jl_ptr_to_array_1d(array_type, data, self.n_elements_unchecked(0), 0),
-            _ => target.local_scope::<1>(|frame| {
+            _ => target.local_scope::<_, 1>(|frame| {
                 let tuple = unsized_dim_tuple(frame, self);
                 jl_ptr_to_array(array_type, data, tuple.unwrap(Private), 0)
             }),
@@ -727,7 +602,7 @@ pub unsafe trait RankedDims: Dims {
         Tgt: Target<'target>,
     {
         let _: () = Self::ASSERT_RANKED;
-        target.local_scope::<1>(|mut frame| {
+        target.local_scope::<_, 1>(|mut frame| {
             let tuple = sized_dim_tuple(&frame, self);
             tuple.root(&mut frame);
             jl_new_array(array_type, tuple.ptr().as_ptr())
@@ -769,7 +644,7 @@ pub unsafe trait RankedDims: Dims {
 
         let arr = match Self::RANK {
             1 => jl_ptr_to_array_1d(array_type, data, self.n_elements_unchecked(0), 0),
-            _ => target.local_scope::<1>(|frame| {
+            _ => target.local_scope::<_, 1>(|frame| {
                 let tuple = sized_dim_tuple(frame, self);
                 jl_ptr_to_array(array_type, data, tuple.unwrap(Private), 0)
             }),
@@ -803,55 +678,6 @@ unsafe impl RankedDims for usize {
     }
 }
 
-unsafe impl RankedDims for () {
-    type ArrayConstructor<T: ConstructType> = ArrayTypeConstructor<T, ConstantIsize<0>>;
-
-    #[inline]
-    fn fill_tuple(&self, _tup: &mut [MaybeUninit<usize>], _: Private) {}
-}
-
-unsafe impl RankedDims for (usize,) {
-    type ArrayConstructor<T: ConstructType> = ArrayTypeConstructor<T, ConstantIsize<1>>;
-
-    #[inline]
-    fn fill_tuple(&self, tup: &mut [MaybeUninit<usize>], _: Private) {
-        tup[0].write(self.0);
-    }
-}
-
-unsafe impl RankedDims for (usize, usize) {
-    type ArrayConstructor<T: ConstructType> = ArrayTypeConstructor<T, ConstantIsize<2>>;
-
-    #[inline]
-    fn fill_tuple(&self, tup: &mut [MaybeUninit<usize>], _: Private) {
-        tup[0].write(self.0);
-        tup[1].write(self.1);
-    }
-}
-
-unsafe impl RankedDims for (usize, usize, usize) {
-    type ArrayConstructor<T: ConstructType> = ArrayTypeConstructor<T, ConstantIsize<3>>;
-
-    #[inline]
-    fn fill_tuple(&self, tup: &mut [MaybeUninit<usize>], _: Private) {
-        tup[0].write(self.0);
-        tup[1].write(self.1);
-        tup[2].write(self.2);
-    }
-}
-
-unsafe impl RankedDims for (usize, usize, usize, usize) {
-    type ArrayConstructor<T: ConstructType> = ArrayTypeConstructor<T, ConstantIsize<4>>;
-
-    #[inline]
-    fn fill_tuple(&self, tup: &mut [MaybeUninit<usize>], _: Private) {
-        tup[0].write(self.0);
-        tup[1].write(self.1);
-        tup[2].write(self.2);
-        tup[3].write(self.3);
-    }
-}
-
 unsafe impl<const N: usize> RankedDims for &[usize; N] {
     type ArrayConstructor<T: ConstructType> = ArrayTypeConstructor<T, ConstantSize<N>>;
 
@@ -872,46 +698,22 @@ unsafe impl<const N: usize> RankedDims for [usize; N] {
     }
 }
 
-// If the array is one-dimensional, the size of the array can change by pushing or popping
-// elements. This is not true for arrays of rank greater than 1 because their size is
-// constant.
-pub(crate) union Elem {
-    pub(crate) dims_cell: ManuallyDrop<Cell<usize>>,
-    pub(crate) dims_usize: usize,
-}
-
 /// Reference to the dimensions of an [array].
 ///
 /// [array]: crate::data::managed::array::ArrayBase
+#[derive(Debug)]
 pub struct ArrayDimensions<'borrow, const N: isize> {
-    dims: &'borrow [Elem],
-}
-
-impl<const N: isize> Debug for ArrayDimensions<'_, N> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        if N == 1 || self.rank() == 1 {
-            let dim = unsafe { self.dims[0].dims_cell.get() };
-            let dims = &[dim][..];
-            f.debug_struct("ArrayDimensions")
-                .field("dims", &dims)
-                .finish()
-        } else {
-            let dims = unsafe { &*(self.dims as *const [Elem] as *const [usize]) };
-            f.debug_struct("ArrayDimensions")
-                .field("dims", &dims)
-                .finish()
-        }
-    }
+    dims: &'borrow [UnsafeCell<usize>],
 }
 
 impl<'borrow, const N: isize> ArrayDimensions<'borrow, N> {
     #[inline]
-    pub(crate) fn new(dims: &'borrow [Elem]) -> Self {
+    pub(crate) fn new(dims: &'borrow [UnsafeCell<usize>]) -> Self {
         ArrayDimensions { dims }
     }
 
     #[inline]
-    pub(crate) fn as_slice(&self) -> &[Elem] {
+    pub(crate) fn as_slice(&self) -> &'borrow [UnsafeCell<usize>] {
         &self.dims
     }
 }
@@ -1041,52 +843,6 @@ mod tests {
         assert_eq!(d.rank(), 1);
         assert_eq!(d.n_elements(0), Some(4));
         assert_eq!(d.size(), 4);
-    }
-
-    #[test]
-    fn convert_tuple_0d() {
-        let d: Dimensions = ().to_dimensions();
-        assert_eq!(d.rank(), 0);
-        assert_eq!(d.n_elements(0), Some(0));
-        assert_eq!(d.size(), 1);
-    }
-
-    #[test]
-    fn convert_tuple_1d() {
-        let d: Dimensions = (4,).to_dimensions();
-        assert_eq!(d.rank(), 1);
-        assert_eq!(d.n_elements(0), Some(4));
-        assert_eq!(d.size(), 4);
-    }
-
-    #[test]
-    fn convert_tuple_2d() {
-        let d: Dimensions = (4, 3).to_dimensions();
-        assert_eq!(d.rank(), 2);
-        assert_eq!(d.n_elements(0), Some(4));
-        assert_eq!(d.n_elements(1), Some(3));
-        assert_eq!(d.size(), 12);
-    }
-
-    #[test]
-    fn convert_tuple_3d() {
-        let d: Dimensions = (4, 3, 2).to_dimensions();
-        assert_eq!(d.rank(), 3);
-        assert_eq!(d.n_elements(0), Some(4));
-        assert_eq!(d.n_elements(1), Some(3));
-        assert_eq!(d.n_elements(2), Some(2));
-        assert_eq!(d.size(), 24);
-    }
-
-    #[test]
-    fn convert_tuple_4d() {
-        let d: Dimensions = (4, 3, 2, 1).to_dimensions();
-        assert_eq!(d.rank(), 4);
-        assert_eq!(d.n_elements(0), Some(4));
-        assert_eq!(d.n_elements(1), Some(3));
-        assert_eq!(d.n_elements(2), Some(2));
-        assert_eq!(d.n_elements(3), Some(1));
-        assert_eq!(d.size(), 24);
     }
 
     #[test]

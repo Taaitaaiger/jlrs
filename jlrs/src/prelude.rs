@@ -21,11 +21,10 @@ pub use crate::runtime::executor::tokio_exec::*;
 pub use crate::{
     async_util::task::{AsyncTask, PersistentTask},
     call::CallAsync,
-    memory::target::frame::AsyncGcFrame,
+    memory::{scope::AsyncScope, target::frame::AsyncGcFrame},
 };
 pub use crate::{
     call::{Call, ProvideKeywords},
-    convert::into_jlrs_result::IntoJlrsResult,
     data::{
         layout::{bool::Bool, char::Char, nothing::Nothing},
         managed::{
@@ -51,7 +50,7 @@ pub use crate::{
     define_fast_array_key, define_fast_key,
     error::JlrsResult,
     memory::{
-        scope::{LocalReturning, LocalScope, LocalScopeExt, Returning, Scope},
+        scope::{LocalScope, LocalScopeExt, Scope},
         target::{Target, TargetType},
     },
     named_tuple,

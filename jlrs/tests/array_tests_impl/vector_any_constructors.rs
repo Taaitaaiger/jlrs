@@ -7,14 +7,10 @@ pub(crate) mod tests {
     use crate::util::JULIA;
 
     fn vector_any_new_any(julia: &mut StackHandle) {
-        julia
-            .returning::<JlrsResult<_>>()
-            .scope(|mut frame| {
-                let arr = VectorAny::new_any(&mut frame, 3);
-                assert!(arr.is_ok());
-                Ok(())
-            })
-            .unwrap();
+        julia.scope(|mut frame| {
+            let arr = VectorAny::new_any(&mut frame, 3);
+            assert!(arr.is_ok());
+        })
     }
 
     pub(crate) fn vector_any_tests() {

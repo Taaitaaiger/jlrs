@@ -73,7 +73,7 @@ fn doc_info_fragment((index, info): (usize, &ItemWithAttrs)) -> Result<Expr> {
 
             let q = parse_quote! {
                 {
-                    frame.local_scope::<3>(|mut frame| {
+                    frame.local_scope::<_, 3>(|mut frame| {
                         unsafe {
                             let module = #override_module_fragment;
                             let item = ::jlrs::data::managed::symbol::Symbol::new(&frame, #rename);
@@ -81,7 +81,7 @@ fn doc_info_fragment((index, info): (usize, &ItemWithAttrs)) -> Result<Expr> {
                             let doc = ::jlrs::data::managed::string::JuliaString::new(&mut frame, #doc);
 
                             let doc_it = doc_item_ty.instantiate_unchecked(&mut frame, [module.as_value(), item.as_value(), signature, doc.as_value()]);
-                            accessor.set_value(&mut frame, #index, doc_it).unwrap().into_jlrs_result().unwrap();
+                            accessor.set_value(&mut frame, #index, doc_it).unwrap().unwrap();
                         }
                     });
                 }
@@ -109,7 +109,7 @@ fn doc_info_fragment((index, info): (usize, &ItemWithAttrs)) -> Result<Expr> {
 
             let q = parse_quote! {
                 {
-                    frame.local_scope::<3>(|mut frame| {
+                    frame.local_scope::<_, 3>(|mut frame| {
                         unsafe {
                             let module = #override_module_fragment;
                             let item = ::jlrs::data::managed::symbol::Symbol::new(&frame, #rename);
@@ -117,7 +117,7 @@ fn doc_info_fragment((index, info): (usize, &ItemWithAttrs)) -> Result<Expr> {
                             let doc = ::jlrs::data::managed::string::JuliaString::new(&mut frame, #doc);
 
                             let doc_it = doc_item_ty.instantiate_unchecked(&mut frame, [module.as_value(), item.as_value(), signature, doc.as_value()]);
-                            accessor.set_value(&mut frame, #index, doc_it).unwrap().into_jlrs_result().unwrap();
+                            accessor.set_value(&mut frame, #index, doc_it).unwrap().unwrap();
                         }
                     });
                 }
@@ -146,7 +146,7 @@ fn doc_info_fragment((index, info): (usize, &ItemWithAttrs)) -> Result<Expr> {
 
             let q = parse_quote! {
                 {
-                    frame.local_scope::<3>(|mut frame| {
+                    frame.local_scope::<_, 3>(|mut frame| {
                         unsafe {
                             let module = #override_module_fragment;
                             let item = ::jlrs::data::managed::symbol::Symbol::new(&frame, #rename);
@@ -154,7 +154,7 @@ fn doc_info_fragment((index, info): (usize, &ItemWithAttrs)) -> Result<Expr> {
                             let doc = ::jlrs::data::managed::string::JuliaString::new(&mut frame, #doc);
 
                             let doc_it = doc_item_ty.instantiate_unchecked(&mut frame, [module.as_value(), item.as_value(), signature, doc.as_value()]);
-                            accessor.set_value(&mut frame, #index, doc_it).unwrap().into_jlrs_result().unwrap();
+                            accessor.set_value(&mut frame, #index, doc_it).unwrap().unwrap();
                         }
                     });
                 }
@@ -170,14 +170,14 @@ fn doc_info_fragment((index, info): (usize, &ItemWithAttrs)) -> Result<Expr> {
 
             let q = parse_quote! {
                 {
-                    frame.local_scope::<3>(|mut frame| {
+                    frame.local_scope::<_, 3>(|mut frame| {
                         unsafe {
                             let item = ::jlrs::data::managed::symbol::Symbol::new(&frame, #rename);
                             let signature = ::jlrs::data::managed::value::Value::bottom_type(&frame);
                             let doc = ::jlrs::data::managed::string::JuliaString::new(&mut frame, #doc);
 
                             let doc_it = doc_item_ty.instantiate_unchecked(&mut frame, [module.as_value(), item.as_value(), signature, doc.as_value()]);
-                            accessor.set_value(&mut frame, #index, doc_it).unwrap().into_jlrs_result().unwrap();
+                            accessor.set_value(&mut frame, #index, doc_it).unwrap().unwrap();
                         }
                     });
                 }

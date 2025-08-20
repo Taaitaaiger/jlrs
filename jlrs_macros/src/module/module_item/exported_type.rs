@@ -188,7 +188,7 @@ impl TypeFragments {
                 frame: &Tgt,
                 module: ::jlrs::data::managed::module::Module,
             ) {
-                frame.local_scope::<1>(|mut frame| {
+                frame.local_scope::<_, 1>(|mut frame| {
                     let mut output = frame.output();
 
                     unsafe {
@@ -209,7 +209,7 @@ impl TypeFragments {
                 module: jlrs::data::managed::module::Module
             ) {
 
-                frame.local_scope::<1>(|mut frame| {
+                frame.local_scope::<_, 1>(|mut frame| {
                     let mut output = frame.output();
 
                     unsafe {
@@ -242,7 +242,7 @@ impl TypeFragments {
                 module: ::jlrs::data::managed::module::Module,
             ) {
 
-                frame.local_scope::<1>(|mut frame| {
+                frame.local_scope::<_, 1>(|mut frame| {
                     let mut output = frame.output();
 
                     unsafe {
@@ -266,7 +266,7 @@ impl TypeFragments {
                 module: jlrs::data::managed::module::Module
             ) {
 
-                frame.local_scope::<1>(|mut frame| {
+                frame.local_scope::<_, 1>(|mut frame| {
                     let mut output = frame.output();
 
                     unsafe {

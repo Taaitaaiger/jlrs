@@ -339,7 +339,7 @@ impl IncludeTask {
             Some(path) => {
                 let path = JuliaString::new(&mut frame, path);
                 Main::include(&frame)
-                    .call1(&frame, path.as_value())
+                    .call(&frame, [path.as_value()])
                     .map_err(|e| {
                         JlrsError::exception(format!("include error: {:?}", e.as_value()))
                     })?;
@@ -401,7 +401,7 @@ impl SetErrorColorTask {
             };
 
             JlrsCore::set_error_color(&unrooted)
-                .call1(&unrooted, enable)
+                .call(&unrooted, [enable])
                 .ok();
         };
         self.sender.send(()).ok();

@@ -14,12 +14,11 @@ mod tests {
                         frame.scope(|mut frame| unsafe {
                             let idx = Value::new(&mut frame, 4usize);
                             let data = vec![1.0f64, 2., 3.];
-                            let array = TypedArray::<f64>::from_vec(&mut frame, data, 3)?
-                                .into_jlrs_result()?;
+                            let array = TypedArray::<f64>::from_vec(&mut frame, data, 3)??;
                             let func = Module::base(&frame)
                                 .global(&frame, "getindex")?
                                 .as_managed();
-                            let out = func.call2(&mut frame, array.as_value(), idx).unwrap_err();
+                            let out = func.call(&mut frame, [array.as_value(), idx]).unwrap_err();
 
                             assert_eq!(out.datatype_name(), "BoundsError");
 

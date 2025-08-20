@@ -2,7 +2,7 @@
 
 use super::IsActive;
 use crate::{
-    memory::{context::stack::Stack, scope::Returning, target::frame::GcFrame},
+    memory::{context::stack::Stack, target::frame::GcFrame},
     prelude::{LocalScope, Scope, Value},
     weak_handle_unchecked,
 };
@@ -15,7 +15,7 @@ pub trait WithStack: IsActive {
         for<'ctx> F: FnOnce(StackHandle<'ctx>) -> T,
     {
         unsafe {
-            weak_handle_unchecked!().local_scope::<1>(|mut frame| {
+            weak_handle_unchecked!().local_scope::<_, 1>(|mut frame| {
                 let stack = Value::new(&mut frame, Stack::default());
                 func(StackHandle {
                     stack: stack.data_ptr().cast().as_ref(),
@@ -35,18 +35,11 @@ pub struct StackHandle<'ctx> {
     stack: &'ctx Stack,
 }
 
-impl<'ctx> Returning<'ctx> for StackHandle<'ctx> {
-    #[inline]
-    fn returning<T>(&mut self) -> &mut impl Scope<'ctx, T> {
-        self
-    }
-}
-
 impl<'ctx> IsActive for StackHandle<'ctx> {}
 
-impl<'ctx, T> Scope<'ctx, T> for StackHandle<'ctx> {
+unsafe impl<'ctx> Scope for StackHandle<'ctx> {
     #[inline]
-    fn scope(&mut self, func: impl for<'scope> FnOnce(GcFrame<'scope>) -> T) -> T {
+    fn scope<T>(&mut self, func: impl for<'scope> FnOnce(GcFrame<'scope>) -> T) -> T {
         unsafe {
             let frame = GcFrame::base(&self.stack);
             let ret = func(frame);

@@ -4,7 +4,10 @@ mod util;
 mod tests {
     use std::ptr::null_mut;
 
-    use jlrs::{data::layout::valid_layout::ValidLayout, prelude::*};
+    use jlrs::{
+        data::layout::valid_layout::{ValidField, ValidLayout},
+        prelude::*,
+    };
 
     use super::util::JULIA;
 
@@ -13,15 +16,11 @@ mod tests {
             fn $name() {
                 JULIA.with(|handle| {
                     handle.borrow_mut().with_stack(|mut stack| {
-                        stack
-                            .returning::<JlrsResult<_>>()
-                            .scope(|mut frame| {
-                                let val: $t = $val;
-                                let v = Value::new(&mut frame, val);
-                                assert!(<$t>::valid_layout(v.datatype().as_value()));
-                                Ok(())
-                            })
-                            .unwrap();
+                        stack.scope(|mut frame| {
+                            let val: $t = $val;
+                            let v = Value::new(&mut frame, val);
+                            assert!(<$t>::valid_layout(v.datatype().as_value()));
+                        });
                     })
                 })
             }
@@ -29,14 +28,10 @@ mod tests {
             fn $invalid_name() {
                 JULIA.with(|handle| {
                     handle.borrow_mut().with_stack(|mut stack| {
-                        stack
-                            .returning::<JlrsResult<_>>()
-                            .scope(|mut frame| {
-                                let v = Value::new(&mut frame, null_mut::<$t>());
-                                assert!(!<$t>::valid_layout(v.datatype().as_value()));
-                                Ok(())
-                            })
-                            .unwrap();
+                        stack.scope(|mut frame| {
+                            let v = Value::new(&mut frame, null_mut::<$t>());
+                            assert!(!<$t>::valid_layout(v.datatype().as_value()));
+                        });
                     })
                 })
             }
@@ -146,38 +141,30 @@ mod tests {
     fn invalid_ptr_layout() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| {
-                        let v = Value::new(&mut frame, null_mut::<u8>());
-                        assert!(!<u8>::valid_layout(v.datatype().as_value()));
-                        Ok(())
-                    })
-                    .unwrap();
+                stack.scope(|mut frame| {
+                    let v = Value::new(&mut frame, null_mut::<u8>());
+                    assert!(!<u8>::valid_layout(v.datatype().as_value()));
+                });
             })
         })
     }
 
-    /*
-    TODO
     fn valid_layout_array() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>().scope(|mut frame| {
-                        unsafe {
-                            let v = Array::new::<i32, _, _>(&mut frame, (2, 2))
-                                .into_jlrs_result()?
-                                .as_value();
-                            assert!(ArrayRef::valid_layout(v.datatype().as_value()));
+                stack.scope(|mut frame| unsafe {
+                    let v = TypedArray::<i32>::new::<_, _>(&mut frame, [2, 2])
+                        .unwrap()
+                        .as_value();
+                    assert!(Option::<WeakArray>::valid_field(v.datatype().as_value()));
 
-                            let ua = Module::base(&frame).global(&frame, "Array")?.as_managed();
+                    let ua = Module::base(&frame)
+                        .global(&frame, "Array")
+                        .unwrap()
+                        .as_managed();
 
-                            assert!(ArrayRef::valid_layout(ua));
-                        }
-                        Ok(())
-                    })
-                    .unwrap();
+                    assert!(Option::<WeakArray>::valid_field(ua));
+                });
             })
         })
     }
@@ -185,18 +172,21 @@ mod tests {
     fn invalid_layout_array() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
-                stack
-                    .returning::<JlrsResult<_>>().scope(|mut frame| {
-                        let v = Array::new::<i32, _, _>(&mut frame, (2, 2))
-                            .into_jlrs_result()?
-                            .as_value();
-                        assert!(!bool::valid_layout(v));
-                        Ok(())
-                    })
-                    .unwrap();
+                stack.scope(|mut frame| {
+                    let v = TypedArray::<i32>::new::<_, _>(&mut frame, [2, 2])
+                        .unwrap()
+                        .as_value();
+
+                    assert!(Option::<WeakTypedArray<i32>>::valid_field(
+                        v.datatype().as_value()
+                    ));
+                    assert!(!Option::<WeakTypedArray<u32>>::valid_field(
+                        v.datatype().as_value()
+                    ));
+                });
             })
         })
-    }*/
+    }
 
     #[test]
     fn valid_layout_tests() {
@@ -259,7 +249,7 @@ mod tests {
         invalid_layout_char_ptr();
 
         invalid_ptr_layout();
-        //valid_layout_array();
-        //invalid_layout_array();
+        valid_layout_array();
+        invalid_layout_array();
     }
 }

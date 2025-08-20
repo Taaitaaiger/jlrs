@@ -117,7 +117,7 @@ impl JuliaModule {
 
                 match ::jlrs::weak_handle!() {
                     Ok(handle) => {
-                        handle.local_scope::<2>(|mut frame| {
+                        handle.local_scope::<_, 2>(|mut frame| {
                             let wrap_mod = ::jlrs::data::managed::module::Module::jlrs_core(&frame)
                                 .submodule(&frame, "Wrap")
                                 .unwrap()

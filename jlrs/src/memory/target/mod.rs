@@ -111,6 +111,7 @@ use super::scope::{LocalScope, LocalScopeExt};
 use crate::runtime::handle::mt_handle::ActiveHandle;
 use crate::{
     data::managed::Weak,
+    memory::scope::private::LocalScopePriv,
     prelude::{Managed, ValueData},
     runtime::{
         handle::{weak_handle::WeakHandle, with_stack::StackHandle},
@@ -169,8 +170,9 @@ pub trait Target<'target>: TargetPriv<'target> {
     }
 }
 
-impl<'target, T, Tgt: Target<'target>> LocalScope<'target, T> for Tgt {}
-impl<'target, T, Tgt: Target<'target>> LocalScopeExt<'target, T> for Tgt {}
+impl<'target, Tgt: Target<'target>> LocalScopePriv for Tgt {}
+unsafe impl<'target, Tgt: Target<'target>> LocalScope for Tgt {}
+unsafe impl<'target, Tgt: Target<'target>> LocalScopeExt<'target> for Tgt {}
 
 /// A `Target` bundled with a [`GcFrame`].
 pub struct ExtendedTarget<'target, 'current, 'borrow, Tgt>
@@ -502,6 +504,7 @@ pub(crate) mod private {
     impl<'target, const N: usize> TargetPriv<'target> for &mut LocalGcFrame<'target, N> {
         // Safety: the pointer must point to valid data.
         #[inline]
+        #[track_caller]
         unsafe fn data_from_ptr<'data, T: Managed<'target, 'data>>(
             self,
             value: NonNull<T::Wraps>,
@@ -512,6 +515,7 @@ pub(crate) mod private {
 
         // Safety: the pointer must point to valid data.
         #[inline]
+        #[track_caller]
         unsafe fn result_from_ptr<'data, T: Managed<'target, 'data>>(
             self,
             result: Result<NonNull<T::Wraps>, NonNull<jl_value_t>>,
@@ -525,6 +529,7 @@ pub(crate) mod private {
 
         // Safety: the pointer must point to valid data.
         #[inline]
+        #[track_caller]
         unsafe fn exception_from_ptr<'data, T>(
             self,
             result: Result<T, NonNull<jl_value_t>>,
@@ -540,6 +545,7 @@ pub(crate) mod private {
     impl<'target> TargetPriv<'target> for &mut UnsizedLocalGcFrame<'target> {
         // Safety: the pointer must point to valid data.
         #[inline]
+        #[track_caller]
         unsafe fn data_from_ptr<'data, T: Managed<'target, 'data>>(
             self,
             value: NonNull<T::Wraps>,
@@ -550,6 +556,7 @@ pub(crate) mod private {
 
         // Safety: the pointer must point to valid data.
         #[inline]
+        #[track_caller]
         unsafe fn result_from_ptr<'data, T: Managed<'target, 'data>>(
             self,
             result: Result<NonNull<T::Wraps>, NonNull<jl_value_t>>,
@@ -563,6 +570,7 @@ pub(crate) mod private {
 
         // Safety: the pointer must point to valid data.
         #[inline]
+        #[track_caller]
         unsafe fn exception_from_ptr<'data, T>(
             self,
             result: Result<T, NonNull<jl_value_t>>,
@@ -578,6 +586,7 @@ pub(crate) mod private {
     impl<'target> TargetPriv<'target> for GcFrame<'target> {
         // Safety: the pointer must point to valid data.
         #[inline]
+        #[track_caller]
         unsafe fn data_from_ptr<'data, T: Managed<'target, 'data>>(
             self,
             value: NonNull<T::Wraps>,
@@ -588,6 +597,7 @@ pub(crate) mod private {
 
         // Safety: the pointer must point to valid data.
         #[inline]
+        #[track_caller]
         unsafe fn result_from_ptr<'data, T: Managed<'target, 'data>>(
             self,
             result: Result<NonNull<T::Wraps>, NonNull<jl_value_t>>,
@@ -601,6 +611,7 @@ pub(crate) mod private {
 
         // Safety: the pointer must point to valid data.
         #[inline]
+        #[track_caller]
         unsafe fn exception_from_ptr<'data, T>(
             self,
             result: Result<T, NonNull<jl_value_t>>,
@@ -616,6 +627,7 @@ pub(crate) mod private {
     impl<'target, const N: usize> TargetPriv<'target> for LocalGcFrame<'target, N> {
         // Safety: the pointer must point to valid data.
         #[inline]
+        #[track_caller]
         unsafe fn data_from_ptr<'data, T: Managed<'target, 'data>>(
             mut self,
             value: NonNull<T::Wraps>,
@@ -626,6 +638,7 @@ pub(crate) mod private {
 
         // Safety: the pointer must point to valid data.
         #[inline]
+        #[track_caller]
         unsafe fn result_from_ptr<'data, T: Managed<'target, 'data>>(
             mut self,
             result: Result<NonNull<T::Wraps>, NonNull<jl_value_t>>,
@@ -639,6 +652,7 @@ pub(crate) mod private {
 
         // Safety: the pointer must point to valid data.
         #[inline]
+        #[track_caller]
         unsafe fn exception_from_ptr<'data, T>(
             mut self,
             result: Result<T, NonNull<jl_value_t>>,

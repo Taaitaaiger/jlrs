@@ -39,8 +39,7 @@ impl AsyncTask for MyTask {
                         .global(&frame, "complexfunc")?
                         .as_managed()
                         .call_async(&mut frame, [dims, iters])
-                        .await
-                        .into_jlrs_result()?
+                        .await?
                 };
 
                 Ok(out.root(output))

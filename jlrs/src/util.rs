@@ -4,8 +4,11 @@ use std::{ffi::CStr, process::abort, ptr::null_mut, sync::atomic::AtomicPtr};
 
 #[cfg(not(any(windows, target_os = "windows", feature = "windows")))]
 use atomic::Ordering;
+use jl_sys::jl_value_t;
 #[cfg(not(any(windows, target_os = "windows", feature = "windows")))]
 use jl_sys::{jl_dlclose, jl_dlopen, jl_dlsym};
+
+use crate::prelude::Target;
 
 pub trait RequireSendSync: 'static + Send + Sync {}
 
@@ -68,4 +71,25 @@ unsafe fn load_uv_async_send_func(tgt: &AtomicPtr<c_void>) -> *mut c_void {
             abort()
         }
     }
+}
+
+#[cfg(any(julia_1_10, julia_1_11))]
+#[inline(always)]
+pub(crate) fn kwcall_function<'target, Tgt>(_target: &Tgt) -> *mut jl_value_t
+where
+    Tgt: Target<'target>,
+{
+    unsafe { jl_sys::jl_kwcall_func }
+}
+
+#[cfg(not(any(julia_1_10, julia_1_11)))]
+#[inline(always)]
+pub(crate) fn kwcall_function<'target, Tgt>(target: &Tgt) -> *mut jl_value_t
+where
+    Tgt: Target<'target>,
+{
+    use crate::data::managed::private::ManagedPriv as _;
+
+    crate::inline_static_ref!(KWCALL, crate::prelude::Value, "Core.kwcall", target)
+        .unwrap(crate::private::Private)
 }

@@ -178,11 +178,11 @@ impl ExportedFunction {
                         let mut julia_arg_types_ref = julia_arg_types.indeterminate_data_mut();
 
                         #(
-                            frame.local_scope::<2>(|mut frame| {
+                            frame.local_scope::<_, 2>(|mut frame| {
                                 let t1 = #ccall_arg_types.as_value();
-                                ccall_arg_types_ref.set_value(&mut output, #ccall_arg_idx, t1).unwrap().into_jlrs_result().unwrap();
+                                ccall_arg_types_ref.set_value(&mut output, #ccall_arg_idx, t1).unwrap().unwrap();
                                 let t2 = #function_arg_types.as_value();
-                                julia_arg_types_ref.set_value(&mut output, #julia_arg_idx, t2).unwrap().into_jlrs_result().unwrap();
+                                julia_arg_types_ref.set_value(&mut output, #julia_arg_idx, t2).unwrap().unwrap();
                             });
                         )*
 
@@ -217,12 +217,12 @@ impl ExportedFunction {
         .map(|(idx, expr)| -> Expr {
             parse_quote! {
                 {
-                    frame.local_scope::<8>(|mut frame| {
+                    frame.local_scope::<_, 8>(|mut frame| {
                         // Root 1
                         let mut output = frame.output();
                         let instance = #expr;
                         let n = offset + #start + #idx;
-                        accessor.set_value(&mut output, n, instance).unwrap().into_jlrs_result().unwrap();
+                        accessor.set_value(&mut output, n, instance).unwrap().unwrap();
                     });
                 }
             }
@@ -388,7 +388,7 @@ fn function_info_fragment(
 
     let expr = parse_quote! {
         {
-            frame.local_scope::<8>(|mut frame| {
+            frame.local_scope::<_, 8>(|mut frame| {
                 // Root #1
                 let mut output = frame.output();
                 let name = ::jlrs::data::managed::symbol::Symbol::new(&frame, #rename);
@@ -424,11 +424,11 @@ fn function_info_fragment(
                     let mut julia_arg_types_ref = julia_arg_types.indeterminate_data_mut();
 
                     #(
-                        frame.local_scope::<2>(|mut frame| {
+                        frame.local_scope::<_, 2>(|mut frame| {
                             let t1 = #ccall_arg_types.as_value();
-                            ccall_arg_types_ref.set_value(&mut output, #ccall_arg_idx, t1).unwrap().into_jlrs_result().unwrap();
+                            ccall_arg_types_ref.set_value(&mut output, #ccall_arg_idx, t1).unwrap().unwrap();
                             let t2 = #julia_arg_types.as_value();
-                            julia_arg_types_ref.set_value(&mut output, #julia_arg_idx, t2).unwrap().into_jlrs_result().unwrap();
+                            julia_arg_types_ref.set_value(&mut output, #julia_arg_idx, t2).unwrap().unwrap();
                         });
                     )*
 
@@ -453,7 +453,7 @@ fn function_info_fragment(
                     ]);
 
                     let n = #index;
-                    accessor.set_value(&mut output, n, instance).unwrap().into_jlrs_result().unwrap();
+                    accessor.set_value(&mut output, n, instance).unwrap().unwrap();
                 }
             });
         }

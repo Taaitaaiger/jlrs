@@ -53,6 +53,20 @@ pub type JuliaResultDataU<'target, 'data, V, Tgt> = Result<V, ValueData<'target,
 /// Alias for `Result<V, ValueRet>`.
 pub type JuliaResultRet<V = ValueRet> = Result<V, ValueRet>;
 
+impl From<Value<'_, '_>> for Box<JlrsError> {
+    fn from(e: Value<'_, '_>) -> Self {
+        Box::new(JlrsError::exception(
+            e.error_string_or(CANNOT_DISPLAY_VALUE),
+        ))
+    }
+}
+
+impl From<Value<'_, '_>> for JlrsError {
+    fn from(e: Value<'_, '_>) -> Self {
+        JlrsError::exception(e.error_string_or(CANNOT_DISPLAY_VALUE))
+    }
+}
+
 /// Extension trait for `JuliaResult`.
 pub trait JuliaResultExt<'scope, V> {
     /// Leak the content of `self`.
@@ -220,8 +234,6 @@ pub enum IOError {
 /// Type errors.
 #[derive(Debug, Error, Clone)]
 pub enum TypeError {
-    #[error("expected a Function, {name} is a {ty}")]
-    NotAFunction { name: String, ty: String },
     #[error("expected a NamedTuple, got a {ty}")]
     NotANamedTuple { ty: String },
     #[error("expected a Module, {name} is a {ty}")]

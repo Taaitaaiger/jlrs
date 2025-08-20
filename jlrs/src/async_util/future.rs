@@ -1,3 +1,5 @@
+//! Julia-aware futures.
+
 use std::{
     ffi::c_void,
     fmt::Display,
@@ -14,10 +16,8 @@ use jl_sys::{jl_call, jl_call1, jl_exception_occurred, jlrs_current_task};
 use crate::{
     args::Values,
     call::{Call, WithKeywords},
-    catch::catch_exceptions,
     data::managed::{
         erase_scope_lifetime,
-        function::kwcall_function,
         module::{JlrsCore, Module},
         private::ManagedPriv,
         value::Value,
@@ -32,8 +32,14 @@ use crate::{
         PTls,
     },
     private::Private,
+    util::kwcall_function,
 };
 
+/// A `Future` that enters a GC-safe state while it's progressing.
+///
+/// A typical use-case for GC-safe futures is async functions that don't interact with Julia; if
+/// we're awaiting such a future, the GC can safely collect garbage while the future is pending.
+/// Normally, such an operation would prevent garbage from being collected.
 pub struct GcSafeFuture<T, F>
 where
     F: Future<Output = T>,
@@ -47,9 +53,14 @@ impl<T, F> GcSafeFuture<T, F>
 where
     F: Future<Output = T>,
 {
+    /// Create a new GC-safe future.
+    ///
+    /// A GC-safe future can only be created from a thread that can call into Julia.
     pub unsafe fn new(fut: F) -> Self {
-        debug_assert!(!jlrs_current_task().is_null(), "invalid_thread");
+        assert!(!jlrs_current_task().is_null(), "No task");
         let ptls = get_tls();
+        assert!(!ptls.is_null(), "no TLS");
+
         GcSafeFuture {
             fut,
             ptls,
@@ -79,65 +90,10 @@ where
     }
 }
 
-pub struct TryCatchFuture<T, F, E, H>
-where
-    F: Future<Output = T>,
-    H: for<'exc> FnOnce(Value<'exc, 'static>) -> E,
-{
-    fut: F,
-    on_error: H,
-    _marker_t: PhantomData<T>,
-    _marker_e: PhantomData<E>,
-}
-
-impl<T, F, E, H> TryCatchFuture<T, F, E, H>
-where
-    F: Future<Output = T>,
-    H: for<'exc> FnOnce(Value<'exc, 'static>) -> E,
-    H: Clone,
-{
-    pub unsafe fn new(fut: F, on_error: H) -> Self {
-        debug_assert!(!jlrs_current_task().is_null(), "invalid_thread");
-        TryCatchFuture {
-            fut,
-            on_error,
-            _marker_t: PhantomData,
-            _marker_e: PhantomData,
-        }
-    }
-}
-
-impl<T, F, E, H> Future for TryCatchFuture<T, F, E, H>
-where
-    F: Future<Output = T>,
-    H: for<'exc> FnOnce(Value<'exc, 'static>) -> E,
-    H: Clone,
-{
-    type Output = Result<T, E>;
-
-    // Poll in GC-safe state to allow Julia to collect garbage on this thread.
-    fn poll(
-        self: Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Self::Output> {
-        unsafe {
-            let s = self.get_unchecked_mut();
-            let on_error = s.on_error.clone();
-            let pinned: Pin<&mut F> = std::pin::Pin::new_unchecked(&mut s.fut);
-
-            let res = catch_exceptions(
-                || pinned.poll(cx).map(|v| Ok(v)),
-                |e| std::task::Poll::Ready(Err(on_error(e))),
-            );
-
-            match res {
-                Ok(v) => v,
-                Err(e) => e,
-            }
-        }
-    }
-}
-
+/// A `Future` that enters a GC-unsafe state while it's progressing.
+///
+/// A typical use-case for GC-unsafe futures is async functions that interact with Julia; if
+/// we're awaiting such a future, we want to be able to mutate the GC state.
 pub struct GcUnsafeFuture<T, F>
 where
     F: Future<Output = T>,
@@ -151,6 +107,9 @@ impl<T, F> GcUnsafeFuture<T, F>
 where
     F: Future<Output = T>,
 {
+    /// Create a new GC-unsafe future.
+    ///
+    /// A GC-safe future can only be created from a thread that can call into Julia.
     pub fn new(fut: F) -> Self {
         unsafe {
             debug_assert!(!jlrs_current_task().is_null(), "invalid_thread");

@@ -27,7 +27,7 @@ mod tests {
             let blocking_recv = r
                 .as_ref()
                 .blocking_task(|mut frame| -> JlrsResult<()> {
-                    Value::eval_string(&mut frame, ASYNC_TESTS_JL).into_jlrs_result()?;
+                    Value::eval_string(&mut frame, ASYNC_TESTS_JL)?;
                     Ok(())
                 })
                 .try_dispatch()
@@ -229,50 +229,36 @@ mod tests {
             .unwrap()
             .unwrap();
 
-        //     let handle = julia
-        //         .persistent(AccumulatorTask { init_value: 5.0 })
-        //         .try_dispatch()
-        //         .ok()
-        //         .expect("Cannot send task")
-        //         .blocking_recv()
-        //         .unwrap()
-        //         .unwrap();
+        let handle = julia
+            .persistent(AccumulatorTask { init_value: 5.0 })
+            .try_dispatch()
+            .ok()
+            .expect("Cannot send task")
+            .blocking_recv()
+            .unwrap()
+            .unwrap();
 
-        //     let res = handle
-        //         .call(7.0)
-        //         .try_dispatch()
-        //         .ok()
-        //         .unwrap()
-        //         .blocking_recv()
-        //         .unwrap()
-        //         .unwrap();
+        let res = handle
+            .call(7.0)
+            .try_dispatch()
+            .ok()
+            .unwrap()
+            .blocking_recv()
+            .unwrap()
+            .unwrap();
 
-        //     assert_eq!(res, 12.0);
+        assert_eq!(res, 12.0);
 
-        //     let res = handle
-        //         .call(12.0)
-        //         .try_dispatch()
-        //         .ok()
-        //         .unwrap()
-        //         .blocking_recv()
-        //         .unwrap()
-        //         .unwrap();
+        let res = handle
+            .call(12.0)
+            .try_dispatch()
+            .ok()
+            .unwrap()
+            .blocking_recv()
+            .unwrap()
+            .unwrap();
 
-        //     assert_eq!(res, 24.0);
-        //     // let handle = {
-        //     //     let (handle_sender, handle_receiver) = crossbeam_channel::bounded(1);
-
-        //     //     handle_receiver
-        //     //         .blocking_recv()
-        //     //         .expect("Channel was closed")
-        //     //         .expect("Cannot init task")
-        //     // };
-
-        //     // handle.try_call(7.0.clone()).unwrap();
-        //     // assert_eq!(receiver.blocking_recv().unwrap().unwrap(), 12.0);
-
-        //     // handle.try_call(12.0).unwrap();
-        //     // assert_eq!(receiver.blocking_recv().unwrap().unwrap(), 24.0);
+        assert_eq!(res, 24.0);
     }
 
     #[test]

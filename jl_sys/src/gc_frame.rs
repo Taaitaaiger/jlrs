@@ -88,6 +88,7 @@ impl<const N: usize> RawGcFrame<N> {
     }
 
     #[inline]
+    #[track_caller]
     pub unsafe fn set_root(&self, slot: usize, root: *mut c_void) {
         debug_assert!(slot < N, "Out of bounds slot");
         self.roots.get_unchecked(slot).set(root);
@@ -146,7 +147,7 @@ pub struct UnsizedGcFrame<'scope> {
 impl<'scope> UnsizedGcFrame<'scope> {
     #[inline]
     pub unsafe fn root_value(&mut self, slot: usize, value: *mut c_void) {
-        debug_assert!(self.size() > slot, "Slot out of bounds");
+        assert!(self.size() > slot, "Slot out of bounds");
 
         unsafe {
             self.roots().get_unchecked(slot).set(value as _);

@@ -78,7 +78,7 @@ pub trait Gc: private::GcPriv {
         };
 
         // Safety: GC.enable_logging is safe to call.
-        unsafe { func.call1(&global, arg) }.expect("GC.enable_logging threw an exception");
+        unsafe { func.call(&global, [arg]) }.expect("GC.enable_logging threw an exception");
     }
 
     /// Returns `true` if the GC is enabled.

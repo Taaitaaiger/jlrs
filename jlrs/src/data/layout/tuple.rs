@@ -8,7 +8,7 @@
 //! # use jlrs::{prelude::*, data::layout::tuple::Tuple2};
 //! # fn main() {
 //! # let mut julia = Builder::new().start_local().unwrap();
-//! julia.local_scope::<1>(|mut frame| {
+//! julia.local_scope::<_, 1>(|mut frame| {
 //!     let tup = Tuple2(2i32, true);
 //!     let val = Value::new(&mut frame, tup);
 //!     assert!(val.is::<Tuple2<i32, bool>>());
@@ -252,7 +252,7 @@ macro_rules! impl_tuple {
                 const N: usize = count!($($types),*);
                 use $crate::memory::scope::LocalScopeExt;
 
-                target.with_local_scope::<N>(|target, mut frame| {
+                target.with_local_scope::<_, N>(|target, mut frame| {
                     let types = &mut [
                         $(<$types as $crate::data::types::construct_type::ConstructType>::construct_type(&mut frame)),+
                     ];
@@ -273,7 +273,7 @@ macro_rules! impl_tuple {
                     const N: usize = count!($($types),*);
                     use $crate::memory::scope::LocalScopeExt;
 
-                    target.with_local_scope::<N>(|target, mut frame| {
+                    target.with_local_scope::<_, N>(|target, mut frame| {
                         let types = &mut [
                             $(<$types as $crate::data::types::construct_type::ConstructType>::construct_type_with_env(&mut frame, env)),+
                         ];
@@ -511,7 +511,7 @@ unsafe impl<T: ConstructType, const N: usize> ConstructType for NTuple<T, N> {
         Tgt: Target<'target>,
     {
         unsafe {
-            target.with_local_scope::<1>(|target, mut frame| {
+            target.with_local_scope::<_, 1>(|target, mut frame| {
                 let ty = T::construct_type(&mut frame);
                 let types = [ty; N];
                 let tt = DataType::anytuple_type(&frame).as_value();
@@ -528,7 +528,7 @@ unsafe impl<T: ConstructType, const N: usize> ConstructType for NTuple<T, N> {
         Tgt: Target<'target>,
     {
         unsafe {
-            target.with_local_scope::<1>(|target, mut frame| {
+            target.with_local_scope::<_, 1>(|target, mut frame| {
                 let ty = T::construct_type_with_env(&mut frame, env);
                 let types = [ty; N];
                 let tt = DataType::anytuple_type(&frame).as_value();

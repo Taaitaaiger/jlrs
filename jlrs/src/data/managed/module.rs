@@ -26,10 +26,7 @@ use crate::{
     data::{
         cache::Cache,
         layout::nothing::Nothing,
-        managed::{
-            function::Function, private::ManagedPriv, symbol::Symbol, union_all::UnionAll,
-            value::Value,
-        },
+        managed::{private::ManagedPriv, symbol::Symbol, union_all::UnionAll, value::Value},
         static_data::StaticRef,
         types::{construct_type::ConstructType, typecheck::Typecheck},
     },
@@ -394,7 +391,7 @@ impl<'scope> Module<'scope> {
         );
 
         #[cfg(not(any(julia_1_10, julia_1_11)))]
-        jl_sys::bindings::jl_declare_constant_val(
+        jl_sys::bindings::jlrs_declare_constant_val(
             null_mut(),
             self.unwrap(Private),
             symbol.unwrap(Private),
@@ -501,10 +498,9 @@ impl<'scope> Module<'scope> {
     {
         Module::typed_global_cached::<Value, _, _>(&target, "Base.require")
             .unwrap()
-            .call2(
+            .call(
                 target,
-                self.as_value(),
-                module.to_symbol_priv(Private).as_value(),
+                [self.as_value(), module.to_symbol_priv(Private).as_value()],
             )
     }
 }
@@ -580,58 +576,43 @@ impl JlrsCore {
     }
 
     #[inline]
-    pub fn value_string<'target, Tgt>(target: &Tgt) -> Function<'target, 'static>
+    pub fn value_string<'target, Tgt>(target: &Tgt) -> Value<'target, 'static>
     where
         Tgt: Target<'target>,
     {
-        inline_static_ref!(VALUE_STRING, Function, "JlrsCore.valuestring", target)
+        inline_static_ref!(VALUE_STRING, Value, "JlrsCore.valuestring", target)
     }
 
     #[inline]
-    pub fn error_string<'target, Tgt>(target: &Tgt) -> Function<'target, 'static>
+    pub fn error_string<'target, Tgt>(target: &Tgt) -> Value<'target, 'static>
     where
         Tgt: Target<'target>,
     {
-        inline_static_ref!(ERROR_STRING, Function, "JlrsCore.errorstring", target)
+        inline_static_ref!(ERROR_STRING, Value, "JlrsCore.errorstring", target)
     }
 
     #[inline]
-    pub fn set_error_color<'target, Tgt>(target: &Tgt) -> Function<'target, 'static>
+    pub fn set_error_color<'target, Tgt>(target: &Tgt) -> Value<'target, 'static>
     where
         Tgt: Target<'target>,
     {
-        inline_static_ref!(
-            SET_ERROR_COLOR,
-            Function,
-            "JlrsCore.set_error_color",
-            target
-        )
+        inline_static_ref!(SET_ERROR_COLOR, Value, "JlrsCore.set_error_color", target)
     }
 
     #[inline]
-    pub fn wait_main<'target, Tgt>(target: &Tgt) -> Function<'target, 'static>
+    pub fn wait_main<'target, Tgt>(target: &Tgt) -> Value<'target, 'static>
     where
         Tgt: Target<'target>,
     {
-        inline_static_ref!(
-            SET_POOL_SIZE,
-            Function,
-            "JlrsCore.Threads.wait_main",
-            target
-        )
+        inline_static_ref!(SET_POOL_SIZE, Value, "JlrsCore.Threads.wait_main", target)
     }
 
     #[inline]
-    pub fn notify_main<'target, Tgt>(target: &Tgt) -> Function<'target, 'static>
+    pub fn notify_main<'target, Tgt>(target: &Tgt) -> Value<'target, 'static>
     where
         Tgt: Target<'target>,
     {
-        inline_static_ref!(
-            SET_POOL_SIZE,
-            Function,
-            "JlrsCore.Threads.notify_main",
-            target
-        )
+        inline_static_ref!(SET_POOL_SIZE, Value, "JlrsCore.Threads.notify_main", target)
     }
 
     #[inline]
@@ -652,22 +633,22 @@ impl JlrsCore {
 
     #[cfg(feature = "async")]
     #[inline]
-    pub(crate) fn async_call<'target, Tgt>(target: &Tgt) -> Function<'target, 'static>
+    pub(crate) fn async_call<'target, Tgt>(target: &Tgt) -> Value<'target, 'static>
     where
         Tgt: Target<'target>,
     {
-        inline_static_ref!(ASYNC_CALL, Function, "JlrsCore.Threads.asynccall", target)
+        inline_static_ref!(ASYNC_CALL, Value, "JlrsCore.Threads.asynccall", target)
     }
 
     #[cfg(feature = "async")]
     #[inline]
-    pub(crate) fn interactive_call<'target, Tgt>(target: &Tgt) -> Function<'target, 'static>
+    pub(crate) fn interactive_call<'target, Tgt>(target: &Tgt) -> Value<'target, 'static>
     where
         Tgt: Target<'target>,
     {
         inline_static_ref!(
             INTERACTIVE_CALL,
-            Function,
+            Value,
             "JlrsCore.Threads.interactivecall",
             target
         )
@@ -687,10 +668,10 @@ pub struct Main;
 
 impl Main {
     #[inline]
-    pub fn include<'target, Tgt>(target: &Tgt) -> Function<'target, 'static>
+    pub fn include<'target, Tgt>(target: &Tgt) -> Value<'target, 'static>
     where
         Tgt: Target<'target>,
     {
-        inline_static_ref!(INCLUDE, Function, "Main.include", target)
+        inline_static_ref!(INCLUDE, Value, "Main.include", target)
     }
 }

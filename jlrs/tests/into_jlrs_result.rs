@@ -9,10 +9,8 @@ mod tests {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
                 stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| unsafe {
-                        Value::eval_string(&mut frame, "1 + 1").into_jlrs_result()?;
-
+                    .scope::<JlrsResult<_>>(|mut frame| unsafe {
+                        Value::eval_string(&mut frame, "1 + 1")?;
                         Ok(())
                     })
                     .unwrap();
@@ -24,10 +22,8 @@ mod tests {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
                 stack
-                    .returning::<JlrsResult<_>>()
-                    .scope(|mut frame| unsafe {
-                        Value::eval_string(&mut frame, "1 + \"a\"").into_jlrs_result()?;
-
+                    .scope::<JlrsResult<_>>(|mut frame| unsafe {
+                        Value::eval_string(&mut frame, "1 + \"a\"")?;
                         Ok(())
                     })
                     .unwrap_err();

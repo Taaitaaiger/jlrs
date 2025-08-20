@@ -26,7 +26,10 @@ use super::{
     ExtendedTarget, Target,
 };
 use crate::{
-    data::managed::Managed, memory::context::stack::Stack, prelude::Scope, private::Private,
+    data::managed::Managed,
+    memory::{context::stack::Stack, scope::private::LocalScopePriv},
+    prelude::{LocalScope, Scope},
+    private::Private,
 };
 
 /// A dynamically-sized frame that can hold an arbitrary number of roots.
@@ -123,6 +126,7 @@ impl<'scope> GcFrame<'scope> {
 
     // Safety: ptr must be a valid pointer to T
     #[inline]
+    #[track_caller]
     pub(crate) unsafe fn root<'data, T: Managed<'scope, 'data>>(
         &self,
         ptr: NonNull<T::Wraps>,
@@ -157,19 +161,14 @@ impl<'scope> GcFrame<'scope> {
         }
     }
 
-    #[inline]
-    pub fn returning<T>(&mut self) -> &mut impl Scope<'scope, T> {
-        self
-    }
-
     // pub fn stack_addr(&self) -> *const c_void {
     //     self.stack as *const _ as *const _
     // }
 }
 
-impl<'ctx, T> Scope<'ctx, T> for GcFrame<'ctx> {
+unsafe impl<'f> Scope for GcFrame<'f> {
     #[inline]
-    fn scope(&mut self, func: impl for<'scope> FnOnce(GcFrame<'scope>) -> T) -> T {
+    fn scope<T>(&mut self, func: impl for<'scope> FnOnce(GcFrame<'scope>) -> T) -> T {
         unsafe {
             let (offset, nested) = self.nest();
             let res = func(nested);
@@ -237,6 +236,7 @@ impl<'scope, const N: usize> LocalGcFrame<'scope, N> {
     }
 
     #[inline]
+    #[track_caller]
     pub(crate) unsafe fn root<'data, T: Managed<'scope, 'data>>(
         &mut self,
         ptr: NonNull<T::Wraps>,
@@ -306,6 +306,7 @@ impl<'scope> UnsizedLocalGcFrame<'scope> {
     }
 
     #[inline]
+    #[track_caller]
     pub(crate) unsafe fn root<'data, T: Managed<'scope, 'data>>(
         &mut self,
         ptr: NonNull<T::Wraps>,
@@ -324,35 +325,45 @@ pub struct BorrowedFrame<'borrow, 'current, F>(
     pub(crate) PhantomData<&'current ()>,
 );
 
-// FIXME: scope trait
-impl<'borrow, 'current> BorrowedFrame<'borrow, 'current, GcFrame<'current>> {
-    /// Create a temporary scope by calling [`GcFrame::scope`].
+impl<'borrow, 'current> LocalScopePriv for BorrowedFrame<'borrow, 'current, GcFrame<'current>> {}
 
+unsafe impl<'borrow, 'current> LocalScope for BorrowedFrame<'borrow, 'current, GcFrame<'current>> {}
+
+unsafe impl<'borrow, 'current> Scope for BorrowedFrame<'borrow, 'current, GcFrame<'current>> {
     #[inline]
-    pub fn scope<T, F>(self, func: F) -> T
-    where
-        for<'inner> F: FnOnce(GcFrame<'inner>) -> T,
-    {
+    fn scope<T>(&mut self, func: impl for<'scope> FnOnce(GcFrame<'scope>) -> T) -> T {
         self.0.scope(func)
     }
 }
 
 #[cfg(feature = "async")]
-impl<'borrow, 'current> BorrowedFrame<'borrow, 'current, AsyncGcFrame<'current>> {
-    /// Create a temporary scope by calling [`GcFrame::scope`].
+impl<'borrow, 'current> LocalScopePriv
+    for BorrowedFrame<'borrow, 'current, AsyncGcFrame<'current>>
+{
+}
+
+#[cfg(feature = "async")]
+unsafe impl<'borrow, 'current> LocalScope
+    for BorrowedFrame<'borrow, 'current, AsyncGcFrame<'current>>
+{
+}
+
+#[cfg(feature = "async")]
+unsafe impl<'borrow, 'current> Scope for BorrowedFrame<'borrow, 'current, AsyncGcFrame<'current>> {
     #[inline]
-    pub fn scope<T, F>(self, func: F) -> T
-    where
-        for<'inner> F: FnOnce(GcFrame<'inner>) -> T,
-    {
+    fn scope<T>(&mut self, func: impl for<'scope> FnOnce(GcFrame<'scope>) -> T) -> T {
         self.0.scope(func)
     }
+}
 
-    /// Create a temporary scope by calling [`AsyncGcFrame::async_scope`].
+#[cfg(feature = "async")]
+unsafe impl<'borrow, 'current> crate::prelude::AsyncScope
+    for BorrowedFrame<'borrow, 'current, AsyncGcFrame<'current>>
+{
     #[inline]
-    pub async fn async_scope<T>(
+    async fn async_scope<T>(
         &mut self,
-        func: impl for<'inner> AsyncFnOnce(AsyncGcFrame<'inner>) -> T,
+        func: impl for<'scope> AsyncFnOnce(AsyncGcFrame<'scope>) -> T,
     ) -> T {
         self.0.async_scope(func).await
     }
