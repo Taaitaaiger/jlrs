@@ -86,6 +86,8 @@
 
 - All crates have been migrated to the 2024 edition of Rust.
 
+- The `JULIA_DIR` environment variable has been renamed to `JLRS_JULIA_DIR`.
+
 ## v0.21
 
 - Support generating bindings for Julia enums with integer base types in combination with JlrsCore.Reflect and the `Enum` derive macro.
