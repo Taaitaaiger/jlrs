@@ -37,12 +37,16 @@ pub(crate) mod tests {
                         .unwrap();
                     let mut accessor = arr.union_data_mut();
 
-                    assert!(accessor
-                        .set([0, 0], DataType::float64_type(&frame), 1.0f64)
-                        .is_ok());
-                    assert!(accessor
-                        .set([0, 1], DataType::int64_type(&frame), 2isize)
-                        .is_ok());
+                    assert!(
+                        accessor
+                            .set([0, 0], DataType::float64_type(&frame), 1.0f64)
+                            .is_ok()
+                    );
+                    assert!(
+                        accessor
+                            .set([0, 1], DataType::int64_type(&frame), 2isize)
+                            .is_ok()
+                    );
 
                     assert_eq!(accessor.get::<f64, _>([0, 0]).unwrap().unwrap(), 1.0);
                     assert_eq!(accessor.get::<isize, _>([0, 1]).unwrap().unwrap(), 2);
@@ -60,10 +64,12 @@ pub(crate) mod tests {
                         .unwrap();
                     let mut accessor = arr.union_data_mut();
 
-                    assert!(accessor
-                        .set([0, 0], DataType::float32_type(&frame), 1.0f32)
-                        .unwrap()
-                        .is_err());
+                    assert!(
+                        accessor
+                            .set([0, 0], DataType::float32_type(&frame), 1.0f32)
+                            .unwrap()
+                            .is_err()
+                    );
                 })
             });
         });

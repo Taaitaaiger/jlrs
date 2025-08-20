@@ -1,7 +1,7 @@
 use jlrs::{
     data::{
         layout::valid_layout::ValidLayout,
-        managed::background_task::{spawn_background_task, BackgroundTaskLayout},
+        managed::background_task::{BackgroundTaskLayout, spawn_background_task},
     },
     prelude::*,
 };

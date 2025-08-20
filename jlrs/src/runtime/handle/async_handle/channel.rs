@@ -1,6 +1,6 @@
 //! Re-export tokio oneshot channel sender and receiver types, and async-channel's `RecvError`.
 
-use async_channel::{bounded, unbounded, Receiver, Sender};
+use async_channel::{Receiver, Sender, bounded, unbounded};
 
 /// Reexport of the sending half of a tokio oneshot channel
 pub type OneshotSender<T> = tokio::sync::oneshot::Sender<T>;

@@ -1,6 +1,6 @@
 use std::ptr::NonNull;
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, black_box, criterion_group, criterion_main};
 use jlrs::{memory::target::frame::GcFrame, prelude::*};
 #[cfg(not(target_os = "windows"))]
 use pprof::{

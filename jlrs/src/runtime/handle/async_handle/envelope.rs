@@ -1,7 +1,7 @@
 use std::{future::Future, marker::PhantomData, path::PathBuf, pin::Pin};
 
 use super::{
-    channel::{channel, OneshotSender},
+    channel::{OneshotSender, channel},
     persistent::PersistentHandle,
 };
 use crate::{
@@ -189,9 +189,7 @@ where
         &'inner mut self,
         frame: AsyncGcFrame<'static>,
     ) -> JlrsResult<<Self::P as PersistentTask>::State<'static>> {
-        {
-            self.init(frame).await
-        }
+        self.init(frame).await
     }
 
     async fn call_run<'inner>(
@@ -262,9 +260,9 @@ where
 
 pub(crate) type InnerPersistentMessage<P> = Box<
     dyn CallPersistentTaskEnvelope<
-        Input = <P as PersistentTask>::Input,
-        Output = <P as PersistentTask>::Output,
-    >,
+            Input = <P as PersistentTask>::Input,
+            Output = <P as PersistentTask>::Output,
+        >,
 >;
 
 pub(crate) struct CallPersistentTask<I, O>
@@ -335,19 +333,21 @@ impl IncludeTask {
 
     #[inline]
     unsafe fn call_inner<'scope>(mut frame: GcFrame<'scope>, path: PathBuf) -> JlrsResult<()> {
-        match path.to_str() {
-            Some(path) => {
-                let path = JuliaString::new(&mut frame, path);
-                Main::include(&frame)
-                    .call(&frame, [path.as_value()])
-                    .map_err(|e| {
-                        JlrsError::exception(format!("include error: {:?}", e.as_value()))
-                    })?;
+        unsafe {
+            match path.to_str() {
+                Some(path) => {
+                    let path = JuliaString::new(&mut frame, path);
+                    Main::include(&frame)
+                        .call(&frame, [path.as_value()])
+                        .map_err(|e| {
+                            JlrsError::exception(format!("include error: {:?}", e.as_value()))
+                        })?;
+                }
+                None => {}
             }
-            None => {}
-        }
 
-        Ok(())
+            Ok(())
+        }
     }
 
     fn call<'scope>(self: Box<Self>, frame: GcFrame<'scope>) {

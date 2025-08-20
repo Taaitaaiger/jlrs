@@ -10,8 +10,8 @@
 use jl_sys::unsized_local_scope;
 
 use super::target::{
-    frame::{GcFrame, LocalFrame, LocalGcFrame, UnsizedLocalGcFrame},
     Target,
+    frame::{GcFrame, LocalFrame, LocalGcFrame, UnsizedLocalGcFrame},
 };
 
 /// Create new local scopes, local scopes can store a prespecified number of roots.

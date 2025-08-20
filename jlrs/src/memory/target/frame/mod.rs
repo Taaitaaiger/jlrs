@@ -14,16 +14,16 @@ pub mod async_frame;
 
 use std::{marker::PhantomData, pin::Pin, ptr::NonNull};
 
-use jl_sys::{pop_frame, RawGcFrame, UnsizedGcFrame};
+use jl_sys::{RawGcFrame, UnsizedGcFrame, pop_frame};
 
 #[cfg(feature = "async")]
 pub use self::async_frame::*;
 use super::{
+    ExtendedTarget, Target,
     output::Output,
     reusable_slot::ReusableSlot,
     slot_ref::{LocalSlotRef, StackSlotRef},
     unrooted::Unrooted,
-    ExtendedTarget, Target,
 };
 use crate::{
     data::managed::Managed,
@@ -131,8 +131,10 @@ impl<'scope> GcFrame<'scope> {
         &self,
         ptr: NonNull<T::Wraps>,
     ) -> T {
-        self.stack.push_root(ptr.cast());
-        T::wrap_non_null(ptr, Private)
+        unsafe {
+            self.stack.push_root(ptr.cast());
+            T::wrap_non_null(ptr, Private)
+        }
     }
 
     #[inline]
@@ -241,12 +243,14 @@ impl<'scope, const N: usize> LocalGcFrame<'scope, N> {
         &mut self,
         ptr: NonNull<T::Wraps>,
     ) -> T {
-        self.frame
-            .frame
-            .raw
-            .set_root(self.offset, ptr.as_ptr().cast());
-        self.offset += 1;
-        T::wrap_non_null(ptr, Private)
+        unsafe {
+            self.frame
+                .frame
+                .raw
+                .set_root(self.offset, ptr.as_ptr().cast());
+            self.offset += 1;
+            T::wrap_non_null(ptr, Private)
+        }
     }
 }
 
@@ -311,9 +315,11 @@ impl<'scope> UnsizedLocalGcFrame<'scope> {
         &mut self,
         ptr: NonNull<T::Wraps>,
     ) -> T {
-        self.frame.get_root(self.offset).set(ptr.as_ptr().cast());
-        self.offset += 1;
-        T::wrap_non_null(ptr, Private)
+        unsafe {
+            self.frame.get_root(self.offset).set(ptr.as_ptr().cast());
+            self.offset += 1;
+            T::wrap_non_null(ptr, Private)
+        }
     }
 }
 
@@ -386,7 +392,7 @@ impl<const N: usize> LocalFrame<N> {
 
     #[inline]
     pub(crate) unsafe fn pin<'scope>(&'scope mut self) -> PinnedLocalFrame<'scope, N> {
-        PinnedLocalFrame::new(self)
+        unsafe { PinnedLocalFrame::new(self) }
     }
 }
 
@@ -398,20 +404,24 @@ pub(crate) struct PinnedLocalFrame<'scope, const N: usize> {
 impl<'scope, const N: usize> PinnedLocalFrame<'scope, N> {
     #[inline]
     unsafe fn new(frame: &'scope mut LocalFrame<N>) -> Self {
-        if N > 0 {
-            frame.raw.push_frame();
-        }
+        unsafe {
+            if N > 0 {
+                frame.raw.push_frame();
+            }
 
-        PinnedLocalFrame {
-            frame: Pin::new_unchecked(frame),
-            _marker: PhantomData,
+            PinnedLocalFrame {
+                frame: Pin::new_unchecked(frame),
+                _marker: PhantomData,
+            }
         }
     }
 
     #[inline]
     pub(crate) unsafe fn pop(&self) {
-        if N > 0 {
-            pop_frame()
+        unsafe {
+            if N > 0 {
+                pop_frame()
+            }
         }
     }
 }

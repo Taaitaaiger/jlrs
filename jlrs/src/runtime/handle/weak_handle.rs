@@ -29,11 +29,9 @@ use crate::{error::RuntimeError, prelude::JlrsResult, runtime::state::GC_UNSAFE}
 #[macro_export]
 macro_rules! weak_handle {
     () => {
-        unsafe {
-            $crate::error::project_jlrs_result(::std::pin::pin!(
-                $crate::runtime::handle::weak_handle::WeakHandle::new()
-            ))
-        }
+        $crate::error::project_jlrs_result(::std::pin::pin!(unsafe {
+            $crate::runtime::handle::weak_handle::WeakHandle::new()
+        }))
     };
 }
 
@@ -71,11 +69,13 @@ impl WeakHandle {
     /// `MtHandle::with`.
     #[inline]
     pub unsafe fn new() -> JlrsResult<Self> {
-        if jlrs_task_gc_state() != GC_UNSAFE {
-            Err(RuntimeError::IncorrectState)?;
-        }
+        unsafe {
+            if jlrs_task_gc_state() != GC_UNSAFE {
+                Err(RuntimeError::IncorrectState)?;
+            }
 
-        Ok(Self::new_unchecked())
+            Ok(Self::new_unchecked())
+        }
     }
 
     /// Create a new `WeakHandle` to the current thread without checking if this is allowed.

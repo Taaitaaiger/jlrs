@@ -10,9 +10,8 @@ use jl_sys::{
 };
 
 use super::{
-    get_tls,
-    target::{unrooted::Unrooted, Target},
-    PTls,
+    PTls, get_tls,
+    target::{Target, unrooted::Unrooted},
 };
 use crate::{
     call::Call,
@@ -132,8 +131,10 @@ pub trait Gc: private::GcPriv {
     /// by this function.
     #[inline]
     unsafe fn gc_safe_enter() -> i8 {
-        let ptls = get_tls();
-        jlrs_gc_safe_enter(ptls)
+        unsafe {
+            let ptls = get_tls();
+            jlrs_gc_safe_enter(ptls)
+        }
     }
 
     /// Leave a GC-safe region and return to the previous GC-state.
@@ -143,8 +144,10 @@ pub trait Gc: private::GcPriv {
     /// Must be called with the state returned by a matching call to [`Gc::gc_safe_enter`].
     #[inline]
     unsafe fn gc_safe_leave(state: i8) {
-        let ptls = get_tls();
-        jlrs_gc_safe_leave(ptls, state)
+        unsafe {
+            let ptls = get_tls();
+            jlrs_gc_safe_leave(ptls, state)
+        }
     }
 
     /// Put the current task in a GC-unsafe state.
@@ -160,8 +163,10 @@ pub trait Gc: private::GcPriv {
     /// returned by this function.
     #[inline]
     unsafe fn gc_unsafe_enter() -> i8 {
-        let ptls = get_tls();
-        jlrs_gc_unsafe_enter(ptls)
+        unsafe {
+            let ptls = get_tls();
+            jlrs_gc_unsafe_enter(ptls)
+        }
     }
 
     /// Leave a GC-unsafe region and return to the previous GC-state.
@@ -171,8 +176,10 @@ pub trait Gc: private::GcPriv {
     /// Must be called with the state returned by a matching call to [`Gc::gc_unsafe_enter`].
     #[inline]
     unsafe fn gc_unsafe_leave(state: i8) {
-        let ptls = get_tls();
-        jlrs_gc_unsafe_leave(ptls, state)
+        unsafe {
+            let ptls = get_tls();
+            jlrs_gc_unsafe_leave(ptls, state)
+        }
     }
 }
 
@@ -187,7 +194,7 @@ pub trait Gc: private::GcPriv {
 /// This method must only be called from `ForeignType::mark`.
 #[inline]
 pub unsafe fn mark_queue_obj(ptls: PTls, obj: WeakValue) -> bool {
-    jl_gc_mark_queue_obj(ptls, obj.ptr().as_ptr()) != 0
+    unsafe { jl_gc_mark_queue_obj(ptls, obj.ptr().as_ptr()) != 0 }
 }
 
 /// Mark `objs`.
@@ -202,7 +209,9 @@ pub unsafe fn mark_queue_obj(ptls: PTls, obj: WeakValue) -> bool {
 /// This method must only be called from `ForeignType::mark`.
 #[inline]
 pub unsafe fn mark_queue_objarray(ptls: PTls, parent: WeakValue, objs: &[Option<WeakValue>]) {
-    jl_gc_mark_queue_objarray(ptls, parent.ptr().as_ptr(), objs.as_ptr() as _, objs.len())
+    unsafe {
+        jl_gc_mark_queue_objarray(ptls, parent.ptr().as_ptr(), objs.as_ptr() as _, objs.len())
+    }
 }
 
 /// Updates the write barrier.
@@ -218,7 +227,7 @@ pub unsafe fn mark_queue_objarray(ptls: PTls, parent: WeakValue, objs: &[Option<
 /// managed by the GC.
 #[inline]
 pub unsafe fn write_barrier<T>(data: &mut T, child: Value) {
-    jlrs_gc_wb(data as *mut _ as *mut _, child.unwrap(Private).cast())
+    unsafe { jlrs_gc_wb(data as *mut _ as *mut _, child.unwrap(Private).cast()) }
 }
 
 /// Put the current task in a GC-safe state, call `f`, and return to the previous GC state.
@@ -234,27 +243,31 @@ pub unsafe fn write_barrier<T>(data: &mut T, child: Value) {
 /// - `f` must not call into Julia in any way, except inside a function called with `gc_unsafe`.
 #[inline]
 pub unsafe fn gc_safe<F: FnOnce() -> T, T>(f: F) -> T {
-    let pgc = jlrs_ppgcstack();
-    if pgc.is_null() {
-        return f();
+    unsafe {
+        let pgc = jlrs_ppgcstack();
+        if pgc.is_null() {
+            return f();
+        }
+
+        let ptls = get_tls();
+        let state = jlrs_gc_safe_enter(ptls);
+        let res = f();
+        jlrs_gc_safe_leave(ptls, state);
+
+        res
     }
-
-    let ptls = get_tls();
-    let state = jlrs_gc_safe_enter(ptls);
-    let res = f();
-    jlrs_gc_safe_leave(ptls, state);
-
-    res
 }
 
 #[inline]
 #[cfg(feature = "async")]
 pub(crate) unsafe fn gc_safe_with<F: FnOnce() -> T, T>(ptls: PTls, f: F) -> T {
-    let state = jlrs_gc_safe_enter(ptls);
-    let res = f();
-    jlrs_gc_safe_leave(ptls, state);
+    unsafe {
+        let state = jlrs_gc_safe_enter(ptls);
+        let res = f();
+        jlrs_gc_safe_leave(ptls, state);
 
-    res
+        res
+    }
 }
 
 /// Put the current task in a GC-unsafe state, call `f`, and return to the previous GC state.
@@ -268,15 +281,17 @@ pub(crate) unsafe fn gc_safe_with<F: FnOnce() -> T, T>(ptls: PTls, f: F) -> T {
 /// - This function must be called from a thread that can call into Julia.
 #[inline]
 pub unsafe fn gc_unsafe<F: for<'scope> FnOnce(Unrooted<'scope>) -> T, T>(f: F) -> T {
-    debug_assert!(!jlrs_ppgcstack().is_null());
-    let ptls = get_tls();
+    unsafe {
+        debug_assert!(!jlrs_ppgcstack().is_null());
+        let ptls = get_tls();
 
-    let unrooted = Unrooted::new();
-    let state = jlrs_gc_unsafe_enter(ptls);
-    let res = f(unrooted);
-    jlrs_gc_unsafe_leave(ptls, state);
+        let unrooted = Unrooted::new();
+        let state = jlrs_gc_unsafe_enter(ptls);
+        let res = f(unrooted);
+        jlrs_gc_unsafe_leave(ptls, state);
 
-    res
+        res
+    }
 }
 
 #[cfg(feature = "async")]
@@ -284,12 +299,14 @@ pub(crate) unsafe fn gc_unsafe_with<F: for<'scope> FnOnce(Unrooted<'scope>) -> T
     ptls: PTls,
     f: F,
 ) -> T {
-    let state = jlrs_gc_unsafe_enter(ptls);
-    let unrooted = Unrooted::new();
-    let res = f(unrooted);
-    jlrs_gc_unsafe_leave(ptls, state);
+    unsafe {
+        let state = jlrs_gc_unsafe_enter(ptls);
+        let unrooted = Unrooted::new();
+        let res = f(unrooted);
+        jlrs_gc_unsafe_leave(ptls, state);
 
-    res
+        res
+    }
 }
 
 impl<'frame, Tgt: Target<'frame>> Gc for Tgt {}

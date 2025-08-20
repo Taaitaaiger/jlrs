@@ -1,12 +1,12 @@
 use itertools::Itertools;
 use quote::format_ident;
 use syn::{
+    Attribute, Expr, FnArg, Ident, ItemFn, Result, Signature, Token, Type,
     parse::{Parse, ParseStream},
     parse_quote, parse_quote_spanned,
     punctuated::Punctuated,
     spanned::Spanned,
     token::{Comma, Pub},
-    Attribute, Expr, FnArg, Ident, ItemFn, Result, Signature, Token, Type,
 };
 
 use super::{
@@ -15,11 +15,11 @@ use super::{
     override_module_fragment, return_type_fragments,
 };
 use crate::{
-    module::{
-        as_return_as, module_item::has_outer_path_attr, take_type, Apply, ParameterEnvironment,
-        ParameterList, RenameFragments, ResolvedParameterList,
-    },
     JuliaModule,
+    module::{
+        Apply, ParameterEnvironment, ParameterList, RenameFragments, ResolvedParameterList,
+        as_return_as, module_item::has_outer_path_attr, take_type,
+    },
 };
 
 pub struct ExportedMethod {
@@ -643,8 +643,10 @@ fn invoke_fn_no_self_method_fragment(info: &ExportedMethod, gc_safe: bool) -> It
 
     parse_quote_spanned! {
         span=> unsafe extern "C" fn invoke(#args) #new_ret_ty {
-            let res = #call_expr;
-            <#ret_ty as ::jlrs::convert::ccall_types::CCallReturn>::return_or_throw(res)
+            unsafe {
+                let res = #call_expr;
+                <#ret_ty as ::jlrs::convert::ccall_types::CCallReturn>::return_or_throw(res)
+            }
         }
     }
 }
@@ -682,8 +684,10 @@ fn invoke_fn_no_self_method_fragment_in_env(
 
     parse_quote_spanned! {
         span=> unsafe extern "C" fn invoke(#args) #new_ret_ty {
-            let res = #call_expr;
-            <#ret_ty as ::jlrs::convert::ccall_types::CCallReturn>::return_or_throw(res)
+            unsafe {
+                let res = #call_expr;
+                <#ret_ty as ::jlrs::convert::ccall_types::CCallReturn>::return_or_throw(res)
+            }
         }
     }
 }
@@ -735,12 +739,14 @@ fn invoke_fn_ref_self_method_fragment(
 
     parse_quote_spanned! {
         span=> unsafe extern "C" fn invoke(#args_self_renamed) #new_ret_ty {
-            match #to_ref_expr {
-                Ok(this) => {
-                    let res = #call_expr;
-                    <#ret_ty as ::jlrs::convert::ccall_types::CCallReturn>::return_or_throw(res)
-                },
-                Err(_) => ::jlrs::runtime::handle::ccall::throw_borrow_exception()
+            unsafe {
+                match #to_ref_expr {
+                    Ok(this) => {
+                        let res = #call_expr;
+                        <#ret_ty as ::jlrs::convert::ccall_types::CCallReturn>::return_or_throw(res)
+                    },
+                    Err(_) => ::jlrs::runtime::handle::ccall::throw_borrow_exception()
+                }
             }
         }
     }
@@ -794,12 +800,14 @@ fn invoke_fn_ref_self_method_fragment_in_env(
 
     parse_quote_spanned! {
         span=> unsafe extern "C" fn invoke(#args_self_renamed) #new_ret_ty {
-            match #to_ref_expr {
-                Ok(this) => {
-                    let res = #call_expr;
-                    <#ret_ty as ::jlrs::convert::ccall_types::CCallReturn>::return_or_throw(res)
-                },
-                Err(_) => ::jlrs::runtime::handle::ccall::throw_borrow_exception()
+            unsafe {
+                match #to_ref_expr {
+                    Ok(this) => {
+                        let res = #call_expr;
+                        <#ret_ty as ::jlrs::convert::ccall_types::CCallReturn>::return_or_throw(res)
+                    },
+                    Err(_) => ::jlrs::runtime::handle::ccall::throw_borrow_exception()
+                }
             }
         }
     }
@@ -852,12 +860,14 @@ fn invoke_fn_move_self_method_fragment(
 
     parse_quote_spanned! {
         span=> unsafe extern "C" fn invoke(#args_self_renamed) #new_ret_ty {
-            match #to_ref_expr {
-                Ok(this) => {
-                    let res = #call_expr;
-                    <#ret_ty as ::jlrs::convert::ccall_types::CCallReturn>::return_or_throw(res)
-                },
-                Err(_) => ::jlrs::runtime::handle::ccall::throw_borrow_exception()
+            unsafe {
+                match #to_ref_expr {
+                    Ok(this) => {
+                        let res = #call_expr;
+                        <#ret_ty as ::jlrs::convert::ccall_types::CCallReturn>::return_or_throw(res)
+                    },
+                    Err(_) => ::jlrs::runtime::handle::ccall::throw_borrow_exception()
+                }
             }
         }
     }
@@ -911,12 +921,14 @@ fn invoke_fn_move_self_method_fragment_in_env(
 
     parse_quote_spanned! {
         span=> unsafe extern "C" fn invoke(#args_self_renamed) #new_ret_ty {
-            match #to_ref_expr {
-                Ok(this) => {
-                    let res = #call_expr;
-                    <#ret_ty as ::jlrs::convert::ccall_types::CCallReturn>::return_or_throw(res)
-                },
-                Err(_) => ::jlrs::runtime::handle::ccall::throw_borrow_exception()
+            unsafe {
+                match #to_ref_expr {
+                    Ok(this) => {
+                        let res = #call_expr;
+                        <#ret_ty as ::jlrs::convert::ccall_types::CCallReturn>::return_or_throw(res)
+                    },
+                    Err(_) => ::jlrs::runtime::handle::ccall::throw_borrow_exception()
+                }
             }
         }
     }
@@ -968,13 +980,15 @@ fn invoke_fn_mut_self_method_fragment(
 
     parse_quote_spanned! {
         span=> unsafe extern "C" fn invoke(#args_self_renamed) #new_ret_ty {
-            match #to_ref_expr {
-                #[allow(unused_mut)]
-                Ok(mut this) => {
-                    let res = #call_expr;
-                    <#ret_ty as ::jlrs::convert::ccall_types::CCallReturn>::return_or_throw(res)
-                },
-                Err(_) => ::jlrs::runtime::handle::ccall::throw_borrow_exception()
+            unsafe {
+                match #to_ref_expr {
+                    #[allow(unused_mut)]
+                    Ok(mut this) => {
+                        let res = #call_expr;
+                        <#ret_ty as ::jlrs::convert::ccall_types::CCallReturn>::return_or_throw(res)
+                    },
+                    Err(_) => ::jlrs::runtime::handle::ccall::throw_borrow_exception()
+                }
             }
         }
     }
@@ -1027,13 +1041,15 @@ fn invoke_fn_mut_self_method_fragment_in_env(
 
     parse_quote_spanned! {
         span=> unsafe extern "C" fn invoke(#args_self_renamed) #new_ret_ty {
-            match #to_ref_expr {
-                #[allow(unused_mut)]
-                Ok(mut this) => {
-                    let res = #call_expr;
-                    <#ret_ty as ::jlrs::convert::ccall_types::CCallReturn>::return_or_throw(res)
-                },
-                Err(_) => ::jlrs::runtime::handle::ccall::throw_borrow_exception()
+            unsafe {
+                match #to_ref_expr {
+                    #[allow(unused_mut)]
+                    Ok(mut this) => {
+                        let res = #call_expr;
+                        <#ret_ty as ::jlrs::convert::ccall_types::CCallReturn>::return_or_throw(res)
+                    },
+                    Err(_) => ::jlrs::runtime::handle::ccall::throw_borrow_exception()
+                }
             }
         }
     }

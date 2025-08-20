@@ -3,12 +3,12 @@ use std::{collections::HashMap, ops::AddAssign};
 use jlrs::{
     data::{
         managed::value::{
-            typed::{TypedValue, TypedValueRet},
             ValueRet,
+            typed::{TypedValue, TypedValueRet},
         },
         types::{construct_type::ConstructType, foreign_type::mark::Mark},
     },
-    memory::gc::{write_barrier},
+    memory::gc::write_barrier,
     prelude::{ForeignType, Managed, OpaqueType, Value, WeakValue},
     weak_handle_unchecked,
 };

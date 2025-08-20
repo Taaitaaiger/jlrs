@@ -21,7 +21,7 @@
 //! [`Array`]: crate::data::managed::array::Array
 
 macro_rules! impl_construct_type_managed {
-    ($ty:ident, 1, $jl_ty:expr) => {
+    ($ty:ident, 1, $jl_ty:expr_2021) => {
         unsafe impl crate::data::types::construct_type::ConstructType for $ty<'_> {
             type Static = $ty<'static>;
 
@@ -71,7 +71,7 @@ macro_rules! impl_construct_type_managed {
             }
         }
     };
-    ($ty:ident, 2, $jl_ty:expr) => {
+    ($ty:ident, 2, $jl_ty:expr_2021) => {
         unsafe impl crate::data::types::construct_type::ConstructType for $ty<'_, '_> {
             type Static = $ty<'static, 'static>;
 
@@ -307,7 +307,7 @@ use std::{
     ffi::c_void,
     fmt::{Debug, Formatter, Result as FmtResult},
     marker::PhantomData,
-    ptr::{null_mut, NonNull},
+    ptr::{NonNull, null_mut},
     sync::atomic::{AtomicPtr, Ordering},
 };
 
@@ -320,8 +320,8 @@ use crate::{
         layout::valid_layout::{ValidField, ValidLayout},
         managed::{module::Module, string::JuliaString, value::Value},
     },
-    error::{JlrsError, JlrsResult, CANNOT_DISPLAY_VALUE},
-    memory::target::{unrooted::Unrooted, Target},
+    error::{CANNOT_DISPLAY_VALUE, JlrsError, JlrsResult},
+    memory::target::{Target, unrooted::Unrooted},
     prelude::TargetType,
     private::Private,
 };
@@ -444,13 +444,15 @@ pub trait Managed<'scope, 'data>: private::ManagedPriv<'scope, 'data> {
 
     #[doc(hidden)]
     unsafe fn print_error(self) {
-        let unrooted = Unrooted::new();
-        let stderr = Value::wrap_non_null(NonNull::new_unchecked(jl_stderr_obj()), Private);
-        let showerror = Module::base(&unrooted)
-            .global(unrooted, "showerror")
-            .unwrap()
-            .as_value();
-        showerror.call(unrooted, [stderr, self.as_value()]).ok();
+        unsafe {
+            let unrooted = Unrooted::new();
+            let stderr = Value::wrap_non_null(NonNull::new_unchecked(jl_stderr_obj()), Private);
+            let showerror = Module::base(&unrooted)
+                .global(unrooted, "showerror")
+                .unwrap()
+                .as_value();
+            showerror.call(unrooted, [stderr, self.as_value()]).ok();
+        }
     }
 
     /// Convert `self` to its display string, i.e. the string that is shown by calling
@@ -528,7 +530,7 @@ impl<'scope, 'data, W: Managed<'scope, 'data>> Weak<'scope, 'data, W> {
     where
         Tgt: Target<'target>,
     {
-        target.data_from_ptr(self.ptr().cast(), Private)
+        unsafe { target.data_from_ptr(self.ptr().cast(), Private) }
     }
 
     #[inline]
@@ -543,7 +545,7 @@ impl<'scope, 'data, W: Managed<'scope, 'data>> Weak<'scope, 'data, W> {
     /// safepoint is reached, this is typically the case when new Julia data is allocated.
     #[inline]
     pub unsafe fn as_managed(self) -> W {
-        W::wrap_non_null(self.ptr(), Private)
+        unsafe { W::wrap_non_null(self.ptr(), Private) }
     }
 
     /// Assume the reference still points to valid managed data and convert it to a `Value`.
@@ -553,7 +555,7 @@ impl<'scope, 'data, W: Managed<'scope, 'data>> Weak<'scope, 'data, W> {
     /// safepoint is reached, this is typically the case when new Julia data is allocated.
     #[inline]
     pub unsafe fn as_value(self) -> Value<'scope, 'data> {
-        Value::wrap_non_null(self.data_ptr().cast(), Private)
+        unsafe { Value::wrap_non_null(self.data_ptr().cast(), Private) }
     }
 
     /// Extends the `'data` lifetime to `'static`.
@@ -668,14 +670,14 @@ impl<'borrow, 'data, T: Managed<'borrow, 'data>, P: Managed<'borrow, 'data>>
     /// Safety: you must guarantee the content of this slice is never changed and contains no
     /// undefined references.
     pub unsafe fn assume_immutable_non_null(self) -> &'borrow [T] {
-        std::mem::transmute(self.slice)
+        unsafe { std::mem::transmute(self.slice) }
     }
 
     /// Returns the underlying slice, assuming the data is immutable but possibly null.
     ///
     /// Safety: you must guarantee the content of this slice is never changed
     pub unsafe fn assume_immutable(self) -> &'borrow [Option<T>] {
-        std::mem::transmute(self.slice)
+        unsafe { std::mem::transmute(self.slice) }
     }
 
     /// Atomically sets the element at position `index` to `data` with ordering `order`.
@@ -683,11 +685,13 @@ impl<'borrow, 'data, T: Managed<'borrow, 'data>, P: Managed<'borrow, 'data>>
     /// Safety: Mutating Julia data is generally unsafe. You must guarantee that you're allowed to
     /// mutate this data.
     pub unsafe fn store(&self, index: usize, data: Option<T::InScope<'_>>, order: Ordering) {
-        self.slice[index].store(data, order);
-        jlrs_gc_wb(
-            self.parent.unwrap(Private).cast(),
-            data.map(|x| x.unwrap(Private)).unwrap_or(null_mut()).cast(),
-        )
+        unsafe {
+            self.slice[index].store(data, order);
+            jlrs_gc_wb(
+                self.parent.unwrap(Private).cast(),
+                data.map(|x| x.unwrap(Private)).unwrap_or(null_mut()).cast(),
+            )
+        }
     }
 
     /// Atomically sets the element at position `index` to `data` with relaxed ordering.
@@ -695,7 +699,7 @@ impl<'borrow, 'data, T: Managed<'borrow, 'data>, P: Managed<'borrow, 'data>>
     /// Safety: Mutating Julia data is generally unsafe. You must guarantee that you're allowed to
     /// mutate this data.
     pub unsafe fn store_relaxed(&self, index: usize, data: Option<T::InScope<'_>>) {
-        self.store(index, data, Ordering::Relaxed)
+        unsafe { self.store(index, data, Ordering::Relaxed) }
     }
 }
 
@@ -706,14 +710,14 @@ impl<'borrow, 'data, T: Managed<'borrow, 'data>, P: Managed<'borrow, 'data>>
 pub unsafe fn erase_scope_lifetime<'scope, 'data, M: Managed<'scope, 'data>>(
     data: M,
 ) -> M::InScope<'static> {
-    data.leak().as_managed()
+    unsafe { data.leak().as_managed() }
 }
 
 pub(crate) mod private {
     use std::{fmt::Debug, ptr::NonNull};
 
     use crate::{
-        data::managed::{value::Value, Weak},
+        data::managed::{Weak, value::Value},
         private::Private,
     };
 
@@ -729,7 +733,7 @@ pub(crate) mod private {
         // Safety: `Self` must be the correct type for `value`.
         #[inline]
         unsafe fn from_value_unchecked(value: Value<'scope, 'data>, _: Private) -> Self {
-            Self::wrap_non_null(value.unwrap_non_null(Private).cast(), Private)
+            unsafe { Self::wrap_non_null(value.unwrap_non_null(Private).cast(), Private) }
         }
 
         fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps>;

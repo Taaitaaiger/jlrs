@@ -2,8 +2,8 @@ mod util;
 #[cfg(feature = "local-rt")]
 mod tests {
     use std::sync::{
-        atomic::{AtomicU8, Ordering},
         Arc,
+        atomic::{AtomicU8, Ordering},
     };
 
     use jlrs::{data::managed::parachute::AttachParachute, memory::gc::Gc, prelude::*};

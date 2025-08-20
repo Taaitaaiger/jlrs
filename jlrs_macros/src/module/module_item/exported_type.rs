@@ -1,18 +1,19 @@
 use itertools::Itertools;
 use quote::format_ident;
 use syn::{
+    Expr, Ident, ItemFn, Path, Result, Token,
     parse::{Parse, ParseStream},
-    parse_quote, Expr, Ident, ItemFn, Path, Result, Token,
+    parse_quote,
 };
 
 use super::{generics::GenericEnvironment, init_fn::InitFn};
 use crate::{
+    JuliaModule,
     module::{
+        RenameFragments,
         module_item::override_module_fragment,
         parameters::{Apply, ParameterEnvironment, ParameterList},
-        RenameFragments,
     },
-    JuliaModule,
 };
 
 pub struct ExportedType {

@@ -148,5 +148,5 @@ pub type PTls = *mut jl_tls_states_t;
 
 #[inline]
 pub(crate) unsafe fn get_tls() -> PTls {
-    jlrs_get_ptls_states()
+    unsafe { jlrs_get_ptls_states() }
 }

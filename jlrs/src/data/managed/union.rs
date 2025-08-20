@@ -8,12 +8,12 @@ use jl_sys::{
 };
 
 use super::{
-    value::{ValueData, ValueResult},
     Weak,
+    value::{ValueData, ValueResult},
 };
 use crate::{
     catch::{catch_exceptions, unwrap_exc},
-    data::managed::{private::ManagedPriv, value::Value, Managed},
+    data::managed::{Managed, private::ManagedPriv, value::Value},
     impl_julia_typecheck,
     memory::target::{Target, TargetResult},
     private::Private,
@@ -74,9 +74,11 @@ impl<'scope> Union<'scope> {
         V: AsRef<[Value<'scope, 'static>]>,
         Tgt: Target<'target>,
     {
-        let types = types.as_ref();
-        let un = jl_type_union(types.as_ptr() as *mut _, types.len());
-        target.data_from_ptr(NonNull::new_unchecked(un), Private)
+        unsafe {
+            let types = types.as_ref();
+            let un = jl_type_union(types.as_ptr() as *mut _, types.len());
+            target.data_from_ptr(NonNull::new_unchecked(un), Private)
+        }
     }
 
     /// Returns true if the bits-union optimization applies to this union type.
@@ -178,11 +180,7 @@ pub(crate) fn nth_union_component<'scope, 'data>(
             return nth_union_component(un.b(), pi);
         }
     } else {
-        if *pi == 0 {
-            Some(v)
-        } else {
-            None
-        }
+        if *pi == 0 { Some(v) } else { None }
     }
 }
 

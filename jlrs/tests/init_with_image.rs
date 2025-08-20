@@ -14,12 +14,14 @@ mod tests {
             let image_path = format!("{}/lib/julia/sys.dylib", julia_dir);
 
             unsafe {
-                assert!(Builder::new()
-                    .image(bindir, image_path)
-                    .ok()
-                    .unwrap()
-                    .start_local()
-                    .is_ok())
+                assert!(
+                    Builder::new()
+                        .image(bindir, image_path)
+                        .ok()
+                        .unwrap()
+                        .start_local()
+                        .is_ok()
+                )
             }
         } else {
             println!("Skipping image test because JULIA_DIR environment variable is not set.");

@@ -24,7 +24,7 @@
 
 use std::ptr::NonNull;
 
-use super::{union_all::UnionAll, value::typed::TypedValueRet, Managed};
+use super::{Managed, union_all::UnionAll, value::typed::TypedValueRet};
 use crate::{
     convert::ccall_types::{CCallArg, CCallReturn},
     data::{
@@ -36,7 +36,7 @@ use crate::{
             typecheck::Typecheck,
         },
     },
-    error::{JlrsError, JlrsResult, TypeError, CANNOT_DISPLAY_TYPE},
+    error::{CANNOT_DISPLAY_TYPE, JlrsError, JlrsResult, TypeError},
     memory::{scope::LocalScopeExt, target::unrooted::Unrooted},
     prelude::Target,
 };
@@ -120,7 +120,7 @@ impl<'scope, T> CCallRef<'scope, T> {
     /// Safety: `T` must be the layout of the referenced data.
     #[inline]
     pub unsafe fn as_ref_unchecked(&self) -> &'scope T {
-        self.0.ptr_to_inline.as_ref()
+        unsafe { self.0.ptr_to_inline.as_ref() }
     }
 
     /// Access the referenced data directly without checking if this conversion is valid.
@@ -128,7 +128,7 @@ impl<'scope, T> CCallRef<'scope, T> {
     /// Safety: `U` must be the layout of the referenced data.
     #[inline]
     pub unsafe fn as_ref_to_unchecked<U>(&self) -> &'scope U {
-        self.0.ptr_to_inline.cast().as_ref()
+        unsafe { self.0.ptr_to_inline.cast().as_ref() }
     }
 
     /// Access the referenced data as a `Value` without checking if this conversion is valid.
@@ -136,7 +136,7 @@ impl<'scope, T> CCallRef<'scope, T> {
     /// Safety: `T` must not be an inline allocated type, or `Any`.
     #[inline]
     pub unsafe fn as_value_unchecked(&self) -> Value<'scope, 'static> {
-        self.0.managed_type
+        unsafe { self.0.managed_type }
     }
 }
 
@@ -331,7 +331,7 @@ where
     /// Safety: `T` must not be `Value`.
     #[inline]
     pub unsafe fn as_managed_unchecked(&self) -> T {
-        self.0.managed_type.cast_unchecked::<T>()
+        unsafe { self.0.managed_type.cast_unchecked::<T>() }
     }
 }
 

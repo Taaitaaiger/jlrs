@@ -3,10 +3,10 @@
 use std::{
     ffi::c_void,
     pin::Pin,
-    ptr::{null_mut, NonNull},
+    ptr::{NonNull, null_mut},
 };
 
-use jl_sys::{pop_frame, SplitGcFrame};
+use jl_sys::{SplitGcFrame, pop_frame};
 
 use super::context::stack::Stack;
 
@@ -42,11 +42,13 @@ impl<const N: usize> StackFrame<N> {
         allow(unused)
     )]
     pub(crate) unsafe fn pin<'scope>(&'scope mut self) -> PinnedFrame<'scope, N> {
-        self.s.get_head_root(0).set(null_mut());
-        for i in 0..N {
-            self.s.set_tail_root(i, null_mut());
+        unsafe {
+            self.s.get_head_root(0).set(null_mut());
+            for i in 0..N {
+                self.s.set_tail_root(i, null_mut());
+            }
+            PinnedFrame::new(self)
         }
-        PinnedFrame::new(self)
     }
 }
 
@@ -61,9 +63,11 @@ impl<'scope, const N: usize> PinnedFrame<'scope, N> {
         allow(unused)
     )]
     unsafe fn new(raw: &'scope mut StackFrame<N>) -> Self {
-        raw.s.push_frame();
-        PinnedFrame {
-            raw: Pin::new_unchecked(raw),
+        unsafe {
+            raw.s.push_frame();
+            PinnedFrame {
+                raw: Pin::new_unchecked(raw),
+            }
         }
     }
 
@@ -75,13 +79,15 @@ impl<'scope, const N: usize> PinnedFrame<'scope, N> {
     pub(crate) unsafe fn stack_frame<'inner>(
         &'inner mut self,
     ) -> JlrsStackFrame<'scope, 'inner, N> {
-        JlrsStackFrame::new(self)
+        unsafe { JlrsStackFrame::new(self) }
     }
 
     #[inline]
     #[allow(unused)]
     pub(crate) unsafe fn set_sync_root(&self, root: *mut c_void) {
-        self.raw.s.set_head_root(0, root);
+        unsafe {
+            self.raw.s.set_head_root(0, root);
+        }
     }
 }
 
@@ -106,19 +112,21 @@ impl<'scope, 'inner, const N: usize> JlrsStackFrame<'scope, 'inner, N> {
         allow(unused)
     )]
     unsafe fn new(pinned: &'inner mut PinnedFrame<'scope, N>) -> Self {
-        if pinned.raw.s.get_head_root(0).get().is_null() {
-            {
-                let ptr = Stack::alloc();
-                pinned.raw.s.set_head_root(0, ptr.cast());
+        unsafe {
+            if pinned.raw.s.get_head_root(0).get().is_null() {
+                {
+                    let ptr = Stack::alloc();
+                    pinned.raw.s.set_head_root(0, ptr.cast());
+                }
+
+                for i in 0..N {
+                    let ptr = Stack::alloc();
+                    pinned.raw.s.set_tail_root(i, ptr.cast());
+                }
             }
 
-            for i in 0..N {
-                let ptr = Stack::alloc();
-                pinned.raw.s.set_tail_root(i, ptr.cast());
-            }
+            JlrsStackFrame { pinned }
         }
-
-        JlrsStackFrame { pinned }
     }
 
     #[inline]
@@ -127,16 +135,20 @@ impl<'scope, 'inner, const N: usize> JlrsStackFrame<'scope, 'inner, N> {
         allow(unused)
     )]
     pub(crate) unsafe fn sync_stack(&self) -> &'scope Stack {
-        NonNull::new_unchecked(self.pinned.raw.s.get_head_root(0).get())
-            .cast()
-            .as_ref()
+        unsafe {
+            NonNull::new_unchecked(self.pinned.raw.s.get_head_root(0).get())
+                .cast()
+                .as_ref()
+        }
     }
 
     #[cfg(feature = "async")]
     #[inline]
     pub(crate) unsafe fn nth_stack(&self, n: usize) -> &'scope Stack {
-        NonNull::new_unchecked(self.pinned.raw.s.get_tail_root(n).get())
-            .cast()
-            .as_ref()
+        unsafe {
+            NonNull::new_unchecked(self.pinned.raw.s.get_tail_root(n).get())
+                .cast()
+                .as_ref()
+        }
     }
 }

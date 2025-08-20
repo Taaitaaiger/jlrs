@@ -53,7 +53,9 @@ mod private {
     unsafe impl<'target> SlotRefPriv for StackSlotRef<'target> {
         #[inline]
         unsafe fn set(&self, data: NonNull<c_void>, _: Private) {
-            self.stack.set_root(self.offset, data.cast());
+            unsafe {
+                self.stack.set_root(self.offset, data.cast());
+            }
         }
     }
 

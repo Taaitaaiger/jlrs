@@ -67,7 +67,7 @@ unsafe impl Unbox for Bool {
 
     #[inline]
     unsafe fn unbox(value: Value) -> Bool {
-        Bool(jl_unbox_int8(value.unwrap(Private).cast()))
+        unsafe { Bool(jl_unbox_int8(value.unwrap(Private).cast())) }
     }
 }
 
@@ -76,7 +76,7 @@ unsafe impl Unbox for bool {
 
     #[inline]
     unsafe fn unbox(value: Value) -> Bool {
-        Bool(jl_unbox_int8(value.unwrap(Private).cast()))
+        unsafe { Bool(jl_unbox_int8(value.unwrap(Private).cast())) }
     }
 }
 

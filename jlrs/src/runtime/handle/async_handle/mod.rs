@@ -3,13 +3,13 @@
 use std::{
     cell::RefCell,
     collections::VecDeque,
-    ffi::{c_void, CStr},
+    ffi::{CStr, c_void},
     path::Path,
     ptr::NonNull,
     rc::Rc,
     sync::{
-        atomic::{AtomicUsize, Ordering},
         Arc,
+        atomic::{AtomicUsize, Ordering},
     },
     time::Duration,
 };
@@ -31,11 +31,11 @@ use self::{
     persistent::PersistentHandle,
 };
 #[cfg(feature = "multi-rt")]
-use super::mt_handle::manager::{get_manager, PoolId};
+use super::mt_handle::manager::{PoolId, get_manager};
 use crate::{
     async_util::{
-        future::{wake_task, GcUnsafeFuture},
-        task::{sleep, AsyncTask, PersistentTask, Register},
+        future::{GcUnsafeFuture, wake_task},
+        task::{AsyncTask, PersistentTask, Register, sleep},
     },
     error::IOError,
     memory::{
@@ -276,84 +276,86 @@ pub(crate) async unsafe fn on_main_thread<'ctx, R: Executor<N>, const N: usize>(
     token: CancellationToken,
     base_frame: &'ctx mut StackFrame<N>,
 ) {
-    let ptls = get_tls();
-    // gc-unsafe: {
-    let state = jlrs_gc_unsafe_enter(ptls);
-    let base_frame: &'static mut StackFrame<N> = std::mem::transmute(base_frame);
-    let mut pinned = base_frame.pin();
-    let base_frame = pinned.stack_frame();
+    unsafe {
+        let ptls = get_tls();
+        // gc-unsafe: {
+        let state = jlrs_gc_unsafe_enter(ptls);
+        let base_frame: &'static mut StackFrame<N> = std::mem::transmute(base_frame);
+        let mut pinned = base_frame.pin();
+        let base_frame = pinned.stack_frame();
 
-    set_custom_fns();
-    jlrs_gc_unsafe_leave(ptls, state);
-    // }
+        set_custom_fns();
+        jlrs_gc_unsafe_leave(ptls, state);
+        // }
 
-    let free_stacks = create_free_stacks(N);
-    let running_tasks = create_running_tasks::<R, N>();
+        let free_stacks = create_free_stacks(N);
+        let running_tasks = create_running_tasks::<R, N>();
 
-    let ppgcstack = jlrs_ppgcstack();
-    assert!(!ppgcstack.is_null());
-    let pgcstack = *ppgcstack;
+        let ppgcstack = jlrs_ppgcstack();
+        assert!(!ppgcstack.is_null());
+        let pgcstack = *ppgcstack;
 
-    loop {
-        clear_failed_tasks::<R, N>(&running_tasks, &free_stacks, &base_frame, pgcstack).await;
+        loop {
+            clear_failed_tasks::<R, N>(&running_tasks, &free_stacks, &base_frame, pgcstack).await;
 
-        if token.is_cancelled() {
-            break;
-        }
+            if token.is_cancelled() {
+                break;
+            }
 
-        while free_stacks.borrow().len() == 0 {
-            gc_unsafe_with(ptls, |unrooted| sleep(&unrooted, Duration::from_millis(1)));
-            R::yield_now().await;
-        }
-
-        match receiver.try_recv() {
-            Err(TryRecvError::Empty) => {
+            while free_stacks.borrow().len() == 0 {
                 gc_unsafe_with(ptls, |unrooted| sleep(&unrooted, Duration::from_millis(1)));
                 R::yield_now().await;
             }
-            Ok(msg) => match msg.inner {
-                MessageInner::Task(task) => {
-                    let idx = free_stacks.borrow_mut().pop_front().unwrap();
-                    let stack = base_frame.nth_stack(idx);
 
-                    let task = {
-                        let free_stacks = free_stacks.clone();
-                        let running_tasks = running_tasks.clone();
+            match receiver.try_recv() {
+                Err(TryRecvError::Empty) => {
+                    gc_unsafe_with(ptls, |unrooted| sleep(&unrooted, Duration::from_millis(1)));
+                    R::yield_now().await;
+                }
+                Ok(msg) => match msg.inner {
+                    MessageInner::Task(task) => {
+                        let idx = free_stacks.borrow_mut().pop_front().unwrap();
+                        let stack = base_frame.nth_stack(idx);
 
-                        R::spawn_local(GcUnsafeFuture::new(async move {
-                            task.call(stack).await;
-                            free_stacks.borrow_mut().push_back(idx);
-                            running_tasks.borrow_mut()[idx] = None;
-                        }))
-                    };
+                        let task = {
+                            let free_stacks = free_stacks.clone();
+                            let running_tasks = running_tasks.clone();
 
-                    running_tasks.borrow_mut()[idx] = Some(task);
-                }
-                MessageInner::BlockingTask(task) => {
-                    let stack = base_frame.sync_stack();
-                    gc_unsafe_with(ptls, |_| task.call(stack))
-                }
-                MessageInner::Include(task) => {
-                    let stack = base_frame.sync_stack();
-                    gc_unsafe_with(ptls, |_| task.call(stack))
-                }
-                MessageInner::ErrorColor(task) => {
-                    let stack = base_frame.sync_stack();
-                    gc_unsafe_with(ptls, |_| task.call(stack))
-                }
-            },
-            _ => break,
+                            R::spawn_local(GcUnsafeFuture::new(async move {
+                                task.call(stack).await;
+                                free_stacks.borrow_mut().push_back(idx);
+                                running_tasks.borrow_mut()[idx] = None;
+                            }))
+                        };
+
+                        running_tasks.borrow_mut()[idx] = Some(task);
+                    }
+                    MessageInner::BlockingTask(task) => {
+                        let stack = base_frame.sync_stack();
+                        gc_unsafe_with(ptls, |_| task.call(stack))
+                    }
+                    MessageInner::Include(task) => {
+                        let stack = base_frame.sync_stack();
+                        gc_unsafe_with(ptls, |_| task.call(stack))
+                    }
+                    MessageInner::ErrorColor(task) => {
+                        let stack = base_frame.sync_stack();
+                        gc_unsafe_with(ptls, |_| task.call(stack))
+                    }
+                },
+                _ => break,
+            }
         }
-    }
 
-    for i in 0..N {
-        while running_tasks.borrow()[i].is_some() {
-            gc_unsafe_with(ptls, |unrooted| sleep(&unrooted, Duration::from_millis(1)));
-            R::yield_now().await;
+        for i in 0..N {
+            while running_tasks.borrow()[i].is_some() {
+                gc_unsafe_with(ptls, |unrooted| sleep(&unrooted, Duration::from_millis(1)));
+                R::yield_now().await;
+            }
         }
-    }
 
-    ::std::mem::drop(pinned);
+        ::std::mem::drop(pinned);
+    }
 }
 
 // Run the async runtime on an adopted thread.
@@ -369,90 +371,92 @@ pub(super) async unsafe fn on_adopted_thread<'ctx, R: Executor<N>, const N: usiz
     token: CancellationToken,
     base_frame: &'ctx mut StackFrame<N>,
 ) {
-    let _: () = R::VALID;
-    let ptls = get_tls();
-    // gc-unsafe: {
-    let state = jlrs_gc_unsafe_enter(ptls);
-    let base_frame: &'static mut StackFrame<N> = std::mem::transmute(base_frame);
-    let mut pinned = base_frame.pin();
-    let base_frame = pinned.stack_frame();
+    unsafe {
+        let _: () = R::VALID;
+        let ptls = get_tls();
+        // gc-unsafe: {
+        let state = jlrs_gc_unsafe_enter(ptls);
+        let base_frame: &'static mut StackFrame<N> = std::mem::transmute(base_frame);
+        let mut pinned = base_frame.pin();
+        let base_frame = pinned.stack_frame();
 
-    set_custom_fns();
-    jlrs_gc_unsafe_leave(ptls, state);
-    // }
+        set_custom_fns();
+        jlrs_gc_unsafe_leave(ptls, state);
+        // }
 
-    let free_stacks = create_free_stacks(N);
-    let running_tasks = create_running_tasks::<R, N>();
+        let free_stacks = create_free_stacks(N);
+        let running_tasks = create_running_tasks::<R, N>();
 
-    jl_sys::jl_enter_threaded_region();
+        jl_sys::jl_enter_threaded_region();
 
-    let task_complete_state = TaskCompleteState::new();
-    let task_complete = TaskComplete::new(&task_complete_state);
+        let task_complete_state = TaskCompleteState::new();
+        let task_complete = TaskComplete::new(&task_complete_state);
 
-    let ppgcstack = jlrs_ppgcstack();
-    assert!(!ppgcstack.is_null());
-    let pgcstack = *ppgcstack;
+        let ppgcstack = jlrs_ppgcstack();
+        assert!(!ppgcstack.is_null());
+        let pgcstack = *ppgcstack;
 
-    loop {
-        // If a task has finished but is still in the list, it panicked or was cancelled.
-        clear_failed_tasks::<R, N>(&running_tasks, &free_stacks, &base_frame, pgcstack).await;
+        loop {
+            // If a task has finished but is still in the list, it panicked or was cancelled.
+            clear_failed_tasks::<R, N>(&running_tasks, &free_stacks, &base_frame, pgcstack).await;
 
-        if token.is_cancelled() {
-            break;
+            if token.is_cancelled() {
+                break;
+            }
+
+            if free_stacks.borrow().len() == 0 {
+                task_complete.clear().await;
+            }
+
+            match R::timeout(Duration::from_millis(1), receiver.recv()).await {
+                None => (),
+                Some(Ok(msg)) => match msg.inner {
+                    MessageInner::Task(task) => {
+                        let idx = free_stacks.borrow_mut().pop_front().unwrap();
+                        let stack = base_frame.nth_stack(idx);
+
+                        let task = {
+                            let free_stacks = free_stacks.clone();
+                            let running_tasks = running_tasks.clone();
+                            let task_complete_state = task_complete_state.clone();
+
+                            R::spawn_local(GcUnsafeFuture::new(async move {
+                                task.call(stack).await;
+                                free_stacks.borrow_mut().push_back(idx);
+                                running_tasks.borrow_mut()[idx] = None;
+                                task_complete_state.complete();
+                            }))
+                        };
+
+                        running_tasks.borrow_mut()[idx] = Some(task);
+                    }
+                    MessageInner::BlockingTask(task) => {
+                        let stack = base_frame.sync_stack();
+                        gc_unsafe_with(ptls, |_| task.call(stack))
+                    }
+                    MessageInner::Include(task) => {
+                        let stack = base_frame.sync_stack();
+                        gc_unsafe_with(ptls, |_| task.call(stack))
+                    }
+                    MessageInner::ErrorColor(task) => {
+                        let stack = base_frame.sync_stack();
+                        gc_unsafe_with(ptls, |_| task.call(stack))
+                    }
+                },
+                Some(Err(_)) => break,
+            }
         }
 
-        if free_stacks.borrow().len() == 0 {
-            task_complete.clear().await;
+        for i in 0..N {
+            if let Some(task) = running_tasks.borrow_mut()[i].take() {
+                task.await.ok();
+            }
         }
 
-        match R::timeout(Duration::from_millis(1), receiver.recv()).await {
-            None => (),
-            Some(Ok(msg)) => match msg.inner {
-                MessageInner::Task(task) => {
-                    let idx = free_stacks.borrow_mut().pop_front().unwrap();
-                    let stack = base_frame.nth_stack(idx);
+        jl_sys::jl_exit_threaded_region();
 
-                    let task = {
-                        let free_stacks = free_stacks.clone();
-                        let running_tasks = running_tasks.clone();
-                        let task_complete_state = task_complete_state.clone();
-
-                        R::spawn_local(GcUnsafeFuture::new(async move {
-                            task.call(stack).await;
-                            free_stacks.borrow_mut().push_back(idx);
-                            running_tasks.borrow_mut()[idx] = None;
-                            task_complete_state.complete();
-                        }))
-                    };
-
-                    running_tasks.borrow_mut()[idx] = Some(task);
-                }
-                MessageInner::BlockingTask(task) => {
-                    let stack = base_frame.sync_stack();
-                    gc_unsafe_with(ptls, |_| task.call(stack))
-                }
-                MessageInner::Include(task) => {
-                    let stack = base_frame.sync_stack();
-                    gc_unsafe_with(ptls, |_| task.call(stack))
-                }
-                MessageInner::ErrorColor(task) => {
-                    let stack = base_frame.sync_stack();
-                    gc_unsafe_with(ptls, |_| task.call(stack))
-                }
-            },
-            Some(Err(_)) => break,
-        }
+        ::std::mem::drop(pinned);
     }
-
-    for i in 0..N {
-        if let Some(task) = running_tasks.borrow_mut()[i].take() {
-            task.await.ok();
-        }
-    }
-
-    jl_sys::jl_exit_threaded_region();
-
-    ::std::mem::drop(pinned);
 }
 
 fn create_free_stacks(n: usize) -> Rc<RefCell<VecDeque<usize>>> {
@@ -464,8 +468,8 @@ fn create_free_stacks(n: usize) -> Rc<RefCell<VecDeque<usize>>> {
     Rc::new(RefCell::new(free_stacks))
 }
 
-fn create_running_tasks<R: Executor<N>, const N: usize>(
-) -> Rc<RefCell<Box<[Option<R::JoinHandle>]>>> {
+fn create_running_tasks<R: Executor<N>, const N: usize>()
+-> Rc<RefCell<Box<[Option<R::JoinHandle>]>>> {
     let mut running_tasks = Vec::with_capacity(N);
     for _ in 0..N {
         running_tasks.push(None);
@@ -480,27 +484,29 @@ async unsafe fn clear_failed_tasks<R: Executor<N>, const N: usize>(
     stacks: &JlrsStackFrame<'_, '_, N>,
     pgcstack: *mut jl_gcframe_t,
 ) {
-    let mut cleared = false;
-    for (idx, handle) in running_tasks
-        .borrow_mut()
-        .iter_mut()
-        .enumerate()
-        .filter(|(_, h)| h.is_some())
-    {
-        if handle.as_ref().unwrap_unchecked().is_finished() {
-            if let Err(_e) = handle.take().unwrap().await {
-                stacks.nth_stack(idx).pop_roots(0);
-                free_stacks.borrow_mut().push_back(idx);
-                cleared = true;
-                // restore_gc_stack();
+    unsafe {
+        let mut cleared = false;
+        for (idx, handle) in running_tasks
+            .borrow_mut()
+            .iter_mut()
+            .enumerate()
+            .filter(|(_, h)| h.is_some())
+        {
+            if handle.as_ref().unwrap_unchecked().is_finished() {
+                if let Err(_e) = handle.take().unwrap().await {
+                    stacks.nth_stack(idx).pop_roots(0);
+                    free_stacks.borrow_mut().push_back(idx);
+                    cleared = true;
+                    // restore_gc_stack();
+                }
             }
         }
-    }
 
-    if cleared {
-        let ppgcstack = jlrs_ppgcstack();
-        let gcstack_ref = NonNull::new_unchecked(ppgcstack).as_mut();
-        *gcstack_ref = pgcstack;
+        if cleared {
+            let ppgcstack = jlrs_ppgcstack();
+            let gcstack_ref = NonNull::new_unchecked(ppgcstack).as_mut();
+            *gcstack_ref = pgcstack;
+        }
     }
 }
 

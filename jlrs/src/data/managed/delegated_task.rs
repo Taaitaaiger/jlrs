@@ -15,10 +15,10 @@ use jl_sys::{jl_adopt_thread, jl_gc_alloc_typed, jlrs_gc_safe_enter, jlrs_gc_wb}
 use parking_lot::{Condvar, Mutex};
 
 use super::{
+    Atomic, Managed, Weak,
     module::JlrsCore,
     private::ManagedPriv,
     value::{Value, ValueData, ValueRet, WeakValue},
-    Atomic, Managed, Weak,
 };
 use crate::{
     call::Call,
@@ -90,22 +90,26 @@ impl<'scope> DelegatedTask<'scope> {
     }
 
     unsafe fn notify(self) {
-        let func = uv_async_send_func();
-        let cond = self.unwrap_non_null(Private).as_ref().cond;
+        unsafe {
+            let func = uv_async_send_func();
+            let cond = self.unwrap_non_null(Private).as_ref().cond;
 
-        let handle_ref = cond.ptr().cast::<*mut c_void>().as_ref();
-        let handle = *handle_ref;
+            let handle_ref = cond.ptr().cast::<*mut c_void>().as_ref();
+            let handle = *handle_ref;
 
-        func(handle);
+            func(handle);
+        }
     }
 
     unsafe fn set_join_handle(self, handle: JoinHandle<JlrsResult<()>>) {
-        let layout = self
-            .unwrap_non_null(Private)
-            .cast::<DelegatedTaskLayout>()
-            .as_ref();
-        let mut guard = layout.thread_handle.lock();
-        *guard = Some(handle);
+        unsafe {
+            let layout = self
+                .unwrap_non_null(Private)
+                .cast::<DelegatedTaskLayout>()
+                .as_ref();
+            let mut guard = layout.thread_handle.lock();
+            *guard = Some(handle);
+        }
     }
 }
 
@@ -226,8 +230,8 @@ impl<'scope> DelegatedTaskLayout<'scope> {
         &self,
         target: Tgt,
     ) -> JlrsResult<ValueData<'target, 'static, Tgt>> {
-        if let Some(x) = self.thread_handle.lock().take() {
-            match unsafe { gc_safe(|| x.join()) } {
+        match self.thread_handle.lock().take() {
+            Some(x) => match unsafe { gc_safe(|| x.join()) } {
                 Ok(Ok(_)) => unsafe {
                     if let Some(v) = self.atomic.load(&target, Ordering::Relaxed) {
                         Ok(v.root(target))
@@ -237,9 +241,8 @@ impl<'scope> DelegatedTaskLayout<'scope> {
                 },
                 Ok(Err(e)) => Err(e)?,
                 Err(_e) => Err(JlrsError::exception("delegated task panicked"))?,
-            }
-        } else {
-            Err(JlrsError::exception("already joined"))?
+            },
+            _ => Err(JlrsError::exception("already joined"))?,
         }
     }
 }
@@ -313,9 +316,11 @@ where
 
 // Should only be called from Julia.
 unsafe extern "C" fn delegated_task_fetch(handle: DelegatedTask) -> ValueRet {
-    let weak_handle = weak_handle_unchecked!();
-    handle
-        .fetch(&weak_handle)
-        .map(|v| v.leak())
-        .return_or_throw()
+    unsafe {
+        let weak_handle = weak_handle_unchecked!();
+        handle
+            .fetch(&weak_handle)
+            .map(|v| v.leak())
+            .return_or_throw()
+    }
 }

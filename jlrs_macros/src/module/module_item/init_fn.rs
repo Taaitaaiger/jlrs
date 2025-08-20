@@ -1,6 +1,6 @@
 use syn::{
-    parse::{Parse, ParseStream},
     Ident, Result, Token,
+    parse::{Parse, ParseStream},
 };
 
 pub struct InitFn {

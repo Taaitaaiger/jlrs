@@ -1,6 +1,6 @@
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{spanned::Spanned, Token};
+use syn::{Token, spanned::Spanned};
 
 use super::{is_enum, is_repr_c, is_repr_int};
 

@@ -17,19 +17,18 @@ use crate::{
     args::Values,
     call::{Call, WithKeywords},
     data::managed::{
-        erase_scope_lifetime,
+        Managed, erase_scope_lifetime,
         module::{JlrsCore, Module},
         private::ManagedPriv,
         value::Value,
-        Managed,
     },
-    error::{JuliaResult, CANNOT_DISPLAY_VALUE},
+    error::{CANNOT_DISPLAY_VALUE, JuliaResult},
     gc_safe::GcSafeMutex,
     memory::{
+        PTls,
         gc::{gc_safe_with, gc_unsafe_with},
         get_tls,
         target::{frame::AsyncGcFrame, private::TargetPriv, unrooted::Unrooted},
-        PTls,
     },
     private::Private,
     util::kwcall_function,
@@ -57,14 +56,16 @@ where
     ///
     /// A GC-safe future can only be created from a thread that can call into Julia.
     pub unsafe fn new(fut: F) -> Self {
-        assert!(!jlrs_current_task().is_null(), "No task");
-        let ptls = get_tls();
-        assert!(!ptls.is_null(), "no TLS");
+        unsafe {
+            assert!(!jlrs_current_task().is_null(), "No task");
+            let ptls = get_tls();
+            assert!(!ptls.is_null(), "no TLS");
 
-        GcSafeFuture {
-            fut,
-            ptls,
-            _marker_t: PhantomData,
+            GcSafeFuture {
+                fut,
+                ptls,
+                _marker_t: PhantomData,
+            }
         }
     }
 }
@@ -377,8 +378,10 @@ impl<'frame, 'data> Future for JuliaFuture<'frame, 'data> {
 // This function is called using `ccall` to indicate a task has completed.
 #[cfg(feature = "async-rt")]
 pub(crate) unsafe extern "C" fn wake_task(state: *const GcSafeMutex<TaskState>) {
-    let state = Arc::from_raw(state);
-    let mut state = state.lock();
-    state.completed = true;
-    state.waker.take().map(|waker| waker.wake());
+    unsafe {
+        let state = Arc::from_raw(state);
+        let mut state = state.lock();
+        state.completed = true;
+        state.waker.take().map(|waker| waker.wake());
+    }
 }

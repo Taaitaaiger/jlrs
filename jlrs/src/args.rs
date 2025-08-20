@@ -52,7 +52,7 @@ pub(crate) mod private {
     use jl_sys::jl_value_t;
     use smallvec::SmallVec;
 
-    use super::{WithSmallVecSize, MAX_SIZE, UMAX};
+    use super::{MAX_SIZE, UMAX, WithSmallVecSize};
     use crate::{
         data::managed::{private::ManagedPriv, value::Value},
         private::Private,

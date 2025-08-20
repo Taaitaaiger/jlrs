@@ -4,7 +4,7 @@
 //! Julia versions 1.10, 1.11 and 1.12 are currently supported. In general jlrs aims to support all
 //! versions starting at the current LTS version, but only the LTS and stable versions are
 //! actively tested. Using the current stable version of Julia is highly recommended. The minimum
-//! supported Rust version is currently 1.79.
+//! supported Rust version is currently 1.85.
 //!
 //! A tutorial is available [here](https://taaitaaiger.github.io/jlrs-tutorial/).
 //!
@@ -34,7 +34,7 @@
 //! # Prerequisites
 //!
 //! To use jlrs, supported versions of Rust and Julia must have been installed. Currently, Julia
-//! 1.10, 1.11 and 1.12 are supported, the minimum supported Rust version is 1.79. Some features may
+//! 1.10, 1.11 and 1.12 are supported, the minimum supported Rust version is 1.85. Some features may
 //! require a more recent version of Rust. jlrs uses the JlrsCore package for Julia, if this
 //! package has not been installed, the latest version will be installed automatically by default.
 //!
@@ -94,12 +94,11 @@
 //!  - `async-rt`
 //!
 //!    Enables the async runtime. The async runtime runs on a separate thread and can be used from
-//!    multiple threads. This feature requires using at least Rust 1.85.
+//!    multiple threads.
 //!
 //!  - `tokio-rt`
 //!
-//!    The async runtime requires an executor. This feature provides a tokio-based executor. This
-//!    feature requires using at least Rust 1.85.
+//!    The async runtime requires an executor. This feature provides a tokio-based executor.
 //!
 //!  - `multi-rt`
 //!
@@ -122,7 +121,7 @@
 //!
 //!   Enable the features of the async runtime which don't depend on the executor. This
 //!   can be used in libraries which provide implementations of tasks that the async runtime can
-//!   handle. This feature requires using at least Rust 1.85.
+//!   handle.
 //!
 //! - `jlrs-derive`
 //!
@@ -805,11 +804,7 @@
 //!
 //! // This function will be provided to Julia as a pointer, so its name can be mangled.
 //! unsafe extern "C" fn call_me(arg: Bool) -> isize {
-//!     if arg.as_bool() {
-//!         1
-//!     } else {
-//!         -1
-//!     }
+//!     if arg.as_bool() { 1 } else { -1 }
 //! }
 //!
 //! # fn main() {
@@ -997,8 +992,7 @@ use std::{
 };
 
 use data::{
-    managed::module::mark_global_cache,
-    static_data::{init_static_data_cache, mark_static_data_cache},
+    managed::module::mark_global_cache, static_data::mark_static_data_cache,
     types::construct_type::mark_constructed_type_cache,
 };
 use jl_sys::{jl_gc_set_cb_root_scanner, jlrs_init_missing_functions};
@@ -1008,14 +1002,8 @@ use semver::Version;
 
 use crate::{
     data::{
-        managed::{
-            module::{init_global_cache, JlrsCore},
-            symbol::init_symbol_cache,
-            value::Value,
-        },
-        types::{
-            construct_type::init_constructed_type_cache, foreign_type::init_foreign_type_registry,
-        },
+        managed::{module::JlrsCore, symbol::init_symbol_cache, value::Value},
+        types::foreign_type::init_foreign_type_registry,
     },
     memory::{
         context::{ledger::init_ledger, stack::Stack},
@@ -1082,8 +1070,9 @@ impl InstallJlrsCore {
         allow(unused)
     )]
     unsafe fn use_or_install(&self) {
-        let unrooted = Unrooted::new();
-        let cmd = match self {
+        unsafe {
+            let unrooted = Unrooted::new();
+            let cmd = match self {
             InstallJlrsCore::Default => {
                 "try; using JlrsCore; catch; import Pkg; Pkg.add(\"JlrsCore\"); using JlrsCore; end"
                     .to_string()
@@ -1103,14 +1092,17 @@ impl InstallJlrsCore {
             InstallJlrsCore::No => "using JlrsCore".to_string(),
         };
 
-        let cmd = format!("if !haskey(Base.loaded_modules, Base.PkgId(Base.UUID(\"29be08bc-e5fd-4da2-bbc1-72011c6ea2c9\"), \"JlrsCore\")); {cmd}; end");
+            let cmd = format!(
+                "if !haskey(Base.loaded_modules, Base.PkgId(Base.UUID(\"29be08bc-e5fd-4da2-bbc1-72011c6ea2c9\"), \"JlrsCore\")); {cmd}; end"
+            );
 
-        if let Err(err) = Value::eval_string(unrooted, cmd) {
-            eprintln!("Failed to load or install JlrsCore package");
-            // JlrsCore failed to load, print the error message to stderr without using
-            // `Managed::error_string_or`.
-            err.as_value().print_error();
-            panic!();
+            if let Err(err) = Value::eval_string(unrooted, cmd) {
+                eprintln!("Failed to load or install JlrsCore package");
+                // JlrsCore failed to load, print the error message to stderr without using
+                // `Managed::error_string_or`.
+                err.as_value().print_error();
+                panic!();
+            }
         }
     }
 }
@@ -1149,39 +1141,40 @@ fn preferred_jlrs_core_version() -> Option<InstallJlrsCore> {
     allow(unused)
 )]
 pub(crate) unsafe fn init_jlrs(install_jlrs_core: &InstallJlrsCore, allow_override: bool) {
-    static IS_INIT: AtomicBool = AtomicBool::new(false);
+    unsafe {
+        static IS_INIT: AtomicBool = AtomicBool::new(false);
 
-    if IS_INIT.swap(true, Ordering::Relaxed) {
-        return;
-    }
+        if IS_INIT.swap(true, Ordering::Relaxed) {
+            return;
+        }
 
-    jlrs_init_missing_functions();
-    init_foreign_type_registry();
-    init_constructed_type_cache();
-    init_symbol_cache();
-    init_global_cache();
-    init_static_data_cache();
+        jlrs_init_missing_functions();
+        init_foreign_type_registry();
+        init_symbol_cache();
 
-    jl_gc_set_cb_root_scanner(root_scanner, 1);
+        jl_gc_set_cb_root_scanner(root_scanner, 1);
 
-    if let Some(preferred_version) = preferred_jlrs_core_version() {
-        if allow_override {
-            preferred_version.use_or_install();
+        if let Some(preferred_version) = preferred_jlrs_core_version() {
+            if allow_override {
+                preferred_version.use_or_install();
+            } else {
+                install_jlrs_core.use_or_install();
+            }
         } else {
             install_jlrs_core.use_or_install();
         }
-    } else {
-        install_jlrs_core.use_or_install();
-    }
 
-    let unrooted = Unrooted::new();
-    let api_version = JlrsCore::api_version(&unrooted);
-    if api_version != JLRS_API_VERSION {
-        panic!("Incompatible version of JlrsCore detected. Expected API version {JLRS_API_VERSION}, found {api_version}");
-    }
+        let unrooted = Unrooted::new();
+        let api_version = JlrsCore::api_version(&unrooted);
+        if api_version != JLRS_API_VERSION {
+            panic!(
+                "Incompatible version of JlrsCore detected. Expected API version {JLRS_API_VERSION}, found {api_version}"
+            );
+        }
 
-    init_ledger();
-    Stack::init(&unrooted);
+        init_ledger();
+        Stack::init(&unrooted);
+    }
 }
 
 #[cfg_attr(

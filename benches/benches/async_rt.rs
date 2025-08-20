@@ -1,4 +1,4 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, black_box, criterion_group, criterion_main};
 use jlrs::{prelude::*, runtime::handle::async_handle::AsyncHandle};
 #[cfg(not(target_os = "windows"))]
 use pprof::{

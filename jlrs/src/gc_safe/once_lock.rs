@@ -80,7 +80,7 @@ impl<T> GcSafeOnceLock<T> {
 
     #[inline]
     pub unsafe fn get_unchecked(&self) -> &T {
-        self.inner.get_unchecked()
+        unsafe { self.inner.get_unchecked() }
     }
 
     #[inline]

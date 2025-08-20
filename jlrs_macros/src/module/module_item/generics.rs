@@ -1,9 +1,10 @@
 use syn::{
+    Expr, Ident, Macro, Path, Result, Token,
     parse::{Parse, ParseStream},
-    parse_quote, Expr, Ident, Macro, Path, Result, Token,
+    parse_quote,
 };
 
-use super::{exported_generics::ExportedGenerics, has_outer_path_attr, ModuleItem};
+use super::{ModuleItem, exported_generics::ExportedGenerics, has_outer_path_attr};
 use crate::module::ParameterEnvironment;
 
 #[derive(Debug)]
@@ -14,11 +15,12 @@ pub enum MacroOrType {
 impl Parse for MacroOrType {
     fn parse(input: ParseStream) -> Result<Self> {
         let fork = input.fork();
-        if let Ok(m) = input.parse() {
-            Ok(MacroOrType::Macro(m))
-        } else {
-            let t = fork.parse()?;
-            Ok(MacroOrType::Type(t))
+        match input.parse() {
+            Ok(m) => Ok(MacroOrType::Macro(m)),
+            _ => {
+                let t = fork.parse()?;
+                Ok(MacroOrType::Type(t))
+            }
         }
     }
 }
@@ -75,7 +77,7 @@ impl<'a> GenericEnvironment<'a> {
         }
     }
 
-    pub fn init_type_fragments(&self) -> impl Iterator<Item = Expr> {
+    pub fn init_type_fragments(&self) -> impl Iterator<Item = Expr> + use<> {
         let mut out = vec![];
         self.init_type_fragments_env(None, &mut out);
         out.into_iter()
@@ -102,7 +104,7 @@ impl<'a> GenericEnvironment<'a> {
         out.extend(exprs);
     }
 
-    pub fn reinit_type_fragments(&self) -> impl Iterator<Item = Expr> {
+    pub fn reinit_type_fragments(&self) -> impl Iterator<Item = Expr> + use<> {
         let mut out = vec![];
         self.reinit_type_fragments_env(None, &mut out);
         out.into_iter()

@@ -98,7 +98,7 @@ impl<'scope> JuliaString<'scope> {
     /// Safety: the string must be properly encoded.
     #[inline]
     pub unsafe fn as_str_unchecked(self) -> &'scope str {
-        str::from_utf8_unchecked(self.as_c_str().to_bytes())
+        unsafe { str::from_utf8_unchecked(self.as_c_str().to_bytes()) }
     }
 }
 
@@ -112,10 +112,12 @@ unsafe impl Unbox for String {
     type Output = Result<String, Vec<u8>>;
     #[inline]
     unsafe fn unbox(value: Value) -> Self::Output {
-        let s = value.cast_unchecked::<JuliaString>();
-        match s.as_str() {
-            Ok(s) => Ok(s.into()),
-            Err(_) => Err(s.as_bytes().into()),
+        unsafe {
+            let s = value.cast_unchecked::<JuliaString>();
+            match s.as_str() {
+                Ok(s) => Ok(s.into()),
+                Err(_) => Err(s.as_bytes().into()),
+            }
         }
     }
 }

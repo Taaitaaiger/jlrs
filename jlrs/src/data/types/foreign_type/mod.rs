@@ -102,7 +102,7 @@
 pub mod mark;
 
 use std::{
-    any::{type_name, Any, TypeId},
+    any::{Any, TypeId, type_name},
     ffi::c_void,
     marker::PhantomData,
     ptr::NonNull,
@@ -120,6 +120,7 @@ use crate::{
     data::{
         layout::valid_layout::ValidLayout,
         managed::{
+            Managed, Weak,
             datatype::{DataType, DataTypeData},
             erase_scope_lifetime,
             module::Module,
@@ -127,12 +128,11 @@ use crate::{
             simple_vector::{SimpleVector, SimpleVectorData},
             symbol::Symbol,
             value::{Value, ValueData},
-            Managed, Weak,
         },
         types::construct_type::ConstructType,
     },
     gc_safe::{GcSafeOnceLock, GcSafeRwLock},
-    memory::{get_tls, scope::LocalScopeExt, target::Target, PTls},
+    memory::{PTls, get_tls, scope::LocalScopeExt, target::Target},
     private::Private,
 };
 
@@ -272,10 +272,12 @@ pub unsafe trait OpaqueType: Sized + Send + Sync + 'static {
     where
         Tgt: Target<'target>,
     {
-        if Self::N_PARAMS == 0 {
-            create_opaque_type::<Self, Tgt>(target, name, module)
-        } else {
-            create_parametric_opaque_type::<Self, Tgt>(target, name, module)
+        unsafe {
+            if Self::N_PARAMS == 0 {
+                create_opaque_type::<Self, Tgt>(target, name, module)
+            } else {
+                create_parametric_opaque_type::<Self, Tgt>(target, name, module)
+            }
         }
     }
 
@@ -291,29 +293,31 @@ pub unsafe trait OpaqueType: Sized + Send + Sync + 'static {
     /// default implementation must not be overridden, it cannot be implemented correctly without
     /// using internal functionality.
     unsafe fn reinit_type(ty: DataType) -> bool {
-        if Self::N_PARAMS == 0 {
-            if let Some(_) = FOREIGN_TYPE_REGISTRY.get_unchecked().find::<Self>() {
-                return true;
+        unsafe {
+            if Self::N_PARAMS == 0 {
+                if let Some(_) = FOREIGN_TYPE_REGISTRY.get_unchecked().find::<Self>() {
+                    return true;
+                }
+
+                FOREIGN_TYPE_REGISTRY
+                    .get_unchecked()
+                    .insert::<Self>(erase_scope_lifetime(ty));
+
+                true
+            } else {
+                if let Some(_) = FOREIGN_TYPE_REGISTRY
+                    .get_unchecked()
+                    .find::<Key<Self::Key>>()
+                {
+                    return true;
+                }
+
+                FOREIGN_TYPE_REGISTRY
+                    .get_unchecked()
+                    .insert::<Key<Self::Key>>(erase_scope_lifetime(ty));
+
+                true
             }
-
-            FOREIGN_TYPE_REGISTRY
-                .get_unchecked()
-                .insert::<Self>(erase_scope_lifetime(ty));
-
-            true
-        } else {
-            if let Some(_) = FOREIGN_TYPE_REGISTRY
-                .get_unchecked()
-                .find::<Key<Self::Key>>()
-            {
-                return true;
-            }
-
-            FOREIGN_TYPE_REGISTRY
-                .get_unchecked()
-                .insert::<Key<Self::Key>>(erase_scope_lifetime(ty));
-
-            true
         }
     }
 
@@ -330,37 +334,39 @@ pub unsafe trait OpaqueType: Sized + Send + Sync + 'static {
     where
         Tgt: Target<'target>,
     {
-        if let Some(ty) = FOREIGN_TYPE_REGISTRY.get_unchecked().find::<Self>() {
-            return target.data_from_ptr(ty.unwrap_non_null(Private), Private);
-        }
+        unsafe {
+            if let Some(ty) = FOREIGN_TYPE_REGISTRY.get_unchecked().find::<Self>() {
+                return target.data_from_ptr(ty.unwrap_non_null(Private), Private);
+            }
 
-        let base_ty = FOREIGN_TYPE_REGISTRY
-            .get_unchecked()
-            .find::<Key<Self::Key>>();
-
-        if base_ty.is_none() {
-            panic!("Type {} was not initialized", name.as_str().unwrap());
-        }
-
-        target.with_local_scope::<_, 3>(|target, mut frame| {
-            let params = Self::variant_parameters(&mut frame);
-            let params = params.data();
-            let params_slice = params.as_atomic_slice().assume_immutable_non_null();
-
-            let ty = base_ty
-                .unwrap_unchecked()
-                .rewrap(&mut frame)
-                .apply_type(&mut frame, params_slice)
-                .unwrap()
-                .cast::<DataType>()
-                .unwrap();
-
-            FOREIGN_TYPE_REGISTRY
+            let base_ty = FOREIGN_TYPE_REGISTRY
                 .get_unchecked()
-                .insert::<Self>(erase_scope_lifetime(ty));
+                .find::<Key<Self::Key>>();
 
-            ty.root(target)
-        })
+            if base_ty.is_none() {
+                panic!("Type {} was not initialized", name.as_str().unwrap());
+            }
+
+            target.with_local_scope::<_, 3>(|target, mut frame| {
+                let params = Self::variant_parameters(&mut frame);
+                let params = params.data();
+                let params_slice = params.as_atomic_slice().assume_immutable_non_null();
+
+                let ty = base_ty
+                    .unwrap_unchecked()
+                    .rewrap(&mut frame)
+                    .apply_type(&mut frame, params_slice)
+                    .unwrap()
+                    .cast::<DataType>()
+                    .unwrap();
+
+                FOREIGN_TYPE_REGISTRY
+                    .get_unchecked()
+                    .insert::<Self>(erase_scope_lifetime(ty));
+
+                ty.root(target)
+            })
+        }
     }
 
     /// Reinitializes the previously created variant `ty`.
@@ -375,15 +381,17 @@ pub unsafe trait OpaqueType: Sized + Send + Sync + 'static {
     /// default implementation must not be overridden, it cannot be implemented correctly without
     /// using internal functionality.
     unsafe fn reinit_variant(ty: DataType) -> bool {
-        if let Some(_) = FOREIGN_TYPE_REGISTRY.get_unchecked().find::<Self>() {
-            return true;
+        unsafe {
+            if let Some(_) = FOREIGN_TYPE_REGISTRY.get_unchecked().find::<Self>() {
+                return true;
+            }
+
+            FOREIGN_TYPE_REGISTRY
+                .get_unchecked()
+                .insert::<Self>(erase_scope_lifetime(ty));
+
+            true
         }
-
-        FOREIGN_TYPE_REGISTRY
-            .get_unchecked()
-            .insert::<Self>(erase_scope_lifetime(ty));
-
-        true
     }
 }
 
@@ -427,7 +435,7 @@ pub unsafe trait OpaqueType: Sized + Send + Sync + 'static {
 /// ```
 /// # use jlrs::prelude::*;
 /// # use std::collections::HashMap;
-/// use jlrs::data::types::foreign_type::{mark::Mark, ForeignType as FT};
+/// use jlrs::data::types::foreign_type::{ForeignType as FT, mark::Mark};
 ///
 /// unsafe fn mark_map<M: Mark, P: FT>(
 ///     data: &HashMap<(), M>,
@@ -599,72 +607,80 @@ unsafe impl<T: ForeignType> OpaqueType for T {
     where
         Tgt: Target<'target>,
     {
-        if let Some(ty) = FOREIGN_TYPE_REGISTRY.get_unchecked().find::<Self>() {
-            return target.data_from_ptr(ty.unwrap_non_null(Private), Private);
+        unsafe {
+            if let Some(ty) = FOREIGN_TYPE_REGISTRY.get_unchecked().find::<Self>() {
+                return target.data_from_ptr(ty.unwrap_non_null(Private), Private);
+            }
+
+            let large = Self::LARGE as _;
+            let has_pointers = true as _;
+
+            unsafe extern "C" fn mark<T: ForeignType>(ptls: PTls, value: *mut jl_value_t) -> usize {
+                unsafe {
+                    let data = NonNull::new_unchecked(value.cast()).as_ref();
+                    T::mark(ptls, data, data)
+                }
+            }
+
+            unsafe extern "C" fn sweep<T: ForeignType>(value: *mut jl_value_t) {
+                unsafe { do_sweep::<T>(value.cast()) }
+            }
+
+            target.with_local_scope::<_, 1>(|target, mut frame| {
+                let super_type = Self::super_type(&mut frame).unwrap(Private);
+
+                let ty = jl_new_foreign_type(
+                    name.unwrap(Private),
+                    module.unwrap(Private),
+                    super_type,
+                    mark::<Self>,
+                    sweep::<Self>,
+                    has_pointers,
+                    large,
+                );
+
+                assert!(
+                    !ty.is_null(),
+                    "Unable to create foreign type {}",
+                    type_name::<Self>()
+                );
+                FOREIGN_TYPE_REGISTRY
+                    .get_unchecked()
+                    .insert::<Self>(DataType::wrap_non_null(NonNull::new_unchecked(ty), Private));
+
+                target.data_from_ptr(NonNull::new_unchecked(ty), Private)
+            })
         }
-
-        let large = Self::LARGE as _;
-        let has_pointers = true as _;
-
-        unsafe extern "C" fn mark<T: ForeignType>(ptls: PTls, value: *mut jl_value_t) -> usize {
-            let data = NonNull::new_unchecked(value.cast()).as_ref();
-            T::mark(ptls, data, data)
-        }
-
-        unsafe extern "C" fn sweep<T: ForeignType>(value: *mut jl_value_t) {
-            do_sweep::<T>(value.cast())
-        }
-
-        target.with_local_scope::<_, 1>(|target, mut frame| {
-            let super_type = Self::super_type(&mut frame).unwrap(Private);
-
-            let ty = jl_new_foreign_type(
-                name.unwrap(Private),
-                module.unwrap(Private),
-                super_type,
-                mark::<Self>,
-                sweep::<Self>,
-                has_pointers,
-                large,
-            );
-
-            assert!(
-                !ty.is_null(),
-                "Unable to create foreign type {}",
-                type_name::<Self>()
-            );
-            FOREIGN_TYPE_REGISTRY
-                .get_unchecked()
-                .insert::<Self>(DataType::wrap_non_null(NonNull::new_unchecked(ty), Private));
-
-            target.data_from_ptr(NonNull::new_unchecked(ty), Private)
-        })
     }
 
     unsafe fn reinit_type(datatype: DataType) -> bool {
-        if let Some(_) = FOREIGN_TYPE_REGISTRY.get_unchecked().find::<Self>() {
-            return true;
-        }
+        unsafe {
+            if let Some(_) = FOREIGN_TYPE_REGISTRY.get_unchecked().find::<Self>() {
+                return true;
+            }
 
-        unsafe extern "C" fn mark<T: ForeignType>(ptls: PTls, value: *mut jl_value_t) -> usize {
-            let data = NonNull::new_unchecked(value.cast()).as_ref();
-            T::mark(ptls, data, data)
-        }
+            unsafe extern "C" fn mark<T: ForeignType>(ptls: PTls, value: *mut jl_value_t) -> usize {
+                unsafe {
+                    let data = NonNull::new_unchecked(value.cast()).as_ref();
+                    T::mark(ptls, data, data)
+                }
+            }
 
-        unsafe extern "C" fn sweep<T: ForeignType>(value: *mut jl_value_t) {
-            do_sweep::<T>(value.cast())
-        }
+            unsafe extern "C" fn sweep<T: ForeignType>(value: *mut jl_value_t) {
+                unsafe { do_sweep::<T>(value.cast()) }
+            }
 
-        let ty = datatype.unwrap(Private);
-        let ret = jl_reinit_foreign_type(ty, mark::<Self>, sweep::<Self>);
-        if ret != 0 {
-            FOREIGN_TYPE_REGISTRY
-                .get_unchecked()
-                .insert::<Self>(DataType::wrap_non_null(NonNull::new_unchecked(ty), Private));
+            let ty = datatype.unwrap(Private);
+            let ret = jl_reinit_foreign_type(ty, mark::<Self>, sweep::<Self>);
+            if ret != 0 {
+                FOREIGN_TYPE_REGISTRY
+                    .get_unchecked()
+                    .insert::<Self>(DataType::wrap_non_null(NonNull::new_unchecked(ty), Private));
 
-            true
-        } else {
-            panic!("Unable to reinit type {}", type_name::<Self>())
+                true
+            } else {
+                panic!("Unable to reinit type {}", type_name::<Self>())
+            }
         }
     }
 
@@ -692,34 +708,39 @@ where
     T: OpaqueType,
     Tgt: Target<'target>,
 {
-    if let Some(ty) = FOREIGN_TYPE_REGISTRY.get_unchecked().find::<Key<T::Key>>() {
-        return target.data_from_ptr(ty.unwrap_non_null(Private), Private);
+    unsafe {
+        if let Some(ty) = FOREIGN_TYPE_REGISTRY.get_unchecked().find::<Key<T::Key>>() {
+            return target.data_from_ptr(ty.unwrap_non_null(Private), Private);
+        }
+
+        target.with_local_scope::<_, 2>(|target, mut frame| {
+            let super_type = T::super_type(&mut frame);
+            let parameters = T::type_parameters(&mut frame);
+
+            let ty = jl_new_datatype(
+                name.unwrap(Private),
+                module.unwrap(Private),
+                super_type.unwrap(Private),
+                parameters.unwrap(Private),
+                jl_emptysvec,
+                jl_emptysvec,
+                jl_emptysvec,
+                0,
+                1,
+                0,
+            );
+
+            debug_assert!(!ty.is_null());
+            FOREIGN_TYPE_REGISTRY
+                .get_unchecked()
+                .insert::<Key<T::Key>>(DataType::wrap_non_null(
+                    NonNull::new_unchecked(ty),
+                    Private,
+                ));
+
+            target.data_from_ptr::<DataType>(NonNull::new_unchecked(ty), Private)
+        })
     }
-
-    target.with_local_scope::<_, 2>(|target, mut frame| {
-        let super_type = T::super_type(&mut frame);
-        let parameters = T::type_parameters(&mut frame);
-
-        let ty = jl_new_datatype(
-            name.unwrap(Private),
-            module.unwrap(Private),
-            super_type.unwrap(Private),
-            parameters.unwrap(Private),
-            jl_emptysvec,
-            jl_emptysvec,
-            jl_emptysvec,
-            0,
-            1,
-            0,
-        );
-
-        debug_assert!(!ty.is_null());
-        FOREIGN_TYPE_REGISTRY
-            .get_unchecked()
-            .insert::<Key<T::Key>>(DataType::wrap_non_null(NonNull::new_unchecked(ty), Private));
-
-        target.data_from_ptr::<DataType>(NonNull::new_unchecked(ty), Private)
-    })
 }
 
 unsafe fn create_opaque_type<'target, T, Tgt>(
@@ -731,34 +752,36 @@ where
     T: OpaqueType,
     Tgt: Target<'target>,
 {
-    if let Some(ty) = FOREIGN_TYPE_REGISTRY.get_unchecked().find::<T>() {
-        return target.data_from_ptr(ty.unwrap_non_null(Private), Private);
+    unsafe {
+        if let Some(ty) = FOREIGN_TYPE_REGISTRY.get_unchecked().find::<T>() {
+            return target.data_from_ptr(ty.unwrap_non_null(Private), Private);
+        }
+
+        target.with_local_scope::<_, 2>(|target, mut frame| {
+            let super_type = T::super_type(&mut frame);
+            let parameters = T::type_parameters(&mut frame);
+
+            let ty = jl_new_datatype(
+                name.unwrap(Private),
+                module.unwrap(Private),
+                super_type.unwrap(Private),
+                parameters.unwrap(Private),
+                jl_emptysvec,
+                jl_emptysvec,
+                jl_emptysvec,
+                0,
+                1,
+                0,
+            );
+
+            debug_assert!(!ty.is_null());
+            FOREIGN_TYPE_REGISTRY
+                .get_unchecked()
+                .insert::<T>(DataType::wrap_non_null(NonNull::new_unchecked(ty), Private));
+
+            target.data_from_ptr::<DataType>(NonNull::new_unchecked(ty), Private)
+        })
     }
-
-    target.with_local_scope::<_, 2>(|target, mut frame| {
-        let super_type = T::super_type(&mut frame);
-        let parameters = T::type_parameters(&mut frame);
-
-        let ty = jl_new_datatype(
-            name.unwrap(Private),
-            module.unwrap(Private),
-            super_type.unwrap(Private),
-            parameters.unwrap(Private),
-            jl_emptysvec,
-            jl_emptysvec,
-            jl_emptysvec,
-            0,
-            1,
-            0,
-        );
-
-        debug_assert!(!ty.is_null());
-        FOREIGN_TYPE_REGISTRY
-            .get_unchecked()
-            .insert::<T>(DataType::wrap_non_null(NonNull::new_unchecked(ty), Private));
-
-        target.data_from_ptr::<DataType>(NonNull::new_unchecked(ty), Private)
-    })
 }
 
 #[inline]
@@ -766,7 +789,9 @@ unsafe fn do_sweep<T>(data: *mut T)
 where
     T: ForeignType,
 {
-    std::ptr::drop_in_place(data);
+    unsafe {
+        std::ptr::drop_in_place(data);
+    }
 }
 
 unsafe impl<F: OpaqueType> IntoJulia for F {
@@ -862,7 +887,9 @@ unsafe impl<T: OpaqueType + Clone> Unbox for T {
 }
 
 unsafe extern "C" fn drop_opaque<T: OpaqueType>(data: *mut T) {
-    std::ptr::drop_in_place(data);
+    unsafe {
+        std::ptr::drop_in_place(data);
+    }
 }
 
 unsafe impl<T: OpaqueType> ConstructType for T {

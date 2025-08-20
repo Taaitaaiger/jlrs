@@ -32,13 +32,17 @@ fn emit_julia_cfg(min_version: i32, max_version: i32) {
     }
 
     if minor < min_version {
-        println!("cargo::error=Unsupported minor version of Julia; expected at least 1.10, detected {major}.{minor}");
+        println!(
+            "cargo::error=Unsupported minor version of Julia; expected at least 1.10, detected {major}.{minor}"
+        );
         return;
     }
 
     if minor > max_version {
-        println!("cargo::rustc-warning=\"Detected unsupported Julia version {major}.{minor}, assuming compatibility with {major}.{max_version}. \
-        Please report any issues at https://www.github.com/Taaitaaiger/jlrs/issues\"");
+        println!(
+            "cargo::rustc-warning=\"Detected unsupported Julia version {major}.{minor}, assuming compatibility with {major}.{max_version}. \
+        Please report any issues at https://www.github.com/Taaitaaiger/jlrs/issues\""
+        );
         println!("cargo::rustc-cfg=julia_{}_{}", major, max_version);
         return;
     }

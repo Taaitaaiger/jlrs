@@ -4,9 +4,9 @@ use std::{any::TypeId, ffi::c_void, marker::PhantomData, ptr::NonNull, string::F
 
 use fnv::FnvHashMap;
 use jl_sys::{
-    jl_bool_type, jl_bottom_type, jl_char_type, jl_float32_type, jl_float64_type, jl_int16_type,
-    jl_int32_type, jl_int64_type, jl_int8_type, jl_pointer_type, jl_uint16_type, jl_uint32_type,
-    jl_uint64_type, jl_uint8_type, jl_uniontype_type, jl_value_t, jl_voidpointer_type,
+    jl_bool_type, jl_bottom_type, jl_char_type, jl_float32_type, jl_float64_type, jl_int8_type,
+    jl_int16_type, jl_int32_type, jl_int64_type, jl_pointer_type, jl_uint8_type, jl_uint16_type,
+    jl_uint32_type, jl_uint64_type, jl_uniontype_type, jl_value_t, jl_voidpointer_type,
 };
 use rustc_hash::FxHashSet;
 
@@ -17,6 +17,7 @@ use crate::{
         cache::Cache,
         layout::{is_bits::IsBits, tuple::Tuple, typed_layout::HasLayout},
         managed::{
+            Managed,
             array::dimensions::DimsExt,
             datatype::DataType,
             simple_vector::SimpleVector,
@@ -24,61 +25,25 @@ use crate::{
             union::Union,
             union_all::UnionAll,
             value::{Value, ValueData, ValueUnbound},
-            Managed,
         },
     },
     memory::{
-        scope::{LocalScope, LocalScopeExt},
-        target::{unrooted::Unrooted, RootingTarget, Target},
         PTls,
+        scope::{LocalScope, LocalScopeExt},
+        target::{RootingTarget, Target, unrooted::Unrooted},
     },
     prelude::{ConstructTypedArray, Symbol, WeakValue},
     private::Private,
 };
 
-#[rustversion::before(1.85)]
-type CacheImpl = crate::gc_safe::GcSafeOnceLock<ConstructedTypes>;
-#[rustversion::since(1.85)]
 type CacheImpl = ConstructedTypes;
 
 static CONSTRUCTED_TYPE_CACHE: CacheImpl = CacheImpl::new();
 
-#[rustversion::before(1.85)]
-#[cfg_attr(
-    not(any(
-        feature = "local-rt",
-        feature = "async-rt",
-        feature = "multi-rt",
-        feature = "ccall"
-    )),
-    allow(unused)
-)]
-pub(crate) unsafe fn init_constructed_type_cache() {
-    CONSTRUCTED_TYPE_CACHE.set(ConstructedTypes::new()).ok();
-}
-
-#[rustversion::since(1.85)]
-#[cfg_attr(
-    not(any(
-        feature = "local-rt",
-        feature = "async-rt",
-        feature = "multi-rt",
-        feature = "ccall"
-    )),
-    allow(unused)
-)]
-pub(crate) unsafe fn init_constructed_type_cache() {}
-
-#[rustversion::before(1.85)]
 pub(crate) unsafe fn mark_constructed_type_cache(ptls: PTls, full: bool) {
-    CONSTRUCTED_TYPE_CACHE
-        .get()
-        .map(|cache| cache.data.mark(ptls, full));
-}
-
-#[rustversion::since(1.85)]
-pub(crate) unsafe fn mark_constructed_type_cache(ptls: PTls, full: bool) {
-    CONSTRUCTED_TYPE_CACHE.data.mark(ptls, full);
+    unsafe {
+        CONSTRUCTED_TYPE_CACHE.data.mark(ptls, full);
+    }
 }
 
 /// Define a fast key type for a constructible type.
@@ -1447,7 +1412,6 @@ struct ConstructedTypes {
 }
 
 impl ConstructedTypes {
-    #[rustversion::since(1.85)]
     const fn new() -> Self {
         let hasher = fnv::FnvBuildHasher::new();
         let map = std::collections::HashMap::with_hasher(hasher);
@@ -1456,16 +1420,7 @@ impl ConstructedTypes {
         ConstructedTypes { data: cache }
     }
 
-    #[rustversion::before(1.85)]
-    fn new() -> Self {
-        let map = FnvHashMap::default();
-        let cache = Cache::new(map);
-
-        ConstructedTypes { data: cache }
-    }
-
     #[inline(always)]
-    #[rustversion::since(1.85)]
     fn get_unchecked(&self) -> &Self {
         self
     }

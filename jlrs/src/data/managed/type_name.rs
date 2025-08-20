@@ -14,7 +14,7 @@ use jl_sys::{
 };
 use jlrs_macros::julia_version;
 
-use super::{simple_vector::SimpleVector, value::Value, Weak};
+use super::{Weak, simple_vector::SimpleVector, value::Value};
 use crate::{
     data::managed::{module::Module, private::ManagedPriv, symbol::Symbol},
     impl_julia_typecheck,

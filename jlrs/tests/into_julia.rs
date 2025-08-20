@@ -9,7 +9,7 @@ mod tests {
     use super::util::JULIA;
 
     macro_rules! impl_test {
-        ($type:ty, $type_test_name:ident, $into_test_name:ident, $val:expr, $assoc_ty:ident) => {
+        ($type:ty, $type_test_name:ident, $into_test_name:ident, $val:expr_2021, $assoc_ty:ident) => {
             fn $type_test_name() {
                 JULIA.with(|handle| {
                     handle.borrow_mut().with_stack(|mut stack| {

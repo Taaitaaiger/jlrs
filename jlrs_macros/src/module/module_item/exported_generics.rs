@@ -1,12 +1,11 @@
 use syn::{
-    braced, bracketed,
+    Ident, Path, Result, Token, braced, bracketed,
     parse::{Parse, ParseStream},
     punctuated::Punctuated,
     token::{Brace, Bracket},
-    Ident, Path, Result, Token,
 };
 
-use super::{generics::GenericEnvironment, ModuleItem};
+use super::{ModuleItem, generics::GenericEnvironment};
 
 pub struct ExportedGenerics {
     pub _for: Token![for],

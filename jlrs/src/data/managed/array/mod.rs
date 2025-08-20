@@ -158,7 +158,7 @@ use crate::{
             valid_layout::{ValidField, ValidLayout},
         },
         managed::{
-            private::ManagedPriv, type_name::TypeName, type_var::TypeVar, union_all::UnionAll, Weak,
+            Weak, private::ManagedPriv, type_name::TypeName, type_var::TypeVar, union_all::UnionAll,
         },
         types::{
             abstract_type::AnyType,
@@ -166,11 +166,11 @@ use crate::{
             typecheck::Typecheck,
         },
     },
-    error::{AccessError, ArrayLayoutError, InstantiationError, TypeError, CANNOT_DISPLAY_TYPE},
+    error::{AccessError, ArrayLayoutError, CANNOT_DISPLAY_TYPE, InstantiationError, TypeError},
     memory::{
         get_tls,
         scope::LocalScopeExt,
-        target::{unrooted::Unrooted, TargetResult},
+        target::{TargetResult, unrooted::Unrooted},
     },
     prelude::{DataType, JlrsResult, LocalScope, Managed, Target, TargetType, Value, ValueData},
     private::Private,
@@ -280,10 +280,12 @@ pub trait ConstructTypedArray<T: ConstructType, const N: isize> {
         Tgt: Target<'target>,
         D: DimsExt,
     {
-        let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
-        let array_type = Self::array_type(&target, &dims).as_value();
-        let array = dims.alloc_array(&target, array_type);
-        target.data_from_ptr(array.ptr(), Private)
+        unsafe {
+            let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
+            let array_type = Self::array_type(&target, &dims).as_value();
+            let array = dims.alloc_array(&target, array_type);
+            target.data_from_ptr(array.ptr(), Private)
+        }
     }
 
     /// Allocate a new Julia array that borrows its data from Rust.
@@ -406,10 +408,12 @@ pub trait ConstructTypedArray<T: ConstructType, const N: isize> {
         T: HasLayout<'static, 'static, Layout = U>,
         U: ValidLayout + ValidField + IsBits,
     {
-        let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
-        let array_type = Self::array_type(&target, &dims).as_value();
-        let array = dims.alloc_array_with_data(&target, array_type, data.as_ptr() as _);
-        target.data_from_ptr(array.ptr(), Private)
+        unsafe {
+            let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
+            let array_type = Self::array_type(&target, &dims).as_value();
+            let array = dims.alloc_array_with_data(&target, array_type, data.as_ptr() as _);
+            target.data_from_ptr(array.ptr(), Private)
+        }
     }
 
     /// Allocate a new Julia array that takes owenership of a Rust `Vec`.
@@ -541,19 +545,21 @@ pub trait ConstructTypedArray<T: ConstructType, const N: isize> {
         T: HasLayout<'static, 'static, Layout = U>,
         U: ValidLayout + ValidField + IsBits,
     {
-        let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
-        let data = Box::leak(data.into_boxed_slice());
+        unsafe {
+            let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
+            let data = Box::leak(data.into_boxed_slice());
 
-        let array_type = Self::array_type(&target, &dims).as_value();
-        let array = dims.alloc_array_with_data(&target, array_type, data.as_mut_ptr() as _);
-        #[cfg(not(julia_1_10))]
-        let mem = jl_sys::inlined::jlrs_array_mem(array.ptr().as_ptr());
-        #[cfg(julia_1_10)]
-        let mem = array.ptr().as_ptr().cast();
+            let array_type = Self::array_type(&target, &dims).as_value();
+            let array = dims.alloc_array_with_data(&target, array_type, data.as_mut_ptr() as _);
+            #[cfg(not(julia_1_10))]
+            let mem = jl_sys::inlined::jlrs_array_mem(array.ptr().as_ptr());
+            #[cfg(julia_1_10)]
+            let mem = array.ptr().as_ptr().cast();
 
-        jl_gc_add_ptr_finalizer(get_tls(), mem, droparray::<U> as *mut c_void);
+            jl_gc_add_ptr_finalizer(get_tls(), mem, droparray::<U> as *mut c_void);
 
-        target.data_from_ptr(array.ptr(), Private)
+            target.data_from_ptr(array.ptr(), Private)
+        }
     }
 
     /// Allocate a new Julia array that clones its data from Rust.
@@ -678,16 +684,18 @@ pub trait ConstructTypedArray<T: ConstructType, const N: isize> {
         U: ValidLayout + ValidField + IsBits + Clone,
         V: AsRef<[U]>,
     {
-        let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
-        let data = data.as_ref();
-        let len = data.len();
+        unsafe {
+            let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
+            let data = data.as_ref();
+            let len = data.len();
 
-        let arr = Self::new_unchecked(&target, dims);
-        let array_data = jlrs_array_data(arr.as_managed().unwrap(Private));
-        let array_data_slice = std::slice::from_raw_parts_mut(array_data as _, len);
-        array_data_slice.clone_from_slice(data);
+            let arr = Self::new_unchecked(&target, dims);
+            let array_data = jlrs_array_data(arr.as_managed().unwrap(Private));
+            let array_data_slice = std::slice::from_raw_parts_mut(array_data as _, len);
+            array_data_slice.clone_from_slice(data);
 
-        arr.root(target)
+            arr.root(target)
+        }
     }
 
     /// Allocate a new Julia array that copies its data from Rust.
@@ -812,16 +820,18 @@ pub trait ConstructTypedArray<T: ConstructType, const N: isize> {
         U: ValidLayout + ValidField + IsBits + Copy,
         V: AsRef<[U]>,
     {
-        let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
-        let data = data.as_ref();
-        let len = data.len();
+        unsafe {
+            let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
+            let data = data.as_ref();
+            let len = data.len();
 
-        let arr = Self::new_unchecked(&target, dims);
-        let array_data = jlrs_array_data(arr.as_managed().unwrap(Private));
-        let array_data_slice = std::slice::from_raw_parts_mut(array_data as _, len);
-        array_data_slice.copy_from_slice(data);
+            let arr = Self::new_unchecked(&target, dims);
+            let array_data = jlrs_array_data(arr.as_managed().unwrap(Private));
+            let array_data_slice = std::slice::from_raw_parts_mut(array_data as _, len);
+            array_data_slice.copy_from_slice(data);
 
-        arr.root(target)
+            arr.root(target)
+        }
     }
 }
 
@@ -918,13 +928,15 @@ impl<const N: isize> ArrayBase<'_, '_, Unknown, N> {
         Tgt: Target<'target>,
         D: DimsExt,
     {
-        let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
-        // array_type should be a concrete type.
-        let array_type = jl_apply_array_type(ty.unwrap(Private), dims.rank());
-        let array_type = Value::wrap_non_null(NonNull::new_unchecked(array_type), Private);
-        let array = dims.alloc_array(&target, array_type);
+        unsafe {
+            let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
+            // array_type should be a concrete type.
+            let array_type = jl_apply_array_type(ty.unwrap(Private), dims.rank());
+            let array_type = Value::wrap_non_null(NonNull::new_unchecked(array_type), Private);
+            let array = dims.alloc_array(&target, array_type);
 
-        target.data_from_ptr(array.ptr(), Private)
+            target.data_from_ptr(array.ptr(), Private)
+        }
     }
 
     /// Allocate a new Julia array that borrows its data from Rust with some provided element
@@ -1064,13 +1076,15 @@ impl<const N: isize> ArrayBase<'_, '_, Unknown, N> {
         D: DimsExt,
         U: ValidLayout + ValidField + IsBits,
     {
-        let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
+        unsafe {
+            let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
 
-        // array_type should be a concrete type.
-        let array_type = jl_apply_array_type(ty.unwrap(Private), dims.rank());
-        let array_type = Value::wrap_non_null(NonNull::new_unchecked(array_type), Private);
-        let array = dims.alloc_array_with_data(&target, array_type, data.as_ptr() as _);
-        target.data_from_ptr(array.ptr(), Private)
+            // array_type should be a concrete type.
+            let array_type = jl_apply_array_type(ty.unwrap(Private), dims.rank());
+            let array_type = Value::wrap_non_null(NonNull::new_unchecked(array_type), Private);
+            let array = dims.alloc_array_with_data(&target, array_type, data.as_ptr() as _);
+            target.data_from_ptr(array.ptr(), Private)
+        }
     }
 
     /// Allocate a new Julia array that takes ownership of a Rust `Vec` with some provided element
@@ -1218,21 +1232,23 @@ impl<const N: isize> ArrayBase<'_, '_, Unknown, N> {
         D: DimsExt,
         U: ValidLayout + ValidField + IsBits,
     {
-        let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
-        let data = Box::leak(data.into_boxed_slice());
+        unsafe {
+            let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
+            let data = Box::leak(data.into_boxed_slice());
 
-        // array_type should be a concrete type.
-        let array_type = jl_apply_array_type(ty.unwrap(Private), dims.rank());
-        let array_type = Value::wrap_non_null(NonNull::new_unchecked(array_type), Private);
-        let array = dims.alloc_array_with_data(&target, array_type, data.as_mut_ptr() as _);
-        #[cfg(not(julia_1_10))]
-        let mem = jl_sys::inlined::jlrs_array_mem(array.ptr().as_ptr());
-        #[cfg(julia_1_10)]
-        let mem = array.ptr().as_ptr().cast();
+            // array_type should be a concrete type.
+            let array_type = jl_apply_array_type(ty.unwrap(Private), dims.rank());
+            let array_type = Value::wrap_non_null(NonNull::new_unchecked(array_type), Private);
+            let array = dims.alloc_array_with_data(&target, array_type, data.as_mut_ptr() as _);
+            #[cfg(not(julia_1_10))]
+            let mem = jl_sys::inlined::jlrs_array_mem(array.ptr().as_ptr());
+            #[cfg(julia_1_10)]
+            let mem = array.ptr().as_ptr().cast();
 
-        jl_gc_add_ptr_finalizer(get_tls(), mem, droparray::<U> as *mut c_void);
+            jl_gc_add_ptr_finalizer(get_tls(), mem, droparray::<U> as *mut c_void);
 
-        target.data_from_ptr(array.ptr(), Private)
+            target.data_from_ptr(array.ptr(), Private)
+        }
     }
 
     /// Allocate a new Julia array with some provided element type that clones its data from Rust.
@@ -1371,17 +1387,19 @@ impl<const N: isize> ArrayBase<'_, '_, Unknown, N> {
         U: ValidLayout + ValidField + IsBits + Clone,
         V: AsRef<[U]>,
     {
-        let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
+        unsafe {
+            let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
 
-        let data = data.as_ref();
-        let len = data.len();
+            let data = data.as_ref();
+            let len = data.len();
 
-        let arr = Self::new_for_unchecked(&target, ty, dims);
-        let array_data = jlrs_array_data(arr.as_managed().unwrap(Private));
-        let array_data_slice = std::slice::from_raw_parts_mut(array_data as _, len);
-        array_data_slice.clone_from_slice(data);
+            let arr = Self::new_for_unchecked(&target, ty, dims);
+            let array_data = jlrs_array_data(arr.as_managed().unwrap(Private));
+            let array_data_slice = std::slice::from_raw_parts_mut(array_data as _, len);
+            array_data_slice.clone_from_slice(data);
 
-        arr.root(target)
+            arr.root(target)
+        }
     }
 
     /// Allocate a new Julia array with some provided element type that copies its data from Rust.
@@ -1520,17 +1538,19 @@ impl<const N: isize> ArrayBase<'_, '_, Unknown, N> {
         U: ValidLayout + ValidField + IsBits + Copy,
         V: AsRef<[U]>,
     {
-        let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
+        unsafe {
+            let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
 
-        let data = data.as_ref();
-        let len = data.len();
+            let data = data.as_ref();
+            let len = data.len();
 
-        let arr = Self::new_for_unchecked(&target, ty, dims);
-        let array_data = jlrs_array_data(arr.as_managed().unwrap(Private));
-        let array_data_slice = std::slice::from_raw_parts_mut(array_data as _, len);
-        array_data_slice.copy_from_slice(data);
+            let arr = Self::new_for_unchecked(&target, ty, dims);
+            let array_data = jlrs_array_data(arr.as_managed().unwrap(Private));
+            let array_data_slice = std::slice::from_raw_parts_mut(array_data as _, len);
+            array_data_slice.copy_from_slice(data);
 
-        arr.root(target)
+            arr.root(target)
+        }
     }
 }
 
@@ -1577,9 +1597,11 @@ impl TypedVector<'_, '_, u8> {
         Tgt: Target<'target>,
         B: AsRef<[u8]>,
     {
-        let bytes = bytes.as_ref();
-        let array = jl_pchar_to_array(bytes.as_ptr() as *const _ as _, bytes.len());
-        target.data_from_ptr(NonNull::new_unchecked(array), Private)
+        unsafe {
+            let bytes = bytes.as_ref();
+            let array = jl_pchar_to_array(bytes.as_ptr() as *const _ as _, bytes.len());
+            target.data_from_ptr(NonNull::new_unchecked(array), Private)
+        }
     }
 
     /// Convert this array to a [`JuliaString`].
@@ -1639,8 +1661,10 @@ impl<'scope, 'data> VectorAny<'_, '_> {
     where
         Tgt: Target<'target>,
     {
-        let arr = jl_alloc_vec_any(size);
-        target.data_from_ptr(NonNull::new_unchecked(arr), Private)
+        unsafe {
+            let arr = jl_alloc_vec_any(size);
+            target.data_from_ptr(NonNull::new_unchecked(arr), Private)
+        }
     }
 }
 
@@ -1793,7 +1817,7 @@ impl<'scope, 'data, T, const N: isize> ArrayBase<'scope, 'data, T, N> {
     /// Returns a pointer to this array's data.
     #[inline]
     pub unsafe fn data_ptr(self) -> *mut c_void {
-        jlrs_array_data(self.unwrap(Private))
+        unsafe { jlrs_array_data(self.unwrap(Private)) }
     }
 
     /// Returns the owner of the array data.
@@ -1893,8 +1917,10 @@ impl<'scope, 'data, T, const N: isize> ArrayBase<'scope, 'data, T, N> {
     where
         T: ConstructType + ValidField + IsBits,
     {
-        // No need for checks, guaranteed to have isbits layout
-        BitsAccessor::new(self)
+        unsafe {
+            // No need for checks, guaranteed to have isbits layout
+            BitsAccessor::new(self)
+        }
     }
 
     /// Create an accessor for `isbits` data with layout `L`.
@@ -1912,8 +1938,10 @@ impl<'scope, 'data, T, const N: isize> ArrayBase<'scope, 'data, T, N> {
         T: ConstructType + HasLayout<'static, 'static, Layout = L>,
         L: IsBits + ValidField,
     {
-        // No need for checks, guaranteed to have isbits layout and L is the layout of T
-        BitsAccessor::new(self)
+        unsafe {
+            // No need for checks, guaranteed to have isbits layout and L is the layout of T
+            BitsAccessor::new(self)
+        }
     }
 
     /// Try to create an accessor for `isbits` data with layout `L`.
@@ -1930,20 +1958,22 @@ impl<'scope, 'data, T, const N: isize> ArrayBase<'scope, 'data, T, N> {
     where
         L: IsBits + ValidField,
     {
-        if !self.has_bits_layout() {
-            Err(ArrayLayoutError::NotBits {
-                element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
-            })?;
-        }
+        unsafe {
+            if !self.has_bits_layout() {
+                Err(ArrayLayoutError::NotBits {
+                    element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
+                })?;
+            }
 
-        let ty = self.element_type();
-        if !L::valid_field(ty) {
-            Err(TypeError::InvalidLayout {
-                value_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
-            })?;
-        }
+            let ty = self.element_type();
+            if !L::valid_field(ty) {
+                Err(TypeError::InvalidLayout {
+                    value_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
+                })?;
+            }
 
-        Ok(BitsAccessor::new(self))
+            Ok(BitsAccessor::new(self))
+        }
     }
 
     /// Create an accessor for `isbits` data with layout `L` without checking any invariants.
@@ -1959,7 +1989,7 @@ impl<'scope, 'data, T, const N: isize> ArrayBase<'scope, 'data, T, N> {
     where
         L: IsBits + ValidField,
     {
-        BitsAccessor::new(self)
+        unsafe { BitsAccessor::new(self) }
     }
 
     /// Create a mutable accessor for `isbits` data.
@@ -1977,8 +2007,10 @@ impl<'scope, 'data, T, const N: isize> ArrayBase<'scope, 'data, T, N> {
     where
         T: ConstructType + ValidField + IsBits,
     {
-        // No need for checks, guaranteed to have isbits layout
-        BitsAccessorMut::new(self)
+        unsafe {
+            // No need for checks, guaranteed to have isbits layout
+            BitsAccessorMut::new(self)
+        }
     }
 
     /// Create a mutable accessor for `isbits` data with layout `L`.
@@ -1996,8 +2028,10 @@ impl<'scope, 'data, T, const N: isize> ArrayBase<'scope, 'data, T, N> {
         T: ConstructType + HasLayout<'static, 'static, Layout = L>,
         L: IsBits + ValidField,
     {
-        // No need for checks, guaranteed to have isbits layout and L is the layout of T
-        BitsAccessorMut::new(self)
+        unsafe {
+            // No need for checks, guaranteed to have isbits layout and L is the layout of T
+            BitsAccessorMut::new(self)
+        }
     }
 
     /// Try to create a mutable accessor for `isbits` data with layout `L`.
@@ -2014,20 +2048,22 @@ impl<'scope, 'data, T, const N: isize> ArrayBase<'scope, 'data, T, N> {
     where
         L: IsBits + ValidField,
     {
-        if !self.has_bits_layout() {
-            Err(ArrayLayoutError::NotBits {
-                element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
-            })?;
-        }
+        unsafe {
+            if !self.has_bits_layout() {
+                Err(ArrayLayoutError::NotBits {
+                    element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
+                })?;
+            }
 
-        let ty = self.element_type();
-        if !L::valid_field(ty) {
-            Err(TypeError::InvalidLayout {
-                value_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
-            })?;
-        }
+            let ty = self.element_type();
+            if !L::valid_field(ty) {
+                Err(TypeError::InvalidLayout {
+                    value_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
+                })?;
+            }
 
-        Ok(BitsAccessorMut::new(self))
+            Ok(BitsAccessorMut::new(self))
+        }
     }
 
     /// Create a mutable accessor for `isbits` data with layout `L` without checking any
@@ -2044,7 +2080,7 @@ impl<'scope, 'data, T, const N: isize> ArrayBase<'scope, 'data, T, N> {
     where
         L: IsBits + ValidField,
     {
-        BitsAccessorMut::new(self)
+        unsafe { BitsAccessorMut::new(self) }
     }
 
     /// Create an accessor for inline data.
@@ -2062,8 +2098,10 @@ impl<'scope, 'data, T, const N: isize> ArrayBase<'scope, 'data, T, N> {
     where
         T: ConstructType + ValidField,
     {
-        // No need for checks, guaranteed to have inline layout
-        InlineAccessor::new(self)
+        unsafe {
+            // No need for checks, guaranteed to have inline layout
+            InlineAccessor::new(self)
+        }
     }
 
     /// Create an accessor for inline data with layout `L`.
@@ -2082,8 +2120,10 @@ impl<'scope, 'data, T, const N: isize> ArrayBase<'scope, 'data, T, N> {
         T: ConstructType + HasLayout<'scope, 'data, Layout = L>,
         L: ValidField,
     {
-        // No need for checks, guaranteed to have inline layout and L is the layout of T
-        InlineAccessor::new(self)
+        unsafe {
+            // No need for checks, guaranteed to have inline layout and L is the layout of T
+            InlineAccessor::new(self)
+        }
     }
 
     /// Try to create an accessor for inline data with layout `L`.
@@ -2101,20 +2141,22 @@ impl<'scope, 'data, T, const N: isize> ArrayBase<'scope, 'data, T, N> {
     where
         L: ValidField,
     {
-        if !self.has_inline_layout() {
-            Err(ArrayLayoutError::NotInline {
-                element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
-            })?;
-        }
+        unsafe {
+            if !self.has_inline_layout() {
+                Err(ArrayLayoutError::NotInline {
+                    element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
+                })?;
+            }
 
-        let ty = self.element_type();
-        if !L::valid_field(ty) {
-            Err(TypeError::InvalidLayout {
-                value_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
-            })?;
-        }
+            let ty = self.element_type();
+            if !L::valid_field(ty) {
+                Err(TypeError::InvalidLayout {
+                    value_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
+                })?;
+            }
 
-        Ok(InlineAccessor::new(self))
+            Ok(InlineAccessor::new(self))
+        }
     }
 
     /// Create an accessor for inline data with layout `L` without checking any invariants.
@@ -2130,7 +2172,7 @@ impl<'scope, 'data, T, const N: isize> ArrayBase<'scope, 'data, T, N> {
     where
         L: ValidField,
     {
-        InlineAccessor::new(self)
+        unsafe { InlineAccessor::new(self) }
     }
 
     /// Create a mutable accessor for inline data.
@@ -2148,8 +2190,10 @@ impl<'scope, 'data, T, const N: isize> ArrayBase<'scope, 'data, T, N> {
     where
         T: ConstructType + ValidField,
     {
-        // No need for checks, guaranteed to have inline layout
-        InlineAccessorMut::new(self)
+        unsafe {
+            // No need for checks, guaranteed to have inline layout
+            InlineAccessorMut::new(self)
+        }
     }
 
     /// Create a mutable accessor for inline data with layout `L`.
@@ -2168,8 +2212,10 @@ impl<'scope, 'data, T, const N: isize> ArrayBase<'scope, 'data, T, N> {
         T: ConstructType + HasLayout<'scope, 'data, Layout = L>,
         L: ValidField,
     {
-        // No need for checks, guaranteed to have inline layout and L is the layout of T
-        InlineAccessorMut::new(self)
+        unsafe {
+            // No need for checks, guaranteed to have inline layout and L is the layout of T
+            InlineAccessorMut::new(self)
+        }
     }
 
     /// Try to create a mutable accessor for inline data with layout `L`.
@@ -2187,20 +2233,22 @@ impl<'scope, 'data, T, const N: isize> ArrayBase<'scope, 'data, T, N> {
     where
         L: ValidField,
     {
-        if !self.has_inline_layout() {
-            Err(ArrayLayoutError::NotInline {
-                element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
-            })?;
-        }
+        unsafe {
+            if !self.has_inline_layout() {
+                Err(ArrayLayoutError::NotInline {
+                    element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
+                })?;
+            }
 
-        let ty = self.element_type();
-        if !L::valid_field(ty) {
-            Err(TypeError::InvalidLayout {
-                value_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
-            })?;
-        }
+            let ty = self.element_type();
+            if !L::valid_field(ty) {
+                Err(TypeError::InvalidLayout {
+                    value_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
+                })?;
+            }
 
-        Ok(InlineAccessorMut::new(self))
+            Ok(InlineAccessorMut::new(self))
+        }
     }
 
     /// Create a mutable  accessor for inline data with layout `L` without checking any
@@ -2217,7 +2265,7 @@ impl<'scope, 'data, T, const N: isize> ArrayBase<'scope, 'data, T, N> {
     where
         L: ValidField,
     {
-        InlineAccessorMut::new(self)
+        unsafe { InlineAccessorMut::new(self) }
     }
 
     /// Create an accessor for unions of isbits types.
@@ -2234,11 +2282,13 @@ impl<'scope, 'data, T, const N: isize> ArrayBase<'scope, 'data, T, N> {
     where
         T: BitsUnionCtor,
     {
-        assert!(
-            self.has_union_layout(),
-            "Array does not have a union layout"
-        );
-        BitsUnionAccessor::new(self)
+        unsafe {
+            assert!(
+                self.has_union_layout(),
+                "Array does not have a union layout"
+            );
+            BitsUnionAccessor::new(self)
+        }
     }
 
     /// Try to create an accessor for unions of isbits types.
@@ -2252,13 +2302,15 @@ impl<'scope, 'data, T, const N: isize> ArrayBase<'scope, 'data, T, N> {
     pub unsafe fn try_union_data<'borrow>(
         &'borrow self,
     ) -> JlrsResult<BitsUnionAccessor<'borrow, 'scope, 'data, T, N>> {
-        if !self.has_union_layout() {
-            Err(ArrayLayoutError::NotUnion {
-                element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
-            })?;
-        }
+        unsafe {
+            if !self.has_union_layout() {
+                Err(ArrayLayoutError::NotUnion {
+                    element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
+                })?;
+            }
 
-        Ok(BitsUnionAccessor::new(self))
+            Ok(BitsUnionAccessor::new(self))
+        }
     }
 
     /// Create an accessor for unions of isbits types without checking any invariants.
@@ -2271,7 +2323,7 @@ impl<'scope, 'data, T, const N: isize> ArrayBase<'scope, 'data, T, N> {
     pub unsafe fn union_data_unchecked<'borrow>(
         &'borrow self,
     ) -> BitsUnionAccessor<'borrow, 'scope, 'data, T, N> {
-        BitsUnionAccessor::new(self)
+        unsafe { BitsUnionAccessor::new(self) }
     }
 
     /// Create a mutable accessor for unions of isbits types.
@@ -2288,11 +2340,13 @@ impl<'scope, 'data, T, const N: isize> ArrayBase<'scope, 'data, T, N> {
     where
         T: BitsUnionCtor,
     {
-        assert!(
-            self.has_union_layout(),
-            "Array does not have a union layout"
-        );
-        BitsUnionAccessorMut::new(self)
+        unsafe {
+            assert!(
+                self.has_union_layout(),
+                "Array does not have a union layout"
+            );
+            BitsUnionAccessorMut::new(self)
+        }
     }
 
     /// Try to create a mutable accessor for unions of isbits types.
@@ -2306,13 +2360,15 @@ impl<'scope, 'data, T, const N: isize> ArrayBase<'scope, 'data, T, N> {
     pub unsafe fn try_union_data_mut<'borrow>(
         &'borrow mut self,
     ) -> JlrsResult<BitsUnionAccessorMut<'borrow, 'scope, 'data, T, N>> {
-        if !self.has_union_layout() {
-            Err(ArrayLayoutError::NotUnion {
-                element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
-            })?;
-        }
+        unsafe {
+            if !self.has_union_layout() {
+                Err(ArrayLayoutError::NotUnion {
+                    element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
+                })?;
+            }
 
-        Ok(BitsUnionAccessorMut::new(self))
+            Ok(BitsUnionAccessorMut::new(self))
+        }
     }
 
     /// Create a mutable accessor for unions of isbits types without checking any invariants.
@@ -2325,7 +2381,7 @@ impl<'scope, 'data, T, const N: isize> ArrayBase<'scope, 'data, T, N> {
     pub unsafe fn union_data_mut_unchecked<'borrow>(
         &'borrow mut self,
     ) -> BitsUnionAccessorMut<'borrow, 'scope, 'data, T, N> {
-        BitsUnionAccessorMut::new(self)
+        unsafe { BitsUnionAccessorMut::new(self) }
     }
 
     /// Create an accessor for managed data.
@@ -2343,8 +2399,10 @@ impl<'scope, 'data, T, const N: isize> ArrayBase<'scope, 'data, T, N> {
     where
         T: Managed<'scope, 'data> + ConstructType,
     {
-        // No need for checks, guaranteed to have correct layout
-        ManagedAccessor::new(self)
+        unsafe {
+            // No need for checks, guaranteed to have correct layout
+            ManagedAccessor::new(self)
+        }
     }
 
     /// Try to create an accessor for managed data of type `L`.
@@ -2360,14 +2418,16 @@ impl<'scope, 'data, T, const N: isize> ArrayBase<'scope, 'data, T, N> {
     where
         L: Managed<'scope, 'data> + Typecheck,
     {
-        if !self.has_managed_layout::<L>() {
-            Err(ArrayLayoutError::NotManaged {
-                element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
-                name: L::NAME.into(),
-            })?;
-        }
+        unsafe {
+            if !self.has_managed_layout::<L>() {
+                Err(ArrayLayoutError::NotManaged {
+                    element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
+                    name: L::NAME.into(),
+                })?;
+            }
 
-        Ok(ManagedAccessor::new(self))
+            Ok(ManagedAccessor::new(self))
+        }
     }
 
     /// Create an accessor for managed data of type `L` without checking any invariants.
@@ -2383,7 +2443,7 @@ impl<'scope, 'data, T, const N: isize> ArrayBase<'scope, 'data, T, N> {
     where
         L: Managed<'scope, 'data>,
     {
-        ManagedAccessor::new(self)
+        unsafe { ManagedAccessor::new(self) }
     }
 
     /// Create a mutable accessor for managed data.
@@ -2401,8 +2461,10 @@ impl<'scope, 'data, T, const N: isize> ArrayBase<'scope, 'data, T, N> {
     where
         T: Managed<'scope, 'data> + ConstructType,
     {
-        // No need for checks, guaranteed to have correct layout
-        ManagedAccessorMut::new(self)
+        unsafe {
+            // No need for checks, guaranteed to have correct layout
+            ManagedAccessorMut::new(self)
+        }
     }
 
     /// Try to create a mutable accessor for managed data of type `L`.
@@ -2418,14 +2480,16 @@ impl<'scope, 'data, T, const N: isize> ArrayBase<'scope, 'data, T, N> {
     where
         L: Managed<'scope, 'data> + Typecheck,
     {
-        if !self.has_managed_layout::<L>() {
-            Err(ArrayLayoutError::NotManaged {
-                element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
-                name: L::NAME.into(),
-            })?;
-        }
+        unsafe {
+            if !self.has_managed_layout::<L>() {
+                Err(ArrayLayoutError::NotManaged {
+                    element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
+                    name: L::NAME.into(),
+                })?;
+            }
 
-        Ok(ManagedAccessorMut::new(self))
+            Ok(ManagedAccessorMut::new(self))
+        }
     }
 
     /// Create a mutable accessor for managed data of type `L` without checking any invariants.
@@ -2441,7 +2505,7 @@ impl<'scope, 'data, T, const N: isize> ArrayBase<'scope, 'data, T, N> {
     where
         L: Managed<'scope, 'data>,
     {
-        ManagedAccessorMut::new(self)
+        unsafe { ManagedAccessorMut::new(self) }
     }
 
     /// Create an accessor for value data.
@@ -2457,8 +2521,10 @@ impl<'scope, 'data, T, const N: isize> ArrayBase<'scope, 'data, T, N> {
     where
         T: Managed<'scope, 'data> + ConstructType,
     {
-        // No need for checks, guaranteed to have inline layout
-        ValueAccessor::new(self)
+        unsafe {
+            // No need for checks, guaranteed to have inline layout
+            ValueAccessor::new(self)
+        }
     }
 
     /// Try to create an accessor for value data.
@@ -2471,13 +2537,15 @@ impl<'scope, 'data, T, const N: isize> ArrayBase<'scope, 'data, T, N> {
     pub unsafe fn try_value_data<'borrow>(
         &'borrow self,
     ) -> JlrsResult<ValueAccessor<'borrow, 'scope, 'data, T, N>> {
-        if !self.has_value_layout() {
-            Err(ArrayLayoutError::NotPointer {
-                element_type: self.element_type().error_string_or(CANNOT_DISPLAY_TYPE),
-            })?;
-        }
+        unsafe {
+            if !self.has_value_layout() {
+                Err(ArrayLayoutError::NotPointer {
+                    element_type: self.element_type().error_string_or(CANNOT_DISPLAY_TYPE),
+                })?;
+            }
 
-        Ok(ValueAccessor::new(self))
+            Ok(ValueAccessor::new(self))
+        }
     }
 
     /// Create an accessor for managed data of type `L` without checking any invariants.
@@ -2489,7 +2557,7 @@ impl<'scope, 'data, T, const N: isize> ArrayBase<'scope, 'data, T, N> {
     pub unsafe fn value_data_unchecked<'borrow>(
         &'borrow self,
     ) -> ValueAccessor<'borrow, 'scope, 'data, T, N> {
-        ValueAccessor::new(self)
+        unsafe { ValueAccessor::new(self) }
     }
 
     /// Create a mutable accessor for value data.
@@ -2507,8 +2575,10 @@ impl<'scope, 'data, T, const N: isize> ArrayBase<'scope, 'data, T, N> {
     where
         T: Managed<'scope, 'data> + ConstructType,
     {
-        // No need for checks, guaranteed to have inline layout
-        ValueAccessorMut::new(self)
+        unsafe {
+            // No need for checks, guaranteed to have inline layout
+            ValueAccessorMut::new(self)
+        }
     }
 
     /// Try to create a mutable accessor for value data.
@@ -2521,13 +2591,15 @@ impl<'scope, 'data, T, const N: isize> ArrayBase<'scope, 'data, T, N> {
     pub unsafe fn try_value_data_mut<'borrow>(
         &'borrow mut self,
     ) -> JlrsResult<ValueAccessorMut<'borrow, 'scope, 'data, T, N>> {
-        if !self.has_value_layout() {
-            Err(ArrayLayoutError::NotPointer {
-                element_type: self.element_type().error_string_or(CANNOT_DISPLAY_TYPE),
-            })?;
-        }
+        unsafe {
+            if !self.has_value_layout() {
+                Err(ArrayLayoutError::NotPointer {
+                    element_type: self.element_type().error_string_or(CANNOT_DISPLAY_TYPE),
+                })?;
+            }
 
-        Ok(ValueAccessorMut::new(self))
+            Ok(ValueAccessorMut::new(self))
+        }
     }
 
     /// Create a mutable accessor for managed data of type `L` without checking any invariants.
@@ -2539,7 +2611,7 @@ impl<'scope, 'data, T, const N: isize> ArrayBase<'scope, 'data, T, N> {
     pub unsafe fn value_data_mut_unchecked<'borrow>(
         &'borrow mut self,
     ) -> ValueAccessorMut<'borrow, 'scope, 'data, T, N> {
-        ValueAccessorMut::new(self)
+        unsafe { ValueAccessorMut::new(self) }
     }
 
     /// Create an accessor for indeterminate data.
@@ -2551,7 +2623,7 @@ impl<'scope, 'data, T, const N: isize> ArrayBase<'scope, 'data, T, N> {
     pub unsafe fn indeterminate_data<'borrow>(
         &'borrow self,
     ) -> IndeterminateAccessor<'borrow, 'scope, 'data, T, N> {
-        IndeterminateAccessor::new(self)
+        unsafe { IndeterminateAccessor::new(self) }
     }
 
     /// Create a mutable accessor for indeterminate data.
@@ -2563,7 +2635,7 @@ impl<'scope, 'data, T, const N: isize> ArrayBase<'scope, 'data, T, N> {
     pub unsafe fn indeterminate_data_mut<'borrow>(
         &'borrow mut self,
     ) -> IndeterminateAccessorMut<'borrow, 'scope, 'data, T, N> {
-        IndeterminateAccessorMut::new(self)
+        unsafe { IndeterminateAccessorMut::new(self) }
     }
 }
 
@@ -3191,15 +3263,17 @@ unsafe extern "C" fn droparray<T>(a: Array) {
 
 #[julia_version(since = "1.11")]
 unsafe extern "C" fn droparray<T>(a: *mut c_void) {
-    #[repr(C)]
-    struct GenericMemory<T> {
-        length: usize,
-        ptr: *mut T,
-    }
+    unsafe {
+        #[repr(C)]
+        struct GenericMemory<T> {
+            length: usize,
+            ptr: *mut T,
+        }
 
-    let a = NonNull::new_unchecked(a as *mut GenericMemory<T>).as_mut();
-    let v = Vec::from_raw_parts(a.ptr as *mut T, a.length, a.length);
-    a.ptr = null_mut();
-    a.length = 0;
-    std::mem::drop(v);
+        let a = NonNull::new_unchecked(a as *mut GenericMemory<T>).as_mut();
+        let v = Vec::from_raw_parts(a.ptr as *mut T, a.length, a.length);
+        a.ptr = null_mut();
+        a.length = 0;
+        std::mem::drop(v);
+    }
 }

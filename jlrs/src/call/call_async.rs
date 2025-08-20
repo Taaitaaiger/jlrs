@@ -120,7 +120,7 @@ impl<'data> CallAsync<'data> for Value<'_, 'data> {
     where
         V: Values<'value, 'data, N>,
     {
-        JuliaFuture::new(frame, erase_scope_lifetime(self), args).await
+        unsafe { JuliaFuture::new(frame, erase_scope_lifetime(self), args).await }
     }
 
     #[inline]
@@ -132,7 +132,7 @@ impl<'data> CallAsync<'data> for Value<'_, 'data> {
     where
         V: Values<'value, 'data, N>,
     {
-        JuliaFuture::new_interactive(frame, erase_scope_lifetime(self), args).await
+        unsafe { JuliaFuture::new_interactive(frame, erase_scope_lifetime(self), args).await }
     }
 
     #[inline]
@@ -144,9 +144,11 @@ impl<'data> CallAsync<'data> for Value<'_, 'data> {
     where
         V: Values<'value, 'data, N>,
     {
-        let args = args.into_extended_with_start([erase_scope_lifetime(self)], Private);
+        unsafe {
+            let args = args.into_extended_with_start([erase_scope_lifetime(self)], Private);
 
-        JlrsCore::interactive_call(&frame).call(&mut *frame, args.as_ref())
+            JlrsCore::interactive_call(&frame).call(&mut *frame, args.as_ref())
+        }
     }
 
     #[inline]
@@ -158,13 +160,15 @@ impl<'data> CallAsync<'data> for Value<'_, 'data> {
     where
         V: Values<'value, 'data, N>,
     {
-        let args = args.into_extended_with_start([erase_scope_lifetime(self)], Private);
+        unsafe {
+            let args = args.into_extended_with_start([erase_scope_lifetime(self)], Private);
 
-        let task = JlrsCore::async_call(&frame).call(&mut *frame, args.as_ref());
+            let task = JlrsCore::async_call(&frame).call(&mut *frame, args.as_ref());
 
-        match task {
-            Ok(t) => Ok(t),
-            Err(e) => Err(e),
+            match task {
+                Ok(t) => Ok(t),
+                Err(e) => Err(e),
+            }
         }
     }
 }
@@ -203,15 +207,18 @@ impl<'data> CallAsync<'data> for WithKeywords<'_, 'data> {
     where
         V: Values<'value, 'data, N>,
     {
-        let args = args.into_extended_with_start([erase_scope_lifetime(self.function())], Private);
+        unsafe {
+            let args =
+                args.into_extended_with_start([erase_scope_lifetime(self.function())], Private);
 
-        let task = JlrsCore::interactive_call(&frame)
-            .provide_keywords(self.keywords())
-            .call(&mut *frame, args.as_ref());
+            let task = JlrsCore::interactive_call(&frame)
+                .provide_keywords(self.keywords())
+                .call(&mut *frame, args.as_ref());
 
-        match task {
-            Ok(t) => Ok(t),
-            Err(e) => Err(e),
+            match task {
+                Ok(t) => Ok(t),
+                Err(e) => Err(e),
+            }
         }
     }
 
@@ -224,15 +231,18 @@ impl<'data> CallAsync<'data> for WithKeywords<'_, 'data> {
     where
         V: Values<'value, 'data, N>,
     {
-        let args = args.into_extended_with_start([erase_scope_lifetime(self.function())], Private);
+        unsafe {
+            let args =
+                args.into_extended_with_start([erase_scope_lifetime(self.function())], Private);
 
-        let task = JlrsCore::async_call(&frame)
-            .provide_keywords(self.keywords())
-            .call(&mut *frame, args.as_ref());
+            let task = JlrsCore::async_call(&frame)
+                .provide_keywords(self.keywords())
+                .call(&mut *frame, args.as_ref());
 
-        match task {
-            Ok(t) => Ok(t),
-            Err(e) => Err(e),
+            match task {
+                Ok(t) => Ok(t),
+                Err(e) => Err(e),
+            }
         }
     }
 }

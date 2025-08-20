@@ -1,6 +1,6 @@
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{spanned::Spanned, Token};
+use syn::{Token, spanned::Spanned};
 
 use super::get_repr_int;
 
@@ -12,7 +12,7 @@ pub fn impl_enum(ast: &syn::DeriveInput) -> syn::Result<TokenStream> {
             return Err(syn::Error::new(
                 ast.span(),
                 "`Enum` can only be derived for enums with an integer repr.",
-            ))
+            ));
         }
     };
 

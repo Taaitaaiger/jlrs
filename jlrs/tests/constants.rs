@@ -6,7 +6,7 @@ mod tests {
     use super::util::JULIA;
 
     macro_rules! impl_constant_test {
-        ($func:ident, $tyname:expr) => {
+        ($func:ident, $tyname:expr_2021) => {
             fn $func() {
                 JULIA.with(|handle| {
                     handle.borrow_mut().with_stack(|mut stack| {
@@ -27,7 +27,7 @@ mod tests {
     }
 
     macro_rules! impl_constant_isa_test {
-        ($func:ident, $tyname:expr) => {
+        ($func:ident, $tyname:expr_2021) => {
             fn $func() {
                 JULIA.with(|handle| {
                     handle.borrow_mut().with_stack(|mut stack| {
@@ -51,7 +51,7 @@ mod tests {
     }
 
     macro_rules! impl_constant_subtype_test {
-        ($func:ident, $tyname:expr) => {
+        ($func:ident, $tyname:expr_2021) => {
             fn $func() {
                 JULIA.with(|handle| {
                     handle.borrow_mut().with_stack(|mut stack| {
@@ -75,7 +75,7 @@ mod tests {
     }
 
     macro_rules! impl_unionall_constant_test {
-        ($func:ident, $tyname:expr) => {
+        ($func:ident, $tyname:expr_2021) => {
             fn $func() {
                 JULIA.with(|handle| {
                     handle.borrow_mut().with_stack(|mut stack| {
@@ -96,7 +96,7 @@ mod tests {
     }
 
     macro_rules! impl_unionall_constant_isa_test {
-        ($func:ident, $tyname:expr) => {
+        ($func:ident, $tyname:expr_2021) => {
             fn $func() {
                 JULIA.with(|handle| {
                     handle.borrow_mut().with_stack(|mut stack| {
@@ -117,7 +117,7 @@ mod tests {
     }
 
     macro_rules! impl_datatype_constant_isa_test {
-        ($func:ident, $tyname:expr) => {
+        ($func:ident, $tyname:expr_2021) => {
             fn $func() {
                 JULIA.with(|handle| {
                     handle.borrow_mut().with_stack(|mut stack| {

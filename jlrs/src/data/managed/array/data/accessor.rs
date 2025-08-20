@@ -38,18 +38,18 @@ use crate::{
             valid_layout::ValidField,
         },
         managed::{
+            Weak,
             array::{
-                dimensions::{Dims, DimsRankAssert, DimsRankCheck},
                 ArrayBase,
+                dimensions::{Dims, DimsRankAssert, DimsRankCheck},
             },
             private::ManagedPriv,
             union::{find_union_component, nth_union_component},
-            Weak,
         },
         types::construct_type::ConstructType,
     },
-    error::{AccessError, JlrsError, TypeError, CANNOT_DISPLAY_TYPE},
-    memory::target::{unrooted::Unrooted, TargetException},
+    error::{AccessError, CANNOT_DISPLAY_TYPE, JlrsError, TypeError},
+    memory::target::{TargetException, unrooted::Unrooted},
     prelude::{
         DataType, JlrsResult, Managed, Target, Value, ValueData, ValueResult, VectorAny, WeakValue,
     },
@@ -138,8 +138,10 @@ pub trait AccessorMut<'scope, 'data, T, const N: isize>: Accessor<'scope, 'data,
     /// element of this array, an exception is thrown which is not caught.
     #[inline]
     unsafe fn set_value_unchecked<D: Dims>(&mut self, index: D, value: Value<'_, 'data>) {
-        let idx = self.array().dimensions().index_of_unchecked(&index);
-        jlrs_arrayset(self.array().unwrap(Private), value.unwrap(Private), idx);
+        unsafe {
+            let idx = self.array().dimensions().index_of_unchecked(&index);
+            jlrs_arrayset(self.array().unwrap(Private), value.unwrap(Private), idx);
+        }
     }
 }
 
@@ -173,7 +175,9 @@ pub trait AccessorMut1D<'scope, 'data, T>: AccessorMut<'scope, 'data, T, 1> {
     /// caught.
     #[inline]
     unsafe fn grow_end_unchecked(&mut self, inc: usize) {
-        jl_array_grow_end(self.array().unwrap(Private), inc);
+        unsafe {
+            jl_array_grow_end(self.array().unwrap(Private), inc);
+        }
     }
     /// Removes `dec` elements from the end of the array. If an exception is thrown, it's caught
     /// and returned.
@@ -203,7 +207,9 @@ pub trait AccessorMut1D<'scope, 'data, T>: AccessorMut<'scope, 'data, T, 1> {
     /// caught.
     #[inline]
     unsafe fn del_end_unchecked(&mut self, dec: usize) {
-        jl_array_del_end(self.array().unwrap(Private), dec);
+        unsafe {
+            jl_array_del_end(self.array().unwrap(Private), dec);
+        }
     }
 }
 
@@ -250,14 +256,16 @@ where
     ///
     /// Safety: `index` must be in-bounds.
     pub unsafe fn get_unchecked<D: Dims>(&self, index: D) -> &L {
-        let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
-        let idx = self.array.dimensions().index_of_unchecked(&index);
+        unsafe {
+            let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
+            let idx = self.array.dimensions().index_of_unchecked(&index);
 
-        let elem = jlrs_array_data_fast(self.array.unwrap(Private))
-            .cast::<L>()
-            .add(idx);
+            let elem = jlrs_array_data_fast(self.array.unwrap(Private))
+                .cast::<L>()
+                .add(idx);
 
-        &*elem
+            &*elem
+        }
     }
 
     /// Temporarily converts this accessor to a slice.
@@ -309,14 +317,16 @@ where
     ///
     /// Safety: `index` must be in-bounds.
     pub unsafe fn get_uninit_unchecked<D: Dims>(&self, index: D) -> &MaybeUninit<L> {
-        let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
-        let idx = self.array.dimensions().index_of_unchecked(&index);
+        unsafe {
+            let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
+            let idx = self.array.dimensions().index_of_unchecked(&index);
 
-        let elem = jlrs_array_data_fast(self.array.unwrap(Private))
-            .cast::<MaybeUninit<L>>()
-            .add(idx);
+            let elem = jlrs_array_data_fast(self.array.unwrap(Private))
+                .cast::<MaybeUninit<L>>()
+                .add(idx);
 
-        &*elem
+            &*elem
+        }
     }
 
     /// Temporarily converts this accessor to a slice.
@@ -423,14 +433,16 @@ where
     ///
     /// Safety: `index` must be in-bounds.
     pub unsafe fn get_mut_unchecked<D: Dims>(&mut self, index: D) -> &mut L {
-        let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
-        let idx = self.array.dimensions().index_of_unchecked(&index);
+        unsafe {
+            let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
+            let idx = self.array.dimensions().index_of_unchecked(&index);
 
-        let elem = jlrs_array_data_fast(self.array.unwrap(Private))
-            .cast::<L>()
-            .add(idx);
+            let elem = jlrs_array_data_fast(self.array.unwrap(Private))
+                .cast::<L>()
+                .add(idx);
 
-        &mut *elem
+            &mut *elem
+        }
     }
 
     /// Returns a mutable reference to the element at `index` if it is in-bounds, `None`
@@ -453,14 +465,16 @@ where
     ///
     /// Safety: `index` must be in-bounds.
     pub unsafe fn get_mut_uninit_unchecked<D: Dims>(&mut self, index: D) -> &mut MaybeUninit<L> {
-        let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
-        let idx = self.array.dimensions().index_of_unchecked(&index);
+        unsafe {
+            let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
+            let idx = self.array.dimensions().index_of_unchecked(&index);
 
-        let elem = jlrs_array_data_fast(self.array.unwrap(Private))
-            .cast::<MaybeUninit<L>>()
-            .add(idx);
+            let elem = jlrs_array_data_fast(self.array.unwrap(Private))
+                .cast::<MaybeUninit<L>>()
+                .add(idx);
 
-        &mut *elem
+            &mut *elem
+        }
     }
 
     /// Sets the elements at `index` to `value` if `index` is in-bounds.
@@ -488,14 +502,16 @@ where
     ///
     /// Safety: `index` must be in-bounds.
     pub unsafe fn set_unchecked<D: Dims>(&mut self, index: D, value: L) {
-        let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
-        let idx = self.array.dimensions().index_of_unchecked(&index);
+        unsafe {
+            let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
+            let idx = self.array.dimensions().index_of_unchecked(&index);
 
-        let elem = jlrs_array_data_fast(self.array.unwrap(Private))
-            .cast::<L>()
-            .add(idx);
+            let elem = jlrs_array_data_fast(self.array.unwrap(Private))
+                .cast::<L>()
+                .add(idx);
 
-        elem.write(value);
+            elem.write(value);
+        }
     }
 
     /// Temporarily converts this accessor to a mutable slice.
@@ -561,9 +577,11 @@ where
     /// Pushes the new element `data` to the end of this `Vector`. If an exception is thrown, it's
     /// not caught.
     pub unsafe fn push_unchecked(&mut self, data: L) {
-        let length = self.array.length();
-        self.grow_end_unchecked(1);
-        self.get_mut_uninit_unchecked(length).write(data);
+        unsafe {
+            let length = self.array.length();
+            self.grow_end_unchecked(1);
+            self.get_mut_uninit_unchecked(length).write(data);
+        }
     }
 
     /// Pushes all elements from `data` to the end of this `Vector`. If an exception is thrown,
@@ -598,14 +616,16 @@ where
     where
         L: Copy,
     {
-        let length = self.array.length();
-        let n = data.len();
-        self.grow_end_unchecked(n);
-        let slice = &mut self.as_mut_uninit_slice()[length..];
-        let data_ptr = data.as_ptr().cast::<MaybeUninit<L>>();
-        let data = std::slice::from_raw_parts(data_ptr, n);
+        unsafe {
+            let length = self.array.length();
+            let n = data.len();
+            self.grow_end_unchecked(n);
+            let slice = &mut self.as_mut_uninit_slice()[length..];
+            let data_ptr = data.as_ptr().cast::<MaybeUninit<L>>();
+            let data = std::slice::from_raw_parts(data_ptr, n);
 
-        slice.copy_from_slice(data);
+            slice.copy_from_slice(data);
+        }
     }
 }
 
@@ -708,14 +728,16 @@ where
     ///
     /// Safety: `index` must be in-bounds.
     pub unsafe fn get_unchecked<D: Dims>(&self, index: D) -> &L {
-        let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
-        let idx = self.array.dimensions().index_of_unchecked(&index);
+        unsafe {
+            let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
+            let idx = self.array.dimensions().index_of_unchecked(&index);
 
-        let elem = jlrs_array_data_fast(self.array.unwrap(Private))
-            .cast::<L>()
-            .add(idx);
+            let elem = jlrs_array_data_fast(self.array.unwrap(Private))
+                .cast::<L>()
+                .add(idx);
 
-        &*elem
+            &*elem
+        }
     }
 
     /// Returns a reference the element at `index` if `index` is in-bounds`, `None` otherwise.
@@ -737,14 +759,16 @@ where
     ///
     /// Safety: `index` must be in-bounds.
     pub unsafe fn get_uninit_unchecked<D: Dims>(&self, index: D) -> &MaybeUninit<L> {
-        let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
-        let idx = self.array.dimensions().index_of_unchecked(&index);
+        unsafe {
+            let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
+            let idx = self.array.dimensions().index_of_unchecked(&index);
 
-        let elem = jlrs_array_data_fast(self.array.unwrap(Private))
-            .cast::<MaybeUninit<L>>()
-            .add(idx);
+            let elem = jlrs_array_data_fast(self.array.unwrap(Private))
+                .cast::<MaybeUninit<L>>()
+                .add(idx);
 
-        &*elem
+            &*elem
+        }
     }
 
     /// Temporarily converts this accessor to a slice.
@@ -921,16 +945,18 @@ impl<'borrow, 'scope, 'data, T, const N: isize> ValueAccessor<'borrow, 'scope, '
         target: Tgt,
         index: D,
     ) -> Option<ValueData<'target, 'data, Tgt>> {
-        let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
-        let idx = self.array.dimensions().index_of_unchecked(&index);
+        unsafe {
+            let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
+            let idx = self.array.dimensions().index_of_unchecked(&index);
 
-        let elem = jlrs_array_data_fast(self.array.unwrap(Private))
-            .cast::<AtomicValueRef<Value>>()
-            .add(idx);
+            let elem = jlrs_array_data_fast(self.array.unwrap(Private))
+                .cast::<AtomicValueRef<Value>>()
+                .add(idx);
 
-        match (&*elem).load(Ordering::Relaxed) {
-            Some(elem) => Some(elem.root(target)),
-            None => None,
+            match (&*elem).load(Ordering::Relaxed) {
+                Some(elem) => Some(elem.root(target)),
+                None => None,
+            }
         }
     }
 
@@ -1089,16 +1115,18 @@ where
         target: Tgt,
         index: D,
     ) -> Option<Tgt::Data<'data, M::InScope<'target>>> {
-        let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
-        let idx = self.array.dimensions().index_of_unchecked(&index);
+        unsafe {
+            let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
+            let idx = self.array.dimensions().index_of_unchecked(&index);
 
-        let elem = jlrs_array_data_fast(self.array.unwrap(Private))
-            .cast::<AtomicValueRef<M>>()
-            .add(idx);
+            let elem = jlrs_array_data_fast(self.array.unwrap(Private))
+                .cast::<AtomicValueRef<M>>()
+                .add(idx);
 
-        match (&*elem).load(Ordering::Relaxed) {
-            Some(elem) => Some(elem.root(target)),
-            None => None,
+            match (&*elem).load(Ordering::Relaxed) {
+                Some(elem) => Some(elem.root(target)),
+                None => None,
+            }
         }
     }
 
@@ -1249,12 +1277,14 @@ impl<'borrow, 'scope, 'data, T, const N: isize> BitsUnionAccessor<'borrow, 'scop
         L: ValidField + IsBits,
         D: Dims,
     {
-        let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
-        let array = self.array;
-        let idx = array.dimensions().index_of_unchecked(&index);
-        let offset = idx * array.element_size();
-        let ptr = array.data_ptr().cast::<u8>().add(offset).cast::<L>();
-        ptr.read()
+        unsafe {
+            let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
+            let array = self.array;
+            let idx = array.dimensions().index_of_unchecked(&index);
+            let offset = idx * array.element_size();
+            let ptr = array.data_ptr().cast::<u8>().add(offset).cast::<L>();
+            ptr.read()
+        }
     }
 }
 
@@ -1384,7 +1414,7 @@ impl<'borrow, 'scope, 'data, T, const N: isize> BitsUnionAccessorMut<'borrow, 's
         L: ConstructType + ValidField + IsBits + HasLayout<'static, 'static, Layout = L>,
         D: Dims,
     {
-        self.set_typed_layout_unchecked(index, TypedLayout::<L, L>::new(value))
+        unsafe { self.set_typed_layout_unchecked(index, TypedLayout::<L, L>::new(value)) }
     }
 
     /// Sets the element at `index` to `value`.
@@ -1396,33 +1426,35 @@ impl<'borrow, 'scope, 'data, T, const N: isize> BitsUnionAccessorMut<'borrow, 's
         L: ValidField + IsBits,
         D: Dims,
     {
-        let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
-        let ty = {
-            let unrooted = Unrooted::new();
-            U::construct_type(unrooted).as_value()
-        };
+        unsafe {
+            let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
+            let ty = {
+                let unrooted = Unrooted::new();
+                U::construct_type(unrooted).as_value()
+            };
 
-        debug_assert!(ty.is::<DataType>());
-        debug_assert!(ty.cast_unchecked::<DataType>().is_bits());
+            debug_assert!(ty.is::<DataType>());
+            debug_assert!(ty.cast_unchecked::<DataType>().is_bits());
 
-        let mut tag = 0;
-        let elty = self.array.element_type();
-        let success = find_union_component(elty, ty, &mut tag);
+            let mut tag = 0;
+            let elty = self.array.element_type();
+            let success = find_union_component(elty, ty, &mut tag);
 
-        debug_assert!(success);
+            debug_assert!(success);
 
-        let idx = self.array.dimensions().index_of_unchecked(&index);
-        let offset = idx * self.array.element_size() as usize;
-        self.array
-            .data_ptr()
-            .cast::<u8>()
-            .add(offset)
-            .cast::<L>()
-            .write(value.into_layout());
+            let idx = self.array.dimensions().index_of_unchecked(&index);
+            let offset = idx * self.array.element_size() as usize;
+            self.array
+                .data_ptr()
+                .cast::<u8>()
+                .add(offset)
+                .cast::<L>()
+                .write(value.into_layout());
 
-        jlrs_array_typetagdata(self.array.unwrap(Private))
-            .add(idx)
-            .write(tag as _);
+            jlrs_array_typetagdata(self.array.unwrap(Private))
+                .add(idx)
+                .write(tag as _);
+        }
     }
 
     /// Sets the element at `index` to `value` using `ty` as the type.
@@ -1486,25 +1518,27 @@ impl<'borrow, 'scope, 'data, T, const N: isize> BitsUnionAccessorMut<'borrow, 's
         L: ValidField + IsBits,
         D: Dims,
     {
-        let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
-        let mut tag = 0;
-        let array = self.array;
-        let elty = array.element_type();
-        let success = find_union_component(elty, ty.as_value(), &mut tag);
-        debug_assert!(success);
+        unsafe {
+            let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
+            let mut tag = 0;
+            let array = self.array;
+            let elty = array.element_type();
+            let success = find_union_component(elty, ty.as_value(), &mut tag);
+            debug_assert!(success);
 
-        let idx = array.dimensions().index_of_unchecked(&index);
-        let offset = idx * self.array.element_size() as usize;
-        array
-            .data_ptr()
-            .cast::<u8>()
-            .add(offset)
-            .cast::<L>()
-            .write(value);
+            let idx = array.dimensions().index_of_unchecked(&index);
+            let offset = idx * self.array.element_size() as usize;
+            array
+                .data_ptr()
+                .cast::<u8>()
+                .add(offset)
+                .cast::<L>()
+                .write(value);
 
-        jlrs_array_typetagdata(self.array.unwrap(Private))
-            .add(idx)
-            .write(tag as _);
+            jlrs_array_typetagdata(self.array.unwrap(Private))
+                .add(idx)
+                .write(tag as _);
+        }
     }
 }
 

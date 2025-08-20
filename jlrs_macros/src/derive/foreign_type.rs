@@ -1,6 +1,6 @@
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse_quote, spanned::Spanned as _, Token};
+use syn::{Token, parse_quote, spanned::Spanned as _};
 
 use super::attrs::JlrsTypeAttrs;
 
@@ -12,7 +12,7 @@ pub fn impl_foreign_type(ast: &syn::DeriveInput) -> syn::Result<TokenStream> {
             return Err(syn::Error::new(
                 ast.span(),
                 "ForeignType can only be derived for structs",
-            ))
+            ));
         }
     }
 

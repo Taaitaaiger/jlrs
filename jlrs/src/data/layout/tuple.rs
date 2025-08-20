@@ -39,7 +39,7 @@ use crate::{
     },
     memory::{
         scope::LocalScopeExt,
-        target::{unrooted::Unrooted, Target},
+        target::{Target, unrooted::Unrooted},
     },
     prelude::Managed,
     private::Private,
@@ -80,12 +80,14 @@ impl Tuple {
         V: AsRef<[Value<'value, 'data>]>,
         Tgt: Target<'target>,
     {
-        let values = values.as_ref();
-        let n = values.len();
-        let values_ptr = values.as_ptr();
-        let tuple: *mut jl_sys::jl_value_t = jlrs_tuple_of(values_ptr as *const _ as *mut _, n);
+        unsafe {
+            let values = values.as_ref();
+            let n = values.len();
+            let values_ptr = values.as_ptr();
+            let tuple: *mut jl_sys::jl_value_t = jlrs_tuple_of(values_ptr as *const _ as *mut _, n);
 
-        target.data_from_ptr(NonNull::new_unchecked(tuple), Private)
+            target.data_from_ptr(NonNull::new_unchecked(tuple), Private)
+        }
     }
 }
 
@@ -106,10 +108,10 @@ macro_rules! count {
 }
 
 macro_rules! check {
-    ($fieldtypes:expr, $unrooted:expr, $n:expr, $t:ident, $($x:ident),+) => {
+    ($fieldtypes:expr_2021, $unrooted:expr_2021, $n:expr_2021, $t:ident, $($x:ident),+) => {
         <$t>::valid_field($fieldtypes.get($unrooted, $n - 1 - count!($($x),+)).unwrap().as_managed()) && check!($fieldtypes, $unrooted, $n, $($x),+)
     };
-    ($fieldtypes:expr, $unrooted:expr, $n:expr, $t:ident) => {
+    ($fieldtypes:expr_2021, $unrooted:expr_2021, $n:expr_2021, $t:ident) => {
         <$t>::valid_field($fieldtypes.get($unrooted, $n - 1).unwrap().as_managed())
     };
 }
@@ -435,11 +437,21 @@ impl_tuple!(Tuple9, T1, T2, T3, T4, T5, T6, T7, T8, T9);
 impl_tuple!(Tuple10, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10);
 impl_tuple!(Tuple11, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11);
 impl_tuple!(Tuple12, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12);
-impl_tuple!(Tuple13, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13);
-impl_tuple!(Tuple14, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14);
-impl_tuple!(Tuple15, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15);
-impl_tuple!(Tuple16, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16);
-impl_tuple!(Tuple17, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, T17);
+impl_tuple!(
+    Tuple13, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13
+);
+impl_tuple!(
+    Tuple14, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
+);
+impl_tuple!(
+    Tuple15, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15
+);
+impl_tuple!(
+    Tuple16, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16
+);
+impl_tuple!(
+    Tuple17, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, T17
+);
 impl_tuple!(
     Tuple18, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, T17, T18
 );

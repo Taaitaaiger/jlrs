@@ -109,18 +109,20 @@ unsafe impl<T: CCallReturn> CCallReturn for Result<T, ValueRet> {
 
     #[inline]
     unsafe fn return_or_throw(self) -> Self::ReturnAs {
-        #[cfg(feature = "ccall")]
-        {
-            match self {
-                Ok(t) => t,
-                Err(e) => crate::runtime::handle::ccall::throw_exception(e),
+        unsafe {
+            #[cfg(feature = "ccall")]
+            {
+                match self {
+                    Ok(t) => t,
+                    Err(e) => crate::runtime::handle::ccall::throw_exception(e),
+                }
             }
-        }
 
-        #[cfg(not(feature = "ccall"))]
-        unimplemented!(
-            "CCallReturn::return_or_throw can only be called if the `ccall` feature is enabled"
-        )
+            #[cfg(not(feature = "ccall"))]
+            unimplemented!(
+                "CCallReturn::return_or_throw can only be called if the `ccall` feature is enabled"
+            )
+        }
     }
 }
 
@@ -142,28 +144,30 @@ unsafe impl<T: CCallReturn> CCallReturn for JlrsResult<T> {
 
     #[inline]
     unsafe fn return_or_throw(self) -> Self::ReturnAs {
-        #[cfg(feature = "ccall")]
-        {
-            match self {
-                Ok(t) => t,
-                Err(e) => {
-                    let handle = weak_handle_unchecked!();
-                    let e = handle.local_scope::<_, 1>(|mut frame| {
-                        let msg = JuliaString::new(&mut frame, format!("{}", e)).as_value();
-                        let err = JlrsCore::jlrs_error(&frame)
-                            .as_value()
-                            .call(&frame, [msg])
-                            .unwrap();
-                        err.leak()
-                    });
-                    crate::runtime::handle::ccall::throw_exception(e)
+        unsafe {
+            #[cfg(feature = "ccall")]
+            {
+                match self {
+                    Ok(t) => t,
+                    Err(e) => {
+                        let handle = weak_handle_unchecked!();
+                        let e = handle.local_scope::<_, 1>(|mut frame| {
+                            let msg = JuliaString::new(&mut frame, format!("{}", e)).as_value();
+                            let err = JlrsCore::jlrs_error(&frame)
+                                .as_value()
+                                .call(&frame, [msg])
+                                .unwrap();
+                            err.leak()
+                        });
+                        crate::runtime::handle::ccall::throw_exception(e)
+                    }
                 }
             }
-        }
 
-        #[cfg(not(feature = "ccall"))]
-        unimplemented!(
-            "CCallReturn::return_or_throw can only be called if the `ccall` feature is enabled"
-        )
+            #[cfg(not(feature = "ccall"))]
+            unimplemented!(
+                "CCallReturn::return_or_throw can only be called if the `ccall` feature is enabled"
+            )
+        }
     }
 }

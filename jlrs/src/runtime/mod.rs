@@ -12,7 +12,7 @@ use handle::IsActive;
 use private::RuntimePriv;
 
 #[cfg(feature = "async-rt")]
-use self::handle::async_handle::{dispatch::Dispatch, message::Message, AsyncHandle};
+use self::handle::async_handle::{AsyncHandle, dispatch::Dispatch, message::Message};
 use crate::{
     call::Call,
     data::managed::module::JlrsCore,
@@ -184,14 +184,14 @@ unsafe impl Runtime for AsyncHandle {
         &'a self,
         path: P,
     ) -> JlrsResult<Dispatch<'a, Message, JlrsResult<()>>> {
-        self.include(path)
+        unsafe { self.include(path) }
     }
 
     unsafe fn using<'a, S: AsRef<str>>(
         &'a self,
         module_name: S,
     ) -> Dispatch<'a, Message, JlrsResult<()>> {
-        self.using(module_name.as_ref().into())
+        unsafe { self.using(module_name.as_ref().into()) }
     }
 }
 
@@ -247,7 +247,7 @@ unsafe fn using<S: AsRef<str>>(module_name: S) -> JlrsResult<()> {
 mod private {
     #[cfg(feature = "async-rt")]
     use super::handle::async_handle::AsyncHandle;
-    use super::{handle::IsActive, RuntimeSettings};
+    use super::{RuntimeSettings, handle::IsActive};
     use crate::prelude::Target;
 
     pub trait RuntimePriv {}

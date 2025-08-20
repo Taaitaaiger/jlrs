@@ -2,7 +2,7 @@ use jlrs::{
     data::{
         managed::{
             array::{ArrayRet, RankedArrayRet, TypedArrayRet, TypedRankedArrayRet},
-            value::{typed::TypedValue, ValueRet},
+            value::{ValueRet, typed::TypedValue},
         },
         types::{
             abstract_type::Integer,

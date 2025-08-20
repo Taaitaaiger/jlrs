@@ -8,12 +8,12 @@ use init_fn::InitFn;
 use item_with_attrs::ItemWithAttrs;
 use quote::ToTokens;
 use syn::{
+    AttrStyle, Attribute, Error, Expr, FnArg, Meta, Result, ReturnType, Token,
     parse::{Parse, ParseStream},
     parse_quote, parse_quote_spanned,
     punctuated::Punctuated,
     spanned::Spanned,
     token::{Comma, Pub},
-    AttrStyle, Attribute, Error, Expr, FnArg, Meta, Result, ReturnType, Token,
 };
 
 use super::RenameFragments;
@@ -50,7 +50,7 @@ impl ModuleItem {
 
     pub fn get_init_fn(&self) -> &InitFn {
         match self {
-            ModuleItem::InitFn(ref init_fn) => init_fn,
+            ModuleItem::InitFn(init_fn) => init_fn,
             _ => panic!(),
         }
     }
@@ -65,7 +65,7 @@ impl ModuleItem {
 
     pub fn get_exported_fn(&self) -> (&ExportedFunction, Option<&[Attribute]>) {
         match self {
-            ModuleItem::ExportedFunction(ref exported_fn) => (exported_fn, None),
+            ModuleItem::ExportedFunction(exported_fn) => (exported_fn, None),
             ModuleItem::ItemWithAttrs(ItemWithAttrs { item, attrs }) if item.is_exported_fn() => {
                 (item.get_exported_fn().0, Some(attrs))
             }
@@ -85,8 +85,8 @@ impl ModuleItem {
 
     pub fn get_exported_method(&self) -> (&ExportedMethod, Option<&[Attribute]>) {
         match self {
-            ModuleItem::ExportedMethod(ref exported_method) => (exported_method, None),
-            ModuleItem::ItemWithAttrs(ItemWithAttrs { item, ref attrs })
+            ModuleItem::ExportedMethod(exported_method) => (exported_method, None),
+            ModuleItem::ItemWithAttrs(ItemWithAttrs { item, attrs })
                 if item.is_exported_method() =>
             {
                 (item.get_exported_method().0, Some(attrs.as_ref()))
@@ -107,7 +107,7 @@ impl ModuleItem {
 
     pub fn get_exported_type(&self) -> &ExportedType {
         match self {
-            ModuleItem::ExportedType(ref exported_type) => exported_type,
+            ModuleItem::ExportedType(exported_type) => exported_type,
             ModuleItem::ItemWithAttrs(ItemWithAttrs { item, .. }) if item.is_exported_type() => {
                 item.get_exported_type()
             }
@@ -127,7 +127,7 @@ impl ModuleItem {
 
     pub fn get_exported_const(&self) -> &ExportedConst {
         match self {
-            ModuleItem::ExportedConst(ref exported_const) => exported_const,
+            ModuleItem::ExportedConst(exported_const) => exported_const,
             ModuleItem::ItemWithAttrs(ItemWithAttrs { item, .. }) if item.is_exported_const() => {
                 item.get_exported_const()
             }
@@ -147,7 +147,7 @@ impl ModuleItem {
 
     pub fn get_exported_alias(&self) -> &ExportedAlias {
         match self {
-            ModuleItem::ExportedAlias(ref exported_alias) => exported_alias,
+            ModuleItem::ExportedAlias(exported_alias) => exported_alias,
             ModuleItem::ItemWithAttrs(ItemWithAttrs { item, .. }) if item.is_exported_alias() => {
                 item.get_exported_alias()
             }
@@ -169,7 +169,7 @@ impl ModuleItem {
 
     pub fn get_exported_generics(&self) -> &ExportedGenerics {
         match self {
-            ModuleItem::ExportedGenerics(ref exported_generics) => exported_generics,
+            ModuleItem::ExportedGenerics(exported_generics) => exported_generics,
             ModuleItem::ItemWithAttrs(ItemWithAttrs { item, .. })
                 if item.is_exported_generics() =>
             {
@@ -182,7 +182,7 @@ impl ModuleItem {
     pub fn get_all_with_docs(&self) -> Vec<&ItemWithAttrs> {
         let mut items = vec![];
         match self {
-            ModuleItem::ExportedGenerics(ref exported_generics) => {
+            ModuleItem::ExportedGenerics(exported_generics) => {
                 for item in exported_generics.items.iter() {
                     item.get_all_with_docs_inner(&mut items);
                 }
@@ -200,7 +200,7 @@ impl ModuleItem {
 
     pub fn get_all_with_docs_inner<'a>(&'a self, items: &mut Vec<&'a ItemWithAttrs>) {
         match self {
-            ModuleItem::ExportedGenerics(ref exported_generics) => {
+            ModuleItem::ExportedGenerics(exported_generics) => {
                 for item in exported_generics.items.iter() {
                     item.get_all_with_docs_inner(items);
                 }
@@ -318,7 +318,7 @@ fn return_type_fragments(ret_ty: &ReturnType) -> (Expr, Expr) {
             let julia_ret_type = ccall_ret_type.clone();
             (ccall_ret_type, julia_ret_type)
         }
-        ReturnType::Type(_, ref ty) => {
+        ReturnType::Type(_, ty) => {
             let span = ty.span();
             let ccall_ret_type = parse_quote_spanned! {
                 span=> if env.is_empty() {

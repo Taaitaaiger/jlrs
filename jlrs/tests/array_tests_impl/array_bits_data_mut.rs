@@ -3,8 +3,8 @@ pub(crate) mod tests {
     use jlrs::{
         data::{
             managed::array::{
-                data::accessor::{Accessor, AccessorMut},
                 TypedRankedArray,
+                data::accessor::{Accessor, AccessorMut},
             },
             types::construct_type::ConstantBool,
         },

@@ -5,7 +5,7 @@ use jlrs::{
 };
 
 pub unsafe fn takes_typed_value(a: TypedValue<usize>) -> usize {
-    a.unbox_unchecked::<usize>()
+    unsafe { a.unbox_unchecked::<usize>() }
 }
 
 pub fn returns_typed_value() -> TypedValueRet<bool> {

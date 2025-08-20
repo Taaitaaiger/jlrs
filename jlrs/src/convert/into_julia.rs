@@ -12,12 +12,12 @@
 use std::{ffi::c_void, mem::MaybeUninit, ptr::NonNull};
 
 use jl_sys::{
-    jl_bool_type, jl_box_bool, jl_box_char, jl_box_float32, jl_box_float64, jl_box_int16,
-    jl_box_int32, jl_box_int64, jl_box_int8, jl_box_uint16, jl_box_uint32, jl_box_uint64,
-    jl_box_uint8, jl_box_voidpointer, jl_char_type, jl_float32_type, jl_float64_type,
-    jl_int16_type, jl_int32_type, jl_int64_type, jl_int8_type, jl_new_struct_uninit,
-    jl_uint16_type, jl_uint32_type, jl_uint64_type, jl_uint8_type, jl_voidpointer_type,
-    jlrs_box_long, jlrs_box_ulong,
+    jl_bool_type, jl_box_bool, jl_box_char, jl_box_float32, jl_box_float64, jl_box_int8,
+    jl_box_int16, jl_box_int32, jl_box_int64, jl_box_uint8, jl_box_uint16, jl_box_uint32,
+    jl_box_uint64, jl_box_voidpointer, jl_char_type, jl_float32_type, jl_float64_type,
+    jl_int8_type, jl_int16_type, jl_int32_type, jl_int64_type, jl_new_struct_uninit, jl_uint8_type,
+    jl_uint16_type, jl_uint32_type, jl_uint64_type, jl_voidpointer_type, jlrs_box_long,
+    jlrs_box_ulong,
 };
 
 use crate::{
@@ -86,7 +86,7 @@ pub unsafe trait IntoJulia: Sized + 'static {
 }
 
 macro_rules! impl_into_julia {
-    ($type:ty, $boxer:ident, $julia_type:expr) => {
+    ($type:ty, $boxer:ident, $julia_type:expr_2021) => {
         // Safety: These implemetations use a boxing function provided by Julia
         unsafe impl IntoJulia for $type {
             #[inline]

@@ -12,7 +12,7 @@ mod tests {
     use super::util::JULIA;
 
     macro_rules! impl_test {
-        ($type:ty, $test_name:ident, $failing_test_name:ident, $val:expr) => {
+        ($type:ty, $test_name:ident, $failing_test_name:ident, $val:expr_2021) => {
             fn $test_name() {
                 JULIA.with(|handle| {
                     handle.borrow_mut().with_stack(|mut stack| {

@@ -1,7 +1,7 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, black_box, criterion_group, criterion_main};
 use jlrs::{
     convert::to_symbol::ToSymbol,
-    data::managed::symbol::static_symbol::{sym, StaticSymbol, Sym},
+    data::managed::symbol::static_symbol::{StaticSymbol, Sym, sym},
     define_static_binary_symbol, define_static_symbol,
     prelude::*,
 };

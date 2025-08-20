@@ -38,9 +38,11 @@ unsafe impl<T: Managed<'static, 'static>> Mark for Weak<'static, 'static, T> {
 unsafe impl<T: Managed<'static, 'static>> Mark for Option<Weak<'static, 'static, T>> {
     #[inline(always)]
     unsafe fn mark<P: ForeignType>(&self, ptls: PTls, _parent: &P) -> usize {
-        match self {
-            Some(weak) => jl_gc_mark_queue_obj(ptls, weak.ptr().as_ptr().cast()) as usize,
-            None => 0,
+        unsafe {
+            match self {
+                Some(weak) => jl_gc_mark_queue_obj(ptls, weak.ptr().as_ptr().cast()) as usize,
+                None => 0,
+            }
         }
     }
 }
@@ -107,6 +109,6 @@ unsafe impl<M: Mark> Mark for Vec<M> {
 
 unsafe impl<T: ForeignType> Mark for T {
     unsafe fn mark<P: ForeignType>(&self, ptls: PTls, parent: &P) -> usize {
-        T::mark(ptls, self, parent)
+        unsafe { T::mark(ptls, self, parent) }
     }
 }

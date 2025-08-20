@@ -25,14 +25,14 @@ use std::{
     any::Any,
     ffi::c_void,
     mem::MaybeUninit,
-    panic::{catch_unwind, AssertUnwindSafe},
-    ptr::{null_mut, NonNull},
+    panic::{AssertUnwindSafe, catch_unwind},
+    ptr::{NonNull, null_mut},
 };
 
 use jl_sys::{jl_value_t, jlrs_catch_t, jlrs_catch_tag_t, jlrs_try_catch};
 
 use crate::{
-    data::managed::{private::ManagedPriv, Managed},
+    data::managed::{Managed, private::ManagedPriv},
     memory::target::unrooted::Unrooted,
     prelude::{LocalScope, Value},
     private::Private,
@@ -49,31 +49,33 @@ pub unsafe fn catch_exceptions<T, E>(
     func: impl FnOnce() -> T,
     exception_handler: impl for<'exc> FnOnce(Value<'exc, 'static>) -> E,
 ) -> Result<T, E> {
-    let mut func = Some(func);
-    let func = &mut func;
-    let trampoline = trampoline_for(func).unwrap_unchecked();
-    let mut result = MaybeUninit::<T>::uninit();
+    unsafe {
+        let mut func = Some(func);
+        let func = &mut func;
+        let trampoline = trampoline_for(func).unwrap_unchecked();
+        let mut result = MaybeUninit::<T>::uninit();
 
-    let res = jlrs_try_catch(
-        func as *mut _ as *mut _,
-        trampoline,
-        (&mut result) as *mut _ as *mut _,
-    );
+        let res = jlrs_try_catch(
+            func as *mut _ as *mut _,
+            trampoline,
+            (&mut result) as *mut _ as *mut _,
+        );
 
-    match res.tag {
-        jlrs_catch_tag_t::Ok => Ok(result.assume_init()),
-        jlrs_catch_tag_t::Exception => {
-            let ptr = NonNull::new_unchecked(res.error.cast());
-            let unrooted = Unrooted::new();
-            unrooted.local_scope::<_, 1>(|frame| {
-                // Root the exception because we're not in an actual catch block.
-                let v = Value::wrap_non_null(ptr, Private).root(frame);
-                Err(exception_handler(v))
-            })
-        }
-        jlrs_catch_tag_t::Panic => {
-            let err: Box<Box<dyn Any + Send>> = Box::from_raw(res.error.cast());
-            std::panic::resume_unwind(err)
+        match res.tag {
+            jlrs_catch_tag_t::Ok => Ok(result.assume_init()),
+            jlrs_catch_tag_t::Exception => {
+                let ptr = NonNull::new_unchecked(res.error.cast());
+                let unrooted = Unrooted::new();
+                unrooted.local_scope::<_, 1>(|frame| {
+                    // Root the exception because we're not in an actual catch block.
+                    let v = Value::wrap_non_null(ptr, Private).root(frame);
+                    Err(exception_handler(v))
+                })
+            }
+            jlrs_catch_tag_t::Panic => {
+                let err: Box<Box<dyn Any + Send>> = Box::from_raw(res.error.cast());
+                std::panic::resume_unwind(err)
+            }
         }
     }
 }

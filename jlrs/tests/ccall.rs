@@ -12,13 +12,15 @@ mod tests {
     }
 
     unsafe extern "C" fn uses_scope(array: TypedArray<f64>) -> bool {
-        match weak_handle!() {
-            Ok(handle) => handle.local_scope::<_, 1>(|mut frame| {
-                let _ = Value::new(&mut frame, 0usize);
-                let borrowed = array.inline_data();
-                borrowed[1] == 1.0
-            }),
-            Err(_) => panic!("Not called from Julia"),
+        unsafe {
+            match weak_handle!() {
+                Ok(handle) => handle.local_scope::<_, 1>(|mut frame| {
+                    let _ = Value::new(&mut frame, 0usize);
+                    let borrowed = array.inline_data();
+                    borrowed[1] == 1.0
+                }),
+                Err(_) => panic!("Not called from Julia"),
+            }
         }
     }
 

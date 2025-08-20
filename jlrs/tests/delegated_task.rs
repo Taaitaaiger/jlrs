@@ -2,7 +2,7 @@ mod delegated_task {
     use jlrs::{
         data::{
             layout::valid_layout::ValidLayout,
-            managed::delegated_task::{spawn_delegated_task, DelegatedTaskLayout},
+            managed::delegated_task::{DelegatedTaskLayout, spawn_delegated_task},
         },
         prelude::*,
         runtime::handle::local_handle::LocalHandle,

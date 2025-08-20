@@ -25,8 +25,8 @@
 use std::ffi::c_void;
 
 use jl_sys::{
-    jl_unbox_float32, jl_unbox_float64, jl_unbox_int16, jl_unbox_int32, jl_unbox_int64,
-    jl_unbox_int8, jl_unbox_uint16, jl_unbox_uint32, jl_unbox_uint64, jl_unbox_uint8,
+    jl_unbox_float32, jl_unbox_float64, jl_unbox_int8, jl_unbox_int16, jl_unbox_int32,
+    jl_unbox_int64, jl_unbox_uint8, jl_unbox_uint16, jl_unbox_uint32, jl_unbox_uint64,
     jl_unbox_voidpointer, jlrs_unbox_long, jlrs_unbox_ulong,
 };
 
@@ -63,22 +63,24 @@ pub unsafe trait Unbox {
     /// the data that `value` points to.
     #[inline]
     unsafe fn unbox(value: Value) -> Self::Output {
-        value.data_ptr().cast::<Self::Output>().as_ref().clone()
+        unsafe { value.data_ptr().cast::<Self::Output>().as_ref().clone() }
     }
 }
 
 macro_rules! impl_unboxer {
-    ($type:ty, $unboxer:expr) => {
+    ($type:ty, $unboxer:expr_2021) => {
         unsafe impl Unbox for $type {
             type Output = Self;
             #[inline]
             unsafe fn unbox(value: Value) -> $type {
-                $unboxer(
-                    <Value as crate::data::managed::private::ManagedPriv>::unwrap(
-                        value,
-                        $crate::private::Private,
-                    ),
-                ) as _
+                unsafe {
+                    $unboxer(
+                        <Value as crate::data::managed::private::ManagedPriv>::unwrap(
+                            value,
+                            $crate::private::Private,
+                        ),
+                    ) as _
+                }
             }
         }
     };

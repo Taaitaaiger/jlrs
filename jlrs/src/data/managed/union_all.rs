@@ -11,9 +11,8 @@ use jl_sys::{
 use jlrs_macros::julia_version;
 
 use super::{
-    erase_scope_lifetime,
+    Managed, Weak, erase_scope_lifetime,
     value::{ValueData, ValueResult},
-    Managed, Weak,
 };
 use crate::{
     catch::{catch_exceptions, unwrap_exc},
@@ -68,8 +67,10 @@ impl<'scope> UnionAll<'scope> {
     where
         Tgt: Target<'target>,
     {
-        let ua = jl_type_unionall(tvar.unwrap(Private), body.unwrap(Private));
-        target.data_from_ptr(NonNull::new_unchecked(ua), Private)
+        unsafe {
+            let ua = jl_type_unionall(tvar.unwrap(Private), body.unwrap(Private));
+            target.data_from_ptr(NonNull::new_unchecked(ua), Private)
+        }
     }
 
     /// The type at the bottom of this `UnionAll`.
@@ -154,12 +155,14 @@ impl<'scope> UnionAll<'scope> {
         V: AsRef<[Value<'params, 'static>]>,
         Tgt: Target<'target>,
     {
-        let types = types.as_ref();
-        let n = types.len();
-        let types_ptr = types.as_ptr() as *mut *mut jl_value_t;
-        let applied = jl_apply_type(self.as_value().unwrap(Private), types_ptr, n);
-        debug_assert!(!applied.is_null());
-        target.data_from_ptr(NonNull::new_unchecked(applied), Private)
+        unsafe {
+            let types = types.as_ref();
+            let n = types.len();
+            let types_ptr = types.as_ptr() as *mut *mut jl_value_t;
+            let applied = jl_apply_type(self.as_value().unwrap(Private), types_ptr, n);
+            debug_assert!(!applied.is_null());
+            target.data_from_ptr(NonNull::new_unchecked(applied), Private)
+        }
     }
 
     /// Wrap `ty` with its free type parameters.

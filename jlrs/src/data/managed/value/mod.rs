@@ -42,22 +42,22 @@ pub mod typed;
 #[doc(hidden)]
 #[macro_export]
 macro_rules! count {
-    ($name:expr => $value:expr) => {
+    ($name:expr_2021 => $value:expr_2021) => {
         2
     };
-    ($name:expr => $value:expr, $($rest:tt)+) => {
+    ($name:expr_2021 => $value:expr_2021, $($rest:tt)+) => {
         $crate::count!(2, $($rest)+)
     };
-    ($n:expr, $name:expr => $value:expr) => {
+    ($n:expr_2021, $name:expr_2021 => $value:expr_2021) => {
         $n + 1
     };
-    ($n:expr, $name:expr => $value:expr, $($rest:tt)+) => {
+    ($n:expr_2021, $name:expr_2021 => $value:expr_2021, $($rest:tt)+) => {
         $crate::count!($n + 1, $($rest)+)
     };
 }
 
 use std::{
-    ffi::{c_void, CStr, CString},
+    ffi::{CStr, CString, c_void},
     marker::PhantomData,
     mem::MaybeUninit,
     ptr::NonNull,
@@ -79,7 +79,7 @@ use jl_sys::{
 use jlrs_macros::julia_version;
 
 use self::{field_accessor::FieldAccessor, typed::TypedValue};
-use super::{type_var::TypeVar, Weak};
+use super::{Weak, type_var::TypeVar};
 use crate::{
     args::Values,
     call::{Call, ProvideKeywords, WithKeywords},
@@ -92,6 +92,7 @@ use crate::{
             valid_layout::{ValidField, ValidLayout},
         },
         managed::{
+            Managed,
             datatype::DataType,
             module::Module,
             named_tuple::NamedTuple,
@@ -100,16 +101,15 @@ use crate::{
             union::Union,
             union_all::UnionAll,
             value::tracked::{Tracked, TrackedMut},
-            Managed,
         },
         types::{construct_type::ConstructType, typecheck::Typecheck},
     },
-    error::{AccessError, JlrsError, JlrsResult, TypeError, CANNOT_DISPLAY_TYPE},
+    error::{AccessError, CANNOT_DISPLAY_TYPE, JlrsError, JlrsResult, TypeError},
     memory::{
         context::ledger::Ledger,
         get_tls,
         scope::LocalScopeExt,
-        target::{unrooted::Unrooted, Target, TargetException, TargetResult},
+        target::{Target, TargetException, TargetResult, unrooted::Unrooted},
     },
     private::Private,
 };
@@ -253,41 +253,48 @@ impl Value<'_, '_> {
         L: ValidLayout,
         Tgt: Target<'target>,
     {
-        const {
-            let _: () = assert!(!L::IS_REF);
-        }
-
-        target.with_local_scope::<_, 1>(|target, mut frame| {
-            let ty = Ty::construct_type(&mut frame);
-            let ty_dt = ty.cast::<DataType>()?;
-
-            if !ty_dt.is_concrete_type() {
-                let value = ty.display_string_or(CANNOT_DISPLAY_TYPE);
-                Err(TypeError::NotConcrete { value })?;
+        unsafe {
+            const {
+                let _: () = assert!(!L::IS_REF);
             }
 
-            if !L::valid_layout(ty) {
-                let value_type = ty.display_string_or(CANNOT_DISPLAY_TYPE);
-                Err(TypeError::InvalidLayout { value_type })?;
-            }
+            target.with_local_scope::<_, 1>(|target, mut frame| {
+                let ty = Ty::construct_type(&mut frame);
+                let ty_dt = ty.cast::<DataType>()?;
 
-            if let Some(n_fields) = ty_dt.n_fields() {
-                for i in 0..n_fields as usize {
-                    let ft = ty_dt.field_type_unchecked(i);
+                if !ty_dt.is_concrete_type() {
+                    let value = ty.display_string_or(CANNOT_DISPLAY_TYPE);
+                    Err(TypeError::NotConcrete { value })?;
+                }
 
-                    if ty_dt.is_pointer_field_unchecked(i) {
-                        let offset = ty_dt.field_offset_unchecked(i) as usize;
-                        check_field_isa(ft, &layout, offset)?;
-                    } else if let Ok(u) = ft.cast::<Union>() {
-                        check_union_equivalent::<L, _>(&frame, i, u)?;
+                if !L::valid_layout(ty) {
+                    let value_type = ty.display_string_or(CANNOT_DISPLAY_TYPE);
+                    Err(TypeError::InvalidLayout { value_type })?;
+                }
+
+                if let Some(n_fields) = ty_dt.n_fields() {
+                    for i in 0..n_fields as usize {
+                        let ft = ty_dt.field_type_unchecked(i);
+
+                        if ty_dt.is_pointer_field_unchecked(i) {
+                            let offset = ty_dt.field_offset_unchecked(i) as usize;
+                            check_field_isa(ft, &layout, offset)?;
+                        } else {
+                            match ft.cast::<Union>() {
+                                Ok(u) => {
+                                    check_union_equivalent::<L, _>(&frame, i, u)?;
+                                }
+                                _ => {}
+                            }
+                        }
                     }
                 }
-            }
 
-            let ptr = jl_new_struct_uninit(ty_dt.unwrap(Private));
-            std::ptr::write(ptr.cast::<L>(), layout);
-            Ok(target.data_from_ptr(NonNull::new_unchecked(ptr), Private))
-        })
+                let ptr = jl_new_struct_uninit(ty_dt.unwrap(Private));
+                std::ptr::write(ptr.cast::<L>(), layout);
+                Ok(target.data_from_ptr(NonNull::new_unchecked(ptr), Private))
+            })
+        }
     }
 
     /// Apply the given types to `self`.
@@ -350,9 +357,12 @@ impl Value<'_, '_> {
         Tgt: Target<'target>,
         V: AsRef<[Value<'value, 'data>]>,
     {
-        let types = types.as_ref();
-        let applied = jl_apply_type(self.unwrap(Private), types.as_ptr() as *mut _, types.len());
-        target.data_from_ptr(NonNull::new_unchecked(applied), Private)
+        unsafe {
+            let types = types.as_ref();
+            let applied =
+                jl_apply_type(self.unwrap(Private), types.as_ptr() as *mut _, types.len());
+            target.data_from_ptr(NonNull::new_unchecked(applied), Private)
+        }
     }
 }
 
@@ -543,20 +553,22 @@ impl<'scope, 'data> Value<'scope, 'data> {
     pub unsafe fn track_exclusive<'borrow, T: ValidLayout>(
         &'borrow mut self,
     ) -> JlrsResult<TrackedMut<'borrow, 'scope, 'data, T>> {
-        let ty = self.datatype();
+        unsafe {
+            let ty = self.datatype();
 
-        if !ty.mutable() {
-            let value_type = ty.display_string_or(CANNOT_DISPLAY_TYPE).into();
-            Err(TypeError::Immutable { value_type })?;
+            if !ty.mutable() {
+                let value_type = ty.display_string_or(CANNOT_DISPLAY_TYPE).into();
+                Err(TypeError::Immutable { value_type })?;
+            }
+
+            if !T::valid_layout(ty.as_value()) {
+                let value_type = ty.display_string_or(CANNOT_DISPLAY_TYPE).into();
+                Err(AccessError::InvalidLayout { value_type })?;
+            }
+
+            Ledger::try_borrow_exclusive(*self)?;
+            Ok(TrackedMut::new(self))
         }
-
-        if !T::valid_layout(ty.as_value()) {
-            let value_type = ty.display_string_or(CANNOT_DISPLAY_TYPE).into();
-            Err(AccessError::InvalidLayout { value_type })?;
-        }
-
-        Ledger::try_borrow_exclusive(*self)?;
-        Ok(TrackedMut::new(self))
     }
 
     /// Returns `true` if `self` is currently tracked.
@@ -623,20 +635,22 @@ impl ValueUnbound {
     pub unsafe fn track_exclusive_unbound<T: ValidLayout + Send>(
         self,
     ) -> JlrsResult<TrackedMut<'static, 'static, 'static, T>> {
-        let ty = self.datatype();
+        unsafe {
+            let ty = self.datatype();
 
-        if !ty.mutable() {
-            let value_type = ty.display_string_or(CANNOT_DISPLAY_TYPE).into();
-            Err(TypeError::Immutable { value_type })?;
+            if !ty.mutable() {
+                let value_type = ty.display_string_or(CANNOT_DISPLAY_TYPE).into();
+                Err(TypeError::Immutable { value_type })?;
+            }
+
+            if !T::valid_layout(ty.as_value()) {
+                let value_type = ty.display_string_or(CANNOT_DISPLAY_TYPE).into();
+                Err(AccessError::InvalidLayout { value_type })?;
+            }
+
+            Ledger::try_borrow_exclusive(self)?;
+            Ok(TrackedMut::new_owned(self))
         }
-
-        if !T::valid_layout(ty.as_value()) {
-            let value_type = ty.display_string_or(CANNOT_DISPLAY_TYPE).into();
-            Err(AccessError::InvalidLayout { value_type })?;
-        }
-
-        Ledger::try_borrow_exclusive(self)?;
-        Ok(TrackedMut::new_owned(self))
     }
 }
 
@@ -654,7 +668,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
     /// Safety: The value must not contain any data borrowed from Rust.
     #[inline]
     pub unsafe fn assume_owned(self) -> Value<'scope, 'static> {
-        Value::wrap_non_null(self.unwrap_non_null(Private), Private)
+        unsafe { Value::wrap_non_null(self.unwrap_non_null(Private), Private) }
     }
 }
 
@@ -691,7 +705,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
     /// Safety: You must guarantee `self.is::<T>()` would have returned `true`.
     #[inline]
     pub unsafe fn cast_unchecked<T: Managed<'scope, 'data>>(self) -> T {
-        T::from_value_unchecked(self, Private)
+        unsafe { T::from_value_unchecked(self, Private) }
     }
 
     /// Unbox the contents of the value as the output type associated with `T`. Returns an error
@@ -714,7 +728,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
     /// Safety: You must guarantee `self.is::<T>()` would have returned `true`.
     #[inline]
     pub unsafe fn unbox_unchecked<T: Unbox>(self) -> T::Output {
-        T::unbox(self)
+        unsafe { T::unbox(self) }
     }
 
     /// Convert this value to a typed value if this value is an instance of the constructed type.
@@ -740,7 +754,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
     /// Safety: the converted value must be an instance of the constructed type.
     #[inline]
     pub unsafe fn as_typed_unchecked<T: ConstructType>(self) -> TypedValue<'scope, 'data, T> {
-        TypedValue::<T>::from_value_unchecked(self)
+        unsafe { TypedValue::<T>::from_value_unchecked(self) }
     }
 
     /// Returns a pointer to the data, this is useful when the output type of `Unbox` is different
@@ -979,43 +993,45 @@ impl<'scope, 'data> Value<'scope, 'data> {
     where
         Tgt: Target<'target>,
     {
-        if self.is::<Module>() {
-            Err(AccessError::ModuleField)?
+        unsafe {
+            if self.is::<Module>() {
+                Err(AccessError::ModuleField)?
+            }
+
+            let n_fields = self.n_fields();
+            if n_fields <= idx {
+                Err(AccessError::OutOfBoundsField {
+                    idx,
+                    n_fields,
+                    value_type: self.datatype().display_string_or(CANNOT_DISPLAY_TYPE),
+                })?;
+            }
+
+            let field_type = self
+                .datatype()
+                .field_types()
+                .data()
+                .get(&target, idx)
+                .unwrap()
+                .as_value();
+            let dt = value.datatype();
+
+            if !Value::subtype(dt.as_value(), field_type) {
+                Err(TypeError::NotASubtype {
+                    field_type: field_type.display_string_or(CANNOT_DISPLAY_TYPE),
+                    value_type: value.datatype().display_string_or(CANNOT_DISPLAY_TYPE),
+                })?
+            }
+
+            let callback = || jl_set_nth_field(self.unwrap(Private), idx, value.unwrap(Private));
+
+            let res = match catch_exceptions(callback, unwrap_exc) {
+                Ok(_) => Ok(()),
+                Err(e) => Err(e),
+            };
+
+            Ok(target.exception_from_ptr(res, Private))
         }
-
-        let n_fields = self.n_fields();
-        if n_fields <= idx {
-            Err(AccessError::OutOfBoundsField {
-                idx,
-                n_fields,
-                value_type: self.datatype().display_string_or(CANNOT_DISPLAY_TYPE),
-            })?;
-        }
-
-        let field_type = self
-            .datatype()
-            .field_types()
-            .data()
-            .get(&target, idx)
-            .unwrap()
-            .as_value();
-        let dt = value.datatype();
-
-        if !Value::subtype(dt.as_value(), field_type) {
-            Err(TypeError::NotASubtype {
-                field_type: field_type.display_string_or(CANNOT_DISPLAY_TYPE),
-                value_type: value.datatype().display_string_or(CANNOT_DISPLAY_TYPE),
-            })?
-        }
-
-        let callback = || jl_set_nth_field(self.unwrap(Private), idx, value.unwrap(Private));
-
-        let res = match catch_exceptions(callback, unwrap_exc) {
-            Ok(_) => Ok(()),
-            Err(e) => Err(e),
-        };
-
-        Ok(target.exception_from_ptr(res, Private))
     }
 
     /// Set the value of the field at `idx`. If Julia throws an exception the process aborts.
@@ -1025,7 +1041,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
     /// `DataType`, is also not prevented.
     #[inline]
     pub unsafe fn set_nth_field_unchecked(self, idx: usize, value: Value<'_, 'data>) {
-        jl_set_nth_field(self.unwrap(Private), idx, value.unwrap(Private))
+        unsafe { jl_set_nth_field(self.unwrap(Private), idx, value.unwrap(Private)) }
     }
 
     /// Set the value of the field with the name `field_name`. If Julia throws an exception it's
@@ -1044,45 +1060,47 @@ impl<'scope, 'data> Value<'scope, 'data> {
         N: ToSymbol,
         Tgt: Target<'target>,
     {
-        if self.is::<Module>() {
-            Err(AccessError::ModuleField)?
+        unsafe {
+            if self.is::<Module>() {
+                Err(AccessError::ModuleField)?
+            }
+
+            let symbol = field_name.to_symbol_priv(Private);
+            let idx = jl_field_index(self.datatype().unwrap(Private), symbol.unwrap(Private), 0);
+
+            if idx < 0 {
+                Err(AccessError::NoSuchField {
+                    type_name: self.datatype().display_string_or(CANNOT_DISPLAY_TYPE),
+                    field_name: symbol.as_str().unwrap_or("<Non-UTF8 symbol>").into(),
+                })?
+            }
+
+            let field_type = self
+                .datatype()
+                .field_types()
+                .data()
+                .get(&target, idx as usize)
+                .unwrap()
+                .as_value();
+            let dt = value.datatype();
+
+            if !Value::subtype(dt.as_value(), field_type) {
+                Err(TypeError::NotASubtype {
+                    field_type: field_type.display_string_or(CANNOT_DISPLAY_TYPE),
+                    value_type: value.datatype().display_string_or(CANNOT_DISPLAY_TYPE),
+                })?
+            }
+
+            let callback =
+                || jl_set_nth_field(self.unwrap(Private), idx as usize, value.unwrap(Private));
+
+            let res = match catch_exceptions(callback, unwrap_exc) {
+                Ok(_) => Ok(()),
+                Err(e) => Err(e),
+            };
+
+            Ok(target.exception_from_ptr(res, Private))
         }
-
-        let symbol = field_name.to_symbol_priv(Private);
-        let idx = jl_field_index(self.datatype().unwrap(Private), symbol.unwrap(Private), 0);
-
-        if idx < 0 {
-            Err(AccessError::NoSuchField {
-                type_name: self.datatype().display_string_or(CANNOT_DISPLAY_TYPE),
-                field_name: symbol.as_str().unwrap_or("<Non-UTF8 symbol>").into(),
-            })?
-        }
-
-        let field_type = self
-            .datatype()
-            .field_types()
-            .data()
-            .get(&target, idx as usize)
-            .unwrap()
-            .as_value();
-        let dt = value.datatype();
-
-        if !Value::subtype(dt.as_value(), field_type) {
-            Err(TypeError::NotASubtype {
-                field_type: field_type.display_string_or(CANNOT_DISPLAY_TYPE),
-                value_type: value.datatype().display_string_or(CANNOT_DISPLAY_TYPE),
-            })?
-        }
-
-        let callback =
-            || jl_set_nth_field(self.unwrap(Private), idx as usize, value.unwrap(Private));
-
-        let res = match catch_exceptions(callback, unwrap_exc) {
-            Ok(_) => Ok(()),
-            Err(e) => Err(e),
-        };
-
-        Ok(target.exception_from_ptr(res, Private))
     }
 
     /// Set the value of the field with the name `field_name`. If Julia throws an exception the
@@ -1099,20 +1117,22 @@ impl<'scope, 'data> Value<'scope, 'data> {
     where
         N: ToSymbol,
     {
-        let symbol = field_name.to_symbol_priv(Private);
-        let idx = jl_field_index(self.datatype().unwrap(Private), symbol.unwrap(Private), 0);
+        unsafe {
+            let symbol = field_name.to_symbol_priv(Private);
+            let idx = jl_field_index(self.datatype().unwrap(Private), symbol.unwrap(Private), 0);
 
-        if idx < 0 {
-            Err(AccessError::NoSuchField {
-                type_name: self.datatype().display_string_or(CANNOT_DISPLAY_TYPE),
-                field_name: symbol.as_str().unwrap_or("<Non-UTF8 symbol>").into(),
-            })?
+            if idx < 0 {
+                Err(AccessError::NoSuchField {
+                    type_name: self.datatype().display_string_or(CANNOT_DISPLAY_TYPE),
+                    field_name: symbol.as_str().unwrap_or("<Non-UTF8 symbol>").into(),
+                })?
+            }
+            Ok(jl_set_nth_field(
+                self.unwrap(Private),
+                idx as usize,
+                value.unwrap(Private),
+            ))
         }
-        Ok(jl_set_nth_field(
-            self.unwrap(Private),
-            idx as usize,
-            value.unwrap(Private),
-        ))
     }
 }
 
@@ -1136,17 +1156,19 @@ impl Value<'_, '_> {
         C: AsRef<str>,
         Tgt: Target<'target>,
     {
-        let cmd = cmd.as_ref();
-        let cmd_cstring = CString::new(cmd).map_err(JlrsError::other).unwrap();
-        let cmd_ptr = cmd_cstring.as_ptr();
-        let res = jl_eval_string(cmd_ptr);
-        let exc = jl_exception_occurred();
-        let output = if exc.is_null() {
-            Ok(NonNull::new_unchecked(res))
-        } else {
-            Err(NonNull::new_unchecked(exc))
-        };
-        target.result_from_ptr(output, Private)
+        unsafe {
+            let cmd = cmd.as_ref();
+            let cmd_cstring = CString::new(cmd).map_err(JlrsError::other).unwrap();
+            let cmd_ptr = cmd_cstring.as_ptr();
+            let res = jl_eval_string(cmd_ptr);
+            let exc = jl_exception_occurred();
+            let output = if exc.is_null() {
+                Ok(NonNull::new_unchecked(res))
+            } else {
+                Err(NonNull::new_unchecked(exc))
+            };
+            target.result_from_ptr(output, Private)
+        }
     }
 
     /// Execute a Julia command `cmd`. This is equivalent to `Value::eval_string`, but uses a
@@ -1163,16 +1185,18 @@ impl Value<'_, '_> {
         C: AsRef<CStr>,
         Tgt: Target<'target>,
     {
-        let cmd = cmd.as_ref();
-        let cmd_ptr = cmd.as_ptr();
-        let res = jl_eval_string(cmd_ptr);
-        let exc = jl_exception_occurred();
-        let output = if exc.is_null() {
-            Ok(NonNull::new_unchecked(res))
-        } else {
-            Err(NonNull::new_unchecked(exc))
-        };
-        target.result_from_ptr(output, Private)
+        unsafe {
+            let cmd = cmd.as_ref();
+            let cmd_ptr = cmd.as_ptr();
+            let res = jl_eval_string(cmd_ptr);
+            let exc = jl_exception_occurred();
+            let output = if exc.is_null() {
+                Ok(NonNull::new_unchecked(res))
+            } else {
+                Err(NonNull::new_unchecked(exc))
+            };
+            target.result_from_ptr(output, Private)
+        }
     }
 }
 
@@ -1203,7 +1227,7 @@ impl Value<'_, '_> {
     /// Safety: the finalizer must be compatible with the data.
     #[inline]
     pub unsafe fn add_finalizer(self, f: Value<'_, 'static>) {
-        jl_gc_add_finalizer(self.unwrap(Private), f.unwrap(Private))
+        unsafe { jl_gc_add_finalizer(self.unwrap(Private), f.unwrap(Private)) }
     }
 
     /// Add a finalizer `f` to this value. The finalizer must be an `extern "C"` function that
@@ -1212,7 +1236,7 @@ impl Value<'_, '_> {
     /// Safety: the finalizer must be compatible with the data.
     #[inline]
     pub unsafe fn add_ptr_finalizer(self, f: unsafe extern "C" fn(*mut c_void) -> ()) {
-        jl_gc_add_ptr_finalizer(get_tls(), self.unwrap(Private), f as *mut c_void)
+        unsafe { jl_gc_add_ptr_finalizer(get_tls(), self.unwrap(Private), f as *mut c_void) }
     }
 }
 
@@ -1479,13 +1503,15 @@ impl<'data> Call<'data> for Value<'_, 'data> {
         V: Values<'value, 'data, N>,
         Tgt: Target<'target>,
     {
-        let args = args.as_pointers(Private);
-        let v = jlrs_call_unchecked(
-            self.unwrap(Private),
-            args.as_ptr() as *mut _,
-            args.len() as _,
-        );
-        target.data_from_ptr(NonNull::new_unchecked(v), Private)
+        unsafe {
+            let args = args.as_pointers(Private);
+            let v = jlrs_call_unchecked(
+                self.unwrap(Private),
+                args.as_ptr() as *mut _,
+                args.len() as _,
+            );
+            target.data_from_ptr(NonNull::new_unchecked(v), Private)
+        }
     }
 
     #[inline]
@@ -1498,24 +1524,11 @@ impl<'data> Call<'data> for Value<'_, 'data> {
         V: Values<'value, 'data, N>,
         Tgt: Target<'target>,
     {
-        let args = args.as_slice(Private);
-        let n = args.len();
+        unsafe {
+            let args = args.as_slice(Private);
+            let n = args.len();
 
-        let res = match N {
-            0 => jl_call0(self.unwrap(Private)),
-            1 => jl_call1(self.unwrap(Private), args[0].unwrap(Private)),
-            2 => jl_call2(
-                self.unwrap(Private),
-                args[0].unwrap(Private),
-                args[1].unwrap(Private),
-            ),
-            3 => jl_call3(
-                self.unwrap(Private),
-                args[0].unwrap(Private),
-                args[1].unwrap(Private),
-                args[2].unwrap(Private),
-            ),
-            usize::MAX => match n {
+            let res = match N {
                 0 => jl_call0(self.unwrap(Private)),
                 1 => jl_call1(self.unwrap(Private), args[0].unwrap(Private)),
                 2 => jl_call2(
@@ -1529,28 +1542,43 @@ impl<'data> Call<'data> for Value<'_, 'data> {
                     args[1].unwrap(Private),
                     args[2].unwrap(Private),
                 ),
+                usize::MAX => match n {
+                    0 => jl_call0(self.unwrap(Private)),
+                    1 => jl_call1(self.unwrap(Private), args[0].unwrap(Private)),
+                    2 => jl_call2(
+                        self.unwrap(Private),
+                        args[0].unwrap(Private),
+                        args[1].unwrap(Private),
+                    ),
+                    3 => jl_call3(
+                        self.unwrap(Private),
+                        args[0].unwrap(Private),
+                        args[1].unwrap(Private),
+                        args[2].unwrap(Private),
+                    ),
+                    _ => jl_call(
+                        self.unwrap(Private),
+                        args.as_ptr() as *const _ as *mut _,
+                        n as _,
+                    ),
+                },
                 _ => jl_call(
                     self.unwrap(Private),
                     args.as_ptr() as *const _ as *mut _,
                     n as _,
                 ),
-            },
-            _ => jl_call(
-                self.unwrap(Private),
-                args.as_ptr() as *const _ as *mut _,
-                n as _,
-            ),
-        };
+            };
 
-        let exc = jl_exception_occurred();
+            let exc = jl_exception_occurred();
 
-        let res = if exc.is_null() {
-            Ok(NonNull::new_unchecked(res))
-        } else {
-            Err(NonNull::new_unchecked(exc))
-        };
+            let res = if exc.is_null() {
+                Ok(NonNull::new_unchecked(res))
+            } else {
+                Err(NonNull::new_unchecked(exc))
+            };
 
-        target.result_from_ptr(res, Private)
+            target.result_from_ptr(res, Private)
+        }
     }
 }
 
@@ -1678,54 +1706,62 @@ unsafe fn check_union_equivalent<'target, L: ValidLayout, Tgt: Target<'target>>(
     idx: usize,
     u: Union,
 ) -> JlrsResult<()> {
-    // TODO: Union{}?
+    unsafe {
+        // TODO: Union{}?
 
-    // Field is a bits union. Check if the union in the layout and the constructed type contain
-    // the same types.
-    let type_obj = L::type_object(target);
-    if let Ok(type_obj) = type_obj.cast::<DataType>() {
-        let ft_in_layout = type_obj.field_type_unchecked(idx);
-        if ft_in_layout != u {
-            Err(TypeError::IncompatibleType {
-                element_type: u.display_string_or(CANNOT_DISPLAY_TYPE),
-                value_type: ft_in_layout.display_string_or(CANNOT_DISPLAY_TYPE),
-            })?
+        // Field is a bits union. Check if the union in the layout and the constructed type contain
+        // the same types.
+        let type_obj = L::type_object(target);
+        match type_obj.cast::<DataType>() {
+            Ok(type_obj) => {
+                let ft_in_layout = type_obj.field_type_unchecked(idx);
+                if ft_in_layout != u {
+                    Err(TypeError::IncompatibleType {
+                        element_type: u.display_string_or(CANNOT_DISPLAY_TYPE),
+                        value_type: ft_in_layout.display_string_or(CANNOT_DISPLAY_TYPE),
+                    })?
+                }
+            }
+            _ => match type_obj.cast::<UnionAll>() {
+                Ok(type_obj) => {
+                    let base_type_obj = type_obj.base_type();
+                    let ft_in_layout = base_type_obj.field_type_unchecked(idx);
+                    if ft_in_layout != u {
+                        Err(TypeError::IncompatibleType {
+                            element_type: u.display_string_or(CANNOT_DISPLAY_TYPE),
+                            value_type: ft_in_layout.display_string_or(CANNOT_DISPLAY_TYPE),
+                        })?
+                    }
+                }
+                _ => Err(TypeError::NotA {
+                    value: type_obj.display_string_or(CANNOT_DISPLAY_TYPE),
+                    field_type: "DataType or UnionAll".into(),
+                })?,
+            },
         }
-    } else if let Ok(type_obj) = type_obj.cast::<UnionAll>() {
-        let base_type_obj = type_obj.base_type();
-        let ft_in_layout = base_type_obj.field_type_unchecked(idx);
-        if ft_in_layout != u {
-            Err(TypeError::IncompatibleType {
-                element_type: u.display_string_or(CANNOT_DISPLAY_TYPE),
-                value_type: ft_in_layout.display_string_or(CANNOT_DISPLAY_TYPE),
-            })?
-        }
-    } else {
-        Err(TypeError::NotA {
-            value: type_obj.display_string_or(CANNOT_DISPLAY_TYPE),
-            field_type: "DataType or UnionAll".into(),
-        })?
+
+        Ok(())
     }
-
-    Ok(())
 }
 
 unsafe fn check_field_isa<L: ValidLayout>(ft: Value, data: &L, offset: usize) -> JlrsResult<()> {
-    // Field is a pointer field, check if the provided value in that position is a valid instance
-    // of the field type.
-    if let Some(field) = (data as *const L)
-        .cast::<MaybeUninit<u8>>()
-        .add(offset)
-        .cast::<Value>()
-        .as_ref()
-    {
-        if !field.isa(ft) {
-            Err(TypeError::NotA {
-                value: field.display_string_or("<Cannot display value>"),
-                field_type: ft.display_string_or("<Cannot display type>"),
-            })?
+    unsafe {
+        // Field is a pointer field, check if the provided value in that position is a valid instance
+        // of the field type.
+        if let Some(field) = (data as *const L)
+            .cast::<MaybeUninit<u8>>()
+            .add(offset)
+            .cast::<Value>()
+            .as_ref()
+        {
+            if !field.isa(ft) {
+                Err(TypeError::NotA {
+                    value: field.display_string_or("<Cannot display value>"),
+                    field_type: ft.display_string_or("<Cannot display type>"),
+                })?
+            }
         }
-    }
 
-    Ok(())
+        Ok(())
+    }
 }

@@ -11,7 +11,7 @@ use crate::{
             is_bits::IsBits,
             valid_layout::{ValidField, ValidLayout},
         },
-        managed::{datatype::DataType, union_all::UnionAll, value::Value, Managed},
+        managed::{Managed, datatype::DataType, union_all::UnionAll, value::Value},
         types::{construct_type::ConstructType, typecheck::Typecheck},
     },
     define_fast_key, define_static_ref,

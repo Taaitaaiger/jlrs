@@ -30,7 +30,7 @@
 
 - Methods that call a Julia function and track the arguments have been removed.
 
-- The MSRV has been increased to 1.79.
+- The MSRV has been increased to 1.85.
 
 - The closure in scopes is now taken as an `impl trait` to get rid of the (unnameable) generic, this change should only affect local scopes which now just take their size as a constant generic. To update your code, replace `.local_scope::<_,` with `.local_scope::<`.
 
@@ -83,6 +83,8 @@
 - A custom `NamedTuple` type has been added, the `named_tuple` macro has been moved to the new `jlrs::data::managed::named_tuple` module and now returns a `JlrsResult<NamedTuple>`. `ProvideKeywords::provide_keywords` now requires an instance of `NamedTuple` to be passed. Several methods to access named tuples, and create new named tuple that extend an existing one have been added. The old `Typecheck` placeholder has been removed in favor of the new `NamedTuple` type.
 
 - `Call::call0`, `Call::call1`, `Call::call2`, and `Call::call3` have been deprecated in favor of using `Call::call`.
+
+- All crates have been migrated to the 2024 edition of Rust.
 
 ## v0.21
 

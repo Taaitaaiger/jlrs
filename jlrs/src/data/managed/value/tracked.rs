@@ -32,10 +32,12 @@ pub struct Tracked<'tracked, 'scope, 'data, T> {
 impl<'tracked, 'scope, 'data, T: ValidLayout> Tracked<'tracked, 'scope, 'data, T> {
     #[inline]
     pub(crate) unsafe fn new(value: &'tracked Value<'scope, 'data>) -> Self {
-        Tracked {
-            tracked: value.data_ptr().cast::<T>().as_ref(),
-            _s: PhantomData,
-            _d: PhantomData,
+        unsafe {
+            Tracked {
+                tracked: value.data_ptr().cast::<T>().as_ref(),
+                _s: PhantomData,
+                _d: PhantomData,
+            }
         }
     }
 }
@@ -43,10 +45,12 @@ impl<'tracked, 'scope, 'data, T: ValidLayout> Tracked<'tracked, 'scope, 'data, T
 impl<'scope, 'data, T: ValidLayout> Tracked<'scope, 'scope, 'data, T> {
     #[inline]
     pub(crate) unsafe fn new_owned(value: Value<'scope, 'data>) -> Self {
-        Tracked {
-            tracked: value.data_ptr().cast::<T>().as_ref(),
-            _s: PhantomData,
-            _d: PhantomData,
+        unsafe {
+            Tracked {
+                tracked: value.data_ptr().cast::<T>().as_ref(),
+                _s: PhantomData,
+                _d: PhantomData,
+            }
         }
     }
 }
@@ -91,10 +95,12 @@ pub struct TrackedMut<'tracked, 'scope, 'data, T: ValidLayout> {
 impl<'tracked, 'scope, 'data, T: ValidLayout> TrackedMut<'tracked, 'scope, 'data, T> {
     #[inline]
     pub(crate) unsafe fn new(value: &'tracked mut Value<'scope, 'data>) -> Self {
-        TrackedMut {
-            t: value.data_ptr().cast::<T>().as_mut(),
-            _s: PhantomData,
-            _d: PhantomData,
+        unsafe {
+            TrackedMut {
+                t: value.data_ptr().cast::<T>().as_mut(),
+                _s: PhantomData,
+                _d: PhantomData,
+            }
         }
     }
 }
@@ -102,10 +108,12 @@ impl<'tracked, 'scope, 'data, T: ValidLayout> TrackedMut<'tracked, 'scope, 'data
 impl<'scope, 'data, T: ValidLayout> TrackedMut<'scope, 'scope, 'data, T> {
     #[inline]
     pub(crate) unsafe fn new_owned(value: Value<'scope, 'data>) -> Self {
-        TrackedMut {
-            t: value.data_ptr().cast::<T>().as_mut(),
-            _s: PhantomData,
-            _d: PhantomData,
+        unsafe {
+            TrackedMut {
+                t: value.data_ptr().cast::<T>().as_mut(),
+                _s: PhantomData,
+                _d: PhantomData,
+            }
         }
     }
 }

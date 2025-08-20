@@ -1,7 +1,7 @@
 use std::{cell::RefCell, future::Future};
 
 use criterion::{
-    async_executor::AsyncExecutor, black_box, /* criterion_group, criterion_main, */ Criterion,
+    /* criterion_group, criterion_main, */ Criterion, async_executor::AsyncExecutor, black_box,
 };
 use jlrs::{prelude::*, runtime::handle::mt_handle::MtHandle};
 #[cfg(not(target_os = "windows"))]

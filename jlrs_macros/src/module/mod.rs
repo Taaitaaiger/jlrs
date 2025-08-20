@@ -3,6 +3,7 @@ mod parameters;
 
 use itertools::Itertools;
 use module_item::{
+    ModuleItem,
     documentation::DocFragments,
     exported_alias::{AliasFragments, ExportedAlias},
     exported_const::{ConstFragments, ExportedConst},
@@ -12,15 +13,14 @@ use module_item::{
     exported_type::{ExportedType, TypeFragments},
     init_fn::InitFn,
     item_with_attrs::ItemWithAttrs,
-    ModuleItem,
 };
 use parameters::{ParameterEnvironment, ParameterList};
 use proc_macro::TokenStream;
 use proc_macro2::Span;
 use syn::{
+    Attribute, Error, Ident, Result, Token,
     parse::{Parse, ParseStream},
     punctuated::Punctuated,
-    Attribute, Error, Ident, Result, Token,
 };
 
 use self::parameters::{Apply, ResolvedParameterList};
@@ -80,91 +80,93 @@ impl JuliaModule {
         let doc_init_fn_ident = doc_fragments.init_docs_fn_ident;
 
         let generated = quote::quote! {
-            #[no_mangle]
+            #[unsafe(no_mangle)]
             pub unsafe extern "C" fn #init_fn_ident(
                 module: ::jlrs::data::managed::module::Module,
                 precompiling: u8,
             ) -> ::jlrs::data::managed::value::ValueRet {
-                #type_init_fn
+                unsafe {
+                    #type_init_fn
 
-                #type_reinit_fn
+                    #type_reinit_fn
 
-                #generic_type_init_fn
+                    #generic_type_init_fn
 
-                #generic_type_reinit_fn
+                    #generic_type_reinit_fn
 
-                #function_init_fn
+                    #function_init_fn
 
-                #generic_function_init_fn
+                    #generic_function_init_fn
 
-                #method_init_fn
+                    #method_init_fn
 
-                #generic_method_init_fn
+                    #generic_method_init_fn
 
-                #const_init_fn
+                    #const_init_fn
 
-                #alias_init_fn
+                    #alias_init_fn
 
-                #doc_init_fn
+                    #doc_init_fn
 
-                static IS_INIT: ::std::sync::atomic::AtomicBool = ::std::sync::atomic::AtomicBool::new(false);
-                if IS_INIT.compare_exchange(false, true, ::std::sync::atomic::Ordering::Relaxed, ::std::sync::atomic::Ordering::Relaxed).is_err() {
-                    let unrooted = <::jlrs::data::managed::module::Module as ::jlrs::data::managed::Managed>::unrooted_target(module);
-                    return ::jlrs::data::managed::value::Value::nothing(&unrooted).as_weak().leak();
-                }
+                    static IS_INIT: ::std::sync::atomic::AtomicBool = ::std::sync::atomic::AtomicBool::new(false);
+                    if IS_INIT.compare_exchange(false, true, ::std::sync::atomic::Ordering::Relaxed, ::std::sync::atomic::Ordering::Relaxed).is_err() {
+                        let unrooted = <::jlrs::data::managed::module::Module as ::jlrs::data::managed::Managed>::unrooted_target(module);
+                        return ::jlrs::data::managed::value::Value::nothing(&unrooted).as_weak().leak();
+                    }
 
-                ::jlrs::runtime::handle::ccall::init_jlrs_wrapped(&::jlrs::InstallJlrsCore::No);
+                    ::jlrs::runtime::handle::ccall::init_jlrs_wrapped(&::jlrs::InstallJlrsCore::No);
 
-                match ::jlrs::weak_handle!() {
-                    Ok(handle) => {
-                        handle.local_scope::<_, 2>(|mut frame| {
-                            let wrap_mod = ::jlrs::data::managed::module::Module::jlrs_core(&frame)
-                                .submodule(&frame, "Wrap")
-                                .unwrap()
-                                .as_managed();
+                    match ::jlrs::weak_handle!() {
+                        Ok(handle) => {
+                            handle.local_scope::<_, 2>(|mut frame| {
+                                let wrap_mod = ::jlrs::data::managed::module::Module::jlrs_core(&frame)
+                                    .submodule(&frame, "Wrap")
+                                    .unwrap()
+                                    .as_managed();
 
-                            let function_info_ty = wrap_mod
-                                .global(&frame, "JlrsFunctionInfo")
-                                .unwrap()
-                                .as_value()
-                                .cast_unchecked::<::jlrs::data::managed::datatype::DataType>();
+                                let function_info_ty = wrap_mod
+                                    .global(&frame, "JlrsFunctionInfo")
+                                    .unwrap()
+                                    .as_value()
+                                    .cast_unchecked::<::jlrs::data::managed::datatype::DataType>();
 
-                            let doc_item_ty = wrap_mod
-                                .global(&frame, "DocItem")
-                                .unwrap()
-                                .as_value()
-                                .cast_unchecked::<::jlrs::data::managed::datatype::DataType>();
+                                let doc_item_ty = wrap_mod
+                                    .global(&frame, "DocItem")
+                                    .unwrap()
+                                    .as_value()
+                                    .cast_unchecked::<::jlrs::data::managed::datatype::DataType>();
 
-                            let module_info_ty = wrap_mod
-                                .global(&frame, "JlrsModuleInfo")
-                                .unwrap()
-                                .as_value()
-                                .cast_unchecked::<::jlrs::data::managed::datatype::DataType>();
+                                let module_info_ty = wrap_mod
+                                    .global(&frame, "JlrsModuleInfo")
+                                    .unwrap()
+                                    .as_value()
+                                    .cast_unchecked::<::jlrs::data::managed::datatype::DataType>();
 
-                            if precompiling == 1 {
-                                #type_init_fn_ident(&frame, module);
-                                #generic_type_init_fn_ident(&frame, module);
-                                #const_init_fn_ident(&frame, module);
-                                #alias_init_fn_ident(&frame, module);
-                            } else {
-                                #type_reinit_fn_ident(&frame, module);
-                                #generic_type_reinit_fn_ident(&frame, module);
-                            }
+                                if precompiling == 1 {
+                                    #type_init_fn_ident(&frame, module);
+                                    #generic_type_init_fn_ident(&frame, module);
+                                    #const_init_fn_ident(&frame, module);
+                                    #alias_init_fn_ident(&frame, module);
+                                } else {
+                                    #type_reinit_fn_ident(&frame, module);
+                                    #generic_type_reinit_fn_ident(&frame, module);
+                                }
 
-                            let mut arr = ::jlrs::data::managed::array::Vector::new_for_unchecked(&mut frame, function_info_ty.as_value(), 0);
-                            #function_init_fn_ident(&frame, &mut arr, module, function_info_ty);
-                            #generic_function_init_fn_ident(&frame, &mut arr, module, function_info_ty);
-                            #method_init_fn_ident(&frame, &mut arr, module, function_info_ty);
-                            #generic_method_init_fn_ident(&frame, &mut arr, module, function_info_ty);
+                                let mut arr = ::jlrs::data::managed::array::Vector::new_for_unchecked(&mut frame, function_info_ty.as_value(), 0);
+                                #function_init_fn_ident(&frame, &mut arr, module, function_info_ty);
+                                #generic_function_init_fn_ident(&frame, &mut arr, module, function_info_ty);
+                                #method_init_fn_ident(&frame, &mut arr, module, function_info_ty);
+                                #generic_method_init_fn_ident(&frame, &mut arr, module, function_info_ty);
 
-                            let mut doc_items = ::jlrs::data::managed::array::Vector::new_for_unchecked(&mut frame, doc_item_ty.as_value(), 0);
-                            if precompiling == 1 {
-                                #doc_init_fn_ident(&frame, &mut doc_items, module, doc_item_ty);
-                            }
-                            module_info_ty.instantiate_unchecked(&frame, [arr.as_value(), doc_items.as_value()]).leak()
-                        })
-                    },
-                    Err(_) => panic!("Not called from Julia, or Julia is in a GC-safe state"),
+                                let mut doc_items = ::jlrs::data::managed::array::Vector::new_for_unchecked(&mut frame, doc_item_ty.as_value(), 0);
+                                if precompiling == 1 {
+                                    #doc_init_fn_ident(&frame, &mut doc_items, module, doc_item_ty);
+                                }
+                                module_info_ty.instantiate_unchecked(&frame, [arr.as_value(), doc_items.as_value()]).leak()
+                            })
+                        },
+                        Err(_) => panic!("Not called from Julia, or Julia is in a GC-safe state"),
+                    }
                 }
             }
         };

@@ -11,8 +11,8 @@
 use std::ffi::c_void;
 
 use jl_sys::{
-    jl_bool_type, jl_char_type, jl_float32_type, jl_float64_type, jl_int16_type, jl_int32_type,
-    jl_int64_type, jl_int8_type, jl_uint16_type, jl_uint32_type, jl_uint64_type, jl_uint8_type,
+    jl_bool_type, jl_char_type, jl_float32_type, jl_float64_type, jl_int8_type, jl_int16_type,
+    jl_int32_type, jl_int64_type, jl_uint8_type, jl_uint16_type, jl_uint32_type, jl_uint64_type,
     jl_voidpointer_type,
 };
 

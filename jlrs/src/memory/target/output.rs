@@ -75,8 +75,10 @@ impl<'target, S: SlotRef> Output<'target, S> {
         self,
         ptr: NonNull<T::Wraps>,
     ) -> T {
-        self.slot.set(ptr.cast(), Private);
-        T::wrap_non_null(ptr, Private)
+        unsafe {
+            self.slot.set(ptr.cast(), Private);
+            T::wrap_non_null(ptr, Private)
+        }
     }
 
     #[inline]
@@ -84,7 +86,9 @@ impl<'target, S: SlotRef> Output<'target, S> {
         &'t mut self,
         ptr: NonNull<T::Wraps>,
     ) -> T {
-        self.slot.set(ptr.cast(), Private);
-        T::wrap_non_null(ptr, Private)
+        unsafe {
+            self.slot.set(ptr.cast(), Private);
+            T::wrap_non_null(ptr, Private)
+        }
     }
 }

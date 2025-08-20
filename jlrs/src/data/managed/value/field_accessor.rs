@@ -1,7 +1,7 @@
 use std::{
     mem::MaybeUninit,
-    ptr::{null_mut, NonNull},
-    sync::atomic::{AtomicPtr, AtomicU16, AtomicU32, AtomicU64, AtomicU8, Ordering},
+    ptr::{NonNull, null_mut},
+    sync::atomic::{AtomicPtr, AtomicU8, AtomicU16, AtomicU32, AtomicU64, Ordering},
     usize,
 };
 
@@ -12,14 +12,14 @@ use crate::{
     data::{
         layout::valid_layout::ValidLayout,
         managed::{
+            Managed,
             array::Array,
             datatype::{DataType, WeakDataType},
             private::ManagedPriv,
-            union::{nth_union_component, Union},
-            Managed,
+            union::{Union, nth_union_component},
         },
     },
-    error::{AccessError, JlrsResult, CANNOT_DISPLAY_TYPE},
+    error::{AccessError, CANNOT_DISPLAY_TYPE, JlrsResult},
     private::Private,
 };
 
@@ -330,33 +330,39 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
         is_pointer_field: bool,
         next_field_type: Value<'scope, 'data>,
     ) {
-        if is_pointer_field {
-            debug_assert_eq!(self.offset, 0);
-            let ptr = self.buffer.ptr;
-            if ptr.is_null() {
-                self.value = None;
-            } else {
-                self.value = Some(WeakValue::wrap(NonNull::new_unchecked(ptr)));
-            }
+        unsafe {
+            if is_pointer_field {
+                debug_assert_eq!(self.offset, 0);
+                let ptr = self.buffer.ptr;
+                if ptr.is_null() {
+                    self.value = None;
+                } else {
+                    self.value = Some(WeakValue::wrap(NonNull::new_unchecked(ptr)));
+                }
 
-            self.state = ViewState::Unlocked;
-            if self.value.is_none() {
-                if let Ok(ty) = next_field_type.cast::<DataType>() {
-                    if ty.is_concrete_type() {
-                        self.current_field_type = Some(ty.as_weak());
-                    } else {
-                        self.current_field_type = None;
+                self.state = ViewState::Unlocked;
+                if self.value.is_none() {
+                    match next_field_type.cast::<DataType>() {
+                        Ok(ty) => {
+                            if ty.is_concrete_type() {
+                                self.current_field_type = Some(ty.as_weak());
+                            } else {
+                                self.current_field_type = None;
+                            }
+                        }
+                        _ => {
+                            self.current_field_type = None;
+                        }
                     }
                 } else {
-                    self.current_field_type = None;
+                    self.current_field_type =
+                        Some(self.value.unwrap().as_managed().datatype().as_weak());
                 }
             } else {
+                debug_assert!(next_field_type.is::<DataType>());
                 self.current_field_type =
-                    Some(self.value.unwrap().as_managed().datatype().as_weak());
+                    Some(next_field_type.cast_unchecked::<DataType>().as_weak());
             }
-        } else {
-            debug_assert!(next_field_type.is::<DataType>());
-            self.current_field_type = Some(next_field_type.cast_unchecked::<DataType>().as_weak());
         }
     }
 
@@ -370,21 +376,29 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
         pointer_ordering: Ordering,
         inline_ordering: Ordering,
     ) {
-        let is_atomic_field = current_field_type.is_atomic_field_unchecked(index);
-        if is_pointer_field {
-            if is_atomic_field {
-                self.get_atomic_pointer_field(next_field_type, pointer_ordering);
+        unsafe {
+            let is_atomic_field = current_field_type.is_atomic_field_unchecked(index);
+            if is_pointer_field {
+                if is_atomic_field {
+                    self.get_atomic_pointer_field(next_field_type, pointer_ordering);
+                } else {
+                    self.get_pointer_field(false, next_field_type);
+                }
             } else {
-                self.get_pointer_field(false, next_field_type);
-            }
-        } else if let Ok(un) = next_field_type.cast::<Union>() {
-            self.get_bits_union_field(un);
-        } else {
-            debug_assert!(next_field_type.is::<DataType>());
-            self.current_field_type = Some(next_field_type.cast_unchecked::<DataType>().as_weak());
+                match next_field_type.cast::<Union>() {
+                    Ok(un) => {
+                        self.get_bits_union_field(un);
+                    }
+                    _ => {
+                        debug_assert!(next_field_type.is::<DataType>());
+                        self.current_field_type =
+                            Some(next_field_type.cast_unchecked::<DataType>().as_weak());
 
-            if is_atomic_field {
-                self.lock_or_copy_atomic(inline_ordering);
+                        if is_atomic_field {
+                            self.lock_or_copy_atomic(inline_ordering);
+                        }
+                    }
+                }
             }
         }
     }
@@ -395,13 +409,21 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
         is_pointer_field: bool,
         next_field_type: Value<'scope, 'data>,
     ) {
-        if is_pointer_field {
-            self.get_pointer_field(true, next_field_type);
-        } else if let Ok(un) = next_field_type.cast::<Union>() {
-            self.get_bits_union_field(un);
-        } else {
-            debug_assert!(next_field_type.is::<DataType>());
-            self.current_field_type = Some(next_field_type.cast_unchecked::<DataType>().as_weak());
+        unsafe {
+            if is_pointer_field {
+                self.get_pointer_field(true, next_field_type);
+            } else {
+                match next_field_type.cast::<Union>() {
+                    Ok(un) => {
+                        self.get_bits_union_field(un);
+                    }
+                    _ => {
+                        debug_assert!(next_field_type.is::<DataType>());
+                        self.current_field_type =
+                            Some(next_field_type.cast_unchecked::<DataType>().as_weak());
+                    }
+                }
+            }
         }
     }
 
@@ -411,202 +433,220 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
         is_pointer_field: bool,
         next_field_type: Value<'scope, 'data>,
     ) -> JlrsResult<()> {
-        // Inline field of the current array
-        if is_pointer_field {
-            self.value = self
-                .value
-                .unwrap()
-                .as_value()
-                .cast::<Array>()?
-                .data_ptr()
-                .cast::<MaybeUninit<u8>>()
-                .add(self.offset as usize)
-                .cast::<Option<WeakValue>>()
-                .read();
+        unsafe {
+            // Inline field of the current array
+            if is_pointer_field {
+                self.value = self
+                    .value
+                    .unwrap()
+                    .as_value()
+                    .cast::<Array>()?
+                    .data_ptr()
+                    .cast::<MaybeUninit<u8>>()
+                    .add(self.offset as usize)
+                    .cast::<Option<WeakValue>>()
+                    .read();
 
-            self.offset = 0;
-            self.state = ViewState::Unlocked;
+                self.offset = 0;
+                self.state = ViewState::Unlocked;
 
-            if self.value.is_none() {
-                if let Ok(ty) = next_field_type.cast::<DataType>() {
-                    if ty.is_concrete_type() {
-                        self.current_field_type = Some(ty.as_weak());
-                    } else {
-                        self.current_field_type = None;
+                if self.value.is_none() {
+                    match next_field_type.cast::<DataType>() {
+                        Ok(ty) => {
+                            if ty.is_concrete_type() {
+                                self.current_field_type = Some(ty.as_weak());
+                            } else {
+                                self.current_field_type = None;
+                            }
+                        }
+                        _ => {
+                            self.current_field_type = None;
+                        }
                     }
                 } else {
-                    self.current_field_type = None;
+                    self.current_field_type =
+                        Some(self.value.unwrap().as_value().datatype().as_weak());
                 }
             } else {
-                self.current_field_type = Some(self.value.unwrap().as_value().datatype().as_weak());
+                self.current_field_type = Some(next_field_type.cast::<DataType>()?.as_weak());
             }
-        } else {
-            self.current_field_type = Some(next_field_type.cast::<DataType>()?.as_weak());
-        }
 
-        Ok(())
+            Ok(())
+        }
     }
 
     // Safety: must only be used to read an atomic field
     unsafe fn lock_or_copy_atomic(&mut self, ordering: Ordering) {
-        let ptr = self
-            .value
-            .unwrap()
-            .ptr()
-            .cast::<MaybeUninit<u8>>()
-            .as_ptr()
-            .add(self.offset as usize);
+        unsafe {
+            let ptr = self
+                .value
+                .unwrap()
+                .ptr()
+                .cast::<MaybeUninit<u8>>()
+                .as_ptr()
+                .add(self.offset as usize);
 
-        match self
-            .current_field_type
-            .unwrap()
-            .as_managed()
-            .size()
-            .unwrap_or(std::mem::size_of::<usize>() as _)
-        {
-            0 => (),
-            1 => {
-                let atomic = &*ptr.cast::<AtomicU8>();
-                let v = atomic.load(ordering);
-                let dst_ptr = self.buffer.bytes.as_mut_ptr();
-                std::ptr::copy_nonoverlapping(&v as *const _ as *const u8, dst_ptr as _, 1);
-                self.state = ViewState::AtomicBuffer;
-                self.offset = 0;
-            }
-            2 => {
-                let atomic = &*ptr.cast::<AtomicU16>();
-                let v = atomic.load(ordering);
-                let dst_ptr = self.buffer.bytes.as_mut_ptr();
-                std::ptr::copy_nonoverlapping(&v as *const _ as *const u8, dst_ptr as _, 2);
-                self.state = ViewState::AtomicBuffer;
-                self.offset = 0;
-            }
-            sz if sz <= 4 => {
-                let atomic = &*ptr.cast::<AtomicU32>();
-                let v = atomic.load(ordering);
-                let dst_ptr = self.buffer.bytes.as_mut_ptr();
-                std::ptr::copy_nonoverlapping(
-                    &v as *const _ as *const u8,
-                    dst_ptr as _,
-                    sz as usize,
-                );
-                self.state = ViewState::AtomicBuffer;
-                self.offset = 0;
-            }
-            sz if sz <= 8 => {
-                let atomic = &*ptr.cast::<AtomicU64>();
-                let v = atomic.load(ordering);
-                let dst_ptr = self.buffer.bytes.as_mut_ptr();
-                std::ptr::copy_nonoverlapping(
-                    &v as *const _ as *const u8,
-                    dst_ptr as _,
-                    sz as usize,
-                );
-                self.state = ViewState::AtomicBuffer;
-                self.offset = 0;
-            }
-            #[cfg(not(any(julia_1_10, julia_1_11)))]
-            sz if sz <= 16 => {
-                let atomic = &*ptr.cast::<atomic::Atomic<u128>>();
-                let v = atomic.load(ordering);
-                let dst_ptr = self.buffer.bytes.as_mut_ptr();
-                std::ptr::copy_nonoverlapping(
-                    &v as *const _ as *const u8,
-                    dst_ptr as _,
-                    sz as usize,
-                );
-                self.state = ViewState::AtomicBuffer;
-                self.offset = 0;
-            }
-            _ => {
-                jlrs_lock_value(self.value.unwrap().ptr().as_ptr());
-                self.state = ViewState::Locked;
+            match self
+                .current_field_type
+                .unwrap()
+                .as_managed()
+                .size()
+                .unwrap_or(std::mem::size_of::<usize>() as _)
+            {
+                0 => (),
+                1 => {
+                    let atomic = &*ptr.cast::<AtomicU8>();
+                    let v = atomic.load(ordering);
+                    let dst_ptr = self.buffer.bytes.as_mut_ptr();
+                    std::ptr::copy_nonoverlapping(&v as *const _ as *const u8, dst_ptr as _, 1);
+                    self.state = ViewState::AtomicBuffer;
+                    self.offset = 0;
+                }
+                2 => {
+                    let atomic = &*ptr.cast::<AtomicU16>();
+                    let v = atomic.load(ordering);
+                    let dst_ptr = self.buffer.bytes.as_mut_ptr();
+                    std::ptr::copy_nonoverlapping(&v as *const _ as *const u8, dst_ptr as _, 2);
+                    self.state = ViewState::AtomicBuffer;
+                    self.offset = 0;
+                }
+                sz if sz <= 4 => {
+                    let atomic = &*ptr.cast::<AtomicU32>();
+                    let v = atomic.load(ordering);
+                    let dst_ptr = self.buffer.bytes.as_mut_ptr();
+                    std::ptr::copy_nonoverlapping(
+                        &v as *const _ as *const u8,
+                        dst_ptr as _,
+                        sz as usize,
+                    );
+                    self.state = ViewState::AtomicBuffer;
+                    self.offset = 0;
+                }
+                sz if sz <= 8 => {
+                    let atomic = &*ptr.cast::<AtomicU64>();
+                    let v = atomic.load(ordering);
+                    let dst_ptr = self.buffer.bytes.as_mut_ptr();
+                    std::ptr::copy_nonoverlapping(
+                        &v as *const _ as *const u8,
+                        dst_ptr as _,
+                        sz as usize,
+                    );
+                    self.state = ViewState::AtomicBuffer;
+                    self.offset = 0;
+                }
+                #[cfg(not(any(julia_1_10, julia_1_11)))]
+                sz if sz <= 16 => {
+                    let atomic = &*ptr.cast::<atomic::Atomic<u128>>();
+                    let v = atomic.load(ordering);
+                    let dst_ptr = self.buffer.bytes.as_mut_ptr();
+                    std::ptr::copy_nonoverlapping(
+                        &v as *const _ as *const u8,
+                        dst_ptr as _,
+                        sz as usize,
+                    );
+                    self.state = ViewState::AtomicBuffer;
+                    self.offset = 0;
+                }
+                _ => {
+                    jlrs_lock_value(self.value.unwrap().ptr().as_ptr());
+                    self.state = ViewState::Locked;
+                }
             }
         }
     }
 
     // Safety: must only be used to read an array element
     unsafe fn get_array_field(&mut self, arr: Array<'scope, 'data>, index: usize) {
-        debug_assert!(self.state == ViewState::Array);
-        let el_size = arr.element_size() as usize;
-        self.offset = (index * el_size) as u32;
+        unsafe {
+            debug_assert!(self.state == ViewState::Array);
+            let el_size = arr.element_size() as usize;
+            self.offset = (index * el_size) as u32;
 
-        if arr.has_value_layout() {
-            self.value = arr.data_ptr().cast::<Option<WeakValue>>().add(index).read();
-            self.offset = 0;
-            if self.value.is_none() {
-                if let Ok(ty) = arr.element_type().cast::<DataType>() {
-                    if ty.is_concrete_type() {
-                        self.current_field_type = Some(ty.as_weak());
-                    } else {
-                        self.current_field_type = None;
+            if arr.has_value_layout() {
+                self.value = arr.data_ptr().cast::<Option<WeakValue>>().add(index).read();
+                self.offset = 0;
+                if self.value.is_none() {
+                    match arr.element_type().cast::<DataType>() {
+                        Ok(ty) => {
+                            if ty.is_concrete_type() {
+                                self.current_field_type = Some(ty.as_weak());
+                            } else {
+                                self.current_field_type = None;
+                            }
+
+                            if !ty.is::<Array>() {
+                                self.state = ViewState::Unlocked;
+                            }
+                        }
+                        _ => {
+                            self.current_field_type = None;
+                            self.state = ViewState::Unlocked;
+                        }
                     }
-
+                } else {
+                    let ty = self.value.unwrap().as_value().datatype();
+                    self.current_field_type = Some(ty.as_weak());
                     if !ty.is::<Array>() {
                         self.state = ViewState::Unlocked;
                     }
-                } else {
-                    self.current_field_type = None;
-                    self.state = ViewState::Unlocked;
                 }
-            } else {
-                let ty = self.value.unwrap().as_value().datatype();
+            } else if arr.has_union_layout() {
+                let mut tag = *jlrs_array_typetagdata(arr.unwrap(Private)).add(index) as i32;
+                let component = nth_union_component(arr.element_type(), &mut tag);
+                debug_assert!(component.is_some());
+                let ty = component.unwrap_unchecked();
+                debug_assert!(ty.is::<DataType>());
+                let ty = ty.cast_unchecked::<DataType>();
+                debug_assert!(ty.is_concrete_type());
                 self.current_field_type = Some(ty.as_weak());
-                if !ty.is::<Array>() {
-                    self.state = ViewState::Unlocked;
-                }
+            } else {
+                let ty = arr.element_type();
+                debug_assert!(ty.is::<DataType>());
+                self.current_field_type = Some(ty.cast_unchecked::<DataType>().as_weak());
             }
-        } else if arr.has_union_layout() {
-            let mut tag = *jlrs_array_typetagdata(arr.unwrap(Private)).add(index) as i32;
-            let component = nth_union_component(arr.element_type(), &mut tag);
-            debug_assert!(component.is_some());
-            let ty = component.unwrap_unchecked();
-            debug_assert!(ty.is::<DataType>());
-            let ty = ty.cast_unchecked::<DataType>();
-            debug_assert!(ty.is_concrete_type());
-            self.current_field_type = Some(ty.as_weak());
-        } else {
-            let ty = arr.element_type();
-            debug_assert!(ty.is::<DataType>());
-            self.current_field_type = Some(ty.cast_unchecked::<DataType>().as_weak());
         }
     }
 
     // Safety: must only be used to read an pointer field
     unsafe fn get_pointer_field(&mut self, locked: bool, next_field_type: Value<'scope, 'data>) {
-        let value = self
-            .value
-            .unwrap()
-            .ptr()
-            .cast::<u8>()
-            .as_ptr()
-            .add(self.offset as usize)
-            .cast::<Option<WeakValue>>()
-            .read();
+        unsafe {
+            let value = self
+                .value
+                .unwrap()
+                .ptr()
+                .cast::<u8>()
+                .as_ptr()
+                .add(self.offset as usize)
+                .cast::<Option<WeakValue>>()
+                .read();
 
-        if locked {
-            jlrs_unlock_value(self.value.unwrap().ptr().as_ptr());
-            self.state = ViewState::Unlocked;
-        }
+            if locked {
+                jlrs_unlock_value(self.value.unwrap().ptr().as_ptr());
+                self.state = ViewState::Unlocked;
+            }
 
-        self.value = value;
-        self.offset = 0;
+            self.value = value;
+            self.offset = 0;
 
-        if self.value.is_none() {
-            if let Ok(ty) = next_field_type.cast::<DataType>() {
-                if ty.is_concrete_type() {
-                    self.current_field_type = Some(ty.as_weak());
-                } else {
-                    self.current_field_type = None;
+            if self.value.is_none() {
+                match next_field_type.cast::<DataType>() {
+                    Ok(ty) => {
+                        if ty.is_concrete_type() {
+                            self.current_field_type = Some(ty.as_weak());
+                        } else {
+                            self.current_field_type = None;
+                        }
+                    }
+                    _ => {
+                        self.current_field_type = None;
+                    }
                 }
             } else {
-                self.current_field_type = None;
-            }
-        } else {
-            let value = self.value.unwrap().as_value();
-            self.current_field_type = Some(value.datatype().as_weak());
-            if value.is::<Array>() {
-                self.state = ViewState::Array;
+                let value = self.value.unwrap().as_value();
+                self.current_field_type = Some(value.datatype().as_weak());
+                if value.is::<Array>() {
+                    self.state = ViewState::Array;
+                }
             }
         }
     }
@@ -617,66 +657,73 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
         next_field_type: Value<'scope, 'data>,
         ordering: Ordering,
     ) {
-        let v = &*self
-            .value
-            .unwrap()
-            .ptr()
-            .cast::<u8>()
-            .as_ptr()
-            .add(self.offset as usize)
-            .cast::<AtomicPtr<jl_value_t>>();
+        unsafe {
+            let v = &*self
+                .value
+                .unwrap()
+                .ptr()
+                .cast::<u8>()
+                .as_ptr()
+                .add(self.offset as usize)
+                .cast::<AtomicPtr<jl_value_t>>();
 
-        let ptr = v.load(ordering);
-        if ptr.is_null() {
-            self.value = None;
-        } else {
-            self.value = Some(WeakValue::wrap(NonNull::new_unchecked(ptr)));
-        }
+            let ptr = v.load(ordering);
+            if ptr.is_null() {
+                self.value = None;
+            } else {
+                self.value = Some(WeakValue::wrap(NonNull::new_unchecked(ptr)));
+            }
 
-        self.offset = 0;
+            self.offset = 0;
 
-        if self.value.is_none() {
-            if let Ok(ty) = next_field_type.cast::<DataType>() {
-                if ty.is_concrete_type() {
-                    self.current_field_type = Some(ty.as_weak());
-                } else {
-                    self.current_field_type = None;
+            if self.value.is_none() {
+                match next_field_type.cast::<DataType>() {
+                    Ok(ty) => {
+                        if ty.is_concrete_type() {
+                            self.current_field_type = Some(ty.as_weak());
+                        } else {
+                            self.current_field_type = None;
+                        }
+                    }
+                    _ => {
+                        self.current_field_type = None;
+                    }
                 }
             } else {
-                self.current_field_type = None;
-            }
-        } else {
-            let value = self.value.unwrap().as_value();
-            self.current_field_type = Some(value.datatype().as_weak());
-            if value.is::<Array>() {
-                self.state = ViewState::Array;
+                let value = self.value.unwrap().as_value();
+                self.current_field_type = Some(value.datatype().as_weak());
+                if value.is::<Array>() {
+                    self.state = ViewState::Array;
+                }
             }
         }
     }
 
     // Safety: must only be used to read a bits union field
     unsafe fn get_bits_union_field(&mut self, union: Union<'scope>) {
-        let mut size = 0;
-        let isbits = union.isbits_size_align(&mut size, &mut 0);
-        debug_assert!(isbits);
-        let flag_offset = self.offset as usize + size;
-        let mut flag = self
-            .value
-            .unwrap()
-            .ptr()
-            .cast::<u8>()
-            .as_ptr()
-            .add(flag_offset)
-            .read() as i32;
+        unsafe {
+            let mut size = 0;
+            let isbits = union.isbits_size_align(&mut size, &mut 0);
+            debug_assert!(isbits);
+            let flag_offset = self.offset as usize + size;
+            let mut flag = self
+                .value
+                .unwrap()
+                .ptr()
+                .cast::<u8>()
+                .as_ptr()
+                .add(flag_offset)
+                .read() as i32;
 
-        let active_ty = nth_union_component(union.as_value(), &mut flag);
-        debug_assert!(active_ty.is_some());
-        let active_ty = active_ty.unwrap_unchecked();
-        debug_assert!(active_ty.is::<DataType>());
+            let active_ty = nth_union_component(union.as_value(), &mut flag);
+            debug_assert!(active_ty.is_some());
+            let active_ty = active_ty.unwrap_unchecked();
+            debug_assert!(active_ty.is::<DataType>());
 
-        let ty = active_ty.cast_unchecked::<DataType>();
-        debug_assert!(ty.is_concrete_type());
-        self.current_field_type = Some(ty.as_weak());
+            let ty = active_ty.cast_unchecked::<DataType>();
+            debug_assert!(ty.is_concrete_type());
+            self.current_field_type = Some(ty.as_weak());
+        }
     }
 }
 
@@ -700,13 +747,13 @@ mod private {
     use crate::{
         convert::to_symbol::private::ToSymbolPriv,
         data::managed::{
-            array::{dimensions::Dims, Array},
+            Managed,
+            array::{Array, dimensions::Dims},
             datatype::DataType,
             string::JuliaString,
             symbol::Symbol,
-            Managed,
         },
-        error::{AccessError, JlrsResult, CANNOT_DISPLAY_TYPE, CANNOT_DISPLAY_VALUE},
+        error::{AccessError, CANNOT_DISPLAY_TYPE, CANNOT_DISPLAY_VALUE, JlrsResult},
         private::Private,
     };
 

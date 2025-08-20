@@ -9,8 +9,8 @@ repository = "https://github.com/Taaitaaiger/jlrs"
 readme = "../README.md"
 keywords = ["Julia", "math", "mathematics", "bindings", "ffi"]
 license = "MIT"
-edition = "2021"
-rust-version = "1.79"
+edition = "2024"
+rust-version = "1.85"
 
 [features]
 

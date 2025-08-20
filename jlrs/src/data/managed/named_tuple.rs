@@ -4,7 +4,7 @@
 //! provided when necessary. A `NamedTuple` should be created with the [`named_tuple`] macro,
 //! several functions and methods are provided to create named tuples in more specialized cases,
 //! and create new instances that add and/or remove pairs.
-//! 
+//!
 //! [`named_tuple`]: crate::named_tuple
 
 use std::{fmt, marker::PhantomData, ptr::NonNull};
@@ -18,12 +18,12 @@ use crate::{
     convert::to_symbol::ToSymbol,
     data::{
         layout::tuple::{NTuple, Tuple},
-        managed::{private::ManagedPriv, type_name::TypeName, union_all::UnionAll, Weak},
+        managed::{Weak, private::ManagedPriv, type_name::TypeName, union_all::UnionAll},
         types::{construct_type::ConstructType, typecheck::Typecheck},
     },
     memory::{
         scope::LocalScopeExt,
-        target::{unrooted::Unrooted, TargetResult, TargetType},
+        target::{TargetResult, TargetType, unrooted::Unrooted},
     },
     prelude::{DataType, Managed, Symbol, Target, Value, ValueData},
     private::Private,
@@ -66,13 +66,13 @@ use crate::{
 /// # }
 #[macro_export]
 macro_rules! named_tuple {
-    ($frame:expr, $name:expr => $value:expr) => {
+    ($frame:expr_2021, $name:expr_2021 => $value:expr_2021) => {
         {
             let name = $crate::convert::to_symbol::ToSymbol::to_symbol(&$name, &$frame);
             $crate::data::managed::named_tuple::NamedTuple::from_n_pairs($frame, &[(name, $value)])
         }
     };
-    ($frame:expr, $name:expr => $value:expr, $($rest:tt)+) => {
+    ($frame:expr_2021, $name:expr_2021 => $value:expr_2021, $($rest:tt)+) => {
         {
             const N: usize = $crate::count!($($rest)+);
             let mut pairs: [::std::mem::MaybeUninit::<($crate::data::managed::symbol::Symbol, $crate::data::managed::value::Value)>; N] = [::std::mem::MaybeUninit::uninit(); N];
@@ -82,14 +82,14 @@ macro_rules! named_tuple {
             $crate::named_tuple!($frame, 1, &mut pairs, $($rest)+)
         }
     };
-    ($frame:expr, $i:expr, $pairs:expr, $name:expr => $value:expr, $($rest:tt)+) => {
+    ($frame:expr_2021, $i:expr_2021, $pairs:expr_2021, $name:expr_2021 => $value:expr_2021, $($rest:tt)+) => {
         {
             let name = $crate::convert::to_symbol::ToSymbol::to_symbol(&$name, &$frame);
             $pairs[$i].write((name, $value));
             $crate::named_tuple!($frame, $i + 1, $pairs, $($rest)+)
         }
     };
-    ($frame:expr, $i:expr, $pairs:expr, $name:expr => $value:expr) => {
+    ($frame:expr_2021, $i:expr_2021, $pairs:expr_2021, $name:expr_2021 => $value:expr_2021) => {
         {
             let name = $crate::convert::to_symbol::ToSymbol::to_symbol(&$name, &$frame);
             $pairs[$i].write((name, $value));

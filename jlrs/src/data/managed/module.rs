@@ -15,9 +15,8 @@ use jl_sys::{
 use rustc_hash::FxHashMap;
 
 use super::{
-    erase_scope_lifetime,
+    Managed, Weak, erase_scope_lifetime,
     value::{ValueData, ValueResult, ValueUnbound},
-    Managed, Weak,
 };
 use crate::{
     call::Call,
@@ -34,43 +33,24 @@ use crate::{
     gc_safe::GcSafeOnceLock,
     impl_julia_typecheck, inline_static_ref,
     memory::{
-        target::{Target, TargetException, TargetResult},
         PTls,
+        target::{Target, TargetException, TargetResult},
     },
     prelude::DataType,
     private::Private,
 };
 
-#[rustversion::before(1.85)]
-type CacheImpl =
-    crate::gc_safe::GcSafeOnceLock<Cache<FxHashMap<Box<[u8]>, (TypeId, ValueUnbound)>>>;
-#[rustversion::since(1.85)]
 type CacheImpl = Cache<FxHashMap<Box<[u8]>, (TypeId, ValueUnbound)>>;
 
-#[rustversion::before(1.85)]
-static CACHE: CacheImpl = CacheImpl::new();
-#[rustversion::since(1.85)]
 static CACHE: CacheImpl = CacheImpl::new({
     let hasher = rustc_hash::FxBuildHasher;
     std::collections::HashMap::with_hasher(hasher)
 });
 
-#[rustversion::before(1.85)]
-pub(crate) unsafe fn init_global_cache() {
-    CACHE.set(Default::default()).ok();
-}
-
-#[rustversion::since(1.85)]
-pub(crate) unsafe fn init_global_cache() {}
-
-#[rustversion::before(1.85)]
 pub(crate) unsafe fn mark_global_cache(ptls: PTls, full: bool) {
-    CACHE.get().map(|cache| cache.mark(ptls, full));
-}
-
-#[rustversion::since(1.85)]
-pub(crate) unsafe fn mark_global_cache(ptls: PTls, full: bool) {
-    CACHE.mark(ptls, full);
+    unsafe {
+        CACHE.mark(ptls, full);
+    }
 }
 
 /// Functionality in Julia can be accessed through its module system. You can get a handle to the
@@ -120,78 +100,80 @@ impl<'scope> Module<'scope> {
         S: AsRef<str>,
         Tgt: Target<'target>,
     {
-        let tid = T::type_id();
-        let cache = &CACHE.get_unchecked();
+        unsafe {
+            let tid = T::type_id();
+            let cache = &CACHE.get_unchecked();
 
-        let path = path.as_ref();
-        let res = cache.read(|cache| -> JlrsResult<Option<_>> {
-            if let Some(cached) = cache.cache().get(path.as_bytes()) {
-                if cached.0 == tid {
-                    return Ok(Some(cached.1.cast_unchecked()));
-                } else {
-                    let ty = T::construct_type(target).as_value();
-                    Err(TypeError::NotA {
-                        value: cached.1.display_string_or("<Cannot display value>"),
-                        field_type: ty.display_string_or("<Cannot display type>"),
-                    })?
+            let path = path.as_ref();
+            let res = cache.read(|cache| -> JlrsResult<Option<_>> {
+                if let Some(cached) = cache.cache().get(path.as_bytes()) {
+                    if cached.0 == tid {
+                        return Ok(Some(cached.1.cast_unchecked()));
+                    } else {
+                        let ty = T::construct_type(target).as_value();
+                        Err(TypeError::NotA {
+                            value: cached.1.display_string_or("<Cannot display value>"),
+                            field_type: ty.display_string_or("<Cannot display type>"),
+                        })?
+                    }
                 }
+                Ok(None)
+            })?;
+
+            if let Some(res) = res {
+                return Ok(res);
             }
-            Ok(None)
-        })?;
 
-        if let Some(res) = res {
-            return Ok(res);
-        }
+            let mut parts = path.split('.');
+            let n_parts = parts.clone().count();
+            let module_name = parts.next().unwrap();
 
-        let mut parts = path.split('.');
-        let n_parts = parts.clone().count();
-        let module_name = parts.next().unwrap();
-
-        let mut module = match module_name {
-            "Main" => Module::main(&target),
-            "Base" => Module::base(&target),
-            "Core" => Module::core(&target),
-            "JlrsCore" => Module::jlrs_core(&target),
-            module => {
-                if let Some(module) = Module::package_root_module(&target, module) {
-                    module
-                } else {
-                    Err(AccessError::ModuleNotFound {
-                        module: module_name.into(),
-                    })?
+            let mut module = match module_name {
+                "Main" => Module::main(&target),
+                "Base" => Module::base(&target),
+                "Core" => Module::core(&target),
+                "JlrsCore" => Module::jlrs_core(&target),
+                module => {
+                    if let Some(module) = Module::package_root_module(&target, module) {
+                        module
+                    } else {
+                        Err(AccessError::ModuleNotFound {
+                            module: module_name.into(),
+                        })?
+                    }
                 }
-            }
-        };
+            };
 
-        let item = match n_parts {
-            1 => module.as_value().cast::<T>()?,
-            2 => module
-                .global(&target, parts.next().unwrap())?
-                .as_value()
-                .cast::<T>()?,
-            n => {
-                for _ in 1..n - 1 {
-                    module = module
-                        .submodule(&target, parts.next().unwrap())?
-                        .as_managed();
-                }
-
-                module
+            let item = match n_parts {
+                1 => module.as_value().cast::<T>()?,
+                2 => module
                     .global(&target, parts.next().unwrap())?
                     .as_value()
-                    .cast::<T>()?
-            }
-        };
+                    .cast::<T>()?,
+                n => {
+                    for _ in 1..n - 1 {
+                        module = module
+                            .submodule(&target, parts.next().unwrap())?
+                            .as_managed();
+                    }
 
-        cache.write(|cache| {
-            cache.roots_mut().insert(item.as_value());
-            cache.cache_mut().insert(
-                path.as_bytes().into(),
-                (tid, erase_scope_lifetime(item.as_value())),
-            );
-        });
+                    module
+                        .global(&target, parts.next().unwrap())?
+                        .as_value()
+                        .cast::<T>()?
+                }
+            };
 
-        Ok(item)
+            cache.write(|cache| {
+                cache.roots_mut().insert(item.as_value());
+                cache.cache_mut().insert(
+                    path.as_bytes().into(),
+                    (tid, erase_scope_lifetime(item.as_value())),
+                );
+            });
+
+            Ok(item)
+        }
     }
 
     /// Returns a handle to Julia's `Main`-module. If you include your own Julia code with
@@ -223,7 +205,9 @@ impl<'scope> Module<'scope> {
     #[inline]
     pub fn jlrs_core<Tgt: Target<'scope>>(target: &Tgt) -> Self {
         // This won't be called until jlrs has been initialized, which loads the JlrsCore module.
-        static JLRS_CORE: StaticRef<Module> = StaticRef::new("Base.loaded_modules[Base.PkgId(Base.UUID(\"29be08bc-e5fd-4da2-bbc1-72011c6ea2c9\"), \"JlrsCore\")]");
+        static JLRS_CORE: StaticRef<Module> = StaticRef::new(
+            "Base.loaded_modules[Base.PkgId(Base.UUID(\"29be08bc-e5fd-4da2-bbc1-72011c6ea2c9\"), \"JlrsCore\")]",
+        );
         unsafe { JLRS_CORE.get_or_eval(target) }
     }
 
@@ -297,18 +281,20 @@ impl<'scope> Module<'scope> {
         N: ToSymbol,
         Tgt: Target<'target>,
     {
-        let symbol = name.to_symbol_priv(Private);
+        unsafe {
+            let symbol = name.to_symbol_priv(Private);
 
-        let callback = || {
-            jl_set_global(
-                self.unwrap(Private),
-                symbol.unwrap(Private),
-                value.unwrap(Private),
-            )
-        };
+            let callback = || {
+                jl_set_global(
+                    self.unwrap(Private),
+                    symbol.unwrap(Private),
+                    value.unwrap(Private),
+                )
+            };
 
-        let res = catch_exceptions(callback, unwrap_exc);
-        target.exception_from_ptr(res, Private)
+            let res = catch_exceptions(callback, unwrap_exc);
+            target.exception_from_ptr(res, Private)
+        }
     }
 
     /// Set a global value in this module. Creating new globals at runtime is not supported for
@@ -321,13 +307,15 @@ impl<'scope> Module<'scope> {
     where
         N: ToSymbol,
     {
-        let symbol = name.to_symbol_priv(Private);
+        unsafe {
+            let symbol = name.to_symbol_priv(Private);
 
-        jl_set_global(
-            self.unwrap(Private),
-            symbol.unwrap(Private),
-            value.unwrap(Private),
-        );
+            jl_set_global(
+                self.unwrap(Private),
+                symbol.unwrap(Private),
+                value.unwrap(Private),
+            );
+        }
     }
 
     /// Set a constant in this module.
@@ -381,24 +369,26 @@ impl<'scope> Module<'scope> {
     where
         N: ToSymbol,
     {
-        let symbol = name.to_symbol_priv(Private);
+        unsafe {
+            let symbol = name.to_symbol_priv(Private);
 
-        #[cfg(any(julia_1_10, julia_1_11))]
-        jl_sys::bindings::jl_set_const(
-            self.unwrap(Private),
-            symbol.unwrap(Private),
-            value.unwrap(Private),
-        );
+            #[cfg(any(julia_1_10, julia_1_11))]
+            jl_sys::bindings::jl_set_const(
+                self.unwrap(Private),
+                symbol.unwrap(Private),
+                value.unwrap(Private),
+            );
 
-        #[cfg(not(any(julia_1_10, julia_1_11)))]
-        jl_sys::bindings::jlrs_declare_constant_val(
-            null_mut(),
-            self.unwrap(Private),
-            symbol.unwrap(Private),
-            value.unwrap(Private),
-        );
+            #[cfg(not(any(julia_1_10, julia_1_11)))]
+            jl_sys::bindings::jlrs_declare_constant_val(
+                null_mut(),
+                self.unwrap(Private),
+                symbol.unwrap(Private),
+                value.unwrap(Private),
+            );
 
-        Value::wrap_non_null(value.unwrap_non_null(Private), Private)
+            Value::wrap_non_null(value.unwrap_non_null(Private), Private)
+        }
     }
 
     /// Returns the global named `name` in this module.
@@ -496,12 +486,14 @@ impl<'scope> Module<'scope> {
         Tgt: Target<'target>,
         N: ToSymbol,
     {
-        Module::typed_global_cached::<Value, _, _>(&target, "Base.require")
-            .unwrap()
-            .call(
-                target,
-                [self.as_value(), module.to_symbol_priv(Private).as_value()],
-            )
+        unsafe {
+            Module::typed_global_cached::<Value, _, _>(&target, "Base.require")
+                .unwrap()
+                .call(
+                    target,
+                    [self.as_value(), module.to_symbol_priv(Private).as_value()],
+                )
+        }
     }
 }
 

@@ -160,9 +160,11 @@ mod tests {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
                 stack.scope(|mut frame| {
-                    assert!(Module::main(&frame)
-                        .submodule(&mut frame, "JlrsTests".to_string())
-                        .is_ok());
+                    assert!(
+                        Module::main(&frame)
+                            .submodule(&mut frame, "JlrsTests".to_string())
+                            .is_ok()
+                    );
                 })
             })
         })
@@ -172,9 +174,11 @@ mod tests {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
                 stack.scope(|mut frame| {
-                    assert!(Module::main(&frame)
-                        .submodule(&mut frame, Cow::from("JlrsTests"))
-                        .is_ok());
+                    assert!(
+                        Module::main(&frame)
+                            .submodule(&mut frame, Cow::from("JlrsTests"))
+                            .is_ok()
+                    );
                 })
             })
         })
@@ -192,9 +196,11 @@ mod tests {
             handle.borrow_mut().with_stack(|mut stack| {
                 stack.scope(|mut frame| {
                     let name = MyString("JlrsTests".to_string());
-                    assert!(Module::main(&frame)
-                        .submodule(&mut frame, &name as &dyn AsRef<str>)
-                        .is_ok());
+                    assert!(
+                        Module::main(&frame)
+                            .submodule(&mut frame, &name as &dyn AsRef<str>)
+                            .is_ok()
+                    );
                 })
             })
         })
@@ -220,9 +226,11 @@ mod tests {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {
                 stack.scope(|mut frame| unsafe {
-                    assert!(Module::main(&frame)
-                        .global(&mut frame, "Hermitian")
-                        .is_err());
+                    assert!(
+                        Module::main(&frame)
+                            .global(&mut frame, "Hermitian")
+                            .is_err()
+                    );
                     Value::eval_string(&mut frame, "using LinearAlgebra: Hermitian").unwrap();
                     assert!(Module::main(&frame).global(&mut frame, "Hermitian").is_ok());
                 });

@@ -1,12 +1,12 @@
 use itertools::Itertools;
 use quote::format_ident;
 use syn::{
+    Attribute, Expr, FnArg, Ident, ItemFn, Result, Signature, Token,
     parse::{Parse, ParseStream},
     parse_quote, parse_quote_spanned,
     punctuated::Punctuated,
     spanned::Spanned,
     token::Comma,
-    Attribute, Expr, FnArg, Ident, ItemFn, Result, Signature, Token,
 };
 
 use super::{
@@ -17,10 +17,10 @@ use super::{
     override_module_fragment, return_type_fragments,
 };
 use crate::{
-    module::{
-        as_return_as, take_type, Apply, ParameterEnvironment, ParameterList, RenameFragments,
-    },
     JuliaModule,
+    module::{
+        Apply, ParameterEnvironment, ParameterList, RenameFragments, as_return_as, take_type,
+    },
 };
 
 pub struct ExportedFunction {
@@ -127,8 +127,10 @@ impl ExportedFunction {
             let span = self.func.span();
             let invoke_fn: ItemFn = parse_quote_spanned! {
                 span=> unsafe extern "C" fn invoke(#args) #new_ret_ty {
-                    let res = #call_expr;
-                    <#ret_ty as ::jlrs::convert::ccall_types::CCallReturn>::return_or_throw(res)
+                    unsafe {
+                        let res = #call_expr;
+                        <#ret_ty as ::jlrs::convert::ccall_types::CCallReturn>::return_or_throw(res)
+                    }
                 }
             };
 
@@ -368,8 +370,10 @@ fn function_info_fragment(
     let span = info.func.span();
     let invoke_fn: ItemFn = parse_quote_spanned! {
         span=> unsafe extern "C" fn invoke(#args) #new_ret_ty {
-            let res = #call_expr;
-            <#ret_ty as ::jlrs::convert::ccall_types::CCallReturn>::return_or_throw(res)
+            unsafe {
+                let res = #call_expr;
+                <#ret_ty as ::jlrs::convert::ccall_types::CCallReturn>::return_or_throw(res)
+            }
         }
     };
 

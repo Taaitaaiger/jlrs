@@ -30,7 +30,7 @@ use super::valid_layout::{ValidField, ValidLayout};
 use crate::{
     data::{
         managed::{
-            datatype::DataType, private::ManagedPriv as _, union::Union, value::Value, Managed,
+            Managed, datatype::DataType, private::ManagedPriv as _, union::Union, value::Value,
         },
         types::{construct_type::ConstructType, typecheck::Typecheck},
     },
@@ -257,7 +257,7 @@ unsafe impl Flag for u8 {}
 mod private {
     use std::fmt::Debug;
 
-    use super::{Align1, Align16, Align2, Align4, Align8, BitsUnion, TypedBitsUnion};
+    use super::{Align1, Align2, Align4, Align8, Align16, BitsUnion, TypedBitsUnion};
     use crate::data::types::construct_type::ConstructType;
 
     pub trait AlignPriv: Copy + Debug {}

@@ -17,7 +17,7 @@ use jl_sys::jl_string_type;
 use super::abstract_type::AbstractType;
 use crate::{
     convert::into_julia::IntoJulia,
-    data::managed::{datatype::DataType, type_name::TypeName, union_all::UnionAll, Managed},
+    data::managed::{Managed, datatype::DataType, type_name::TypeName, union_all::UnionAll},
     memory::target::unrooted::Unrooted,
     prelude::LocalScope,
 };
@@ -60,7 +60,7 @@ unsafe impl<A: AbstractType> Typecheck for AbstractTypecheck<A> {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! impl_julia_typecheck {
-    ($type:ty, $jl_type:expr, $($lt:lifetime),+) => {
+    ($type:ty, $jl_type:expr_2021, $($lt:lifetime),+) => {
         unsafe impl<$($lt),+> crate::data::types::typecheck::Typecheck for $type {
             #[inline]
             fn typecheck(t: $crate::data::managed::datatype::DataType) -> bool {
@@ -70,7 +70,7 @@ macro_rules! impl_julia_typecheck {
             }
         }
     };
-    ($type:ty, $jl_type:expr) => {
+    ($type:ty, $jl_type:expr_2021) => {
         unsafe impl crate::data::types::typecheck::Typecheck for $type {
             #[inline]
             fn typecheck(t: $crate::data::managed::datatype::DataType) -> bool {
