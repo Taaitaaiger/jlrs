@@ -63,7 +63,7 @@ pub unsafe trait Unbox {
     /// the data that `value` points to.
     #[inline]
     unsafe fn unbox(value: Value) -> Self::Output {
-        unsafe { value.data_ptr().cast::<Self::Output>().as_ref().clone() }
+        unsafe { value.data_ptr().cast::<Self::Output>().read() }
     }
 }
 

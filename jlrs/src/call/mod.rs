@@ -160,11 +160,10 @@
 //!     // Access the function in the `Main` module and provide it with our keyword arguments:
 //!     let func = Module::main(&frame)
 //!         .global(&mut frame, "my_kw_func")
-//!         .expect("cannot find `my_kw_func` in `Main` module")
-//!         .provide_keywords(kws);
+//!         .expect("cannot find `my_kw_func` in `Main` module");
 //!
 //!     // Positional arguments are provided via `call[n]`:
-//!     let res = unsafe { func.call(&mut frame, [x]).expect("unexpected exception") };
+//!     let res = unsafe { func.call_kw(&mut frame, [x], kws).expect("unexpected exception") };
 //!     let unboxed = res.unbox::<isize>().expect("wrong type");
 //!
 //!     assert_eq!(unboxed, 4);
@@ -292,11 +291,13 @@ use crate::{
 };
 
 /// A function and its keyword arguments.
+#[deprecated = "Use one of the methods from Call or AsyncCall that takes keyword arguments"]
 pub struct WithKeywords<'scope, 'data> {
     func: Value<'scope, 'data>,
     keywords: NamedTuple<'scope, 'data>,
 }
 
+#[allow(deprecated)]
 impl<'scope, 'data> WithKeywords<'scope, 'data> {
     pub(crate) fn new(func: Value<'scope, 'data>, keywords: NamedTuple<'scope, 'data>) -> Self {
         WithKeywords { func, keywords }
@@ -438,6 +439,16 @@ pub trait Call<'data>: private::CallPriv {
         V: Values<'value, 'data, N>,
         Tgt: Target<'target>;
 
+    unsafe fn call_kw<'target, 'value, V, Tgt, const N: usize>(
+        self,
+        target: Tgt,
+        args: V,
+        kwargs: NamedTuple<'_, 'data>,
+    ) -> ValueResult<'target, 'data, Tgt>
+    where
+        V: Values<'value, 'data, N>,
+        Tgt: Target<'target>;
+
     /// Call a function with any number of arguments. Exceptions are not caught.
     ///
     /// Other `call`-methods use a try-catch block internally to
@@ -457,6 +468,7 @@ pub trait Call<'data>: private::CallPriv {
 }
 
 /// Provide keyword arguments to a Julia function.
+#[deprecated = "Use one of the methods from Call or AsyncCall that takes keyword arguments"]
 pub trait ProvideKeywords<'value, 'data>: Call<'data> {
     /// Provide keyword arguments to the function. The keyword arguments must be a `NamedTuple`.
     ///
@@ -480,8 +492,7 @@ pub trait ProvideKeywords<'value, 'data>: Call<'data> {
     ///         // Call the previously defined function. This function simply sums its three
     ///         // keyword arguments and has no side effects, so it's safe to call.
     ///         let res = unsafe {
-    ///             func.provide_keywords(nt)
-    ///                 .call(&mut frame, [])? // 5
+    ///             func.call_kw(&mut frame, [], nt)? // 5
     ///                 .unbox::<isize>()?
     ///         };
     ///
@@ -489,9 +500,12 @@ pub trait ProvideKeywords<'value, 'data>: Call<'data> {
     ///         JlrsResult::Ok(())
     ///     }).unwrap();
     /// # }
+    #[deprecated = "Use one of the methods from Call or AsyncCall that takes keyword arguments"]
+    #[allow(deprecated)]
     fn provide_keywords(self, keywords: NamedTuple<'value, 'data>) -> WithKeywords<'value, 'data>;
 }
 
+#[allow(deprecated)]
 impl<'data> Call<'data> for WithKeywords<'_, 'data> {
     #[inline]
     unsafe fn call<'target, 'value, V, Tgt, const N: usize>(
@@ -554,12 +568,28 @@ impl<'data> Call<'data> for WithKeywords<'_, 'data> {
             target.data_from_ptr(NonNull::new_unchecked(res), Private)
         }
     }
+
+    #[inline]
+    unsafe fn call_kw<'target, 'value, V, Tgt, const N: usize>(
+        self,
+        _target: Tgt,
+        _args: V,
+        _kwargs: NamedTuple<'_, 'data>,
+    ) -> ValueResult<'target, 'data, Tgt>
+    where
+        V: Values<'value, 'data, N>,
+        Tgt: Target<'target>,
+    {
+        unimplemented!("WithKeywords cannot take additional keyword arguments")
+    }
 }
 
 mod private {
+    #[allow(deprecated)]
     use super::WithKeywords;
     use crate::data::managed::value::Value;
     pub trait CallPriv: Sized {}
+    #[allow(deprecated)]
     impl CallPriv for WithKeywords<'_, '_> {}
     impl CallPriv for Value<'_, '_> {}
 }

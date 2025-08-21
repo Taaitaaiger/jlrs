@@ -225,6 +225,8 @@ pub mod globals {
 
 /// Functions from libjulia used by jlrs
 pub mod functions {
+    use crate::jl_gcframe_t;
+
     #[cfg_attr(
         all(
             any(windows, target_os = "windows", feature = "windows"),
@@ -236,6 +238,8 @@ pub mod functions {
         pub fn jl_gc_enable(on: std::ffi::c_int) -> std::ffi::c_int;
 
         pub fn jl_gc_is_enabled() -> std::ffi::c_int;
+
+        pub fn jl_get_pgcstack() -> *mut *mut jl_gcframe_t;
 
         pub fn jl_gc_collect(arg0: crate::types::jl_gc_collection_t);
 
@@ -807,6 +811,11 @@ pub mod jlrs_cc {
             ty: *mut crate::types::jl_datatype_t,
         ) -> *mut crate::types::jl_svec_t;
 
+        pub fn jlrs_datatype_parameter(
+            ty: *mut crate::types::jl_datatype_t,
+            n: usize,
+        ) -> *mut crate::types::jl_value_t;
+
         pub fn jlrs_datatype_instance(
             ty: *mut crate::types::jl_datatype_t,
         ) -> *mut crate::types::jl_value_t;
@@ -866,8 +875,6 @@ pub mod jlrs_cc {
         ) -> *mut crate::types::jl_module_t;
 
         pub fn jlrs_expr_head(expr: *mut crate::types::jl_expr_t) -> *mut crate::types::jl_sym_t;
-
-        pub fn jlrs_ppgcstack() -> *mut *mut crate::types::jl_gcframe_t;
 
         pub fn jlrs_symbol_hash(sym: *mut crate::types::jl_sym_t) -> usize;
 
@@ -978,8 +985,6 @@ mod indirect {
         pub static mut jl_compute_fieldtypes: *mut std::ffi::c_void;
 
         pub static mut jl_setjmp: *mut std::ffi::c_void;
-
-        pub static mut jl_get_pgcstack: *mut std::ffi::c_void;
 
         pub static mut jl_current_exception: *mut std::ffi::c_void;
 

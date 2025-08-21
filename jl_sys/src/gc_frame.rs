@@ -7,7 +7,7 @@ use std::{
 };
 
 use crate::{
-    bindings::{jlrs_ppgcstack, jlrs_unsized_scope},
+    bindings::{jl_get_pgcstack, jlrs_unsized_scope},
     types::jl_gcframe_t,
 };
 
@@ -70,7 +70,7 @@ impl<const M: usize, const N: usize> SplitGcFrame<M, N> {
     #[inline]
     pub unsafe fn push_frame(&mut self) {
         unsafe {
-            let x = jlrs_ppgcstack();
+            let x = jl_get_pgcstack();
             let mut pgcstack = NonNull::new_unchecked(x).cast::<GcStack>();
             let gcstack_ref = pgcstack.as_mut();
             let top = gcstack_ref.ptr.read();
@@ -114,7 +114,7 @@ impl<const N: usize> RawGcFrame<N> {
     #[inline]
     pub unsafe fn push_frame(&mut self) {
         unsafe {
-            let mut pgcstack = NonNull::new_unchecked(jlrs_ppgcstack()).cast::<GcStack>();
+            let mut pgcstack = NonNull::new_unchecked(jl_get_pgcstack()).cast::<GcStack>();
             let gcstack_ref = pgcstack.as_mut();
             let top = gcstack_ref.ptr.read();
             self.header.prev.set(top as _);
@@ -126,7 +126,7 @@ impl<const N: usize> RawGcFrame<N> {
 #[inline]
 pub unsafe fn pop_frame() {
     unsafe {
-        let mut pgcstack = NonNull::new_unchecked(jlrs_ppgcstack()).cast::<GcStack>();
+        let mut pgcstack = NonNull::new_unchecked(jl_get_pgcstack()).cast::<GcStack>();
         let gcstack_ref = pgcstack.as_mut();
         let top = gcstack_ref.ptr.read();
         let prev = (*top).prev.get();

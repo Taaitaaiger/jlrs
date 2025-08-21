@@ -11,15 +11,17 @@ use jl_sys::{
     jl_gensym, jl_sym_t, jl_symbol_n, jl_symbol_type, jl_tagged_gensym, jlrs_symbol_hash,
     jlrs_symbol_name,
 };
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxBuildHasher, FxHashMap};
 
 use self::static_symbol::{StaticSymbol, Sym};
 use super::Weak;
 use crate::{
     catch::{catch_exceptions, unwrap_exc},
-    data::managed::private::ManagedPriv,
+    data::{
+        cache::Cache,
+        managed::{erase_scope_lifetime, private::ManagedPriv},
+    },
     error::{JlrsError, JlrsResult},
-    gc_safe::{GcSafeOnceLock, GcSafeRwLock},
     impl_julia_typecheck,
     memory::target::{Target, TargetException, TargetResult, unrooted::Unrooted},
     private::Private,
@@ -27,44 +29,7 @@ use crate::{
 
 pub mod static_symbol;
 
-struct SymbolCache {
-    data: GcSafeRwLock<FxHashMap<Vec<u8>, Symbol<'static>>>,
-}
-
-impl SymbolCache {
-    #[cfg_attr(
-        not(any(
-            feature = "local-rt",
-            feature = "async-rt",
-            feature = "multi-rt",
-            feature = "ccall"
-        )),
-        allow(unused)
-    )]
-    fn new() -> Self {
-        SymbolCache {
-            data: GcSafeRwLock::default(),
-        }
-    }
-}
-
-unsafe impl Send for SymbolCache {}
-unsafe impl Sync for SymbolCache {}
-
-static CACHE: GcSafeOnceLock<SymbolCache> = GcSafeOnceLock::new();
-
-#[cfg_attr(
-    not(any(
-        feature = "local-rt",
-        feature = "async-rt",
-        feature = "multi-rt",
-        feature = "ccall"
-    )),
-    allow(unused)
-)]
-pub(crate) unsafe fn init_symbol_cache() {
-    CACHE.set(SymbolCache::new()).ok();
-}
+static CACHE: SymbolCache = SymbolCache::new();
 
 /// `Symbol`s are used Julia to represent identifiers, `:x` represents the `Symbol` `x`. Things
 /// that can be accessed using a `Symbol` include submodules, functions, and globals. However,
@@ -86,19 +51,16 @@ impl<'scope> Symbol<'scope> {
         Tgt: Target<'scope>,
     {
         let bytes = symbol.as_ref().as_bytes();
-        let data = unsafe { &CACHE.get_unchecked().data };
 
-        {
-            if let Some(sym) = data.read().get(bytes) {
-                return *sym;
-            }
+        if let Some(sym) = CACHE.find(bytes) {
+            return sym;
         }
 
         // Safety: Can only be called from a thread known to Julia, symbols are globally rooted
         unsafe {
             let sym = jl_symbol_n(bytes.as_ptr().cast(), bytes.len());
             let sym = Symbol::wrap_non_null(NonNull::new_unchecked(sym), Private);
-            data.write().insert(bytes.to_vec(), sym);
+            CACHE.insert(bytes.into(), sym);
             sym
         }
     }
@@ -110,13 +72,10 @@ impl<'scope> Symbol<'scope> {
         Tgt: Target<'scope>,
     {
         let bytes = symbol.as_ref();
-        let data = unsafe { &CACHE.get_unchecked().data };
 
-        {
-            if let Some(sym) = data.read().get(bytes) {
-                unsafe {
-                    return target.exception_from_ptr(Ok(*sym), Private);
-                }
+        if let Some(sym) = CACHE.find(bytes) {
+            unsafe {
+                return target.exception_from_ptr(Ok(sym), Private);
             }
         }
 
@@ -126,8 +85,7 @@ impl<'scope> Symbol<'scope> {
             match catch_exceptions(callback, unwrap_exc) {
                 Ok(sym) => {
                     let sym = Symbol::wrap_non_null(NonNull::new_unchecked(sym), Private);
-                    data.write().insert(bytes.to_vec(), sym);
-
+                    CACHE.insert(bytes.into(), sym);
                     Ok(sym)
                 }
                 Err(e) => target.exception_from_ptr(Err(e), Private),
@@ -145,21 +103,16 @@ impl<'scope> Symbol<'scope> {
         Tgt: Target<'scope>,
     {
         let bytes = symbol.as_ref();
-        let data = unsafe { &CACHE.get_unchecked().data };
 
-        {
-            if let Some(sym) = data.read().get(bytes) {
-                return *sym;
-            }
+        if let Some(sym) = CACHE.find(bytes) {
+            return sym;
         }
 
         // Safety: Can only be called from a thread known to Julia, symbols are globally rooted
         unsafe {
             let sym = jl_symbol_n(bytes.as_ptr().cast(), bytes.len());
             let sym = Symbol::wrap_non_null(NonNull::new_unchecked(sym), Private);
-
-            data.write().insert(bytes.to_vec(), sym);
-
+            CACHE.insert(bytes.into(), sym);
             sym
         }
     }
@@ -327,3 +280,36 @@ pub type SymbolUnbound = Symbol<'static>;
 
 impl_ccall_arg_managed!(Symbol, 1);
 impl_into_typed!(Symbol);
+
+struct SymbolCache {
+    inner: Cache<FxHashMap<Vec<u8>, Symbol<'static>>>,
+}
+
+impl SymbolCache {
+    const fn new() -> Self {
+        let map = std::collections::HashMap::with_hasher(FxBuildHasher);
+        let inner = Cache::new(map);
+
+        SymbolCache { inner }
+    }
+
+    #[inline]
+    fn find(&self, key: &[u8]) -> Option<Symbol<'static>> {
+        unsafe {
+            self.inner.read(
+                #[inline]
+                |cache| cache.cache().get(key).copied(),
+            )
+        }
+    }
+
+    #[inline]
+    fn insert(&self, key: Vec<u8>, sym: Symbol) {
+        unsafe {
+            self.inner.write(
+                #[inline]
+                |cache| cache.cache_mut().insert(key, erase_scope_lifetime(sym)),
+            )
+        };
+    }
+}

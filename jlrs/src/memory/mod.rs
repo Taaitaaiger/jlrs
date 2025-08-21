@@ -83,14 +83,14 @@
 //!
 //! Each target has a lifetime that enforces the result can't outlive the scope that roots it. In
 //! addition to rooting targets like `&mut LocalGcFrame` and `Output` that we've already seen,
-//! there also exist non-rooting targets. Non-rooting targets exist because it isn't always
+//! there also exist weak targets. Non-rooting targets exist because it isn't always
 //! necessary to root data: we might be able to guarantee it's already rooted or reachable and
 //! avoid creating another root, or never use the data at all. Using unrooted data is always
 //! unsafe.
 //!
-//! Rooting targets can be used as a non-rooting target by using a reference to the target.
-//! Rooting and non-rooting targets return different types when they're used: `Value::new`
-//! returns a [`Value`] when a rooting target is used, but a [`WeakValue`] when a non-rooting one
+//! Rooting targets can be used as a weak target by using a reference to the target.
+//! Rooting and weak targets return different types when they're used: `Value::new`
+//! returns a [`Value`] when a rooting target is used, but a [`WeakValue`] when a weak one
 //! is used instead. Every type that represents managed Julia data has a rooted and an unrooted
 //! variant, which are named similarly to `Value` and `WeakValue`. There are two type aliases for
 //! each managed type that can be used as the return type of functions that take a target

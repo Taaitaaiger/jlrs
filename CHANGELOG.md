@@ -80,13 +80,15 @@
 
 - `IntoJlrsResult` has been removed in favor of supporting the `?` operator by implementing conversions from `Value` to `JlrsError` and `Box<JlrsError>`.
 
-- A custom `NamedTuple` type has been added, the `named_tuple` macro has been moved to the new `jlrs::data::managed::named_tuple` module and now returns a `JlrsResult<NamedTuple>`. `ProvideKeywords::provide_keywords` now requires an instance of `NamedTuple` to be passed. Several methods to access named tuples, and create new named tuple that extend an existing one have been added. The old `Typecheck` placeholder has been removed in favor of the new `NamedTuple` type.
+- A custom `NamedTuple` type has been added, the `named_tuple` macro has been moved to the new `jlrs::data::managed::named_tuple` module and now returns a `JlrsResult<NamedTuple>`. `ProvideKeywords::provide_keywords` now requires an instance of `NamedTuple` to be passed. Several methods to access named tuples, and create new named tuple that extend an existing one have been added. The old `Typecheck` placeholder has been removed in favor of the new `NamedTuple` type. `ProvideKeywords` and `WithKeywords` have been deprecated in favor of new methods for the `Call` and `CallAsync` traits that take a named tuple as an argument.
 
 - `Call::call0`, `Call::call1`, `Call::call2`, and `Call::call3` have been deprecated in favor of using `Call::call`.
 
 - All crates have been migrated to the 2024 edition of Rust.
 
 - The `JULIA_DIR` environment variable has been renamed to `JLRS_JULIA_DIR`.
+
+- Non-rooting targets are now called weak targets.
 
 ## v0.21
 

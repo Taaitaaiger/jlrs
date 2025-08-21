@@ -227,7 +227,7 @@ pub unsafe trait ConstructType: Sized {
     const CACHEABLE: bool = true;
 
     /// Returns the `TypeId` of `Self::Static`.
-    #[inline]
+    #[inline(always)]
     fn type_id() -> TypeId {
         TypeId::of::<Self::Static>()
     }
@@ -242,7 +242,6 @@ pub unsafe trait ConstructType: Sized {
         if Self::CACHEABLE {
             unsafe {
                 CONSTRUCTED_TYPE_CACHE
-                    .get_unchecked()
                     .find_or_construct::<Self>()
                     .root(target)
             }
@@ -273,7 +272,6 @@ pub unsafe trait ConstructType: Sized {
         if Self::CACHEABLE {
             unsafe {
                 CONSTRUCTED_TYPE_CACHE
-                    .get_unchecked()
                     .find_or_construct_with_env::<Self>(env)
                     .root(target)
             }
@@ -1420,22 +1418,20 @@ impl ConstructedTypes {
         ConstructedTypes { data: cache }
     }
 
-    #[inline(always)]
-    fn get_unchecked(&self) -> &Self {
-        self
-    }
-
     #[inline]
     fn find_or_construct<T: ConstructType>(&self) -> WeakValue<'static, 'static> {
         let tid = T::type_id();
         let res = unsafe {
-            self.data.read(|cache| {
-                if let Some(res) = cache.cache().get(&tid).copied() {
-                    return Some(res.as_weak());
-                }
+            self.data.read(
+                #[inline]
+                |cache| {
+                    if let Some(res) = cache.cache().get(&tid).copied() {
+                        return Some(res.as_weak());
+                    }
 
-                None
-            })
+                    None
+                },
+            )
         };
 
         if let Some(res) = res {
@@ -1452,13 +1448,16 @@ impl ConstructedTypes {
     ) -> WeakValue<'static, 'static> {
         let tid = T::type_id();
         let res = unsafe {
-            self.data.read(|cache| {
-                if let Some(res) = cache.cache().get(&tid).copied() {
-                    return Some(res.as_weak());
-                }
+            self.data.read(
+                #[inline]
+                |cache| {
+                    if let Some(res) = cache.cache().get(&tid).copied() {
+                        return Some(res.as_weak());
+                    }
 
-                None
-            })
+                    None
+                },
+            )
         };
 
         if let Some(res) = res {
@@ -1483,10 +1482,13 @@ fn do_construct<T: ConstructType>(
             if ty.is::<DataType>() {
                 let dt = ty.cast_unchecked::<DataType>();
                 if !dt.has_free_type_vars() && (!dt.is::<Tuple>() || dt.is_concrete_type()) {
-                    ct.data.write(|cache| {
-                        cache.cache_mut().insert(tid, ty.leak().as_value());
-                        cache.roots_mut().insert(ty.as_value());
-                    });
+                    ct.data.write(
+                        #[inline]
+                        |cache| {
+                            cache.cache_mut().insert(tid, ty.leak().as_value());
+                            cache.roots_mut().insert(ty.as_value());
+                        },
+                    );
                 }
             } else if ty.is::<u8>() || ty.is::<i8>() {
                 ct.data.write(|cache| {
@@ -1515,16 +1517,22 @@ fn do_construct_with_context<T: ConstructType>(
             if ty.is::<DataType>() {
                 let dt = ty.cast_unchecked::<DataType>();
                 if !dt.has_free_type_vars() && (!dt.is::<Tuple>() || dt.is_concrete_type()) {
-                    ct.data.write(|cache| {
-                        cache.cache_mut().insert(tid, ty.leak().as_value());
-                        cache.roots_mut().insert(ty.as_value());
-                    });
+                    ct.data.write(
+                        #[inline]
+                        |cache| {
+                            cache.cache_mut().insert(tid, ty.leak().as_value());
+                            cache.roots_mut().insert(ty.as_value());
+                        },
+                    );
                 }
             } else if ty.is::<u8>() || ty.is::<i8>() {
-                ct.data.write(|cache| {
-                    cache.cache_mut().insert(tid, ty.leak().as_value());
-                    cache.roots_mut().insert(ty.as_value());
-                });
+                ct.data.write(
+                    #[inline]
+                    |cache| {
+                        cache.cache_mut().insert(tid, ty.leak().as_value());
+                        cache.roots_mut().insert(ty.as_value());
+                    },
+                );
             }
 
             ty.root(target)

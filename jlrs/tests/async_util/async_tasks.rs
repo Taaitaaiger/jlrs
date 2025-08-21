@@ -94,8 +94,7 @@ impl AsyncTask for KwTask {
                 .as_managed()
                 .global(&frame, "kwfunc")?
                 .as_managed()
-                .provide_keywords(nt)
-                .call_async(&mut frame, [dims, iters])
+                .call_async_kw(&mut frame, [dims, iters], nt)
                 .await
                 .unwrap()
                 .unbox::<f64>()? as f32
@@ -595,8 +594,7 @@ impl AsyncTask for LocalKwSchedulingTask {
                 .as_managed()
                 .global(&frame, "kwfunc")?
                 .as_managed()
-                .provide_keywords(nt)
-                .schedule_async(&mut frame, [dims, iters])
+                .schedule_async_kw(&mut frame, [dims, iters], nt)
                 .unwrap();
 
             frame.gc_collect(jlrs::memory::gc::GcCollection::Full);
@@ -634,8 +632,7 @@ impl AsyncTask for KwSchedulingTask {
                 .as_managed()
                 .global(&frame, "kwfunc")?
                 .as_managed()
-                .provide_keywords(nt)
-                .schedule_async(&mut frame, [dims, iters])
+                .schedule_async_kw(&mut frame, [dims, iters], nt)
                 .unwrap();
 
             frame.gc_collect(jlrs::memory::gc::GcCollection::Full);
@@ -673,8 +670,7 @@ impl AsyncTask for MainKwSchedulingTask {
                 .as_managed()
                 .global(&frame, "kwfunc")?
                 .as_managed()
-                .provide_keywords(nt)
-                .schedule_async(&mut frame, [dims, iters])
+                .schedule_async_kw(&mut frame, [dims, iters], nt)
                 .unwrap();
 
             frame.gc_collect(jlrs::memory::gc::GcCollection::Full);
@@ -715,8 +711,7 @@ impl AsyncTask for LocalKwTask {
                 .as_managed()
                 .global(&frame, "kwfunc")?
                 .as_managed()
-                .provide_keywords(nt)
-                .call_async(&mut frame, [dims, iters])
+                .call_async_kw(&mut frame, [dims, iters], nt)
                 .await
                 .unwrap()
                 .unbox::<f64>()? as f32
@@ -750,8 +745,7 @@ impl AsyncTask for MainKwTask {
                 .as_managed()
                 .global(&frame, "kwfunc")?
                 .as_managed()
-                .provide_keywords(nt)
-                .call_async(&mut frame, [dims, iters])
+                .call_async_kw(&mut frame, [dims, iters], nt)
                 .await
                 .unwrap()
                 .unbox::<f64>()? as f32

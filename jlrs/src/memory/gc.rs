@@ -5,8 +5,8 @@ use std::marker::PhantomData;
 pub use jl_sys::GcCollection;
 use jl_sys::{
     jl_gc_collect, jl_gc_collection_t, jl_gc_enable, jl_gc_is_enabled, jl_gc_mark_queue_obj,
-    jl_gc_mark_queue_objarray, jl_gc_safepoint, jlrs_gc_safe_enter, jlrs_gc_safe_leave,
-    jlrs_gc_unsafe_enter, jlrs_gc_unsafe_leave, jlrs_gc_wb, jlrs_ppgcstack,
+    jl_gc_mark_queue_objarray, jl_gc_safepoint, jl_get_pgcstack, jlrs_gc_safe_enter,
+    jlrs_gc_safe_leave, jlrs_gc_unsafe_enter, jlrs_gc_unsafe_leave, jlrs_gc_wb,
 };
 
 use super::{
@@ -244,7 +244,7 @@ pub unsafe fn write_barrier<T>(data: &mut T, child: Value) {
 #[inline]
 pub unsafe fn gc_safe<F: FnOnce() -> T, T>(f: F) -> T {
     unsafe {
-        let pgc = jlrs_ppgcstack();
+        let pgc = jl_get_pgcstack();
         if pgc.is_null() {
             return f();
         }
@@ -282,7 +282,7 @@ pub(crate) unsafe fn gc_safe_with<F: FnOnce() -> T, T>(ptls: PTls, f: F) -> T {
 #[inline]
 pub unsafe fn gc_unsafe<F: for<'scope> FnOnce(Unrooted<'scope>) -> T, T>(f: F) -> T {
     unsafe {
-        debug_assert!(!jlrs_ppgcstack().is_null());
+        debug_assert!(!jl_get_pgcstack().is_null());
         let ptls = get_tls();
 
         let unrooted = Unrooted::new();

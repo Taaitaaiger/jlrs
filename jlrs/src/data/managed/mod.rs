@@ -710,7 +710,7 @@ impl<'borrow, 'data, T: Managed<'borrow, 'data>, P: Managed<'borrow, 'data>>
 pub unsafe fn erase_scope_lifetime<'scope, 'data, M: Managed<'scope, 'data>>(
     data: M,
 ) -> M::InScope<'static> {
-    unsafe { data.leak().as_managed() }
+    unsafe { M::InScope::<'static>::wrap_non_null(data.unwrap_non_null(Private).cast(), Private) }
 }
 
 pub(crate) mod private {

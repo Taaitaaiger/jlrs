@@ -16,7 +16,7 @@ use std::{
 
 use async_channel::{Receiver, Sender, TryRecvError};
 use envelope::Task;
-use jl_sys::{jl_gcframe_t, jlrs_gc_unsafe_enter, jlrs_gc_unsafe_leave, jlrs_ppgcstack};
+use jl_sys::{jl_gcframe_t, jl_get_pgcstack, jlrs_gc_unsafe_enter, jlrs_gc_unsafe_leave};
 use tokio::sync::oneshot::channel as oneshot_channel;
 
 #[cfg(feature = "multi-rt")]
@@ -291,7 +291,7 @@ pub(crate) async unsafe fn on_main_thread<'ctx, R: Executor<N>, const N: usize>(
         let free_stacks = create_free_stacks(N);
         let running_tasks = create_running_tasks::<R, N>();
 
-        let ppgcstack = jlrs_ppgcstack();
+        let ppgcstack = jl_get_pgcstack();
         assert!(!ppgcstack.is_null());
         let pgcstack = *ppgcstack;
 
@@ -392,7 +392,7 @@ pub(super) async unsafe fn on_adopted_thread<'ctx, R: Executor<N>, const N: usiz
         let task_complete_state = TaskCompleteState::new();
         let task_complete = TaskComplete::new(&task_complete_state);
 
-        let ppgcstack = jlrs_ppgcstack();
+        let ppgcstack = jl_get_pgcstack();
         assert!(!ppgcstack.is_null());
         let pgcstack = *ppgcstack;
 
@@ -503,7 +503,7 @@ async unsafe fn clear_failed_tasks<R: Executor<N>, const N: usize>(
         }
 
         if cleared {
-            let ppgcstack = jlrs_ppgcstack();
+            let ppgcstack = jl_get_pgcstack();
             let gcstack_ref = NonNull::new_unchecked(ppgcstack).as_mut();
             *gcstack_ref = pgcstack;
         }

@@ -9,7 +9,7 @@ extern "C"
     JULIA_DEFINE_FAST_TLS
 #endif
 
-    jl_tls_states_t *jlrs_get_ptls_states(void)
+    JL_CONST_FUNC jl_tls_states_t *jlrs_get_ptls_states(void)
     {
         jl_gcframe_t **pgcstack = jl_get_pgcstack();
         if (pgcstack == NULL)
@@ -19,11 +19,6 @@ extern "C"
 
         jl_task_t *task = container_of(pgcstack, jl_task_t, gcstack);
         return task->ptls;
-    }
-
-    jl_gcframe_t **jlrs_ppgcstack(void)
-    {
-        return jl_get_pgcstack();
     }
 
     jl_tls_states_t *jlrs_ptls_from_gcstack(jl_gcframe_t **pgcstack)
