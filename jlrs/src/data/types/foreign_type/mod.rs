@@ -103,12 +103,13 @@ pub mod mark;
 
 use std::{
     any::{Any, TypeId, type_name},
+    collections::HashMap,
     ffi::c_void,
     marker::PhantomData,
     ptr::NonNull,
 };
 
-use fnv::FnvHashMap;
+use fnv::{FnvBuildHasher, FnvHashMap};
 use jl_sys::{
     jl_emptysvec, jl_gc_add_ptr_finalizer, jl_gc_alloc_typed, jl_gc_schedule_foreign_sweepfunc,
     jl_new_datatype, jl_new_foreign_type, jl_reinit_foreign_type, jl_value_t, jlrs_gc_wb,
@@ -118,6 +119,7 @@ use super::typecheck::Typecheck;
 use crate::{
     convert::{into_julia::IntoJulia, unbox::Unbox},
     data::{
+        cache::Cache,
         layout::valid_layout::ValidLayout,
         managed::{
             Managed, Weak,
@@ -131,16 +133,11 @@ use crate::{
         },
         types::construct_type::ConstructType,
     },
-    gc_safe::{GcSafeOnceLock, GcSafeRwLock},
     memory::{PTls, get_tls, scope::LocalScopeExt, target::Target},
     private::Private,
 };
 
-static FOREIGN_TYPE_REGISTRY: GcSafeOnceLock<ForeignTypes> = GcSafeOnceLock::new();
-
-pub(crate) unsafe fn init_foreign_type_registry() {
-    FOREIGN_TYPE_REGISTRY.set(ForeignTypes::new()).ok();
-}
+static FOREIGN_TYPE_REGISTRY: ForeignTypes = ForeignTypes::new();
 
 /// Define a type whose layout is invisible to Julia.
 ///
@@ -295,26 +292,19 @@ pub unsafe trait OpaqueType: Sized + Send + Sync + 'static {
     unsafe fn reinit_type(ty: DataType) -> bool {
         unsafe {
             if Self::N_PARAMS == 0 {
-                if let Some(_) = FOREIGN_TYPE_REGISTRY.get_unchecked().find::<Self>() {
+                if let Some(_) = FOREIGN_TYPE_REGISTRY.find::<Self>() {
                     return true;
                 }
 
-                FOREIGN_TYPE_REGISTRY
-                    .get_unchecked()
-                    .insert::<Self>(erase_scope_lifetime(ty));
+                FOREIGN_TYPE_REGISTRY.insert::<Self>(erase_scope_lifetime(ty));
 
                 true
             } else {
-                if let Some(_) = FOREIGN_TYPE_REGISTRY
-                    .get_unchecked()
-                    .find::<Key<Self::Key>>()
-                {
+                if let Some(_) = FOREIGN_TYPE_REGISTRY.find::<Key<Self::Key>>() {
                     return true;
                 }
 
-                FOREIGN_TYPE_REGISTRY
-                    .get_unchecked()
-                    .insert::<Key<Self::Key>>(erase_scope_lifetime(ty));
+                FOREIGN_TYPE_REGISTRY.insert::<Key<Self::Key>>(erase_scope_lifetime(ty));
 
                 true
             }
@@ -335,13 +325,11 @@ pub unsafe trait OpaqueType: Sized + Send + Sync + 'static {
         Tgt: Target<'target>,
     {
         unsafe {
-            if let Some(ty) = FOREIGN_TYPE_REGISTRY.get_unchecked().find::<Self>() {
+            if let Some(ty) = FOREIGN_TYPE_REGISTRY.find::<Self>() {
                 return target.data_from_ptr(ty.unwrap_non_null(Private), Private);
             }
 
-            let base_ty = FOREIGN_TYPE_REGISTRY
-                .get_unchecked()
-                .find::<Key<Self::Key>>();
+            let base_ty = FOREIGN_TYPE_REGISTRY.find::<Key<Self::Key>>();
 
             if base_ty.is_none() {
                 panic!("Type {} was not initialized", name.as_str().unwrap());
@@ -360,9 +348,7 @@ pub unsafe trait OpaqueType: Sized + Send + Sync + 'static {
                     .cast::<DataType>()
                     .unwrap();
 
-                FOREIGN_TYPE_REGISTRY
-                    .get_unchecked()
-                    .insert::<Self>(erase_scope_lifetime(ty));
+                FOREIGN_TYPE_REGISTRY.insert::<Self>(erase_scope_lifetime(ty));
 
                 ty.root(target)
             })
@@ -382,13 +368,11 @@ pub unsafe trait OpaqueType: Sized + Send + Sync + 'static {
     /// using internal functionality.
     unsafe fn reinit_variant(ty: DataType) -> bool {
         unsafe {
-            if let Some(_) = FOREIGN_TYPE_REGISTRY.get_unchecked().find::<Self>() {
+            if let Some(_) = FOREIGN_TYPE_REGISTRY.find::<Self>() {
                 return true;
             }
 
-            FOREIGN_TYPE_REGISTRY
-                .get_unchecked()
-                .insert::<Self>(erase_scope_lifetime(ty));
+            FOREIGN_TYPE_REGISTRY.insert::<Self>(erase_scope_lifetime(ty));
 
             true
         }
@@ -608,7 +592,7 @@ unsafe impl<T: ForeignType> OpaqueType for T {
         Tgt: Target<'target>,
     {
         unsafe {
-            if let Some(ty) = FOREIGN_TYPE_REGISTRY.get_unchecked().find::<Self>() {
+            if let Some(ty) = FOREIGN_TYPE_REGISTRY.find::<Self>() {
                 return target.data_from_ptr(ty.unwrap_non_null(Private), Private);
             }
 
@@ -645,7 +629,6 @@ unsafe impl<T: ForeignType> OpaqueType for T {
                     type_name::<Self>()
                 );
                 FOREIGN_TYPE_REGISTRY
-                    .get_unchecked()
                     .insert::<Self>(DataType::wrap_non_null(NonNull::new_unchecked(ty), Private));
 
                 target.data_from_ptr(NonNull::new_unchecked(ty), Private)
@@ -655,7 +638,7 @@ unsafe impl<T: ForeignType> OpaqueType for T {
 
     unsafe fn reinit_type(datatype: DataType) -> bool {
         unsafe {
-            if let Some(_) = FOREIGN_TYPE_REGISTRY.get_unchecked().find::<Self>() {
+            if let Some(_) = FOREIGN_TYPE_REGISTRY.find::<Self>() {
                 return true;
             }
 
@@ -674,7 +657,6 @@ unsafe impl<T: ForeignType> OpaqueType for T {
             let ret = jl_reinit_foreign_type(ty, mark::<Self>, sweep::<Self>);
             if ret != 0 {
                 FOREIGN_TYPE_REGISTRY
-                    .get_unchecked()
                     .insert::<Self>(DataType::wrap_non_null(NonNull::new_unchecked(ty), Private));
 
                 true
@@ -709,7 +691,7 @@ where
     Tgt: Target<'target>,
 {
     unsafe {
-        if let Some(ty) = FOREIGN_TYPE_REGISTRY.get_unchecked().find::<Key<T::Key>>() {
+        if let Some(ty) = FOREIGN_TYPE_REGISTRY.find::<Key<T::Key>>() {
             return target.data_from_ptr(ty.unwrap_non_null(Private), Private);
         }
 
@@ -731,12 +713,10 @@ where
             );
 
             debug_assert!(!ty.is_null());
-            FOREIGN_TYPE_REGISTRY
-                .get_unchecked()
-                .insert::<Key<T::Key>>(DataType::wrap_non_null(
-                    NonNull::new_unchecked(ty),
-                    Private,
-                ));
+            FOREIGN_TYPE_REGISTRY.insert::<Key<T::Key>>(DataType::wrap_non_null(
+                NonNull::new_unchecked(ty),
+                Private,
+            ));
 
             target.data_from_ptr::<DataType>(NonNull::new_unchecked(ty), Private)
         })
@@ -753,7 +733,7 @@ where
     Tgt: Target<'target>,
 {
     unsafe {
-        if let Some(ty) = FOREIGN_TYPE_REGISTRY.get_unchecked().find::<T>() {
+        if let Some(ty) = FOREIGN_TYPE_REGISTRY.find::<T>() {
             return target.data_from_ptr(ty.unwrap_non_null(Private), Private);
         }
 
@@ -776,7 +756,6 @@ where
 
             debug_assert!(!ty.is_null());
             FOREIGN_TYPE_REGISTRY
-                .get_unchecked()
                 .insert::<T>(DataType::wrap_non_null(NonNull::new_unchecked(ty), Private));
 
             target.data_from_ptr::<DataType>(NonNull::new_unchecked(ty), Private)
@@ -799,13 +778,10 @@ unsafe impl<F: OpaqueType> IntoJulia for F {
     where
         Tgt: Target<'scope>,
     {
-        unsafe {
-            FOREIGN_TYPE_REGISTRY
-                .get_unchecked()
-                .find::<F>()
-                .expect("Type has not been initialized")
-                .root(target)
-        }
+        FOREIGN_TYPE_REGISTRY
+            .find::<F>()
+            .expect("Type has not been initialized")
+            .root(target)
     }
 
     fn into_julia<'scope, Tgt>(self, target: Tgt) -> ValueData<'scope, 'static, Tgt>
@@ -813,12 +789,12 @@ unsafe impl<F: OpaqueType> IntoJulia for F {
         Tgt: Target<'scope>,
     {
         unsafe {
-            let ty = if let Some(ty) = FOREIGN_TYPE_REGISTRY.get_unchecked().find::<F>() {
+            let ty = if let Some(ty) = FOREIGN_TYPE_REGISTRY.find::<F>() {
                 ty
             } else {
                 if let Some(func) = Self::TYPE_FN {
                     let ty = func();
-                    FOREIGN_TYPE_REGISTRY.get_unchecked().insert::<Self>(ty);
+                    FOREIGN_TYPE_REGISTRY.insert::<Self>(ty);
                     ty
                 } else {
                     panic!("Type {} was not initialized", type_name::<Self>());
@@ -860,24 +836,16 @@ unsafe impl<T: OpaqueType> ValidLayout for T {
     }
 
     fn type_object<'target, Tgt: Target<'target>>(_target: &Tgt) -> Value<'target, 'static> {
-        unsafe {
-            FOREIGN_TYPE_REGISTRY
-                .get_unchecked()
-                .find::<T>()
-                .unwrap()
-                .as_value()
-        }
+        FOREIGN_TYPE_REGISTRY.find::<T>().unwrap().as_value()
     }
 }
 
 unsafe impl<T: OpaqueType> Typecheck for T {
     fn typecheck(ty: DataType) -> bool {
-        unsafe {
-            if let Some(found_ty) = FOREIGN_TYPE_REGISTRY.get_unchecked().find::<T>() {
-                ty.unwrap(Private) == found_ty.unwrap(Private)
-            } else {
-                false
-            }
+        if let Some(found_ty) = FOREIGN_TYPE_REGISTRY.find::<T>() {
+            ty.unwrap(Private) == found_ty.unwrap(Private)
+        } else {
+            false
         }
     }
 }
@@ -899,28 +867,18 @@ unsafe impl<T: OpaqueType> ConstructType for T {
     where
         Tgt: Target<'target>,
     {
-        unsafe {
-            FOREIGN_TYPE_REGISTRY
-                .get_unchecked()
-                .find::<T>()
-                .unwrap()
-                .as_value()
-                .root(target)
-        }
+        FOREIGN_TYPE_REGISTRY
+            .find::<T>()
+            .unwrap()
+            .as_value()
+            .root(target)
     }
 
     fn base_type<'target, Tgt>(_target: &Tgt) -> Option<Value<'target, 'static>>
     where
         Tgt: Target<'target>,
     {
-        unsafe {
-            Some(
-                FOREIGN_TYPE_REGISTRY
-                    .get_unchecked()
-                    .find::<T>()?
-                    .as_value(),
-            )
-        }
+        Some(FOREIGN_TYPE_REGISTRY.find::<T>()?.as_value())
     }
 
     fn construct_type_with_env_uncached<'target, Tgt>(
@@ -930,39 +888,40 @@ unsafe impl<T: OpaqueType> ConstructType for T {
     where
         Tgt: Target<'target>,
     {
-        unsafe {
-            FOREIGN_TYPE_REGISTRY
-                .get_unchecked()
-                .find::<T>()
-                .unwrap()
-                .as_value()
-                .root(target)
-        }
+        FOREIGN_TYPE_REGISTRY
+            .find::<T>()
+            .unwrap()
+            .as_value()
+            .root(target)
     }
 }
 
 struct Key<K>(PhantomData<K>);
 
 struct ForeignTypes {
-    data: GcSafeRwLock<FnvHashMap<TypeId, DataType<'static>>>,
+    data: Cache<FnvHashMap<TypeId, DataType<'static>>>,
 }
 
 impl ForeignTypes {
-    fn new() -> Self {
+    const fn new() -> Self {
+        let hasher = FnvBuildHasher::new();
+        let map = HashMap::with_hasher(hasher);
         ForeignTypes {
-            data: GcSafeRwLock::default(),
+            data: Cache::new(map),
         }
     }
 
     fn find<T: 'static>(&self) -> Option<DataType<'_>> {
         let tid = TypeId::of::<T>();
-        self.data.read().get(&tid).copied()
+        unsafe { self.data.read(|cache| cache.cache().get(&tid).copied()) }
     }
 
     // Safety: ty must be the datatype associated with T.
     unsafe fn insert<T: 'static>(&self, ty: DataType<'static>) {
         let tid = TypeId::of::<T>();
-        self.data.write().insert(tid, ty);
+        unsafe {
+            self.data.write(|cache| cache.cache_mut().insert(tid, ty));
+        }
     }
 }
 

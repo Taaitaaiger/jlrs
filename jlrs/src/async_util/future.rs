@@ -15,10 +15,11 @@ use jl_sys::{jl_call, jl_call1, jl_exception_occurred, jlrs_current_task};
 
 use crate::{
     args::Values,
-    call::{Call, WithKeywords},
+    call::Call,
     data::managed::{
         Managed, erase_scope_lifetime,
         module::{JlrsCore, Module},
+        named_tuple::NamedTuple,
         private::ManagedPriv,
         value::Value,
     },
@@ -30,6 +31,7 @@ use crate::{
         get_tls,
         target::{frame::AsyncGcFrame, private::TargetPriv, unrooted::Unrooted},
     },
+    prelude::Target,
     private::Private,
     util::kwcall_function,
 };
@@ -151,9 +153,31 @@ pub(crate) struct TaskState<'frame, 'data> {
     task: Option<Value<'frame, 'data>>,
 }
 
+impl<'frame, 'data> TaskState<'frame, 'data> {
+    fn new() -> Arc<GcSafeMutex<Self>> {
+        Arc::new(GcSafeMutex::new(TaskState {
+            completed: false,
+            waker: None,
+            task: None,
+        }))
+    }
+}
+
 enum AsyncMethod {
     AsyncCall,
     InteractiveCall,
+}
+
+impl AsyncMethod {
+    fn method<'target, Tgt>(&self, target: &Tgt) -> Value<'target, 'static>
+    where
+        Tgt: Target<'target>,
+    {
+        match self {
+            AsyncMethod::AsyncCall => return JlrsCore::async_call(target),
+            AsyncMethod::InteractiveCall => return JlrsCore::interactive_call(target),
+        }
+    }
 }
 
 impl Display for AsyncMethod {
@@ -195,27 +219,29 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
     }
 
     #[inline]
-    pub(crate) fn new_with_keywords<'kw, 'value, V, const N: usize>(
+    pub(crate) fn new_with_keywords<'value, V, const N: usize>(
         frame: &mut AsyncGcFrame<'frame>,
-        func: WithKeywords<'kw, 'data>,
+        func: Value<'_, 'data>,
         values: V,
+        kwargs: NamedTuple<'_, 'data>,
     ) -> Self
     where
         V: Values<'value, 'data, N>,
     {
-        Self::new_future_with_keywords(frame, func, values, AsyncMethod::AsyncCall)
+        Self::new_future_with_keywords(frame, func, kwargs, values, AsyncMethod::AsyncCall)
     }
 
     #[inline]
-    pub(crate) fn new_interactive_with_keywords<'kw, 'value, V, const N: usize>(
+    pub(crate) fn new_interactive_with_keywords<'value, V, const N: usize>(
         frame: &mut AsyncGcFrame<'frame>,
-        func: WithKeywords<'kw, 'data>,
+        func: Value<'_, 'data>,
         values: V,
+        kwargs: NamedTuple<'_, 'data>,
     ) -> Self
     where
         V: Values<'value, 'data, N>,
     {
-        Self::new_future_with_keywords(frame, func, values, AsyncMethod::InteractiveCall)
+        Self::new_future_with_keywords(frame, func, kwargs, values, AsyncMethod::InteractiveCall)
     }
 
     fn new_future<'value, V, const N: usize>(
@@ -227,11 +253,7 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
     where
         V: Values<'value, 'data, N>,
     {
-        let shared_state = Arc::new(GcSafeMutex::new(TaskState {
-            completed: false,
-            waker: None,
-            task: None,
-        }));
+        let shared_state = TaskState::new();
         let state_ptr = Arc::into_raw(shared_state.clone()) as *mut c_void;
         let state_ptr_boxed = Value::new(&mut *frame, state_ptr);
 
@@ -246,15 +268,13 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
                 Private,
             );
 
-            let f = match method {
-                AsyncMethod::AsyncCall => JlrsCore::async_call(&frame),
-                AsyncMethod::InteractiveCall => JlrsCore::interactive_call(&frame),
-            };
-
-            f.call(&mut *frame, values.as_ref()).unwrap_or_else(|e| {
-                let msg = e.display_string_or(CANNOT_DISPLAY_VALUE);
-                panic!("{} threw an exception: {}", method, msg)
-            })
+            method
+                .method(&frame)
+                .call(&mut *frame, values.as_ref())
+                .unwrap_or_else(|e| {
+                    let msg = e.display_string_or(CANNOT_DISPLAY_VALUE);
+                    panic!("{} threw an exception: {}", method, msg)
+                })
         };
 
         {
@@ -265,41 +285,33 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
         JuliaFuture { shared_state }
     }
 
-    fn new_future_with_keywords<'kw, 'value, V, const N: usize>(
+    fn new_future_with_keywords<'value, V, const N: usize>(
         frame: &mut AsyncGcFrame<'frame>,
-        func: WithKeywords<'kw, 'data>,
+        func: Value<'_, 'data>,
+        kwargs: NamedTuple<'_, 'data>,
         values: V,
         method: AsyncMethod,
     ) -> Self
     where
         V: Values<'value, 'data, N>,
     {
-        let shared_state = Arc::new(GcSafeMutex::new(TaskState {
-            completed: false,
-            waker: None,
-            task: None,
-        }));
-
+        let shared_state = TaskState::new();
         let state_ptr = Arc::into_raw(shared_state.clone()) as *mut c_void;
         let state_ptr_boxed = Value::new(&mut *frame, state_ptr);
 
         // Safety: module contents are globally rooted, and the function is guaranteed to be safe
         // by the caller.
         let task = unsafe {
-            let f = match method {
-                AsyncMethod::AsyncCall => JlrsCore::async_call(&frame),
-                AsyncMethod::InteractiveCall => JlrsCore::interactive_call(&frame),
-            };
-
+            let f = method.method(&frame);
             let kw_call = kwcall_function(&frame);
 
             // WithKeywords::call has to extend the provided arguments, it has been inlined so
             // we only need to extend them once.
             let values = values.into_extended_pointers_with_start(
                 [
-                    func.keywords().unwrap(Private),
+                    kwargs.unwrap(Private),
                     f.unwrap(Private),
-                    func.function().unwrap(Private),
+                    func.unwrap(Private),
                     state_ptr_boxed.unwrap(Private),
                 ],
                 Private,

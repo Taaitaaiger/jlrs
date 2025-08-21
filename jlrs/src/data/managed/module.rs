@@ -102,7 +102,7 @@ impl<'scope> Module<'scope> {
     {
         unsafe {
             let tid = T::type_id();
-            let cache = &CACHE.get_unchecked();
+            let cache = &CACHE;
 
             let path = path.as_ref();
             let res = cache.read(|cache| -> JlrsResult<Option<_>> {

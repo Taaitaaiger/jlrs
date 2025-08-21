@@ -37,10 +37,9 @@ mod tests {
                         .as_managed()
                         .global(&frame, "throws_exception")
                         .unwrap()
-                        .as_managed()
-                        .provide_keywords(kw);
+                        .as_managed();
 
-                    let res = func.call(&mut frame, []);
+                    let res = func.call_kw(&mut frame, [], kw);
                     assert!(res.is_err());
                 })
             });
@@ -80,10 +79,9 @@ mod tests {
                         .as_managed()
                         .global(&frame, "throws_exception")
                         .unwrap()
-                        .as_managed()
-                        .provide_keywords(kw);
+                        .as_managed();
 
-                    let res = func.call(&mut frame, [arg]);
+                    let res = func.call_kw(&mut frame, [arg], kw);
                     assert!(res.is_err());
                 })
             });
@@ -123,10 +121,9 @@ mod tests {
                         .as_managed()
                         .global(&frame, "throws_exception")
                         .unwrap()
-                        .as_managed()
-                        .provide_keywords(kw);
+                        .as_managed();
 
-                    let res = func.call(&mut frame, [arg, arg]);
+                    let res = func.call_kw(&mut frame, [arg, arg], kw);
                     assert!(res.is_err());
                 })
             });
@@ -166,10 +163,9 @@ mod tests {
                         .as_managed()
                         .global(&frame, "throws_exception")
                         .unwrap()
-                        .as_managed()
-                        .provide_keywords(kw);
+                        .as_managed();
 
-                    let res = func.call(&mut frame, [arg, arg, arg]);
+                    let res = func.call_kw(&mut frame, [arg, arg, arg], kw);
                     assert!(res.is_err());
                 })
             });
@@ -208,10 +204,9 @@ mod tests {
                         .as_managed()
                         .global(&frame, "throws_exception")
                         .unwrap()
-                        .as_managed()
-                        .provide_keywords(kw);
+                        .as_managed();
 
-                    let res = func.call(&mut frame, []);
+                    let res = func.call_kw(&mut frame, [], kw);
                     assert!(res.is_err());
                 })
             });

@@ -1001,10 +1001,7 @@ use prelude::Managed;
 use semver::Version;
 
 use crate::{
-    data::{
-        managed::{module::JlrsCore, symbol::init_symbol_cache, value::Value},
-        types::foreign_type::init_foreign_type_registry,
-    },
+    data::managed::{module::JlrsCore, value::Value},
     memory::{
         context::{ledger::init_ledger, stack::Stack},
         target::unrooted::Unrooted,
@@ -1149,8 +1146,6 @@ pub(crate) unsafe fn init_jlrs(install_jlrs_core: &InstallJlrsCore, allow_overri
         }
 
         jlrs_init_missing_functions();
-        init_foreign_type_registry();
-        init_symbol_cache();
 
         jl_gc_set_cb_root_scanner(root_scanner, 1);
 

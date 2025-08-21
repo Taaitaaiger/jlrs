@@ -2,11 +2,11 @@
 
 use std::future::Future;
 
-use super::{Call, ProvideKeywords, WithKeywords};
+use super::Call;
 use crate::{
     args::Values,
     async_util::future::JuliaFuture,
-    data::managed::{erase_scope_lifetime, module::JlrsCore},
+    data::managed::{erase_scope_lifetime, module::JlrsCore, named_tuple::NamedTuple},
     error::JuliaResult,
     memory::target::frame::AsyncGcFrame,
     prelude::Value,
@@ -40,6 +40,16 @@ pub trait CallAsync<'data>: Call<'data> {
     where
         V: Values<'value, 'data, N>;
 
+    /// `CallAsync::call_async` with keyword arguments.
+    unsafe fn call_async_kw<'target, 'value, V, const N: usize>(
+        self,
+        frame: &mut AsyncGcFrame<'target>,
+        args: V,
+        kwargs: NamedTuple<'_, 'data>,
+    ) -> impl Future<Output = JuliaResult<'target, 'data>>
+    where
+        V: Values<'value, 'data, N>;
+
     /// Does the same thing as [`CallAsync::call_async`], but the task is returned rather than an
     /// awaitable `Future`. This method should only be called in [`PersistentTask::init`],
     /// otherwise it's not guaranteed this task can make progress.
@@ -59,6 +69,16 @@ pub trait CallAsync<'data>: Call<'data> {
         self,
         frame: &mut AsyncGcFrame<'target>,
         args: V,
+    ) -> JuliaResult<'target, 'data, Value<'target, 'data>>
+    where
+        V: Values<'value, 'data, N>;
+
+    /// `CallAsync::schedule_async` with keyword arguments.
+    unsafe fn schedule_async_kw<'target, 'value, V, const N: usize>(
+        self,
+        frame: &mut AsyncGcFrame<'target>,
+        args: V,
+        kwargs: NamedTuple<'_, 'data>,
     ) -> JuliaResult<'target, 'data, Value<'target, 'data>>
     where
         V: Values<'value, 'data, N>;
@@ -86,6 +106,16 @@ pub trait CallAsync<'data>: Call<'data> {
     where
         V: Values<'value, 'data, N>;
 
+    /// `CallAsync::call_async_interactive` with keyword arguments.
+    unsafe fn call_async_kw_interactive<'target, 'value, V, const N: usize>(
+        self,
+        frame: &mut AsyncGcFrame<'target>,
+        args: V,
+        kwargs: NamedTuple<'_, 'data>,
+    ) -> impl Future<Output = JuliaResult<'target, 'data>>
+    where
+        V: Values<'value, 'data, N>;
+
     /// Does the same thing as [`CallAsync::call_async`], but the task is returned rather than an
     /// awaitable `Future`. This method should only be called in [`PersistentTask::init`],
     /// otherwise it's not guaranteed this task can make progress.
@@ -105,6 +135,16 @@ pub trait CallAsync<'data>: Call<'data> {
         self,
         frame: &mut AsyncGcFrame<'target>,
         args: V,
+    ) -> JuliaResult<'target, 'data, Value<'target, 'data>>
+    where
+        V: Values<'value, 'data, N>;
+
+    /// `CallAsync::schedule_async_interactive` with keyword arguments.
+    unsafe fn schedule_async_kw_interactive<'target, 'value, V, const N: usize>(
+        self,
+        frame: &mut AsyncGcFrame<'target>,
+        args: V,
+        kwargs: NamedTuple<'_, 'data>,
     ) -> JuliaResult<'target, 'data, Value<'target, 'data>>
     where
         V: Values<'value, 'data, N>;
@@ -171,9 +211,70 @@ impl<'data> CallAsync<'data> for Value<'_, 'data> {
             }
         }
     }
+
+    #[inline]
+    async unsafe fn call_async_kw<'target, 'value, V, const N: usize>(
+        self,
+        frame: &mut AsyncGcFrame<'target>,
+        args: V,
+        kwargs: NamedTuple<'_, 'data>,
+    ) -> JuliaResult<'target, 'data>
+    where
+        V: Values<'value, 'data, N>,
+    {
+        JuliaFuture::new_with_keywords(frame, self, args, kwargs).await
+    }
+
+    #[inline]
+    unsafe fn schedule_async_kw<'target, 'value, V, const N: usize>(
+        self,
+        frame: &mut AsyncGcFrame<'target>,
+        args: V,
+        kwargs: NamedTuple<'_, 'data>,
+    ) -> JuliaResult<'target, 'data, Value<'target, 'data>>
+    where
+        V: Values<'value, 'data, N>,
+    {
+        unsafe {
+            let args = args.into_extended_with_start([erase_scope_lifetime(self)], Private);
+
+            JlrsCore::async_call(&frame).call_kw(&mut *frame, args.as_ref(), kwargs)
+        }
+    }
+
+    #[inline]
+    async unsafe fn call_async_kw_interactive<'target, 'value, V, const N: usize>(
+        self,
+        frame: &mut AsyncGcFrame<'target>,
+        args: V,
+        kwargs: NamedTuple<'_, 'data>,
+    ) -> JuliaResult<'target, 'data>
+    where
+        V: Values<'value, 'data, N>,
+    {
+        JuliaFuture::new_interactive_with_keywords(frame, self, args, kwargs).await
+    }
+
+    #[inline]
+    unsafe fn schedule_async_kw_interactive<'target, 'value, V, const N: usize>(
+        self,
+        frame: &mut AsyncGcFrame<'target>,
+        args: V,
+        kwargs: NamedTuple<'_, 'data>,
+    ) -> JuliaResult<'target, 'data, Value<'target, 'data>>
+    where
+        V: Values<'value, 'data, N>,
+    {
+        unsafe {
+            let args = args.into_extended_with_start([erase_scope_lifetime(self)], Private);
+
+            JlrsCore::interactive_call(&frame).call_kw(&mut *frame, args.as_ref(), kwargs)
+        }
+    }
 }
 
-impl<'data> CallAsync<'data> for WithKeywords<'_, 'data> {
+#[allow(deprecated)]
+impl<'data> CallAsync<'data> for super::WithKeywords<'_, 'data> {
     #[inline]
     async unsafe fn call_async<'target, 'value, V, const N: usize>(
         self,
@@ -183,7 +284,7 @@ impl<'data> CallAsync<'data> for WithKeywords<'_, 'data> {
     where
         V: Values<'value, 'data, N>,
     {
-        JuliaFuture::new_with_keywords(frame, self, args).await
+        JuliaFuture::new_with_keywords(frame, self.function(), args, self.keywords()).await
     }
 
     #[inline]
@@ -195,7 +296,8 @@ impl<'data> CallAsync<'data> for WithKeywords<'_, 'data> {
     where
         V: Values<'value, 'data, N>,
     {
-        JuliaFuture::new_interactive_with_keywords(frame, self, args).await
+        JuliaFuture::new_interactive_with_keywords(frame, self.function(), args, self.keywords())
+            .await
     }
 
     #[inline]
@@ -211,14 +313,7 @@ impl<'data> CallAsync<'data> for WithKeywords<'_, 'data> {
             let args =
                 args.into_extended_with_start([erase_scope_lifetime(self.function())], Private);
 
-            let task = JlrsCore::interactive_call(&frame)
-                .provide_keywords(self.keywords())
-                .call(&mut *frame, args.as_ref());
-
-            match task {
-                Ok(t) => Ok(t),
-                Err(e) => Err(e),
-            }
+            JlrsCore::interactive_call(&frame).call_kw(&mut *frame, args.as_ref(), self.keywords())
         }
     }
 
@@ -235,14 +330,55 @@ impl<'data> CallAsync<'data> for WithKeywords<'_, 'data> {
             let args =
                 args.into_extended_with_start([erase_scope_lifetime(self.function())], Private);
 
-            let task = JlrsCore::async_call(&frame)
-                .provide_keywords(self.keywords())
-                .call(&mut *frame, args.as_ref());
-
-            match task {
-                Ok(t) => Ok(t),
-                Err(e) => Err(e),
-            }
+            JlrsCore::async_call(&frame).call_kw(&mut *frame, args.as_ref(), self.keywords())
         }
+    }
+
+    async unsafe fn call_async_kw<'target, 'value, V, const N: usize>(
+        self,
+        _frame: &mut AsyncGcFrame<'target>,
+        _args: V,
+        _kwargs: NamedTuple<'_, 'data>,
+    ) -> JuliaResult<'target, 'data>
+    where
+        V: Values<'value, 'data, N>,
+    {
+        unimplemented!("WithKeywords cannot take additional keyword arguments")
+    }
+
+    unsafe fn schedule_async_kw<'target, 'value, V, const N: usize>(
+        self,
+        _frame: &mut AsyncGcFrame<'target>,
+        _args: V,
+        _kwargs: NamedTuple<'_, 'data>,
+    ) -> JuliaResult<'target, 'data, Value<'target, 'data>>
+    where
+        V: Values<'value, 'data, N>,
+    {
+        unimplemented!("WithKeywords cannot take additional keyword arguments")
+    }
+
+    async unsafe fn call_async_kw_interactive<'target, 'value, V, const N: usize>(
+        self,
+        _frame: &mut AsyncGcFrame<'target>,
+        _args: V,
+        _kwargs: NamedTuple<'_, 'data>,
+    ) -> JuliaResult<'target, 'data>
+    where
+        V: Values<'value, 'data, N>,
+    {
+        unimplemented!("WithKeywords cannot take additional keyword arguments")
+    }
+
+    unsafe fn schedule_async_kw_interactive<'target, 'value, V, const N: usize>(
+        self,
+        _frame: &mut AsyncGcFrame<'target>,
+        _args: V,
+        _kwargs: NamedTuple<'_, 'data>,
+    ) -> JuliaResult<'target, 'data, Value<'target, 'data>>
+    where
+        V: Values<'value, 'data, N>,
+    {
+        unimplemented!("WithKeywords cannot take additional keyword arguments")
     }
 }

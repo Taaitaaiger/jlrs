@@ -52,7 +52,7 @@ pub struct Tuple;
 
 impl Tuple {
     /// Create a new tuple from the contents of `values`.
-    pub fn new<'target, 'current, 'borrow, 'value, 'data, V, Tgt>(
+    pub fn new<'target, 'value, 'data, V, Tgt>(
         target: Tgt,
         values: V,
     ) -> ValueResult<'target, 'data, Tgt>
@@ -72,7 +72,7 @@ impl Tuple {
     }
 
     /// Create a new tuple from the contents of `values`.
-    pub unsafe fn new_unchecked<'target, 'current, 'borrow, 'value, 'data, V, Tgt>(
+    pub unsafe fn new_unchecked<'target, 'value, 'data, V, Tgt>(
         target: Tgt,
         values: V,
     ) -> ValueData<'target, 'data, Tgt>

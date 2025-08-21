@@ -4,15 +4,15 @@
 //! targets implement the [`Target`] trait, this trait has a lifetime which encodes how long the
 //! data created with this target can be used.
 //!
-//! There are two different kinds of target, rooting and non-rooting targets. A rooting target
-//! guarantees the returned data is rooted while it can can be used, a non-rooting target doesn't
+//! There are two different kinds of target, rooting and weak targets. A rooting target
+//! guarantees the returned data is rooted while it can can be used, a weak target doesn't
 //! root the returned data at all. jlrs distinguishes between data that has been explicitly rooted
 //! or not at the type level: rooted data is represented by types that implement the [`Managed`]
 //! trait, while non-rooted data is represented as a [`Weak`].
 //!
-//! All targets define whether they are rooting or non-rooting targets by implementing
+//! All targets define whether they are rooting or weak targets by implementing
 //! [`TargetType`]. This trait has a generic associated type: [`TargetType::Data`]. This type
-//! is a [`Managed`] type if the target is a rooting target, and a [`Weak`] if it's non-rooting.
+//! is a [`Managed`] type if the target is a rooting target, and a [`Weak`] if it's weak.
 //! There are also the [`TargetResult`] and [`TargetException`] type aliases, which are `Result`s
 //! that contain [`TargetType::Data`] in at least on of their variants.
 //!
@@ -265,7 +265,7 @@ pub trait TargetType<'target>: Sized {
     /// Type returned by functions that don't catch Julia exceptions.
     ///
     /// For rooting targets, this type is `T`.
-    /// For non-rooting targets, this type is [`Weak<'target, 'data, T>`].
+    /// For weak targets, this type is [`Weak<'target, 'data, T>`].
     type Data<'data, T: Managed<'target, 'data>>;
 }
 

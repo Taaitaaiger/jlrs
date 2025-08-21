@@ -82,7 +82,7 @@ use self::{field_accessor::FieldAccessor, typed::TypedValue};
 use super::{Weak, type_var::TypeVar};
 use crate::{
     args::Values,
-    call::{Call, ProvideKeywords, WithKeywords},
+    call::Call,
     catch::{catch_exceptions, unwrap_exc},
     convert::{into_julia::IntoJulia, to_symbol::ToSymbol, unbox::Unbox},
     data::{
@@ -112,6 +112,7 @@ use crate::{
         target::{Target, TargetException, TargetResult, unrooted::Unrooted},
     },
     private::Private,
+    util::kwcall_function,
 };
 
 /// Arbitrary Julia data.
@@ -1580,12 +1581,49 @@ impl<'data> Call<'data> for Value<'_, 'data> {
             target.result_from_ptr(res, Private)
         }
     }
+
+    unsafe fn call_kw<'target, 'value, V, Tgt, const N: usize>(
+        self,
+        target: Tgt,
+        args: V,
+        kwargs: NamedTuple<'_, 'data>,
+    ) -> ValueResult<'target, 'data, Tgt>
+    where
+        V: Values<'value, 'data, N>,
+        Tgt: Target<'target>,
+    {
+        unsafe {
+            let func = kwcall_function(&target);
+
+            let values = args.into_extended_pointers_with_start(
+                [kwargs.unwrap(Private), self.unwrap(Private)],
+                Private,
+            );
+            let values = values.as_ref();
+
+            let res = jl_call(func, values.as_ptr() as *mut _, values.len() as _);
+            let exc = jl_exception_occurred();
+
+            let res = if exc.is_null() {
+                Ok(NonNull::new_unchecked(res))
+            } else {
+                Err(NonNull::new_unchecked(exc))
+            };
+
+            target.result_from_ptr(res, Private)
+        }
+    }
 }
 
-impl<'value, 'data> ProvideKeywords<'value, 'data> for Value<'value, 'data> {
+#[allow(deprecated)]
+impl<'value, 'data> crate::call::ProvideKeywords<'value, 'data> for Value<'value, 'data> {
     #[inline]
-    fn provide_keywords(self, kws: NamedTuple<'value, 'data>) -> WithKeywords<'value, 'data> {
-        WithKeywords::new(self, kws)
+    #[allow(deprecated)]
+    fn provide_keywords(
+        self,
+        kws: NamedTuple<'value, 'data>,
+    ) -> crate::call::WithKeywords<'value, 'data> {
+        crate::call::WithKeywords::new(self, kws)
     }
 }
 

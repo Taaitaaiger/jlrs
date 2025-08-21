@@ -1,11 +1,11 @@
-//! A non-rooting target.
+//! A weak target.
 //!
-//! While any target can be used as a non-rooting target by using a reference to that target, this
+//! While any target can be used as a weak target by using a reference to that target, this
 //! can be problematic in nested expressions.
 
 use std::marker::PhantomData;
 
-/// A non-rooting target.
+/// A weak target.
 ///
 /// A new [`Unrooted`] can be created with [`Target::unrooted`].
 ///
