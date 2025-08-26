@@ -24,7 +24,7 @@ pub use crate::{
     memory::{scope::AsyncScope, target::frame::AsyncGcFrame},
 };
 pub use crate::{
-    call::{Call, ProvideKeywords},
+    call::Call,
     data::{
         layout::{bool::Bool, char::Char, nothing::Nothing},
         managed::{

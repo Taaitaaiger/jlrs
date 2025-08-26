@@ -37,11 +37,6 @@ impl<C> Cache<C> {
         Cache { inner }
     }
 
-    #[inline(always)]
-    pub(crate) fn get_unchecked(&self) -> &Self {
-        self
-    }
-
     /// Get read access to the cache. `func` must never trigger garbage collection.
     #[inline]
     pub(crate) unsafe fn read<T>(&self, func: impl FnOnce(&CacheInner<C>) -> T) -> T {
@@ -82,17 +77,17 @@ pub(crate) struct CacheInner<C> {
 
 impl<C> CacheInner<C> {
     #[inline(always)]
-    pub(crate) fn cache(&self) -> &C {
+    pub(crate) const fn cache(&self) -> &C {
         &self.cache
     }
 
     #[inline(always)]
-    pub(crate) fn cache_mut(&mut self) -> &mut C {
+    pub(crate) const fn cache_mut(&mut self) -> &mut C {
         &mut self.cache
     }
 
     #[inline(always)]
-    pub(crate) fn roots_mut(&mut self) -> &mut Roots {
+    pub(crate) const fn roots_mut(&mut self) -> &mut Roots {
         &mut self.roots
     }
 }

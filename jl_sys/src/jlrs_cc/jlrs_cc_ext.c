@@ -4,6 +4,14 @@
 extern "C"
 {
 #endif
+    static inline jl_value_t *jlrs_current_exception(void)
+    {
+#if JULIA_VERSION_MINOR >= 11
+        return jl_current_exception(jl_current_task);
+#else
+    return jl_current_exception();
+#endif
+    }
 
     void jlrs_unsized_scope(size_t frame_size, jlrs_unsized_scope_trampoline_t trampoline, void *callback, void *result)
     {
@@ -23,11 +31,7 @@ extern "C"
         }
         JL_CATCH
         {
-#if JULIA_VERSION_MINOR >= 11
-            jl_value_t *exc = jl_current_exception(jl_current_task);
-#else
-        jl_value_t *exc = jl_current_exception();
-#endif
+            jl_value_t *exc = jlrs_current_exception();
             jlrs_catch_t the_exc = {JLRS_CATCH_EXCEPTION, exc};
             return the_exc;
         }
@@ -114,7 +118,7 @@ extern "C"
             }
         }
 
-        return (jl_datatype_t *)jl_apply_type((jl_value_t*)jl_anytuple_type, params, rank);
+        return (jl_datatype_t *)jl_apply_type((jl_value_t *)jl_anytuple_type, params, rank);
     }
 
     jl_value_t *jlrs_tuple_of(jl_value_t **values, size_t n)
@@ -126,7 +130,7 @@ extern "C"
         }
 
         // Should be a leaf type
-        jl_datatype_t *tupty = (jl_datatype_t *)jl_apply_type((jl_value_t*)jl_anytuple_type, types, n);
+        jl_datatype_t *tupty = (jl_datatype_t *)jl_apply_type((jl_value_t *)jl_anytuple_type, types, n);
 
         return jl_new_structv(tupty, values, n);
     }

@@ -46,8 +46,7 @@ mod tests {
 
                     let kw = named_tuple!(&mut frame, "b" => b_value).unwrap();
                     let v = func
-                        .provide_keywords(kw)
-                        .call(&mut frame, [a_value])
+                        .call_kw(&mut frame, [a_value], kw)
                         .unwrap()
                         .unbox::<isize>()
                         .unwrap();
@@ -73,8 +72,7 @@ mod tests {
 
                     let kw = named_tuple!(&mut frame, "b" => b_value).unwrap();
                     let v = func
-                        .provide_keywords(kw)
-                        .call(&mut frame, [])
+                        .call_kw(&mut frame, [], kw)
                         .unwrap()
                         .unbox::<isize>()
                         .unwrap();
@@ -101,8 +99,7 @@ mod tests {
 
                     let kw = named_tuple!(&mut frame, "b" => b_value).unwrap();
                     let v = func
-                        .provide_keywords(kw)
-                        .call(&mut frame, [a_value])
+                        .call_kw(&mut frame, [a_value], kw)
                         .unwrap()
                         .unbox::<isize>()
                         .unwrap();
@@ -130,8 +127,7 @@ mod tests {
 
                     let kw = named_tuple!(&mut frame, "b" => b_value).unwrap();
                     let v = func
-                        .provide_keywords(kw)
-                        .call(&mut frame, [a_value, c_value])
+                        .call_kw(&mut frame, [a_value, c_value], kw)
                         .unwrap()
                         .unbox::<isize>()
                         .unwrap();
@@ -159,8 +155,7 @@ mod tests {
 
                     let kw = named_tuple!(&mut frame, "b" => b_value).unwrap();
                     let v = func
-                        .provide_keywords(kw)
-                        .call(&mut frame, [a_value, c_value])
+                        .call_kw(&mut frame, [a_value, c_value], kw)
                         .unwrap()
                         .unbox::<isize>()
                         .unwrap();
@@ -189,8 +184,7 @@ mod tests {
 
                     let kw = named_tuple!(&mut frame, "b" => b_value).unwrap();
                     let v = func
-                        .provide_keywords(kw)
-                        .call(&mut frame, [a_value, c_value, d_value])
+                        .call_kw(&mut frame, [a_value, c_value, d_value], kw)
                         .unwrap()
                         .unbox::<isize>()
                         .unwrap();
@@ -220,8 +214,7 @@ mod tests {
 
                     let kw = named_tuple!(&mut frame, "b" => b_value).unwrap();
                     let v = func
-                        .provide_keywords(kw)
-                        .call(&mut frame, [a_value, c_value, d_value, e_value])
+                        .call_kw(&mut frame, [a_value, c_value, d_value, e_value], kw)
                         .unwrap()
                         .unbox::<isize>()
                         .unwrap();
@@ -248,8 +241,7 @@ mod tests {
 
                     let kw = named_tuple!(&mut frame, "b" => b_value).unwrap();
                     let v = func
-                        .provide_keywords(kw)
-                        .call(&mut frame, [a_value])
+                        .call_kw(&mut frame, [a_value], kw)
                         .unwrap()
                         .unbox::<f32>()
                         .unwrap();
@@ -276,8 +268,7 @@ mod tests {
 
                     let kw = named_tuple!(&mut frame, "b" => b_value).unwrap();
                     let v = func
-                        .provide_keywords(kw)
-                        .call(&mut frame, [a_value])
+                        .call_kw(&mut frame, [a_value], kw)
                         .unwrap()
                         .unbox::<f64>()
                         .unwrap();

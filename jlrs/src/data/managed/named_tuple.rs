@@ -55,8 +55,7 @@ use crate::{
 ///         // Call the previously defined function. This function simply sums its three
 ///         // keyword arguments and has no side effects, so it's safe to call.
 ///         let res = unsafe {
-///             func.provide_keywords(nt)
-///                 .call(&mut frame, [])? // 5
+///             func.call_kw(&mut frame, [], nt)? // 5
 ///                 .unbox::<isize>()?
 ///         };
 ///

@@ -120,7 +120,7 @@ where
                     .cast::<T>()
                     .unwrap();
 
-                CACHE.get_unchecked().write(|cache| {
+                CACHE.write(|cache| {
                     cache.roots_mut().insert(global.as_value());
                 });
 
@@ -280,7 +280,7 @@ where
                 .cast::<T>()
                 .unwrap();
 
-            CACHE.get_unchecked().write(|cache| {
+            CACHE.write(|cache| {
                 cache.roots_mut().insert(global.as_value());
             });
 
@@ -321,7 +321,7 @@ where
                 .cast::<T>()
                 .unwrap();
 
-            CACHE.get_unchecked().write(|cache| {
+            CACHE.write(|cache| {
                 cache.roots_mut().insert(v.as_value());
             });
 
@@ -374,7 +374,7 @@ where
     {
         unsafe {
             let v = T::construct_type(target).as_value();
-            CACHE.get_unchecked().write(|cache| {
+            CACHE.write(|cache| {
                 cache.roots_mut().insert(v);
             });
             self.global.store(v.unwrap(Private), Ordering::Relaxed);
