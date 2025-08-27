@@ -28,7 +28,6 @@ fn main() {
     }
 
     println!("cargo::rerun-if-changed=src/jlrs_cc/jlrs_cc_ext.c");
-    println!("cargo::rerun-if-changed=src/jlrs_cc/jlrs_version.c");
     println!("cargo::rerun-if-changed=src/jlrs_cc/jlrs_cc_hacks.c");
     println!("cargo::rerun-if-changed=src/jlrs_cc/jlrs_cc_reexport.c");
     println!("cargo::rerun-if-changed=src/jlrs_cc/jlrs_cc_fast_tls.c");
