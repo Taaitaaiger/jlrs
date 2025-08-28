@@ -39,10 +39,7 @@ fn emit_julia_cfg(min_version: i32, max_version: i32) {
     }
 
     if minor > max_version {
-        println!(
-            "cargo::rustc-warning=\"Detected unsupported Julia version {major}.{minor}, assuming compatibility with {major}.{max_version}. \
-        Please report any issues at https://www.github.com/Taaitaaiger/jlrs/issues\""
-        );
+        // Don't warn, already happens in jl_sys build script
         println!("cargo::rustc-cfg=julia_{}_{}", major, max_version);
         return;
     }

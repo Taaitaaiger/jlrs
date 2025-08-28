@@ -1,4 +1,3 @@
-#[cfg(not(feature = "yggdrasil"))]
 use std::path::PathBuf;
 #[cfg(not(feature = "yggdrasil"))]
 use std::process::Command;
@@ -193,7 +192,8 @@ fn find_julia_dir() -> Option<PathBuf> {
 enum Target {
     Windows,
     WindowsI686,
-    I686,
+    NoDefaultFlags,
+    IncludeEndian,
 }
 
 #[cfg(not(feature = "yggdrasil"))]
@@ -211,8 +211,12 @@ fn interpret_target() -> Option<Target> {
             return Some(Target::Windows);
         }
 
-        if target.contains("i686") || target.contains("arm") {
-            return Some(Target::I686);
+        if target.contains("i686") || target.contains("arm") || target.contains("aarch") {
+            return Some(Target::NoDefaultFlags);
+        }
+
+        if target.contains("x86_64-apple") {
+            return Some(Target::IncludeEndian);
         }
     }
 
@@ -292,7 +296,7 @@ fn compile_jlrs_cc(julia_dir: &str, target: Option<Target>) {
                 .file("src/jlrs_cc/jlrs_cc_fast_tls.c");
 
             match target {
-                Some(Target::I686) => {
+                Some(Target::NoDefaultFlags) => {
                     c.no_default_flags(true)
                         .flag("-O3")
                         .flag("-fPIC");
@@ -304,6 +308,10 @@ fn compile_jlrs_cc(julia_dir: &str, target: Option<Target>) {
                     c.no_default_flags(true)
                         .flag("-O3")
                         .flag("-mwindows");
+                }
+                Some(Target::IncludeEndian) => {
+                    // Avoid error due to missing include
+                    c.include("/opt/x86_64-apple-darwin14/x86_64-apple-darwin14/sys-root/usr/include/machine/");
                 }
                 _ => ()
             }
