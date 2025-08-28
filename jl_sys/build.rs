@@ -1,4 +1,3 @@
-#[cfg(not(feature = "yggdrasil"))]
 use std::path::PathBuf;
 #[cfg(not(feature = "yggdrasil"))]
 use std::process::Command;
