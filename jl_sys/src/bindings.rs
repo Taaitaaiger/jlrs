@@ -990,6 +990,8 @@ mod indirect {
 
         pub static mut jl_get_world_counter: *mut std::ffi::c_void;
 
+        pub static mut jl_egal__bitstag: *mut std::ffi::c_void;
+
         // Removed in Julia 1.11
 
         #[cfg(julia_1_10)]

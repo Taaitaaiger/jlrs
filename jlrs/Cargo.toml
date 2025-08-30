@@ -68,7 +68,7 @@ i686 = ["jl-sys/i686"]
 # loaded by and used from Julia.
 no-link = ["jl-sys/no-link"]
 # Compile from BinaryBuilder's cross-compilation environment
-yggdrasil = ["jl-sys/yggdrasil"]
+yggdrasil = ["jl-sys/yggdrasil", "jlrs-macros/yggdrasil"]
 # Cross-compile to Windows
 windows = ["jl-sys/windows", "jlrs-macros/windows"]
 # Cross-compile to macOS

@@ -17,6 +17,7 @@ rust-version = "1.85"
 [features]
 default = []
 windows = []
+yggdrasil = ["jl-sys/yggdrasil"]
 
 derive = ["proc-macro2"]
 ccall = ["proc-macro2"]
