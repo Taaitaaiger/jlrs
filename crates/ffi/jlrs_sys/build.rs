@@ -1,12 +1,20 @@
 use std::env;
 
 use cfg_if::cfg_if;
-use find_julia::{JuliaDir, enable_version_cfgs};
-use jlrs_compat::{MAX_MINOR_VERSION, MIN_MINOR_VERSION};
+use find_julia::{JuliaDir, Version, enable_version_cfgs};
+use jlrs_compat::{
+    MAX_MINOR_VERSION, MIN_MINOR_VERSION, STABLE_MAJOR_VERSION, STABLE_MINOR_VERSION,
+};
 
 fn main() {
     // Enable julia_1_x configs
     enable_version_cfgs(MIN_MINOR_VERSION, MAX_MINOR_VERSION);
+
+    if building_docs() {
+        let version = Version::new(STABLE_MAJOR_VERSION, STABLE_MINOR_VERSION, 0, false);
+        version.emit_metadata_unchecked();
+        return;
+    }
 
     // Load julia_dir info from metadata by jl-sys, and re-emit version metadata
     let julia_dir = {
@@ -14,10 +22,6 @@ fn main() {
         julia_dir.version().emit_metadata_unchecked();
         julia_dir
     };
-
-    if building_docs() {
-        return;
-    }
 
     println!("cargo::rerun-if-changed=src/jlrs_cc/jlrs_cc_ext.c");
     println!("cargo::rerun-if-changed=src/jlrs_cc/jlrs_cc_hacks.c");
@@ -164,7 +168,7 @@ fn building_docs() -> bool {
     if env::var("DOCS_RS").is_ok() {
         return true;
     }
-    
+
     #[cfg(feature = "docs")]
     return true;
 
