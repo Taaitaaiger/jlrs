@@ -152,7 +152,7 @@ fn compile_jlrs_cc(julia_dir: &JuliaDir, target: Option<BBTarget>) {
 
         cfg_if! {
             if #[cfg(target_env = "msvc")] {
-                let julia_dll_a = format!("{}/lib/libjulia.dll.a", julia_dir);
+                let julia_dll_a = format!("{}/libjulia.dll.a", julia_dir.lib_dir());
                 c.file("src/jlrs_cc/jlrs_cc_ext.cc")
                     .file("src/jlrs_cc/jlrs_cc_reexport.cc")
                     .file("src/jlrs_cc/jlrs_cc_hacks.cc")

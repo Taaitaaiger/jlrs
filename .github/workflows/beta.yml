@@ -32,6 +32,8 @@ jobs:
       - name: Run tests
         run: |
           julia -e "import Pkg; Pkg.add(url=\"https://github.com/Taaitaaiger/JlrsCore.jl\", rev=\"5cc78665dcea3a400f10dda831fbf36f66f625a9\")"
+          export JLRS_JULIA_DIR="$(dirname $(dirname $(which julia)))"
+          export LD_LIBRARY_PATH="${JLRS_JULIA_DIR}/lib:${LD_LIBRARY_PATH}"
           cargo test --features full --verbose
 
   test-macos:
@@ -57,6 +59,8 @@ jobs:
       - name: Run tests
         run: |
           julia -e "import Pkg; Pkg.add(url=\"https://github.com/Taaitaaiger/JlrsCore.jl\", rev=\"5cc78665dcea3a400f10dda831fbf36f66f625a9\")"
+          export JLRS_JULIA_DIR="$(dirname $(dirname $(which julia)))"
+          export DYLD_LIBRARY_PATH="${JLRS_JULIA_DIR}/lib:${DYLD_LIBRARY_PATH}"
           cargo test --features full --verbose
 
   test-windows-gnu:
@@ -127,7 +131,7 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: stable
-
+      
       - name: Run module tests
         run: |
           julia -e "import Pkg; Pkg.add(url=\"https://github.com/Taaitaaiger/JlrsCore.jl\", rev=\"5cc78665dcea3a400f10dda831fbf36f66f625a9\")"
