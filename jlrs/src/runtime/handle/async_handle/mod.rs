@@ -16,7 +16,8 @@ use std::{
 
 use async_channel::{Receiver, Sender, TryRecvError};
 use envelope::Task;
-use jl_sys::{jl_gcframe_t, jl_get_pgcstack, jlrs_gc_unsafe_enter, jlrs_gc_unsafe_leave};
+use jl_sys::{jl_gcframe_t, jl_get_pgcstack, };
+use jlrs_sys::{jlrs_gc_unsafe_enter, jlrs_gc_unsafe_leave};
 use tokio::sync::oneshot::channel as oneshot_channel;
 
 #[cfg(feature = "multi-rt")]

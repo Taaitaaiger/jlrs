@@ -7,10 +7,8 @@ use std::{
     ptr::NonNull,
 };
 
-use jl_sys::{
-    jl_gensym, jl_sym_t, jl_symbol_n, jl_symbol_type, jl_tagged_gensym, jlrs_symbol_hash,
-    jlrs_symbol_name,
-};
+use jl_sys::{jl_gensym, jl_sym_t, jl_symbol_n, jl_symbol_type, jl_tagged_gensym};
+use jlrs_sys::{jlrs_symbol_hash, jlrs_symbol_name};
 use rustc_hash::{FxBuildHasher, FxHashMap};
 
 use self::static_symbol::{StaticSymbol, Sym};

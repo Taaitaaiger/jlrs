@@ -1,0 +1,23 @@
+[package]
+name = "jlrs-sys"
+version = "0.1.0"
+edition = "2024"
+
+[features]
+fast-tls = []
+lto = []
+
+i686 = []
+debug = []
+macos = []
+windows = []
+docs = []
+
+[dependencies]
+jl-sys = { path = "../jl_sys", version = "0.26"}
+
+[build-dependencies]
+find-julia = { path = "../build_utils/find_julia", version = "0.1" }
+jlrs-compat = { path = "../build_utils/jlrs_compat", version = "0.1" }
+cc = "1"
+cfg-if = "1"

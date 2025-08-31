@@ -8,7 +8,8 @@ use std::{
     str,
 };
 
-use jl_sys::{jl_pchar_to_string, jl_string_ptr, jl_string_type, jlrs_string_len};
+use jl_sys::{jl_pchar_to_string, jl_string_ptr, jl_string_type};
+use jlrs_sys::jlrs_string_len;
 
 use super::Weak;
 use crate::{

@@ -29,7 +29,8 @@ use std::{
     ptr::{NonNull, null_mut},
 };
 
-use jl_sys::{jl_value_t, jlrs_catch_t, jlrs_catch_tag_t, jlrs_try_catch};
+use jl_sys::jl_value_t;
+use jlrs_sys::{jlrs_catch_t, jlrs_catch_tag_t, jlrs_try_catch};
 
 use crate::{
     data::managed::{Managed, private::ManagedPriv},

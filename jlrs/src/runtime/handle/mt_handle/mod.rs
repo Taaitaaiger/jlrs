@@ -11,7 +11,8 @@ use std::{
 };
 
 use atomic::Ordering;
-use jl_sys::{jl_adopt_thread, jl_atexit_hook, jlrs_gc_safe_enter, jlrs_ptls_from_gcstack};
+use jl_sys::{jl_adopt_thread, jl_atexit_hook};
+use jlrs_sys::{jlrs_gc_safe_enter, jlrs_ptls_from_gcstack};
 use parking_lot::{Condvar, Mutex};
 
 #[cfg(feature = "async")]

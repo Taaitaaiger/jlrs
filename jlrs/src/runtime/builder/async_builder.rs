@@ -3,7 +3,7 @@
 use std::{path::Path, thread, thread::JoinHandle};
 
 use async_channel::{bounded, unbounded};
-use jl_sys::jlrs_gc_safe_enter;
+use jlrs_sys::jlrs_gc_safe_enter;
 
 #[cfg(feature = "multi-rt")]
 use crate::runtime::handle::mt_handle::MtHandle;

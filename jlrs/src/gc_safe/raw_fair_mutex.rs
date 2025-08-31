@@ -1,6 +1,6 @@
 use std::time::{Duration, Instant};
 
-use jl_sys::{jlrs_gc_safe_enter, jlrs_gc_safe_leave};
+use jlrs_sys::{jlrs_gc_safe_enter, jlrs_gc_safe_leave};
 use parking_lot::RawMutex;
 
 use crate::memory::get_tls;

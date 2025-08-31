@@ -10,7 +10,8 @@ use std::{
 
 use async_channel::Receiver;
 use fnv::FnvHashMap;
-use jl_sys::{jl_adopt_thread, jlrs_clear_gc_stack, jlrs_gc_safe_enter, jlrs_ptls_from_gcstack};
+use jl_sys::jl_adopt_thread;
+use jlrs_sys::{jlrs_clear_gc_stack, jlrs_gc_safe_enter, jlrs_ptls_from_gcstack};
 use once_cell::sync::OnceCell;
 
 use crate::{

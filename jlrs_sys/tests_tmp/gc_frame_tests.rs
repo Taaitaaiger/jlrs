@@ -3,7 +3,7 @@ use std::{
     sync::atomic::{AtomicBool, Ordering},
 };
 
-use jl_sys::{
+use jlrs_sys::jlrs_cc::{
     bindings::{
         jl_alloc_array_1d, jl_array_any_type, jl_gc_add_ptr_finalizer, jl_gc_collect, jl_init,
         jl_is_initialized, jlrs_get_ptls_states,

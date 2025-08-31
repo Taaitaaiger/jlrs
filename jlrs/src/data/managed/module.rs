@@ -10,8 +10,9 @@ use std::{any::TypeId, marker::PhantomData, ptr::NonNull};
 
 use jl_sys::{
     jl_base_module, jl_core_module, jl_get_global, jl_is_const, jl_main_module, jl_module_t,
-    jl_module_type, jl_set_global, jlrs_module_name, jlrs_module_parent,
+    jl_module_type, jl_set_global,
 };
+use jlrs_sys::{jlrs_module_name, jlrs_module_parent};
 use rustc_hash::FxHashMap;
 
 use super::{
@@ -380,7 +381,7 @@ impl<'scope> Module<'scope> {
             );
 
             #[cfg(not(any(julia_1_10, julia_1_11)))]
-            jl_sys::bindings::jlrs_declare_constant_val(
+            jlrs_sys::jlrs_declare_constant_val(
                 null_mut(),
                 self.unwrap(Private),
                 symbol.unwrap(Private),

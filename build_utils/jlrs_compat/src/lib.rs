@@ -1,0 +1,6 @@
+pub const MIN_MINOR_VERSION: u32 = 10;
+pub const MAX_MINOR_VERSION: u32 = 13;
+
+pub const STABLE_MAJOR_VERSION: u32 = 1;
+pub const STABLE_MINOR_VERSION: u32 = 11;
+pub const STABLE_PATCH_VERSION: u32 = 0;

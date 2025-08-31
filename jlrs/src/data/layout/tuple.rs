@@ -21,7 +21,7 @@
 
 use std::{marker::PhantomData, ptr::NonNull};
 
-use jl_sys::jlrs_tuple_of;
+use jlrs_sys::jlrs_tuple_of;
 
 use crate::{
     catch::{catch_exceptions, unwrap_exc},

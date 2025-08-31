@@ -14,7 +14,8 @@ use std::{
     ptr::{NonNull, null_mut},
 };
 
-use jl_sys::{jl_gc_mark_queue_objarray, jl_sym_t, jl_tagged_gensym, jl_value_t, jlrs_gc_wb};
+use jl_sys::{jl_gc_mark_queue_objarray, jl_sym_t, jl_tagged_gensym, jl_value_t, };
+use jlrs_sys::jlrs_gc_wb;
 
 use crate::{
     call::Call,

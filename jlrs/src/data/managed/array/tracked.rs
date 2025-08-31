@@ -13,7 +13,7 @@
 /// [`ArrayBase::track_exclusive`]: crate::data::managed::array::ArrayBase::track_exclusive
 use std::{ops::Deref, ptr::NonNull};
 
-use jl_sys::jlrs_array_data_owner;
+use jlrs_sys::jlrs_array_data_owner;
 
 use super::{
     ArrayBase, Unknown,

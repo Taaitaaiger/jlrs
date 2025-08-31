@@ -179,17 +179,8 @@
 //!
 //!   Link with a debug build of Julia on Linux.
 //!
-//! - `no-link`
-//!
-//!   Don't link Julia.
-//!
-//! - `yggdrasil`
-//!
-//!   Flag that must be enabled when compiling with BinaryBuilder.
-//!
-//! You can enable all features except `debug`, `i686`, `windows`, `no-link`, `lto` and
-//! `yggdrasil` by enabling the `full` feature. If you don't want to enable any runtimes either,
-//! you can use `full-no-rt`.
+//! You can enable all features except `debug`, `i686`, `windows`, and `lto` by enabling the 
+//! `full` feature. If you don't want to enable any runtimes either, you can use `full-no-rt`.
 //!
 //!
 //! ## Environment variables
@@ -995,7 +986,8 @@ use data::{
     managed::module::mark_global_cache, static_data::mark_static_data_cache,
     types::construct_type::mark_constructed_type_cache,
 };
-use jl_sys::{jl_gc_set_cb_root_scanner, jlrs_init_missing_functions};
+use jl_sys::jl_gc_set_cb_root_scanner;
+use jlrs_sys::jlrs_init_missing_functions;
 use memory::get_tls;
 use prelude::Managed;
 use semver::Version;

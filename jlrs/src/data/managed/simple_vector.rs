@@ -8,8 +8,9 @@ use std::{
 
 use jl_sys::{
     jl_alloc_svec, jl_alloc_svec_uninit, jl_emptysvec, jl_simplevector_type, jl_svec_copy,
-    jl_svec_t, jlrs_svec_data, jlrs_svec_len, jlrs_svecref, jlrs_svecset,
+    jl_svec_t,
 };
+use jlrs_sys::{jlrs_svec_data, jlrs_svec_len, jlrs_svecref, jlrs_svecset};
 
 use super::{AtomicSlice, Managed, ManagedData, Weak, datatype::DataType, private::ManagedPriv};
 use crate::{

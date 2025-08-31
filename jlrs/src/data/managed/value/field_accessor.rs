@@ -5,7 +5,8 @@ use std::{
     usize,
 };
 
-use jl_sys::{jl_value_t, jlrs_array_typetagdata, jlrs_lock_value, jlrs_unlock_value};
+use jl_sys::jl_value_t;
+use jlrs_sys::{jlrs_array_typetagdata, jlrs_lock_value, jlrs_unlock_value};
 
 use super::{Value, WeakValue};
 use crate::{

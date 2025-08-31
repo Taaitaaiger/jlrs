@@ -3,7 +3,7 @@ use std::{
     pin::Pin,
 };
 
-use jl_sys::jlrs_task_gc_state;
+use jlrs_sys::jlrs_task_gc_state;
 
 use super::IsActive;
 use crate::{error::RuntimeError, prelude::JlrsResult, runtime::state::GC_UNSAFE};

@@ -33,7 +33,8 @@ itertools = "0.14"
 jl-sys = { path = "../jl_sys", version = "0.26"}
 
 [build-dependencies]
-jlrs-cfg = { path = "../jlrs_cfg", version = "0.1"}
+jlrs-compat = { path = "../build_utils/jlrs_compat", version = "0.1"}
+find-julia = { path = "../build_utils/find_julia", version = "0.1"}
 
 [package.metadata.docs.rs]
 features = ["ccall", "derive"]

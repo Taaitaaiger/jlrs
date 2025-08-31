@@ -11,7 +11,8 @@ use std::{
     task::{Context, Poll, Waker},
 };
 
-use jl_sys::{jl_call, jl_call1, jl_exception_occurred, jlrs_current_task};
+use jl_sys::{jl_call, jl_call1, jl_exception_occurred};
+use jlrs_sys::jlrs_current_task;
 
 use crate::{
     args::Values,

@@ -73,10 +73,10 @@ use jl_sys::{
     jl_memory_exception, jl_new_struct_uninit, jl_nothing, jl_object_id, jl_pair_type,
     jl_readonlymemory_exception, jl_set_nth_field, jl_stackovf_exception, jl_static_show,
     jl_stderr_obj, jl_stderr_stream, jl_stdout_obj, jl_stdout_stream, jl_subtype, jl_true,
-    jl_typeof_str, jl_undefref_exception, jl_value_t, jlrs_call_unchecked, jlrs_egal,
-    jlrs_field_isptr,
+    jl_typeof_str, jl_undefref_exception, jl_value_t,
 };
 use jlrs_macros::julia_version;
+use jlrs_sys::{jlrs_call_unchecked, jlrs_egal, jlrs_field_isptr};
 
 use self::{field_accessor::FieldAccessor, typed::TypedValue};
 use super::{Weak, type_var::TypeVar};
@@ -397,7 +397,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
         // Safety: the pointer points to valid data, every value has a type.
         unsafe {
             let self_ptr = self.unwrap(Private);
-            let ty = jl_sys::jlrs_typeof(self_ptr);
+            let ty = jlrs_sys::jlrs_typeof(self_ptr);
             DataType::wrap_non_null(NonNull::new_unchecked(ty.cast()), Private)
         }
     }

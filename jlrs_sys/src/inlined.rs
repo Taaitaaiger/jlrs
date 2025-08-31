@@ -3,7 +3,7 @@
 
 use std::ptr::NonNull;
 
-use crate::jl_array_t;
+use jl_sys::jl_array_t;
 
 #[inline]
 pub const unsafe fn jlrs_array_data_fast(a: *mut jl_array_t) -> *mut std::ffi::c_void {

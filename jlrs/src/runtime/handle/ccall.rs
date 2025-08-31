@@ -5,7 +5,8 @@
 //!
 //! [`weak_handle`]: crate::weak_handle
 
-use jl_sys::{jl_throw, unsized_local_scope};
+use jl_sys::jl_throw;
+use jlrs_sys::unsized_local_scope;
 
 use crate::{
     InstallJlrsCore,

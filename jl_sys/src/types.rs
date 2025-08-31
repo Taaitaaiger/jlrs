@@ -7,13 +7,6 @@ use std::{
     ptr::null_mut,
 };
 
-#[repr(u32)]
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub enum jlrs_catch_tag_t {
-    Ok = 0,
-    Exception = 1,
-    Panic = 2,
-}
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
@@ -56,8 +49,8 @@ pub type GcCollection = jl_gc_collection_t;
 #[repr(C)]
 #[derive(Debug)]
 pub struct jl_gcframe_t {
-    pub(crate) n_roots: usize,
-    pub(crate) prev: Cell<*mut c_void>,
+    pub n_roots: usize,
+    pub prev: Cell<*mut c_void>,
     _marker: PhantomData<(*mut u8, PhantomPinned)>,
 }
 
@@ -102,21 +95,6 @@ pub struct jl_module_t {
     _unused: [u8; 0],
     _marker: PhantomData<(*mut u8, PhantomPinned)>,
 }
-
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct jlrs_catch_t {
-    pub tag: jlrs_catch_tag_t,
-    pub error: *mut c_void,
-}
-
-pub type jlrs_try_catch_trampoline_t =
-    unsafe extern "C" fn(callback: *mut c_void, result: *mut c_void) -> jlrs_catch_t;
-pub type jlrs_unsized_scope_trampoline_t = unsafe extern "C-unwind" fn(
-    frame: *mut jl_gcframe_t,
-    callback: *mut c_void,
-    result: *mut c_void,
-);
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]

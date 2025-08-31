@@ -6,7 +6,7 @@ use std::{
     ptr::{NonNull, null_mut},
 };
 
-use jl_sys::{SplitGcFrame, pop_frame};
+use jlrs_sys::{SplitGcFrame, pop_frame};
 
 use super::context::stack::Stack;
 

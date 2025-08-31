@@ -27,10 +27,10 @@ full-no-rt = ["async", "jlrs-ndarray", "f16", "jlrs-derive", "ccall"]
 # Runtimes
 
 # Enable local runtime
-local-rt = ["jl-sys/fast-tls"]
+local-rt = ["jlrs-sys/fast-tls"]
 
 # Enable async runtime
-async-rt = ["async", "jl-sys/fast-tls", "tokio"]
+async-rt = ["async", "jlrs-sys/fast-tls", "tokio"]
 
 # Enable tokio as backing runtime
 tokio-rt = ["async-rt"]
@@ -39,7 +39,7 @@ tokio-rt = ["async-rt"]
 tokio-net = ["tokio-rt", "tokio/net"]
 
 # Enable multithreaded runtime
-multi-rt = ["jl-sys/fast-tls"]
+multi-rt = ["jlrs-sys/fast-tls"]
 
 # Utilities
 
@@ -56,7 +56,7 @@ jlrs-ndarray = ["ndarray"]
 # Enable derive macros
 jlrs-derive = ["jlrs-macros/derive"]
 # Compile the support library with support for cross-language LTO.
-lto = ["jl-sys/lto"]
+lto = ["jlrs-sys/lto"]
 
 # Target or link a specific Julia build or arch.
 
@@ -64,11 +64,6 @@ lto = ["jl-sys/lto"]
 debug = ["jl-sys/debug"]
 # Link 32-bits version of Julia on Linux
 i686 = ["jl-sys/i686"]
-# Don't link Julia, useful when building a shared library that will be
-# loaded by and used from Julia.
-no-link = ["jl-sys/no-link"]
-# Compile from BinaryBuilder's cross-compilation environment
-yggdrasil = ["jl-sys/yggdrasil", "jlrs-macros/yggdrasil"]
 # Cross-compile to Windows
 windows = ["jl-sys/windows", "jlrs-macros/windows"]
 # Cross-compile to macOS
@@ -80,6 +75,7 @@ docs = ["jl-sys/docs", "full"]
 
 [dependencies]
 jl-sys = { version = "0.26", path = "../jl_sys" }
+jlrs-sys = { version = "0.1", path = "../jlrs_sys" }
 jlrs-macros = { version = "0.5", path = "../jlrs_macros" }
 smallvec = {version = "1", features = ["const_generics"]}
 thiserror = "2"
@@ -102,6 +98,8 @@ tokio = { version = "1", features = ["rt", "time", "sync"]}
 
 [build-dependencies]
 jlrs-cfg = { path = "../jlrs_cfg", version = "0.1"}
+jlrs-compat = { path = "../build_utils/jlrs_compat", version = "0.1"}
+find-julia = { path = "../build_utils/find_julia", version = "0.1"}
 
 [package.metadata.docs.rs]
 features = ["docs"]

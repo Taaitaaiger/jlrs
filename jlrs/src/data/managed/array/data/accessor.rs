@@ -24,9 +24,10 @@ use std::{
 };
 
 use jl_sys::{
-    inlined::jlrs_array_data_fast, jl_array_del_end, jl_array_grow_end, jl_array_ptr_1d_append,
-    jl_array_ptr_1d_push, jl_value_t, jlrs_array_typetagdata, jlrs_arrayref, jlrs_arrayset,
+    jl_array_del_end, jl_array_grow_end, jl_array_ptr_1d_append,
+    jl_array_ptr_1d_push, jl_value_t, 
 };
+use jlrs_sys::{inlined::jlrs_array_data_fast, jlrs_array_typetagdata, jlrs_arrayref, jlrs_arrayset,};
 
 use super::copied::CopiedArray;
 use crate::{

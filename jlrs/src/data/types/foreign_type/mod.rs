@@ -112,8 +112,9 @@ use std::{
 use fnv::{FnvBuildHasher, FnvHashMap};
 use jl_sys::{
     jl_emptysvec, jl_gc_add_ptr_finalizer, jl_gc_alloc_typed, jl_gc_schedule_foreign_sweepfunc,
-    jl_new_datatype, jl_new_foreign_type, jl_reinit_foreign_type, jl_value_t, jlrs_gc_wb,
+    jl_new_datatype, jl_new_foreign_type, jl_reinit_foreign_type, jl_value_t, 
 };
+use jlrs_sys::jlrs_gc_wb;
 
 use super::typecheck::Typecheck;
 use crate::{

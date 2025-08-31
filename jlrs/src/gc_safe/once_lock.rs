@@ -4,7 +4,7 @@
 
 use std::fmt;
 
-use jl_sys::{jlrs_gc_safe_enter, jlrs_gc_safe_leave, jlrs_gc_unsafe_enter, jlrs_gc_unsafe_leave};
+use jlrs_sys::{jlrs_gc_safe_enter, jlrs_gc_safe_leave, jlrs_gc_unsafe_enter, jlrs_gc_unsafe_leave};
 use once_cell::sync::OnceCell;
 
 use crate::memory::get_tls;

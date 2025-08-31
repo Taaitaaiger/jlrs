@@ -13,13 +13,12 @@ use jl_sys::{
     jl_string_type, jl_symbol_type, jl_task_type, jl_tvar_type, jl_typeerror_type, jl_typename_str,
     jl_typename_type, jl_typeofbottom_type, jl_uint8_type, jl_uint16_type, jl_uint32_type,
     jl_uint64_type, jl_undefvarerror_type, jl_unionall_type, jl_uniontype_type, jl_vararg_type,
-    jl_voidpointer_type, jlrs_datatype_align, jlrs_datatype_first_ptr, jlrs_datatype_has_layout,
-    jlrs_datatype_instance, jlrs_datatype_layout, jlrs_datatype_nfields, jlrs_datatype_parameters,
-    jlrs_datatype_size, jlrs_datatype_super, jlrs_datatype_typename, jlrs_datatype_zeroinit,
-    jlrs_field_isptr, jlrs_field_offset, jlrs_field_size, jlrs_get_fieldtypes,
-    jlrs_is_concrete_type, jlrs_is_primitivetype, jlrs_isbits, jlrs_nparams,
+    jl_voidpointer_type,
 };
 use jlrs_macros::julia_version;
+use jlrs_sys::{
+    jlrs_datatype_abstract, jlrs_datatype_align, jlrs_datatype_first_ptr, jlrs_datatype_has_layout, jlrs_datatype_instance, jlrs_datatype_isinlinealloc, jlrs_datatype_layout, jlrs_datatype_mutable, jlrs_datatype_nfields, jlrs_datatype_parameters, jlrs_datatype_size, jlrs_datatype_super, jlrs_datatype_typename, jlrs_datatype_zeroinit, jlrs_field_isptr, jlrs_field_offset, jlrs_field_size, jlrs_get_fieldtypes, jlrs_is_concrete_type, jlrs_is_primitivetype, jlrs_isbits, jlrs_nparams
+};
 
 use super::{Weak, type_name::TypeName, value::ValueData};
 use crate::{
@@ -246,14 +245,14 @@ impl<'scope> DataType<'scope> {
     #[inline]
     pub fn is_abstract(self) -> bool {
         // Safety: the pointer points to valid data
-        unsafe { jl_sys::jlrs_datatype_abstract(self.unwrap(Private)) != 0 }
+        unsafe { jlrs_datatype_abstract(self.unwrap(Private)) != 0 }
     }
 
     /// Returns true if this is a mutable type.
     #[inline]
     pub fn mutable(self) -> bool {
         // Safety: the pointer points to valid data
-        unsafe { jl_sys::jlrs_datatype_mutable(self.unwrap(Private)) != 0 }
+        unsafe { jlrs_datatype_mutable(self.unwrap(Private)) != 0 }
     }
 
     /// Returns true if this type can have instances
@@ -281,7 +280,7 @@ impl<'scope> DataType<'scope> {
     #[inline]
     pub fn is_inline_alloc(self) -> bool {
         // Safety: the pointer points to valid data
-        unsafe { jl_sys::jlrs_datatype_isinlinealloc(self.unwrap(Private)) != 0 }
+        unsafe { jlrs_datatype_isinlinealloc(self.unwrap(Private)) != 0 }
     }
 
     /// Whether this is declared with 'primitive type' keyword (sized, no fields, and immutable)

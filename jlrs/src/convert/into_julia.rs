@@ -16,10 +16,9 @@ use jl_sys::{
     jl_box_int16, jl_box_int32, jl_box_int64, jl_box_uint8, jl_box_uint16, jl_box_uint32,
     jl_box_uint64, jl_box_voidpointer, jl_char_type, jl_float32_type, jl_float64_type,
     jl_int8_type, jl_int16_type, jl_int32_type, jl_int64_type, jl_new_struct_uninit, jl_uint8_type,
-    jl_uint16_type, jl_uint32_type, jl_uint64_type, jl_voidpointer_type, jlrs_box_long,
-    jlrs_box_ulong,
+    jl_uint16_type, jl_uint32_type, jl_uint64_type, jl_voidpointer_type, 
 };
-
+use jlrs_sys::{jlrs_box_long, jlrs_box_ulong};
 use crate::{
     data::{
         managed::{

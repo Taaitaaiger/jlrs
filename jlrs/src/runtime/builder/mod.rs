@@ -15,10 +15,8 @@ use std::{
 
 #[cfg(feature = "async-rt")]
 pub use async_builder::*;
-use jl_sys::{
-    jl_init, jl_init_with_image, jlrs_set_nthreadpools, jlrs_set_nthreads,
-    jlrs_set_nthreads_per_pool,
-};
+use jl_sys::{jl_init, jl_init_with_image};
+use jlrs_sys::{jlrs_set_nthreadpools, jlrs_set_nthreads, jlrs_set_nthreads_per_pool};
 
 #[cfg(any(feature = "multi-rt", feature = "local-rt"))]
 use crate::error::JlrsResult;

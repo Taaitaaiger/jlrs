@@ -275,7 +275,8 @@ use std::ptr::NonNull;
 
 #[cfg(feature = "async")]
 pub use call_async::CallAsync;
-use jl_sys::{jl_call, jl_exception_occurred, jlrs_call_unchecked};
+use jl_sys::{jl_call, jl_exception_occurred};
+use jlrs_sys::jlrs_call_unchecked;
 
 use crate::{
     args::Values,

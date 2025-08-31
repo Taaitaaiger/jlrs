@@ -2,7 +2,8 @@
 
 use std::{marker::PhantomData, ptr::NonNull};
 
-use jl_sys::{jl_new_typevar, jl_tvar_t, jl_tvar_type, jlrs_tvar_lb, jlrs_tvar_name, jlrs_tvar_ub};
+use jl_sys::{jl_new_typevar, jl_tvar_t, jl_tvar_type};
+use jlrs_sys::{jlrs_tvar_lb, jlrs_tvar_name, jlrs_tvar_ub};
 
 use super::{Weak, value::ValueData};
 use crate::{

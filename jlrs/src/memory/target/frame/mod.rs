@@ -14,7 +14,7 @@ pub mod async_frame;
 
 use std::{marker::PhantomData, pin::Pin, ptr::NonNull};
 
-use jl_sys::{RawGcFrame, UnsizedGcFrame, pop_frame};
+use jlrs_sys::{RawGcFrame, UnsizedGcFrame, pop_frame};
 
 #[cfg(feature = "async")]
 pub use self::async_frame::*;

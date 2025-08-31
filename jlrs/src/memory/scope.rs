@@ -7,7 +7,7 @@
 //! async scopes use a heap-allocated stack to store their frames, their frames can grow to any
 //! size. Async scopes support async operations, and are only used with the async runtime.
 
-use jl_sys::unsized_local_scope;
+use jlrs_sys::unsized_local_scope;
 
 use super::target::{
     Target,

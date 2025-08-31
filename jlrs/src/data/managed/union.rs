@@ -2,10 +2,9 @@
 
 use std::{marker::PhantomData, ptr::NonNull};
 
-use jl_sys::{
-    jl_islayout_inline, jl_type_union, jl_uniontype_t, jl_uniontype_type, jlrs_union_a,
-    jlrs_union_b,
-};
+use jl_sys::{jl_islayout_inline, jl_type_union, jl_uniontype_t, jl_uniontype_type};
+
+use jlrs_sys::{jlrs_union_a, jlrs_union_b};
 
 use super::{
     Weak,

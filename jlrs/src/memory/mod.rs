@@ -142,7 +142,8 @@ pub mod scope;
 pub mod stack_frame;
 pub mod target;
 
-use jl_sys::{jl_tls_states_t, jlrs_get_ptls_states};
+use jl_sys::{jl_tls_states_t};
+use jlrs_sys::jlrs_get_ptls_states;
 
 pub type PTls = *mut jl_tls_states_t;
 

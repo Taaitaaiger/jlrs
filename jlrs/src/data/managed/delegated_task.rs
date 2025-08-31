@@ -11,7 +11,8 @@ use std::{
 };
 
 use atomic::Ordering;
-use jl_sys::{jl_adopt_thread, jl_gc_alloc_typed, jlrs_gc_safe_enter, jlrs_gc_wb};
+use jl_sys::{jl_adopt_thread, jl_gc_alloc_typed};
+use jlrs_sys::{jlrs_gc_safe_enter, jlrs_gc_wb};
 use parking_lot::{Condvar, Mutex};
 
 use super::{

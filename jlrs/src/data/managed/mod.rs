@@ -311,7 +311,8 @@ use std::{
     sync::atomic::{AtomicPtr, Ordering},
 };
 
-use jl_sys::{jl_stderr_obj, jlrs_gc_wb};
+use jl_sys::jl_stderr_obj;
+use jlrs_sys::jlrs_gc_wb;
 
 use self::{module::JlrsCore, private::ManagedPriv};
 use crate::{

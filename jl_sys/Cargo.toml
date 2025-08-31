@@ -18,11 +18,6 @@ links = "julia"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-fast-tls = []
-lto = []
-
-no-link = []
-yggdrasil = ["no-link"]
 i686 = []
 debug = []
 macos = []
@@ -32,6 +27,8 @@ docs = []
 [build-dependencies]
 cc = "1"
 cfg-if = "1"
+find-julia = { path = "../build_utils/find_julia", version = "0.1" }
+jlrs-compat = { path = "../build_utils/jlrs_compat", version = "0.1" }
 
 [package.metadata.docs.rs]
 features = ["docs"]

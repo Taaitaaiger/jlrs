@@ -17,9 +17,10 @@ use jl_sys::jl_alloc_array_nd;
 use jl_sys::jl_new_array;
 use jl_sys::{
     jl_alloc_array_1d, jl_alloc_array_2d, jl_alloc_array_3d, jl_apply_array_type, jl_array_t,
-    jl_ptr_to_array, jl_ptr_to_array_1d, jl_value_t, jlrs_dimtuple_type,
+    jl_ptr_to_array, jl_ptr_to_array_1d, jl_value_t,
 };
 use jlrs_macros::julia_version;
+use jlrs_sys::{jlrs_dimtuple_type};
 
 use super::{ArrayData, sized_dim_tuple, unsized_dim_tuple};
 use crate::{

@@ -124,13 +124,15 @@ use std::{
 };
 
 use jl_sys::{
-    inlined::{jlrs_array_dims_ptr, jlrs_array_ndims_fast},
     jl_alloc_vec_any, jl_apply_array_type, jl_array_eltype, jl_array_rank, jl_array_t,
     jl_array_to_string, jl_gc_add_ptr_finalizer, jl_new_struct_uninit, jl_pchar_to_array,
+};
+use jlrs_macros::julia_version;
+use jlrs_sys::{
+    inlined::{jlrs_array_dims_ptr, jlrs_array_ndims_fast},
     jlrs_array_data, jlrs_array_data_owner, jlrs_array_has_pointers, jlrs_array_how,
     jlrs_array_is_pointer_array, jlrs_array_is_union_array, jlrs_array_len,
 };
-use jlrs_macros::julia_version;
 
 #[julia_version(until = "1.10")]
 use self::dimensions::Dims;
@@ -508,7 +510,7 @@ pub trait ConstructTypedArray<T: ConstructType, const N: isize> {
                 let array = dims.alloc_array_with_data(&target, array_type, data.as_mut_ptr() as _);
 
                 #[cfg(not(julia_1_10))]
-                let mem = jl_sys::inlined::jlrs_array_mem(array.ptr().as_ptr());
+                let mem = jlrs_sys::inlined::jlrs_array_mem(array.ptr().as_ptr());
                 #[cfg(julia_1_10)]
                 let mem = array.ptr().as_ptr().cast();
 
@@ -552,7 +554,7 @@ pub trait ConstructTypedArray<T: ConstructType, const N: isize> {
             let array_type = Self::array_type(&target, &dims).as_value();
             let array = dims.alloc_array_with_data(&target, array_type, data.as_mut_ptr() as _);
             #[cfg(not(julia_1_10))]
-            let mem = jl_sys::inlined::jlrs_array_mem(array.ptr().as_ptr());
+            let mem = jlrs_sys::inlined::jlrs_array_mem(array.ptr().as_ptr());
             #[cfg(julia_1_10)]
             let mem = array.ptr().as_ptr().cast();
 
@@ -1194,7 +1196,7 @@ impl<const N: isize> ArrayBase<'_, '_, Unknown, N> {
                 let array_type = Value::wrap_non_null(NonNull::new_unchecked(array_type), Private);
                 let array = dims.alloc_array_with_data(&target, array_type, data.as_mut_ptr() as _);
                 #[cfg(not(julia_1_10))]
-                let mem = jl_sys::inlined::jlrs_array_mem(array.ptr().as_ptr());
+                let mem = jlrs_sys::inlined::jlrs_array_mem(array.ptr().as_ptr());
                 #[cfg(julia_1_10)]
                 let mem = array.ptr().as_ptr().cast();
 
@@ -1241,7 +1243,7 @@ impl<const N: isize> ArrayBase<'_, '_, Unknown, N> {
             let array_type = Value::wrap_non_null(NonNull::new_unchecked(array_type), Private);
             let array = dims.alloc_array_with_data(&target, array_type, data.as_mut_ptr() as _);
             #[cfg(not(julia_1_10))]
-            let mem = jl_sys::inlined::jlrs_array_mem(array.ptr().as_ptr());
+            let mem = jlrs_sys::inlined::jlrs_array_mem(array.ptr().as_ptr());
             #[cfg(julia_1_10)]
             let mem = array.ptr().as_ptr().cast();
 

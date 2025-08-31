@@ -6,10 +6,9 @@ use std::{
     ptr::{self, NonNull, null_mut},
 };
 
-use crate::{
-    bindings::{jl_get_pgcstack, jlrs_unsized_scope},
-    types::jl_gcframe_t,
-};
+use jl_sys::jl_get_pgcstack;
+
+use crate::{bindings::jlrs_cc::jlrs_unsized_scope, types::jl_gcframe_t};
 
 const NULL_CELL: Cell<*mut c_void> = Cell::new(null_mut());
 
@@ -18,7 +17,7 @@ pub type RootsUnsized = [Cell<*mut c_void>];
 
 #[repr(C)]
 pub struct SplitGcFrame<const M: usize, const N: usize> {
-    header: jl_gcframe_t,
+    pub(crate) header: jl_gcframe_t,
     roots_head: Roots<M>,
     roots_tail: Roots<N>,
     _marker: PhantomData<(*mut u8, PhantomPinned)>,
@@ -82,7 +81,7 @@ impl<const M: usize, const N: usize> SplitGcFrame<M, N> {
 
 #[repr(C)]
 pub struct RawGcFrame<const N: usize> {
-    header: jl_gcframe_t,
+    pub(crate) header: jl_gcframe_t,
     roots: Roots<N>,
     _marker: PhantomData<(*mut u8, PhantomPinned)>,
 }

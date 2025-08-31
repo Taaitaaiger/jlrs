@@ -10,9 +10,11 @@ use std::{marker::PhantomData, ptr::NonNull};
 use jl_sys::{
     jl_array_typename, jl_llvmpointer_typename, jl_namedtuple_typename, jl_pointer_typename,
     jl_tuple_typename, jl_type_typename, jl_typename_t, jl_typename_type, jl_vecelement_typename,
-    jlrs_typename_module, jlrs_typename_name, jlrs_typename_names, jlrs_typename_wrapper,
 };
 use jlrs_macros::julia_version;
+use jlrs_sys::{
+    jlrs_typename_abstract, jlrs_typename_atomicfields, jlrs_typename_constfields, jlrs_typename_mayinlinealloc, jlrs_typename_module, jlrs_typename_mutable, jlrs_typename_name, jlrs_typename_names, jlrs_typename_wrapper
+};
 
 use super::{Weak, simple_vector::SimpleVector, value::Value};
 use crate::{
@@ -73,35 +75,35 @@ impl<'scope> TypeName<'scope> {
     #[inline]
     pub fn atomicfields(self) -> *const u32 {
         // Safety: the pointer points to valid data
-        unsafe { jl_sys::jlrs_typename_atomicfields(self.unwrap(Private)) }
+        unsafe { jlrs_typename_atomicfields(self.unwrap(Private)) }
     }
 
     /// The `atomicfields` field.
     #[inline]
     pub fn constfields(self) -> *const u32 {
         // Safety: the pointer points to valid data
-        unsafe { jl_sys::jlrs_typename_constfields(self.unwrap(Private)) }
+        unsafe { jlrs_typename_constfields(self.unwrap(Private)) }
     }
 
     /// The `abstract` field.
     #[inline]
     pub fn is_abstract(self) -> bool {
         // Safety: the pointer points to valid data
-        unsafe { jl_sys::jlrs_typename_abstract(self.unwrap(Private)) != 0 }
+        unsafe { jlrs_typename_abstract(self.unwrap(Private)) != 0 }
     }
 
     /// The `mutabl` field.
     #[inline]
     pub fn is_mutable(self) -> bool {
         // Safety: the pointer points to valid data
-        unsafe { jl_sys::jlrs_typename_mutable(self.unwrap(Private)) != 0 }
+        unsafe { jlrs_typename_mutable(self.unwrap(Private)) != 0 }
     }
 
     /// The `mayinlinealloc` field.
     #[inline]
     pub fn mayinlinealloc(self) -> bool {
         // Safety: the pointer points to valid data
-        unsafe { jl_sys::jlrs_typename_mayinlinealloc(self.unwrap(Private)) != 0 }
+        unsafe { jlrs_typename_mayinlinealloc(self.unwrap(Private)) != 0 }
     }
 }
 

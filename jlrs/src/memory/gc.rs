@@ -5,9 +5,11 @@ use std::marker::PhantomData;
 pub use jl_sys::GcCollection;
 use jl_sys::{
     jl_gc_collect, jl_gc_collection_t, jl_gc_enable, jl_gc_is_enabled, jl_gc_mark_queue_obj,
-    jl_gc_mark_queue_objarray, jl_gc_safepoint, jl_get_pgcstack, jlrs_gc_safe_enter,
-    jlrs_gc_safe_leave, jlrs_gc_unsafe_enter, jlrs_gc_unsafe_leave, jlrs_gc_wb,
+    jl_gc_mark_queue_objarray, jl_gc_safepoint, jl_get_pgcstack, 
 };
+
+use jlrs_sys::{jlrs_gc_safe_enter,
+    jlrs_gc_safe_leave, jlrs_gc_unsafe_enter, jlrs_gc_unsafe_leave, jlrs_gc_wb,};
 
 use super::{
     PTls, get_tls,
