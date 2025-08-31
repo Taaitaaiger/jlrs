@@ -15,7 +15,7 @@ fn main() {
         julia_dir
     };
 
-    if env::var("DOCS_RS").is_ok() {
+    if building_docs() {
         return;
     }
 
@@ -76,40 +76,25 @@ fn interpret_binary_builder_target(is_binary_builder: bool) -> Option<BBTarget> 
     None
 }
 
-fn set_flags(julia_dir: &JuliaDir, _target: Option<BBTarget>) {
-    if julia_dir.is_binary_builder() {
-        // if let Some(BBTarget::WindowsI686) = target {
-        //     // Linking is necessary until raw dylib linkage is supported for this target
-        //     println!("cargo::rustc-link-lib=julia");
-        //     println!("cargo::rustc-link-lib=uv-2");
-        // }
-    } else {
-        cfg_if! {
-            if #[cfg(all(target_os = "linux", not(any(feature = "windows", feature = "macos"))))] {
-                // let lib_dir = julia_dir.lib_dir();
-                println!("cargo::rustc-link-arg=-rdynamic");
-                // println!("cargo::rustc-link-search={}", lib_dir.display());
-            } else if #[cfg(any(target_os = "macos", target_os = "freebsd", feature = "macos"))] {
-                // let lib_dir = julia_dir.lib_dir();
-                println!("cargo::rustc-link-arg=-rdynamic");
-                // println!("cargo::rustc-link-search={}", lib_dir.display());
-            } else if #[cfg(all(target_os = "windows", target_env = "msvc"))] {
-                let lib_dir = julia_dir.lib_dir();
-                // let bin_dir = julia_dir.bin_dir();
-                // println!("cargo::rustc-link-search={}", lib_dir.display());
-                // println!("cargo::rustc-link-search={}", bin_dir.display());
-            } else if #[cfg(any(all(target_os = "windows", target_env = "gnu"), feature = "windows"))] {
-                let bin_dir = julia_dir.bin_dir();
-                println!("cargo::rustc-link-search={}", bin_dir.display());
+fn set_flags(_julia_dir: &JuliaDir, _target: Option<BBTarget>) {
+    // if julia_dir.is_binary_builder() {
 
-                println!("cargo::rustc-link-lib=openlibm");
-                println!("cargo::rustc-link-lib=libuv-2");
-                println!("cargo::rustc-link-arg=-Wl,--stack,8388608");
-            } else {
-                panic!("Unsupported platform")
-            }
-        }
-    }
+    // } else {
+    //     cfg_if! {
+    //         if #[cfg(any(target_os = "linux", feature = "windows", feature = "macos"))] {
+    //             println!("cargo::rustc-link-arg=-rdynamic");
+    //         } else if #[cfg(any(all(target_os = "windows", target_env = "gnu"), feature = "windows"))] {
+    //             let bin_dir = julia_dir.bin_dir();
+    //             println!("cargo::rustc-link-search={}", bin_dir.display());
+
+    //             println!("cargo::rustc-link-lib=openlibm");
+    //             println!("cargo::rustc-link-lib=libuv-2");
+    //             println!("cargo::rustc-link-arg=-Wl,--stack,8388608");
+    //         } else {
+    //             panic!("Unsupported platform")
+    //         }
+    //     }
+    // }
 }
 
 #[allow(unused_variables)]
@@ -173,4 +158,16 @@ fn compile_jlrs_cc(julia_dir: &JuliaDir, target: Option<BBTarget>) {
     }
 
     c.compile("jlrs_cc");
+}
+
+fn building_docs() -> bool {
+    if env::var("DOCS_RS").is_ok() {
+        return true;
+    }
+    
+    #[cfg(feature = "docs")]
+    return true;
+
+    #[cfg(not(feature = "docs"))]
+    return false;
 }

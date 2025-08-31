@@ -1,3 +1,5 @@
+use std::env;
+
 use find_julia::{JuliaDir, Version, enable_version_cfgs};
 use jlrs_compat::*;
 
@@ -30,6 +32,10 @@ fn main() {
 }
 
 fn building_docs() -> bool {
+    if env::var("DOCS_RS").is_ok() {
+        return true;
+    }
+    
     #[cfg(feature = "docs")]
     return true;
 
