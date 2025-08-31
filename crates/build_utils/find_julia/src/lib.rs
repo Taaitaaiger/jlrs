@@ -260,8 +260,10 @@ impl JuliaDir {
     /// Emit detected Julia installation metadata.
     pub fn emit_metadata(&self, min_minor_version: u32, max_minor_version: u32) {
         println!("cargo::metadata=julia_dir={}", self.path.display());
+
         let is_debug = if self.debug { 1 } else { 0 };
         println!("cargo::metadata=debug={}", is_debug);
+
         let is_windows = if self.windows { 1 } else { 0 };
         println!("cargo::metadata=windows={}", is_windows);
 

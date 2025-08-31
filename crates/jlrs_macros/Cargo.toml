@@ -20,6 +20,7 @@ windows = []
 
 derive = ["proc-macro2"]
 ccall = ["proc-macro2"]
+docs = []
 
 [lib]
 proc-macro = true
