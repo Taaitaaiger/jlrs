@@ -21,3 +21,6 @@ find-julia = { path = "../../build_utils/find_julia", version = "0.1" }
 jlrs-compat = { path = "../../build_utils/jlrs_compat", version = "0.1" }
 cc = "1"
 cfg-if = "1"
+
+[package.metadata.docs.rs]
+features = ["docs"]

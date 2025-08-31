@@ -170,6 +170,7 @@ pub struct JuliaDir {
     is_binary_builder: bool,
     path: PathBuf,
     version: Version,
+    debug: bool,
 }
 
 impl JuliaDir {
@@ -179,7 +180,7 @@ impl JuliaDir {
     /// `which julia` or `where julia` is used to find this directory.
     ///
     /// If `bb_target` and `WORKSPACE` have been set, it is assumed that BinaryBuilder is used.
-    pub fn find() -> Option<Self> {
+    pub fn find(debug: bool) -> Option<Self> {
         let is_bb = building_in_binary_builder();
         if is_bb {
             let path = binary_builer_julia_dir();
@@ -188,6 +189,7 @@ impl JuliaDir {
                 is_binary_builder: is_bb,
                 path,
                 version,
+                debug,
             })
         } else {
             let path = installed_julia_dir()?;
@@ -196,6 +198,7 @@ impl JuliaDir {
                 is_binary_builder: is_bb,
                 path,
                 version,
+                debug,
             })
         }
     }
@@ -230,7 +233,11 @@ impl JuliaDir {
     pub fn link(&self) {
         let lib_dir = self.lib_dir();
         println!("cargo::rustc-link-search={}", lib_dir.display());
-        println!("cargo::rustc-link-lib=julia");
+        if self.debug {
+            println!("cargo::rustc-link-lib=julia-debug");
+        } else {
+            println!("cargo::rustc-link-lib=julia");
+        }
     }
 
     /// Whether or not BinaryBuilder is currently used
@@ -243,6 +250,8 @@ impl JuliaDir {
     /// Emit detected Julia installation metadata.
     pub fn emit_metadata(&self, min_minor_version: u32, max_minor_version: u32) {
         println!("cargo::metadata=julia_dir={}", self.path.display());
+        let is_debug = if self.debug { 1 } else { 0 };
+        println!("cargo::metadata=debug={}", is_debug);
         self.version
             .emit_metadata(min_minor_version, max_minor_version);
     }
@@ -250,6 +259,7 @@ impl JuliaDir {
     /// Load the installation detected when jl-sys was built.
     pub fn from_detected() -> Option<Self> {
         let version = Version::from_detected()?;
+        let debug = env::var("DEP_JULIA_DEBUG").ok()?.parse::<u32>().ok()? != 0;
 
         if building_in_binary_builder() {
             let path = binary_builer_julia_dir();
@@ -257,6 +267,7 @@ impl JuliaDir {
                 is_binary_builder: true,
                 path,
                 version,
+                debug,
             })
         } else {
             let path = PathBuf::from(env::var("DEP_JULIA_JULIA_DIR").ok()?);
@@ -264,6 +275,7 @@ impl JuliaDir {
                 is_binary_builder: false,
                 path,
                 version,
+                debug,
             })
         }
     }
@@ -315,12 +327,6 @@ fn installed_julia_dir() -> Option<PathBuf> {
     if let Some(path) = env::var_os("JLRS_JULIA_DIR") {
         return Some(PathBuf::from(path));
     }
-
-    let out = Command::new("cmd")
-        .args(["/C", "where", "julia"])
-        .output()
-        .ok()?
-        .stdout;
 
     let out = Command::new("cmd")
         .args(["/C", "where", "julia"])

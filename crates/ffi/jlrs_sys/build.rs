@@ -76,28 +76,28 @@ fn interpret_binary_builder_target(is_binary_builder: bool) -> Option<BBTarget> 
     None
 }
 
-fn set_flags(julia_dir: &JuliaDir, target: Option<BBTarget>) {
+fn set_flags(julia_dir: &JuliaDir, _target: Option<BBTarget>) {
     if julia_dir.is_binary_builder() {
-        if let Some(BBTarget::WindowsI686) = target {
-            // Linking is necessary until raw dylib linkage is supported for this target
-            println!("cargo::rustc-link-lib=julia");
-            println!("cargo::rustc-link-lib=uv-2");
-        }
+        // if let Some(BBTarget::WindowsI686) = target {
+        //     // Linking is necessary until raw dylib linkage is supported for this target
+        //     println!("cargo::rustc-link-lib=julia");
+        //     println!("cargo::rustc-link-lib=uv-2");
+        // }
     } else {
         cfg_if! {
             if #[cfg(all(target_os = "linux", not(any(feature = "windows", feature = "macos"))))] {
-                let lib_dir = julia_dir.lib_dir();
+                // let lib_dir = julia_dir.lib_dir();
                 println!("cargo::rustc-link-arg=-rdynamic");
-                println!("cargo::rustc-link-search={}", lib_dir.display());
+                // println!("cargo::rustc-link-search={}", lib_dir.display());
             } else if #[cfg(any(target_os = "macos", target_os = "freebsd", feature = "macos"))] {
-                let lib_dir = julia_dir.lib_dir();
+                // let lib_dir = julia_dir.lib_dir();
                 println!("cargo::rustc-link-arg=-rdynamic");
-                println!("cargo::rustc-link-search={}", lib_dir.display());
+                // println!("cargo::rustc-link-search={}", lib_dir.display());
             } else if #[cfg(all(target_os = "windows", target_env = "msvc"))] {
                 let lib_dir = julia_dir.lib_dir();
-                let bin_dir = julia_dir.bin_dir();
-                println!("cargo::rustc-link-search={}", lib_dir.display());
-                println!("cargo::rustc-link-search={}", bin_dir.display());
+                // let bin_dir = julia_dir.bin_dir();
+                // println!("cargo::rustc-link-search={}", lib_dir.display());
+                // println!("cargo::rustc-link-search={}", bin_dir.display());
             } else if #[cfg(any(all(target_os = "windows", target_env = "gnu"), feature = "windows"))] {
                 let bin_dir = julia_dir.bin_dir();
                 println!("cargo::rustc-link-search={}", bin_dir.display());
@@ -107,14 +107,6 @@ fn set_flags(julia_dir: &JuliaDir, target: Option<BBTarget>) {
                 println!("cargo::rustc-link-arg=-Wl,--stack,8388608");
             } else {
                 panic!("Unsupported platform")
-            }
-        }
-
-        cfg_if! {
-            if #[cfg(feature = "debug")] {
-                println!("cargo::rustc-link-lib=julia-debug");
-            } else {
-                println!("cargo::rustc-link-lib=julia");
             }
         }
     }

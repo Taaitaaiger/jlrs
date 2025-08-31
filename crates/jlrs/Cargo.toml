@@ -63,15 +63,14 @@ lto = ["jlrs-sys/lto"]
 # Link debug build of Julia
 debug = ["jl-sys/debug"]
 # Link 32-bits version of Julia on Linux
-i686 = ["jl-sys/i686"]
+i686 = ["jlrs-sys/i686"]
 # Cross-compile to Windows
-windows = ["jl-sys/windows", "jlrs-macros/windows"]
+windows = ["jl-sys/windows", "jlrs-sys/windows", "jlrs-macros/windows"]
 # Cross-compile to macOS
-macos = ["jl-sys/macos"]
-
+macos = ["jlrs-sys/macos"]
 
 # Used to generate docs for docs.rs
-docs = ["jl-sys/docs", "full"]
+docs = ["jl-sys/docs", "jlrs-sys/docs", "full"]
 
 [dependencies]
 jl-sys = { version = "0.26", path = "../ffi/jl_sys" }

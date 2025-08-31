@@ -16,7 +16,12 @@ fn main() {
         version.emit_metadata_unchecked();
     } else {
         // Detect active version of Julia, emit metadata, and link Julia.
-        let julia_dir = JuliaDir::find()
+        #[cfg(feature = "debug")]
+        let julia_dir = JuliaDir::find(true)
+            .expect("JLRS_JULIA_DIR is not set and no installed version of Julia can be found");
+
+        #[cfg(not(feature = "debug"))]
+        let julia_dir = JuliaDir::find(false)
             .expect("JLRS_JULIA_DIR is not set and no installed version of Julia can be found");
 
         julia_dir.emit_metadata(MIN_MINOR_VERSION, MAX_MINOR_VERSION);
