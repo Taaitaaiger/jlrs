@@ -1,0 +1,21 @@
+[package]
+name = "julia_module_test"
+version = "0.1.0"
+edition = "2024"
+
+[profile.release]
+panic = "abort"
+
+[profile.dev]
+panic = "abort"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[features]
+windows = ["jlrs/windows"]
+lto = ["jlrs/lto"]
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+jlrs = { path = "../../crates/jlrs", features = ["ccall", "jlrs-derive"] }

@@ -1,4 +1,12 @@
 [workspace]
 resolver = "2"
-members = ["jlrs", "jlrs_macros", "jl_sys", "jlrs_cfg", "examples"]
-exclude = ["julia_module_test", "benches"]
+members = [
+    "crates/build_utils/find_julia",
+    "crates/build_utils/jlrs_compat",
+    "crates/ffi/jl_sys",
+    "crates/ffi/jlrs_sys",
+    "crates/jlrs",
+    "crates/jlrs_macros",
+    "examples",
+]
+exclude = ["tests/julia_module_test", "benches"]
