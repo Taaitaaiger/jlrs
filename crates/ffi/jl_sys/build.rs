@@ -23,7 +23,7 @@ fn main() {
             .expect("JLRS_JULIA_DIR is not set and no installed version of Julia can be found");
 
         #[cfg(not(feature = "debug"))]
-        let julia_dir = JuliaDir::find(false)
+        let julia_dir = JuliaDir::find(windows_build(), false)
             .expect("JLRS_JULIA_DIR is not set and no installed version of Julia can be found");
 
         julia_dir.emit_metadata(MIN_MINOR_VERSION, MAX_MINOR_VERSION);
@@ -40,5 +40,13 @@ fn building_docs() -> bool {
     return true;
 
     #[cfg(not(feature = "docs"))]
+    return false;
+}
+
+fn windows_build() -> bool {
+    #[cfg(any(target_os = "windows", feature = "windows"))]
+    return true;
+
+    #[cfg(not(any(target_os = "windows", feature = "windows")))]
     return false;
 }

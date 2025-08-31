@@ -168,6 +168,7 @@ impl Version {
 /// Julia root directory
 pub struct JuliaDir {
     is_binary_builder: bool,
+    windows: bool,
     path: PathBuf,
     version: Version,
     debug: bool,
@@ -180,12 +181,13 @@ impl JuliaDir {
     /// `which julia` or `where julia` is used to find this directory.
     ///
     /// If `bb_target` and `WORKSPACE` have been set, it is assumed that BinaryBuilder is used.
-    pub fn find(debug: bool) -> Option<Self> {
+    pub fn find(windows: bool, debug: bool) -> Option<Self> {
         let is_bb = building_in_binary_builder();
         if is_bb {
             let path = binary_builer_julia_dir();
             let version = Version::detect(path.clone());
             Some(JuliaDir {
+                windows,
                 is_binary_builder: is_bb,
                 path,
                 version,
@@ -195,6 +197,7 @@ impl JuliaDir {
             let path = installed_julia_dir()?;
             let version = Version::detect(path.clone());
             Some(JuliaDir {
+                windows,
                 is_binary_builder: is_bb,
                 path,
                 version,
@@ -231,12 +234,19 @@ impl JuliaDir {
 
     /// Instruct `rustc` to link this installation of Julia
     pub fn link(&self) {
-        let lib_dir = self.lib_dir();
-        println!("cargo::rustc-link-search={}", lib_dir.display());
-        if self.debug {
-            println!("cargo::rustc-link-lib=julia-debug");
-        } else {
-            println!("cargo::rustc-link-lib=julia");
+        if !self.is_binary_builder {
+            let lib_dir = self.lib_dir();
+            println!("cargo::rustc-link-search={}", lib_dir.display());
+
+            if self.debug {
+                println!("cargo::rustc-link-lib=julia-debug");
+            } else {
+                println!("cargo::rustc-link-lib=julia");
+            }
+        }
+
+        if self.windows {
+            println!("cargo::rustc-link-arg=-Wl,--stack,8388608");
         }
     }
 
@@ -252,6 +262,9 @@ impl JuliaDir {
         println!("cargo::metadata=julia_dir={}", self.path.display());
         let is_debug = if self.debug { 1 } else { 0 };
         println!("cargo::metadata=debug={}", is_debug);
+        let is_windows = if self.windows { 1 } else { 0 };
+        println!("cargo::metadata=windows={}", is_windows);
+
         self.version
             .emit_metadata(min_minor_version, max_minor_version);
     }
@@ -260,6 +273,7 @@ impl JuliaDir {
     pub fn from_detected() -> Option<Self> {
         let version = Version::from_detected()?;
         let debug = env::var("DEP_JULIA_DEBUG").ok()?.parse::<u32>().ok()? != 0;
+        let windows = env::var("DEP_JULIA_WINDOWS").ok()?.parse::<u32>().ok()? != 0;
 
         if building_in_binary_builder() {
             let path = binary_builer_julia_dir();
@@ -268,6 +282,7 @@ impl JuliaDir {
                 path,
                 version,
                 debug,
+                windows,
             })
         } else {
             let path = PathBuf::from(env::var("DEP_JULIA_JULIA_DIR").ok()?);
@@ -276,6 +291,7 @@ impl JuliaDir {
                 path,
                 version,
                 debug,
+                windows,
             })
         }
     }
