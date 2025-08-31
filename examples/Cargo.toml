@@ -5,7 +5,7 @@ publish = false
 edition = "2024"
 
 [dev-dependencies]
-jlrs = { version = "0.22", path = "../jlrs", features = ["full"] }
+jlrs = { version = "0.22", path = "../crates/jlrs", features = ["full"] }
 tokio = { version = "1", features = ["macros", "rt"]}
 rayon = "1.10"
 

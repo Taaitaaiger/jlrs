@@ -1,0 +1,34 @@
+[package]
+name = "jl-sys"
+version = "0.26.0"
+authors = ["Thomas van Doornmalen <thomas.vandoornmalen@gmail.com>"]
+description = """
+jl-sys contains the generated bindings for the Julia C API used by jlrs.
+"""
+documentation = "https://docs.rs/jl-sys"
+homepage = "https://github.com/Taaitaaiger/jlrs"
+repository = "https://github.com/Taaitaaiger/jlrs"
+readme = "README.md"
+keywords = ["Julia", "math", "mathematics", "bindings", "ffi"]
+categories = ["external-ffi-bindings"]
+license = "MIT"
+edition = "2024"
+links = "julia"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[features]
+i686 = []
+debug = []
+macos = []
+windows = []
+docs = []
+
+[build-dependencies]
+cc = "1"
+cfg-if = "1"
+find-julia = { path = "../../build_utils/find_julia", version = "0.1" }
+jlrs-compat = { path = "../../build_utils/jlrs_compat", version = "0.1" }
+
+[package.metadata.docs.rs]
+features = ["docs"]

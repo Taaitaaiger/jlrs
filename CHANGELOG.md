@@ -90,6 +90,8 @@
 
 - Non-rooting targets are now called weak targets.
 
+- jl-sys has been split into jl-sys and jlrs-sys. All extensions have been moved to jlrs-sys.
+
 ## v0.21
 
 - Support generating bindings for Julia enums with integer base types in combination with JlrsCore.Reflect and the `Enum` derive macro.

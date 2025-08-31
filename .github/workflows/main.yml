@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [ master, dev ]
+    branches: [ master ]
   pull_request:
-    branches: [ master, dev ]
+    branches: [ master ]
 
   workflow_dispatch:
 
@@ -35,8 +35,6 @@ jobs:
       - name: Run tests
         run: |
           julia -e "import Pkg; Pkg.add(url=\"https://github.com/Taaitaaiger/JlrsCore.jl\", rev=\"5cc78665dcea3a400f10dda831fbf36f66f625a9\")"
-          export JLRS_JULIA_DIR="$(dirname $(dirname $(which julia)))"
-          export LD_LIBRARY_PATH="${JLRS_JULIA_DIR}/lib:${LD_LIBRARY_PATH}"
           cargo test --features full --verbose
 
   test-macos:
@@ -65,8 +63,6 @@ jobs:
       - name: Run tests
         run: |
           julia -e "import Pkg; Pkg.add(url=\"https://github.com/Taaitaaiger/JlrsCore.jl\", rev=\"5cc78665dcea3a400f10dda831fbf36f66f625a9\")"
-          export JLRS_JULIA_DIR="$(dirname $(dirname $(which julia)))"
-          export DYLD_LIBRARY_PATH="${JLRS_JULIA_DIR}/lib:${DYLD_LIBRARY_PATH}"
           cargo test --features full --verbose
 
   test-windows-gnu:
@@ -151,8 +147,6 @@ jobs:
       - name: Run tests
         run: |
           julia -e "import Pkg; Pkg.add(url=\"https://github.com/Taaitaaiger/JlrsCore.jl\", rev=\"5cc78665dcea3a400f10dda831fbf36f66f625a9\")"
-          export JLRS_JULIA_DIR="$(dirname $(dirname $(which julia)))"
-          export LD_LIBRARY_PATH="${JLRS_JULIA_DIR}/lib:${LD_LIBRARY_PATH}"
           cargo test --features full --verbose
 
   test-macos-lts:
@@ -178,8 +172,6 @@ jobs:
       - name: Run tests
         run: |
           julia -e "import Pkg; Pkg.add(url=\"https://github.com/Taaitaaiger/JlrsCore.jl\", rev=\"5cc78665dcea3a400f10dda831fbf36f66f625a9\")"
-          export JLRS_JULIA_DIR="$(dirname $(dirname $(which julia)))"
-          export DYLD_LIBRARY_PATH="${JLRS_JULIA_DIR}/lib:${DYLD_LIBRARY_PATH}"
           cargo test --features full --verbose
 
   test-windows-gnu-lts:
@@ -251,16 +243,10 @@ jobs:
         with:
           toolchain: stable
 
-      - name: Set env
-        run: |
-          julia -e "import Pkg; Pkg.add(url=\"https://github.com/Taaitaaiger/JlrsCore.jl\", rev=\"5cc78665dcea3a400f10dda831fbf36f66f625a9\")"
-          export JLRS_JULIA_DIR=$(dirname $(dirname $(which julia)))
-          echo "LD_LIBRARY_PATH=${JLRS_JULIA_DIR}/lib:${LD_LIBRARY_PATH}" >> $GITHUB_ENV
-          echo "JLRS_JULIA_DIR=${JLRS_JULIA_DIR}" >> $GITHUB_ENV
-
       - name: Run module tests
         run: |
-          cd julia_module_test
+          julia -e "import Pkg; Pkg.add(url=\"https://github.com/Taaitaaiger/JlrsCore.jl\", rev=\"5cc78665dcea3a400f10dda831fbf36f66f625a9\")"
+          cd tests/julia_module_test
           cargo build
           cp ./target/debug/libjulia_module_test.so .
           julia JuliaModuleTest.jl
@@ -284,7 +270,7 @@ jobs:
       - name: Run module tests
         run: |
           julia -e 'import Pkg; Pkg.add(url="https://github.com/Taaitaaiger/JlrsCore.jl", rev="5cc78665dcea3a400f10dda831fbf36f66f625a9")'
-          cd julia_module_test
+          cd tests/julia_module_test
           cargo build
           cp ./target/debug/julia_module_test.* libjulia_module_test.dll
           julia JuliaModuleTest.jl
@@ -308,9 +294,7 @@ jobs:
       - name: Run tests
         run: |
           julia -e "import Pkg; Pkg.add(url=\"https://github.com/Taaitaaiger/JlrsCore.jl\", rev=\"5cc78665dcea3a400f10dda831fbf36f66f625a9\")"
-          export JLRS_JULIA_DIR="$(dirname $(dirname $(which julia)))"
-          export DYLD_LIBRARY_PATH="${JLRS_JULIA_DIR}/lib:${DYLD_LIBRARY_PATH}"
-          cd julia_module_test
+          cd tests/julia_module_test
           cargo build
           cp ./target/debug/libjulia_module_test.* .
           julia JuliaModuleTest.jl
@@ -325,12 +309,6 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: stable
-
-      - name: Set env
-        run: |
-          export JLRS_JULIA_DIR=$(dirname $(dirname $(which julia)))
-          echo "LD_LIBRARY_PATH=${JLRS_JULIA_DIR}/lib:${LD_LIBRARY_PATH}" >> $GITHUB_ENV
-          echo "JLRS_JULIA_DIR=${JLRS_JULIA_DIR}" >> $GITHUB_ENV
 
       - name: Build Docs
         run: cargo doc --features docs,jl-sys/docs
