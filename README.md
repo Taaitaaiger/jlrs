@@ -23,7 +23,7 @@ An incomplete list of features that are currently supported by jlrs:
 
 - Access arbitrary Julia modules and their content.
 - Call Julia functions, including functions that take keyword arguments.
-- Handle exceptions or convert them to an error message, optionally with color.
+- Handle exceptions or convert them to an error message.
 - Include and call your own Julia code.
 - Use custom system images.
 - Create values that Julia can use, and convert them back to Rust, from Rust.
@@ -45,7 +45,22 @@ To use jlrs, supported versions of Rust and Julia must have been installed. Curr
 a more recent version of Rust. jlrs uses the JlrsCore package for Julia, if this package has not
 been installed, the latest version will be installed automatically by default.
 
-### Linux
+### With juliaup
+
+It is possible to use jlrs in combination with juliaup, but the default approach jlrs uses to
+detect the installed version of Julia, its header files, and the libjulia itself will not
+work. Instead, the jlrs-launcher application can be installed. This is an application that
+uses the juliaup crate itself to determine this information and launches an application with
+an updated environment.
+
+### Without juliaup
+
+The recommended way to install Julia is to download the binaries from the official website,
+which is distributed as an archive containing a directory called `julia-x.y.z`. This directory
+contains several other directories, including a `bin` directory containing the `julia`
+executable.
+
+#### Linux
 
 The recommended way to install Julia is to download the binaries from the official website,
 which is distributed as an archive containing a directory called `julia-x.y.z`. This directory
@@ -55,7 +70,7 @@ executable.
 During compilation, the paths to the header and library are normally detected automatically by
 executing the command `which julia`. The path to `julia.h` must be
 `$(which julia)/../include/julia/julia.h` and the path to the library
-`$(which julia)/../lib/libjulia.so`. If you want to override this default behaviour the
+`$(which julia)/../lib/libjulia.so`. If you want to override this default behavior the
 `JLRS_JULIA_DIR` environment variable must be set to the path to the appropriate `julia.x-y-z`
 directory, in this case `$JLRS_JULIA_DIR/include/julia/julia.h` and
 `$JLRS_JULIA_DIR/lib/libjulia.so` are used instead.
@@ -64,13 +79,13 @@ In order to be able to load `libjulia.so` this file must be on the library searc
 this is not the case you must add `/path/to/julia-x.y.z/lib` to the `LD_LIBRARY_PATH`
 environment variable.
 
-### macOS
+#### macOS
 
 Follow the instructions for Linux, but replace `LD_LIBRARY_PATH` with `DYLD_LIBRARY_PATH`.
 
-### Windows
+#### Windows
 
-Julia can be installed using juliaup, or with the installer or portable installation
+Julia can be installed with the installer or portable installation
 downloaded from the official website. In the first case, Julia has been likely installed in
 `%USERPROFILE%\.julia\juliaup\julia-x.y.z+0~x64`, using the installer or extracting allows you to
 pick the destination. After installation or extraction a folder called `Julia-x.y.z` exists, which
@@ -79,8 +94,7 @@ folder must be added to the `Path` environment variable.
 
 Julia is automatically detected by executing the command `where julia`. If this returns
 multiple locations the first one is used. The default can be overridden by setting the
-`JLRS_JULIA_DIR` environment variable. This doesn't work correctly with juliaup, in this case
-the environment variable must be set.
+`JLRS_JULIA_DIR` environment variable.
 
 ## Features
 
@@ -181,15 +195,7 @@ All other features are called utility features. The following are available:
 
   Link with a debug build of Julia on Linux.
 
-- `no-link`
-
-  Don't link Julia.
-
-- `yggdrasil`
-
-  Flag that must be enabled when compiling with BinaryBuilder.
-
-You can enable all features except `debug`, `i686`, `windows`, `no-link` and `yggdrasil` by
+You can enable all features except `debug`, `i686`, and `windows` by
 enabling the `full` feature. If you don't want to enable any runtimes either, you can use
 `full-no-rt`.
 
@@ -197,7 +203,7 @@ enabling the `full` feature. If you don't want to enable any runtimes either, yo
 
 It's possible to override certain defaults of jlrs and Julia by setting environment variables.
 Many of the environment variables mentioned
-[here](https://docs.julialang.org/en/v1/manual/environment-variables/) should apply to applications
+[in the Julia documentation](https://docs.julialang.org/en/v1/manual/environment-variables/) should apply to applications
 that use jlrs as well, but this is mostly untested.
 
 Several additional environment variables can be set which only affect applications that use jlrs.
