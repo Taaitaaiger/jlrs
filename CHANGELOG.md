@@ -92,6 +92,8 @@
 
 - jl-sys has been split into jl-sys and jlrs-sys. All extensions have been moved to jlrs-sys.
 
+- The exception handler of `catch_exceptions` now takes an `Exception` and is called in the catch block.
+
 ## v0.21
 
 - Support generating bindings for Julia enums with integer base types in combination with JlrsCore.Reflect and the `Enum` derive macro.
