@@ -155,6 +155,7 @@ All other features are called utility features. The following are available:
   Adds support for working with Julia's `Float16` type from Rust using half's `f16` type.
 
 - `complex`
+
   Adds support for working with Julia's `Complex` type from Rust using num's `Complex` type.
 
 - `ccall`

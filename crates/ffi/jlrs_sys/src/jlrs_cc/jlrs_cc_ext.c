@@ -4,7 +4,7 @@
 extern "C"
 {
 #endif
-    static inline jl_value_t *jlrs_current_exception(void)
+    jl_value_t *jlrs_current_exception(void)
     {
 #if JULIA_VERSION_MINOR >= 11
         return jl_current_exception(jl_current_task);
@@ -21,19 +21,19 @@ extern "C"
         JL_GC_POP();
     }
 
-    jlrs_catch_t jlrs_try_catch(void *callback, jlrs_try_catch_trampoline_t trampoline, void *result)
+    jlrs_catch_tag_t jlrs_try_catch(void *callback, void *err_callback, jlrs_try_trampoline_t try_trampoline, jlrs_catch_trampoline_t catch_trampoline, void *result, void *exc)
     {
-        jlrs_catch_t res = {JLRS_CATCH_OK, 0};
+        jlrs_catch_tag_t res;
 
         JL_TRY
         {
-            res = trampoline(callback, result);
+            res = JLRS_CATCH_OK;
+            try_trampoline(callback, result);
         }
         JL_CATCH
         {
-            jl_value_t *exc = jlrs_current_exception();
-            jlrs_catch_t the_exc = {JLRS_CATCH_EXCEPTION, exc};
-            return the_exc;
+            res = JLRS_CATCH_EXCEPTION;
+            catch_trampoline(err_callback, exc);
         }
 
         return res;

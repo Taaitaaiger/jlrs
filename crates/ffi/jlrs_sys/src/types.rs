@@ -9,7 +9,6 @@ pub use jl_sys::types::*;
 pub enum jlrs_catch_tag_t {
     Ok = 0,
     Exception = 1,
-    Panic = 2,
 }
 
 #[repr(C)]
@@ -19,8 +18,11 @@ pub struct jlrs_catch_t {
     pub error: *mut c_void,
 }
 
-pub type jlrs_try_catch_trampoline_t =
-    unsafe extern "C" fn(callback: *mut c_void, result: *mut c_void) -> jlrs_catch_t;
+pub type jlrs_try_trampoline_t =
+    unsafe extern "C-unwind" fn(callback: *mut c_void, out: *mut c_void);
+
+pub type jlrs_catch_trampoline_t =
+    unsafe extern "C-unwind" fn(callback: *mut c_void, out: *mut c_void);
 
 pub type jlrs_unsized_scope_trampoline_t = unsafe extern "C-unwind" fn(
     frame: *mut jl_gcframe_t,

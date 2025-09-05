@@ -13,7 +13,6 @@ extern "C"
     {
         JLRS_CATCH_OK = 0,
         JLRS_CATCH_EXCEPTION = 1,
-        JLRS_CATCH_PANIC = 2,
     } jlrs_catch_tag_t;
 
     typedef struct
@@ -22,11 +21,12 @@ extern "C"
         void *error;
     } jlrs_catch_t;
 
-    typedef jlrs_catch_t (*jlrs_try_catch_trampoline_t)(void *callback, void *result);
+    jl_value_t *jlrs_current_exception(void);
+    typedef void (*jlrs_try_trampoline_t)(void *callback, void *result);
+    typedef void (*jlrs_catch_trampoline_t)(void *callback, void *exc);
     typedef void (*jlrs_unsized_scope_trampoline_t)(jl_gcframe_t *frame, void *callback, void *result);
 
     void jlrs_unsized_scope(size_t frame_size, jlrs_unsized_scope_trampoline_t trampoline, void *callback, void *result);
-    jlrs_catch_t jlrs_try_catch(void *callback, jlrs_try_catch_trampoline_t trampoline, void *result);
 
     jl_datatype_t *jlrs_dimtuple_type(size_t rank);
     jl_value_t *jlrs_tuple_of(jl_value_t **values, size_t n);

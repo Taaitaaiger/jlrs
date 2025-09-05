@@ -540,6 +540,12 @@ pub mod functions {
 
         pub fn jl_throw(e: *mut crate::types::jl_value_t) -> !;
 
+        pub fn jl_rethrow() -> !;
+
+        pub fn jl_print_backtrace();
+
+        pub fn jl_rethrow_other(e: *mut crate::types::jl_value_t) -> !;
+
         pub fn jl_stdout_stream() -> *mut crate::types::JL_STREAM;
 
         pub fn jl_stderr_stream() -> *mut crate::types::JL_STREAM;

@@ -88,11 +88,16 @@ pub mod jlrs_cc {
             result: *mut std::ffi::c_void,
         );
 
+        pub fn jlrs_current_exception() -> *mut crate::jl_value_t;
+
         pub fn jlrs_try_catch(
             callback: *mut std::ffi::c_void,
-            trampoline: crate::types::jlrs_try_catch_trampoline_t,
+            err_callback: *mut std::ffi::c_void,
+            try_trampoline: crate::types::jlrs_try_trampoline_t,
+            catch_trampoline: crate::types::jlrs_catch_trampoline_t,
             result: *mut std::ffi::c_void,
-        ) -> crate::types::jlrs_catch_t;
+            err: *mut std::ffi::c_void,
+        ) -> crate::types::jlrs_catch_tag_t;
 
         pub fn jlrs_dimtuple_type(rank: usize) -> *mut crate::types::jl_datatype_t;
 
