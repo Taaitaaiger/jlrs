@@ -4,9 +4,9 @@ use std::{ffi::CStr, process::abort, ptr::null_mut, sync::atomic::AtomicPtr};
 
 #[cfg(not(any(windows, target_os = "windows", feature = "windows")))]
 use atomic::Ordering;
-use jl_sys::jl_value_t;
 #[cfg(not(any(windows, target_os = "windows", feature = "windows")))]
 use jl_sys::{jl_dlclose, jl_dlopen, jl_dlsym};
+use jl_sys::{jl_get_pgcstack, jl_value_t};
 
 use crate::prelude::Target;
 
@@ -93,4 +93,9 @@ where
 
     crate::inline_static_ref!(KWCALL, crate::prelude::Value, "Core.kwcall", target)
         .unwrap(crate::private::Private)
+}
+
+#[doc(hidden)]
+pub unsafe fn pgcstack() -> *mut *mut jl_sys::jl_gcframe_t {
+    unsafe { jl_get_pgcstack() }
 }

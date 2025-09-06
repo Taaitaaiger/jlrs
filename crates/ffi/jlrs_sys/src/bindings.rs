@@ -97,6 +97,7 @@ pub mod jlrs_cc {
             catch_trampoline: crate::types::jlrs_catch_trampoline_t,
             result: *mut std::ffi::c_void,
             err: *mut std::ffi::c_void,
+            panic_payload: *mut *mut std::ffi::c_void,
         ) -> crate::types::jlrs_catch_tag_t;
 
         pub fn jlrs_dimtuple_type(rank: usize) -> *mut crate::types::jl_datatype_t;

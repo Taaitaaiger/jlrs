@@ -120,6 +120,8 @@ impl Stack {
             // Safety: create_foreign_type is called with the correct arguments, the new type is
             // rooted until the constant has been set, and we've just checked if JlrsCore.Stack
             // already exists.
+            //
+            // FIXME: don't set a constant in another module.
             tgt.local_scope::<_, 2>(|mut frame| {
                 let dt = <Self as OpaqueType>::create_type(&mut frame, sym, module);
                 module.set_const(&mut frame, sym, dt.as_value()).unwrap();

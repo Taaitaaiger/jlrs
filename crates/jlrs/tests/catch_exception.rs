@@ -1,6 +1,8 @@
 mod util;
 #[cfg(feature = "local-rt")]
 mod tests {
+    use std::panic::{AssertUnwindSafe, catch_unwind};
+
     use jlrs::{catch::catch_exceptions, prelude::*, weak_handle_unchecked};
 
     use super::util::JULIA;
@@ -80,9 +82,34 @@ mod tests {
         });
     }
 
+    fn catch_panic() {
+        JULIA.with(|handle| {
+            handle.borrow_mut().local_scope::<_, 1>(|frame| unsafe {
+                let s1 = *jlrs::util::pgcstack();
+
+                let res = catch_unwind(AssertUnwindSafe(|| {
+                    let _ = catch_exceptions(
+                        || {
+                            frame.local_scope::<_, 1>(|_| {
+                                panic!("Expected panic");
+                            })
+                        },
+                        |_| (),
+                    );
+                }));
+
+                assert!(res.is_err(), "Didn't panic");
+                let s2 = *jlrs::util::pgcstack();
+                // let s2_prev = (&**s2).prev.get();
+                assert_eq!(s1, s2, "GC corruption");
+            })
+        });
+    }
+
     #[test]
     fn call_exception_tests() {
         call0_exception_is_caught();
         rethrow_exception();
+        catch_panic();
     }
 }
