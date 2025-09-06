@@ -127,7 +127,7 @@ A runtime lets initialize Julia from Rust application, the following features en
 must never enable a runtime feature.
 
 **WARNING**: When building an application that embeds Julia, set
-`RUSTFLAGS="-Clink-args=-rdynamic"` if you want fast code.
+`RUSTFLAGS="-Clink-arg=-rdynamic"` if you want fast code.
 
 ### Utilities
 
@@ -180,7 +180,7 @@ All other features are called utility features. The following are available:
   You must set the `RUSTFLAGS` environment variable if this feature is enabled, and possibly the
   `CC` environment variable. Setting `RUSTFLAGS` overrides the default flags that jlrs sets, so
   you must set at least the following flags:
-  `RUSTFLAGS="-Clinker-plugin-lto -Clinker=clang-XX -Clink-arg=-fuse-ld=lld -Clink-args=-rdynamic"`.
+  `RUSTFLAGS="-Clinker-plugin-lto -Clinker=clang-XX -Clink-arg=-fuse-ld=lld -Clink-arg=-rdynamic"`.
   The last one is particularly important for embedders, forgetting it is guaranteed to kill
   performance.
 

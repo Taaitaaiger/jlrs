@@ -1,6 +1,9 @@
 //! Manage the garbage collector.
 
-use std::marker::PhantomData;
+use std::{
+    marker::PhantomData,
+    panic::{AssertUnwindSafe, catch_unwind, resume_unwind},
+};
 
 pub use jl_sys::GcCollection;
 use jl_sys::{
@@ -253,10 +256,13 @@ pub unsafe fn gc_safe<F: FnOnce() -> T, T>(f: F) -> T {
 
         let ptls = get_tls();
         let state = jlrs_gc_safe_enter(ptls);
-        let res = f();
+        let res = catch_unwind(AssertUnwindSafe(f));
         jlrs_gc_safe_leave(ptls, state);
 
-        res
+        match res {
+            Ok(res) => res,
+            Err(e) => resume_unwind(e),
+        }
     }
 }
 
@@ -265,10 +271,13 @@ pub unsafe fn gc_safe<F: FnOnce() -> T, T>(f: F) -> T {
 pub(crate) unsafe fn gc_safe_with<F: FnOnce() -> T, T>(ptls: PTls, f: F) -> T {
     unsafe {
         let state = jlrs_gc_safe_enter(ptls);
-        let res = f();
+        let res = catch_unwind(AssertUnwindSafe(f));
         jlrs_gc_safe_leave(ptls, state);
 
-        res
+        match res {
+            Ok(res) => res,
+            Err(e) => resume_unwind(e),
+        }
     }
 }
 
@@ -289,10 +298,13 @@ pub unsafe fn gc_unsafe<F: for<'scope> FnOnce(Unrooted<'scope>) -> T, T>(f: F) -
 
         let unrooted = Unrooted::new();
         let state = jlrs_gc_unsafe_enter(ptls);
-        let res = f(unrooted);
+        let res = catch_unwind(AssertUnwindSafe(|| f(unrooted)));
         jlrs_gc_unsafe_leave(ptls, state);
 
-        res
+        match res {
+            Ok(res) => res,
+            Err(e) => resume_unwind(e),
+        }
     }
 }
 
@@ -304,10 +316,13 @@ pub(crate) unsafe fn gc_unsafe_with<F: for<'scope> FnOnce(Unrooted<'scope>) -> T
     unsafe {
         let state = jlrs_gc_unsafe_enter(ptls);
         let unrooted = Unrooted::new();
-        let res = f(unrooted);
+        let res = catch_unwind(AssertUnwindSafe(|| f(unrooted)));
         jlrs_gc_unsafe_leave(ptls, state);
 
-        res
+        match res {
+            Ok(res) => res,
+            Err(e) => resume_unwind(e),
+        }
     }
 }
 

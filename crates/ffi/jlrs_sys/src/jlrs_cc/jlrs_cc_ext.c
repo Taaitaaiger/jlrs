@@ -21,19 +21,39 @@ extern "C"
         JL_GC_POP();
     }
 
-    jlrs_catch_tag_t jlrs_try_catch(void *callback, void *err_callback, jlrs_try_trampoline_t try_trampoline, jlrs_catch_trampoline_t catch_trampoline, void *result, void *exc)
+    jlrs_catch_tag_t jlrs_try_catch(
+        void *callback,
+        void *err_callback,
+        jlrs_try_trampoline_t try_trampoline,
+        jlrs_catch_trampoline_t catch_trampoline,
+        void *result,
+        void *exc,
+        void **panic_payload)
     {
         jlrs_catch_tag_t res;
 
         JL_TRY
         {
             res = JLRS_CATCH_OK;
-            try_trampoline(callback, result);
+            *panic_payload = try_trampoline(callback, result);
+
+            if (*panic_payload != NULL)
+            {
+                // Trigger an exception to force state restoration
+                jl_error("");
+            }
         }
         JL_CATCH
         {
-            res = JLRS_CATCH_EXCEPTION;
-            catch_trampoline(err_callback, exc);
+            if (*panic_payload == NULL)
+            {
+                res = JLRS_CATCH_EXCEPTION;
+                catch_trampoline(err_callback, exc);
+            }
+            else
+            {
+                res = JLRS_CATCH_PANIC;
+            }
         }
 
         return res;

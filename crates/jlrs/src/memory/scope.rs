@@ -9,6 +9,8 @@
 
 use jlrs_sys::unsized_local_scope;
 
+use crate::catch::{Exception, catch_exceptions};
+
 use super::target::{
     Target,
     frame::{GcFrame, LocalFrame, LocalGcFrame, UnsizedLocalGcFrame},
@@ -31,6 +33,16 @@ pub unsafe trait LocalScope: private::LocalScopePriv {
         }
     }
 
+    /// Call [`LocalScope::local_scope`] inside [`catch_exceptions`].
+    fn catching_local_scope<T, E, const N: usize>(
+        &self,
+        func: impl for<'scope> FnOnce(LocalGcFrame<'scope, N>) -> T,
+        exception_handler: impl for<'exc> FnOnce(Exception<'exc, '_>) -> E,
+    ) -> Result<T, E> {
+        let cb = || self.local_scope(func);
+        unsafe { catch_exceptions(cb, exception_handler) }
+    }
+
     /// Create a local scope with capacity for `size` roots and call `func`.
     #[inline]
     fn unsized_local_scope<T>(
@@ -45,6 +57,17 @@ pub unsafe trait LocalScope: private::LocalScopePriv {
                 func.take().unwrap()(frame)
             })
         }
+    }
+
+    /// Call [`LocalScope::unsized_local_scope`] inside [`catch_exceptions`].
+    fn catching_unsized_local_scope<T, E>(
+        &self,
+        size: usize,
+        func: impl for<'scope> FnOnce(UnsizedLocalGcFrame<'scope>) -> T,
+        exception_handler: impl for<'exc> FnOnce(Exception<'exc, '_>) -> E,
+    ) -> Result<T, E> {
+        let cb = || self.unsized_local_scope(size, func);
+        unsafe { catch_exceptions(cb, exception_handler) }
     }
 }
 

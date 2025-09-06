@@ -8,7 +8,9 @@
 //! created every time the function is called and creating such a block is relatively expensive.
 //!
 //! Instead of using the checked variants you can create a try-catch block from Rust with
-//! [`catch_exceptions`]. This function takes two closures, the try and catch blocks.
+//! [`catch_exceptions`]. This function takes two closures, the try and catch blocks. If the
+//! try-block panics, the panic is caught temporarily to restore the Julia state as if an
+//! exception had been caught. In practice though, it is recommended to abort on panics.
 //!
 //! Because exceptions work by jumping to the nearest enclosing catch block, you must guarantee
 //! that there are no pending drops when an exception is thrown. See this [blog post] for more
@@ -19,7 +21,15 @@
 //!
 //! [blog post]: https://blog.rust-lang.org/inside-rust/2021/01/26/ffi-unwind-longjmp.html#pofs-and-stack-deallocating-functions
 
-use std::{cell::Cell, marker::PhantomData, mem::MaybeUninit, ptr::NonNull};
+use std::{
+    any::Any,
+    cell::Cell,
+    marker::PhantomData,
+    mem::MaybeUninit,
+    os::raw::c_void,
+    panic::{AssertUnwindSafe, catch_unwind, resume_unwind},
+    ptr::{NonNull, null_mut},
+};
 
 use jl_sys::{jl_print_backtrace, jl_rethrow, jl_rethrow_other, jl_value_t};
 use jlrs_sys::{
@@ -50,19 +60,24 @@ impl<'exc, 'data> Exception<'exc, 'data> {
     }
 
     /// Rethrow the current exception.
+    /// 
+    /// Safety: this new exception causes execution to jump to the next enclosing try-catch block,
+    /// no pending drops may be jumped over.
     pub unsafe fn rethrow(self) {
         unsafe { jl_rethrow() };
     }
 
     /// Rethrow another value as the current exception.
+    /// 
+    /// Safety: this new exception causes execution to jump to the next enclosing try-catch block,
+    /// no pending drops may be jumped over.
     pub unsafe fn rethrow_other(self, exc: Value) {
         unsafe { jl_rethrow_other(exc.unwrap(Private)) };
     }
 
     /// Prints the current exception and the backtrace to stderr.
     pub fn print_backtrace(self) {
-        let err = self.value();
-        err.show(Stream::Stderr);
+        self.value().show(Stream::Stderr);
         eprintln!();
 
         unsafe {
@@ -71,6 +86,7 @@ impl<'exc, 'data> Exception<'exc, 'data> {
         eprintln!();
     }
 
+    // Safety: must only be called inside a catch-block.
     unsafe fn new() -> Self {
         Exception {
             _exc: PhantomData,
@@ -102,6 +118,8 @@ pub unsafe fn catch_exceptions<T, E>(
         let mut result = MaybeUninit::<T>::uninit();
         let mut err = MaybeUninit::<E>::uninit();
 
+        let mut panic_payload: *mut Box<dyn Any + 'static + Send> = null_mut();
+
         let res = jlrs_sys::jlrs_try_catch(
             func as *mut _ as *mut _,
             handler as *mut _ as *mut _,
@@ -109,11 +127,13 @@ pub unsafe fn catch_exceptions<T, E>(
             catch_trampoline,
             (&mut result) as *mut _ as *mut _,
             (&mut err) as *mut _ as *mut _,
+            (&mut panic_payload) as *mut _ as *mut _,
         );
 
         match res {
             jlrs_catch_tag_t::Ok => Ok(result.assume_init()),
             jlrs_catch_tag_t::Exception => Err(err.assume_init()),
+            jlrs_catch_tag_t::Panic => resume_unwind(Box::from_raw(panic_payload)),
         }
     }
 }
@@ -122,9 +142,16 @@ pub unsafe fn catch_exceptions<T, E>(
 unsafe extern "C-unwind" fn try_trampoline<F: FnOnce() -> T, T>(
     func: &mut Option<F>,
     result: &mut MaybeUninit<T>,
-) {
-    let res = func.take().unwrap()();
-    result.write(res);
+) -> *mut c_void {
+    let res = catch_unwind(AssertUnwindSafe(|| {
+        let res = func.take().unwrap()();
+        result.write(res);
+    }));
+
+    match res {
+        Ok(_) => null_mut(),
+        Err(e) => Box::leak(Box::new(e)) as *mut _ as *mut _,
+    }
 }
 
 #[inline]
@@ -143,7 +170,7 @@ where
 {
     unsafe {
         std::mem::transmute::<
-            Option<unsafe extern "C-unwind" fn(&mut Option<F>, &mut MaybeUninit<T>)>,
+            Option<unsafe extern "C-unwind" fn(&mut Option<F>, &mut MaybeUninit<T>) -> *mut c_void>,
             Option<jlrs_try_trampoline_t>,
         >(Some(try_trampoline::<F, T>))
     }

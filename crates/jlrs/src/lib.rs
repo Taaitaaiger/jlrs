@@ -120,7 +120,7 @@
 //! Libraries must never enable a runtime feature.</div>
 //!
 //! <div class="warning"><strong>WARNING</strong>: When building an application that embeds Julia, set
-//! <code>RUSTFLAGS="-Clink-args=-rdynamic"</code> if you want fast code.</div>
+//! <code>RUSTFLAGS="-Clink-arg=-rdynamic"</code> if you want fast code.</div>
 //!
 //! ## Utilities
 //!
@@ -172,7 +172,7 @@
 //!   You must set the `RUSTFLAGS` environment variable if this feature is enabled, and possibly the
 //!   `CC` environment variable. Setting `RUSTFLAGS` overrides the default flags that jlrs sets, so
 //!   you must set at least the following flags:
-//!   `RUSTFLAGS="-Clinker-plugin-lto -Clinker=clang-XX -Clink-arg=-fuse-ld=lld -Clink-args=-rdynamic"`.
+//!   `RUSTFLAGS="-Clinker-plugin-lto -Clinker=clang-XX -Clink-arg=-fuse-ld=lld -Clink-arg=-rdynamic"`.
 //!
 //! - `i686`
 //!

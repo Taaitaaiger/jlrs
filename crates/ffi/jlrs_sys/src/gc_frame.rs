@@ -117,7 +117,7 @@ impl<const N: usize> RawGcFrame<N> {
             let gcstack_ref = pgcstack.as_mut();
             let top = gcstack_ref.ptr.read();
             self.header.prev.set(top as _);
-            gcstack_ref.set_top(&mut self.header)
+            gcstack_ref.set_top(&mut self.header);
         }
     }
 }
