@@ -381,7 +381,7 @@ impl<'scope> Module<'scope> {
             );
 
             #[cfg(not(any(julia_1_10, julia_1_11)))]
-            jlrs_sys::jlrs_declare_constant_val(
+            jl_sys::jl_declare_constant_val(
                 null_mut(),
                 self.unwrap(Private),
                 symbol.unwrap(Private),

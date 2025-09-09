@@ -20,11 +20,6 @@ extern "C"
     static jl_genericmemory_typetagdata_func_t jl_genericmemory_typetagdata_func;
 #endif
 
-#if JULIA_VERSION_MINOR >= 12
-    typedef jl_binding_partition_t *(*jl_declare_constant_val_func_t)(jl_binding_t *, jl_module_t *, jl_sym_t *, jl_value_t *);
-    static jl_declare_constant_val_func_t jl_declare_constant_val_func;
-#endif
-
     void jlrs_init_missing_functions(void)
     {
         void ***libjulia_internal_handle_ref_v = (void ***)jl_eval_string("cglobal(:jl_libjulia_internal_handle)");
@@ -45,11 +40,6 @@ extern "C"
 
         int found_jl_genericmemory_typetagdata = jl_dlsym(libjulia_internal_handle, "jl_genericmemory_typetagdata", (void **)&jl_genericmemory_typetagdata_func, 0);
         assert(found_jl_genericmemory_typetagdata);
-#endif
-
-#if JULIA_VERSION_MINOR >= 12
-        int found_jl_declare_constant_val = jl_dlsym(libjulia_internal_handle, "jl_declare_constant_val", (void **)&jl_declare_constant_val_func, 0);
-        assert(found_jl_declare_constant_val);
 #endif
     }
 
@@ -82,14 +72,6 @@ extern "C"
     {
         assert(jl_genericmemory_typetagdata_func && "jl_genericmemory_typetagdata_func not loaded");
         return jl_genericmemory_typetagdata_func(m);
-    }
-#endif
-
-#if JULIA_VERSION_MINOR >= 12
-    jl_binding_partition_t *jlrs_declare_constant_val(jl_binding_t *b, jl_module_t *m, jl_sym_t *var, jl_value_t *val)
-    {
-        assert(jl_declare_constant_val_func && "jl_declare_constant_val_func not loaded");
-        return jl_declare_constant_val_func(b, m, var, val);
     }
 #endif
 
