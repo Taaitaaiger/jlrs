@@ -32,7 +32,7 @@
 
 - The MSRV has been increased to 1.85.
 
-- The closure in scopes is now taken as an `impl trait` to get rid of the (unnameable) generic, this change should only affect local scopes which now just take their size as a constant generic. To update your code, replace `.local_scope::<_,` with `.local_scope::<`.
+- The closure in scopes is now taken as an `impl trait` to get rid of the (unnameable) generic, and the return type has been restored as a generic parameter.
 
 - `Target::with_local_scope` has been moved to a new trait, `LocalScopeExt`, and like `LocalScope::local_scope` only takes its size as a constant generic. This trait also provides `LocalScopeExt::with_unsized_local_scope`.
 
@@ -64,7 +64,7 @@
 
 - Custom marking functions can be implemented with the `Mark` trait.
 
-- `ParametricBase` and `ParametricVariant` have been remove, `OpaqueType` can now handle types with type parameters. Both `OpaqueType` and `ForeignType` are now derive traits.
+- `ParametricBase` and `ParametricVariant` have been removed, `OpaqueType` can now handle types with type parameters. Both `OpaqueType` and `ForeignType` are now derive traits.
 
 - `Module::global_unchecked` can return `None` if the global value doesn't exist.
 

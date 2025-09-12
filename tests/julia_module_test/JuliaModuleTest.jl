@@ -250,3 +250,10 @@ end
     @test JuliaModuleTest.takes_four_generics_m_start2(v6) === v6
     @test JuliaModuleTest.takes_four_generics_m_start2(v7) === v7
 end
+
+@testset "Named tuple" begin
+    nt = JuliaModuleTest.returns_named_tuple()
+    @test nt isa NamedTuple
+    @test nt.a isa UInt
+    @test nt.b isa String
+end

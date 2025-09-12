@@ -60,7 +60,7 @@ impl<'exc, 'data> Exception<'exc, 'data> {
     }
 
     /// Rethrow the current exception.
-    /// 
+    ///
     /// Safety: this new exception causes execution to jump to the next enclosing try-catch block,
     /// no pending drops may be jumped over.
     pub unsafe fn rethrow(self) {
@@ -68,7 +68,7 @@ impl<'exc, 'data> Exception<'exc, 'data> {
     }
 
     /// Rethrow another value as the current exception.
-    /// 
+    ///
     /// Safety: this new exception causes execution to jump to the next enclosing try-catch block,
     /// no pending drops may be jumped over.
     pub unsafe fn rethrow_other(self, exc: Value) {
