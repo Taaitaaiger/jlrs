@@ -9,12 +9,11 @@
 
 use jlrs_sys::unsized_local_scope;
 
-use crate::catch::{Exception, catch_exceptions};
-
 use super::target::{
     Target,
     frame::{GcFrame, LocalFrame, LocalGcFrame, UnsizedLocalGcFrame},
 };
+use crate::catch::{Exception, catch_exceptions};
 
 /// Create new local scopes, local scopes can store a prespecified number of roots.
 pub unsafe trait LocalScope: private::LocalScopePriv {

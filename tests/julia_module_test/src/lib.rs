@@ -3,6 +3,7 @@ use jlrs::{
         managed::{
             array::{ArrayRet, RankedArrayRet, TypedArrayRet, TypedRankedArrayRet},
             ccall_ref::{CCallRef, CCallRefRet},
+            named_tuple::NamedTupleRet,
             value::{
                 ValueRet,
                 typed::{TypedValue, TypedValueRet},
@@ -23,6 +24,7 @@ pub mod exceptions;
 pub mod foreign;
 pub mod generics;
 pub mod isbits;
+pub mod named_tuple;
 pub mod ref_types;
 pub mod typed_value;
 
@@ -32,6 +34,7 @@ use exceptions::*;
 use foreign::*;
 use generics::*;
 use isbits::*;
+use named_tuple::*;
 use ref_types::*;
 use typed_value::*;
 
@@ -59,6 +62,7 @@ julia_module! {
     fn returns_typed_array() -> TypedArrayRet<f32>;
     fn returns_typed_rank2_array() -> TypedRankedArrayRet<f32, 2>;
     fn returns_jlrs_result(throw_err: Bool) -> JlrsResult<i32>;
+    fn returns_named_tuple() -> NamedTupleRet;
     fn returns_ref_bool() -> CCallRefRet<bool>;
     fn returns_typed_value() -> TypedValueRet<bool>;
     fn takes_generics_from_env(array: TypedValue<tvar!('A')>, data: TypedValue<tvar!('T')>) use GenericEnv;

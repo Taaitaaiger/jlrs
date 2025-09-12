@@ -10,7 +10,7 @@
 use std::{fmt, marker::PhantomData, ptr::NonNull};
 
 use fnv::FnvHashMap;
-use jl_sys::{jl_field_index, jl_get_nth_field, jl_value_t};
+use jl_sys::{jl_field_index, jl_get_nth_field, jl_namedtuple_type, jl_value_t};
 use smallvec::SmallVec;
 
 use crate::{
@@ -666,3 +666,6 @@ pub type NamedTupleData<'target, 'data, Tgt> =
 /// `JuliaResult<NamedTuple>` or `WeakJuliaResult<WeakNamedTuple>`, depending on the target type `Tgt`.
 pub type NamedTupleResult<'target, 'data, Tgt> =
     TargetResult<'target, 'data, NamedTuple<'target, 'data>, Tgt>;
+
+impl_construct_type_managed!(NamedTuple, 2, jl_namedtuple_type);
+impl_ccall_arg_managed!(NamedTuple, 2);
