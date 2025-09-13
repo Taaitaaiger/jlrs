@@ -256,4 +256,7 @@ end
     @test nt isa NamedTuple
     @test nt.a isa UInt
     @test nt.b isa String
+
+    nt2 = JuliaModuleTest.take_return_named_tuple(nt)
+    @test nt2 == nt
 end

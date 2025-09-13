@@ -1,7 +1,11 @@
 mod util;
 #[cfg(all(feature = "local-rt", feature = "ccall"))]
 mod tests {
-    use jlrs::{prelude::*, weak_handle};
+    use jlrs::{
+        data::managed::{ccall_ref::CCallRef, named_tuple::NamedTuple},
+        prelude::*,
+        weak_handle,
+    };
 
     use super::util::JULIA;
 
@@ -70,9 +74,23 @@ mod tests {
         })
     }
 
+    fn ccall_ref_named_tuple() {
+        JULIA.with(|handle| {
+            handle.borrow().local_scope::<_, 2>(|mut frame| {
+                let a = Value::new(&mut frame, 2usize);
+                let kw = named_tuple!(&mut frame, "a" => a).unwrap();
+                let ccall_ref =
+                    unsafe { std::mem::transmute::<NamedTuple, CCallRef<NamedTuple>>(kw) };
+
+                ccall_ref.as_managed().unwrap();
+            })
+        })
+    }
+
     #[test]
     fn ccall_tests() {
         ccall_with_array();
         ccall_with_array_and_scope();
+        ccall_ref_named_tuple();
     }
 }

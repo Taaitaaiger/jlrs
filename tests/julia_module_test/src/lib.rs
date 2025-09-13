@@ -3,10 +3,9 @@ use jlrs::{
         managed::{
             array::{ArrayRet, RankedArrayRet, TypedArrayRet, TypedRankedArrayRet},
             ccall_ref::{CCallRef, CCallRefRet},
-            named_tuple::NamedTupleRet,
+            named_tuple::{NamedTuple, NamedTupleRet},
             value::{
-                ValueRet,
-                typed::{TypedValue, TypedValueRet},
+                typed::{TypedValue, TypedValueRet}, ValueRet
             },
         },
         types::{
@@ -63,6 +62,7 @@ julia_module! {
     fn returns_typed_rank2_array() -> TypedRankedArrayRet<f32, 2>;
     fn returns_jlrs_result(throw_err: Bool) -> JlrsResult<i32>;
     fn returns_named_tuple() -> NamedTupleRet;
+    fn take_return_named_tuple(nt: CCallRef<NamedTuple<'_, 'static>>)  -> NamedTupleRet;
     fn returns_ref_bool() -> CCallRefRet<bool>;
     fn returns_typed_value() -> TypedValueRet<bool>;
     fn takes_generics_from_env(array: TypedValue<tvar!('A')>, data: TypedValue<tvar!('T')>) use GenericEnv;
