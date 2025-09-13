@@ -1,5 +1,8 @@
 use jlrs::{
-    data::managed::named_tuple::NamedTupleRet,
+    data::managed::{
+        ccall_ref::CCallRef,
+        named_tuple::{NamedTuple, NamedTupleRet},
+    },
     named_tuple,
     prelude::{JuliaString, LocalScope, Managed, Value},
     weak_handle_unchecked,
@@ -14,4 +17,8 @@ pub fn returns_named_tuple() -> NamedTupleRet {
 
         named_tuple!(&frame, "a" => a, "b" => b).unwrap().leak()
     })
+}
+
+pub fn take_return_named_tuple(nt: CCallRef<NamedTuple<'_, 'static>>) -> NamedTupleRet {
+    nt.as_managed().unwrap().leak()
 }

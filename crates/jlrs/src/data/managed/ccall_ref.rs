@@ -29,7 +29,7 @@ use crate::{
     convert::ccall_types::{CCallArg, CCallReturn},
     data::{
         layout::valid_layout::ValidLayout,
-        managed::{datatype::DataType, value::Value},
+        managed::{datatype::DataType, private::ManagedPriv, value::Value},
         types::{
             abstract_type::{AnyType, RefTypeConstructor},
             construct_type::ConstructType,
@@ -39,6 +39,7 @@ use crate::{
     error::{CANNOT_DISPLAY_TYPE, JlrsError, JlrsResult, TypeError},
     memory::{scope::LocalScopeExt, target::unrooted::Unrooted},
     prelude::Target,
+    private::Private,
 };
 
 #[repr(C)]
@@ -308,8 +309,16 @@ where
                 }
             } else if base_type.is::<UnionAll>() {
                 let base_ua = base_type.cast_unchecked::<UnionAll>();
-                let base_dt = base_ua.base_type();
 
+                // Special case for unwrapping NamedTuples
+                if base_ua.unwrap(Private) == UnionAll::namedtuple_type(&unrooted).unwrap(Private)
+                    && T::construct_type(unrooted).as_managed().unwrap(Private)
+                        == base_type.unwrap(Private)
+                {
+                    return self.0.managed_type.cast::<T>();
+                }
+
+                let base_dt = base_ua.base_type();
                 if base_dt.is_concrete_type() && base_dt.mutable() {
                     return self.0.managed_type.cast::<T>();
                 }
