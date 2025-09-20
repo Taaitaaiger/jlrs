@@ -1,4 +1,17 @@
+// TODO
+#![allow(unused)]
+
 use jlrs::prelude::*;
+
+#[derive(ConstructType)]
+#[jlrs(julia_type = "Main.AnAbstractType")]
+pub struct AnAbstractType {}
+
+#[derive(ConstructType)]
+#[jlrs(julia_type = "Main.AnAbstractUnionAll")]
+pub struct AnAbstractUnionAll<T> {
+    _t: ::std::marker::PhantomData<T>,
+}
 
 #[repr(C)]
 #[derive(
@@ -401,38 +414,20 @@ pub struct DoubleHasGenericTypeConstructor<T> {
 }
 
 #[repr(C)]
-#[derive(
-    Clone, Debug, Unbox, ValidLayout, Typecheck, ValidField, ConstructType, CCallArg, CCallReturn,
-)]
+#[derive(Clone, Debug, Unbox, ValidLayout, Typecheck, ValidField, ConstructType, CCallArg)]
 #[jlrs(julia_type = "Main.DoubleImmut")]
 pub struct DoubleImmut<'scope, 'data> {
     pub a: Immut<'scope, 'data>,
 }
 
 #[repr(C)]
-#[derive(
-    Clone, Debug, Unbox, ValidLayout, Typecheck, ValidField, ConstructType, CCallArg, CCallReturn,
-)]
-#[jlrs(julia_type = "Main.DoubleUVariant")]
-pub struct DoubleUVariant {
-    #[jlrs(bits_union_align)]
-    _a_align: ::jlrs::data::layout::union::Align4,
-    #[jlrs(bits_union)]
-    pub a: ::jlrs::data::layout::union::TypedBitsUnion<::jlrs::UnionOf![u16, u32], 4>,
-    #[jlrs(bits_union_flag)]
-    pub a_flag: u8,
-}
-
-#[repr(C)]
-#[derive(
-    Clone, Debug, Unbox, ValidLayout, Typecheck, ValidField, ConstructType, CCallArg, CCallReturn,
-)]
+#[derive(Clone, Debug, Unbox, ValidLayout, Typecheck, ValidField, ConstructType, CCallArg)]
 #[jlrs(julia_type = "Main.DoubleVariant")]
 pub struct DoubleVariant {
     #[jlrs(bits_union_align)]
     _a_align: ::jlrs::data::layout::union::Align4,
     #[jlrs(bits_union)]
-    pub a: ::jlrs::data::layout::union::TypedBitsUnion<::jlrs::UnionOf![i16, i32], 4>,
+    pub a: ::jlrs::data::layout::union::BitsUnion<4>,
     #[jlrs(bits_union_flag)]
     pub a_flag: u8,
 }
@@ -443,6 +438,60 @@ pub struct DoubleVariant {
 )]
 #[jlrs(julia_type = "Main.Empty", zero_sized_type)]
 pub struct Empty {}
+
+#[repr(C)]
+#[derive(Clone, Debug, Unbox, ValidLayout, Typecheck, ValidField, ConstructType, CCallArg)]
+#[jlrs(julia_type = "Main.HasAbstractField")]
+pub struct HasAbstractField<'scope, 'data> {
+    pub a: ::std::option::Option<::jlrs::data::managed::value::WeakValue<'scope, 'data>>,
+}
+
+#[repr(C)]
+#[derive(Clone, Debug, Unbox, ValidLayout, Typecheck, ValidField, ConstructType, CCallArg)]
+#[jlrs(julia_type = "Main.HasAbstractUnionAllField")]
+pub struct HasAbstractUnionAllField<'scope, 'data> {
+    pub a: ::std::option::Option<::jlrs::data::managed::value::WeakValue<'scope, 'data>>,
+}
+
+#[derive(ConstructType)]
+#[jlrs(julia_type = "Main.HasAtomicField")]
+pub struct HasAtomicFieldTypeConstructor {}
+
+#[derive(ConstructType)]
+#[jlrs(julia_type = "Main.HasCustomAtomicField")]
+pub struct HasCustomAtomicFieldTypeConstructor {}
+
+#[repr(C)]
+#[derive(
+    Clone,
+    Debug,
+    Unbox,
+    ValidLayout,
+    Typecheck,
+    ValidField,
+    IsBits,
+    ConstructType,
+    CCallArg,
+    CCallReturn,
+)]
+#[jlrs(julia_type = "Main.HasGenericAbstractField")]
+pub struct HasGenericAbstractField<T> {
+    pub a: T,
+}
+
+#[repr(C)]
+#[derive(Clone, Debug, Unbox, ValidLayout, Typecheck, ValidField, IsBits)]
+#[jlrs(julia_type = "Main.HasGenericAbstractUnionAllField")]
+pub struct HasGenericAbstractUnionAllField<U> {
+    pub a: U,
+}
+
+#[derive(ConstructType, HasLayout)]
+#[jlrs(julia_type = "Main.HasGenericAbstractUnionAllField", constructor_for = "HasGenericAbstractUnionAllField", scope_lifetime = false, data_lifetime = false, layout_params = ["U"], elided_params = ["T"], all_params = ["T", "U"])]
+pub struct HasGenericAbstractUnionAllFieldTypeConstructor<T, U> {
+    _t: ::std::marker::PhantomData<T>,
+    _u: ::std::marker::PhantomData<U>,
+}
 
 #[repr(C)]
 #[derive(Clone, Debug, Unbox, ValidLayout, Typecheck, ValidField)]
@@ -458,7 +507,7 @@ pub struct HasGenericImmutTypeConstructor<T> {
 }
 
 #[repr(C)]
-#[derive(Clone, Debug, Unbox, ValidLayout, Typecheck, IsBits, ConstructType)]
+#[derive(Clone, Debug, Unbox, ValidLayout, Typecheck, ConstructType)]
 #[jlrs(julia_type = "Main.HasGeneric")]
 pub struct HasGeneric<T> {
     pub a: T,
@@ -472,9 +521,7 @@ pub struct HasImmut<'scope, 'data> {
 }
 
 #[repr(C)]
-#[derive(
-    Clone, Debug, Unbox, ValidLayout, Typecheck, ValidField, ConstructType, CCallArg, CCallReturn,
-)]
+#[derive(Clone, Debug, Unbox, ValidLayout, Typecheck, ValidField, ConstructType, CCallArg)]
 #[jlrs(julia_type = "Main.Immut")]
 pub struct Immut<'scope, 'data> {
     pub a: ::std::option::Option<::jlrs::data::managed::value::WeakValue<'scope, 'data>>,
@@ -495,9 +542,7 @@ pub struct MutNested<'scope, 'data> {
 }
 
 #[repr(C)]
-#[derive(
-    Clone, Debug, Unbox, ValidLayout, Typecheck, ValidField, ConstructType, CCallArg, CCallReturn,
-)]
+#[derive(Clone, Debug, Unbox, ValidLayout, Typecheck, ValidField, ConstructType, CCallArg)]
 #[jlrs(julia_type = "Main.NonBitsUnion")]
 pub struct NonBitsUnion<'scope, 'data> {
     pub a: ::std::option::Option<::jlrs::data::managed::value::WeakValue<'scope, 'data>>,
@@ -523,9 +568,7 @@ pub struct SingleVariant {
 }
 
 #[repr(C)]
-#[derive(
-    Clone, Debug, Unbox, ValidLayout, Typecheck, ValidField, ConstructType, CCallArg, CCallReturn,
-)]
+#[derive(Clone, Debug, Unbox, ValidLayout, Typecheck, ValidField, ConstructType, CCallArg)]
 #[jlrs(julia_type = "Main.SizeAlignMismatch")]
 pub struct SizeAlignMismatch {
     #[jlrs(bits_union_align)]
@@ -548,48 +591,38 @@ pub struct TypedEmptyTypeConstructor<T> {
 }
 
 #[repr(C)]
-#[derive(
-    Clone, Debug, Unbox, ValidLayout, Typecheck, ValidField, ConstructType, CCallArg, CCallReturn,
-)]
+#[derive(Clone, Debug, Unbox, ValidLayout, Typecheck, ValidField, ConstructType, CCallArg)]
 #[jlrs(julia_type = "Main.UnionInTuple")]
 pub struct UnionInTuple<'scope, 'data> {
     pub a: ::std::option::Option<::jlrs::data::managed::value::WeakValue<'scope, 'data>>,
 }
 
 #[repr(C)]
-#[derive(
-    Clone, Debug, Unbox, ValidLayout, Typecheck, ValidField, ConstructType, CCallArg, CCallReturn,
-)]
+#[derive(Clone, Debug, Unbox, ValidLayout, Typecheck, ValidField, ConstructType, CCallArg)]
 #[jlrs(julia_type = "Main.WithArray")]
 pub struct WithArray<'scope, 'data> {
     pub a: ::std::option::Option<::jlrs::data::managed::array::WeakArray<'scope, 'data>>,
 }
 
 #[repr(C)]
-#[derive(
-    Clone, Debug, Unbox, ValidLayout, Typecheck, ValidField, ConstructType, CCallArg, CCallReturn,
-)]
+#[derive(Clone, Debug, Unbox, ValidLayout, Typecheck, ValidField, ConstructType, CCallArg)]
 #[jlrs(julia_type = "Main.WithCodeInstance")]
 pub struct WithCodeInstance<'scope, 'data> {
     pub a: ::std::option::Option<::jlrs::data::managed::value::WeakValue<'scope, 'data>>,
 }
 
 #[repr(C)]
-#[derive(
-    Clone, Debug, Unbox, ValidLayout, Typecheck, ValidField, ConstructType, CCallArg, CCallReturn,
-)]
+#[derive(Clone, Debug, Unbox, ValidLayout, Typecheck, ValidField, ConstructType, CCallArg)]
 #[jlrs(julia_type = "Main.WithDataType")]
 pub struct WithDataType<'scope> {
     pub a: ::std::option::Option<::jlrs::data::managed::datatype::WeakDataType<'scope>>,
 }
 
 #[repr(C)]
-#[derive(
-    Clone, Debug, Unbox, ValidLayout, Typecheck, ValidField, ConstructType, CCallArg, CCallReturn,
-)]
+#[derive(Clone, Debug, Unbox, ValidLayout, Typecheck, ValidField, ConstructType, CCallArg)]
 #[jlrs(julia_type = "Main.WithExpr")]
-pub struct WithExpr<'scope, 'data> {
-    pub a: ::std::option::Option<::jlrs::data::managed::value::WeakValue<'scope, 'data>>,
+pub struct WithExpr<'scope> {
+    pub a: ::std::option::Option<::jlrs::data::managed::expr::WeakExpr<'scope>>,
 }
 
 #[repr(C)]
@@ -611,9 +644,7 @@ pub struct WithGenericT<T> {
 }
 
 #[repr(C)]
-#[derive(
-    Clone, Debug, Unbox, ValidLayout, Typecheck, ValidField, ConstructType, CCallArg, CCallReturn,
-)]
+#[derive(Clone, Debug, Unbox, ValidLayout, Typecheck, ValidField, ConstructType, CCallArg)]
 #[jlrs(julia_type = "Main.WithGenericUnionAll")]
 pub struct WithGenericUnionAll<'scope, 'data> {
     pub a: ::std::option::Option<::jlrs::data::managed::value::WeakValue<'scope, 'data>>,
@@ -621,35 +652,46 @@ pub struct WithGenericUnionAll<'scope, 'data> {
 
 #[repr(C)]
 #[derive(
-    Clone, Debug, Unbox, ValidLayout, Typecheck, ValidField, ConstructType, CCallArg, CCallReturn,
+    Clone,
+    Debug,
+    Unbox,
+    ValidLayout,
+    Typecheck,
+    IntoJulia,
+    ValidField,
+    IsBits,
+    ConstructType,
+    CCallArg,
+    CCallReturn,
 )]
+#[jlrs(julia_type = "Main.WithInt32")]
+pub struct WithInt32 {
+    pub int32: i32,
+}
+
+#[repr(C)]
+#[derive(Clone, Debug, Unbox, ValidLayout, Typecheck, ValidField, ConstructType, CCallArg)]
 #[jlrs(julia_type = "Main.WithMethod")]
 pub struct WithMethod<'scope, 'data> {
     pub a: ::std::option::Option<::jlrs::data::managed::value::WeakValue<'scope, 'data>>,
 }
 
 #[repr(C)]
-#[derive(
-    Clone, Debug, Unbox, ValidLayout, Typecheck, ValidField, ConstructType, CCallArg, CCallReturn,
-)]
+#[derive(Clone, Debug, Unbox, ValidLayout, Typecheck, ValidField, ConstructType, CCallArg)]
 #[jlrs(julia_type = "Main.WithMethodInstance")]
 pub struct WithMethodInstance<'scope, 'data> {
     pub a: ::std::option::Option<::jlrs::data::managed::value::WeakValue<'scope, 'data>>,
 }
 
 #[repr(C)]
-#[derive(
-    Clone, Debug, Unbox, ValidLayout, Typecheck, ValidField, ConstructType, CCallArg, CCallReturn,
-)]
+#[derive(Clone, Debug, Unbox, ValidLayout, Typecheck, ValidField, ConstructType, CCallArg)]
 #[jlrs(julia_type = "Main.WithMethodTable")]
 pub struct WithMethodTable<'scope, 'data> {
     pub a: ::std::option::Option<::jlrs::data::managed::value::WeakValue<'scope, 'data>>,
 }
 
 #[repr(C)]
-#[derive(
-    Clone, Debug, Unbox, ValidLayout, Typecheck, ValidField, ConstructType, CCallArg, CCallReturn,
-)]
+#[derive(Clone, Debug, Unbox, ValidLayout, Typecheck, ValidField, ConstructType, CCallArg)]
 #[jlrs(julia_type = "Main.WithModule")]
 pub struct WithModule<'scope> {
     pub a: ::std::option::Option<::jlrs::data::managed::module::WeakModule<'scope>>,
@@ -674,18 +716,14 @@ pub struct WithNestedGenericT<T> {
 }
 
 #[repr(C)]
-#[derive(
-    Clone, Debug, Unbox, ValidLayout, Typecheck, ValidField, ConstructType, CCallArg, CCallReturn,
-)]
+#[derive(Clone, Debug, Unbox, ValidLayout, Typecheck, ValidField, ConstructType, CCallArg)]
 #[jlrs(julia_type = "Main.WithPropagatedLifetime")]
 pub struct WithPropagatedLifetime<'scope> {
     pub a: WithGenericT<::std::option::Option<::jlrs::data::managed::module::WeakModule<'scope>>>,
 }
 
 #[repr(C)]
-#[derive(
-    Clone, Debug, Unbox, ValidLayout, Typecheck, ValidField, ConstructType, CCallArg, CCallReturn,
-)]
+#[derive(Clone, Debug, Unbox, ValidLayout, Typecheck, ValidField, ConstructType, CCallArg)]
 #[jlrs(julia_type = "Main.WithPropagatedLifetimes")]
 pub struct WithPropagatedLifetimes<'scope, 'data> {
     pub a: WithGenericT<
@@ -737,97 +775,70 @@ pub struct WithSetGenericTuple {
 }
 
 #[repr(C)]
-#[derive(
-    Clone, Debug, Unbox, ValidLayout, Typecheck, ValidField, ConstructType, CCallArg, CCallReturn,
-)]
+#[derive(Clone, Debug, Unbox, ValidLayout, Typecheck, ValidField, ConstructType, CCallArg)]
 #[jlrs(julia_type = "Main.WithSimpleVector")]
 pub struct WithSimpleVector<'scope> {
     pub a: ::std::option::Option<::jlrs::data::managed::simple_vector::WeakSimpleVector<'scope>>,
 }
 
 #[repr(C)]
-#[derive(
-    Clone, Debug, Unbox, ValidLayout, Typecheck, ValidField, ConstructType, CCallArg, CCallReturn,
-)]
+#[derive(Clone, Debug, Unbox, ValidLayout, Typecheck, ValidField, ConstructType, CCallArg)]
 #[jlrs(julia_type = "Main.WithString")]
 pub struct WithString<'scope> {
     pub a: ::std::option::Option<::jlrs::data::managed::string::WeakString<'scope>>,
 }
 
 #[repr(C)]
-#[derive(
-    Clone, Debug, Unbox, ValidLayout, Typecheck, ValidField, ConstructType, CCallArg, CCallReturn,
-)]
+#[derive(Clone, Debug, Unbox, ValidLayout, Typecheck, ValidField, ConstructType, CCallArg)]
 #[jlrs(julia_type = "Main.WithSymbol")]
 pub struct WithSymbol<'scope> {
     pub a: ::std::option::Option<::jlrs::data::managed::symbol::WeakSymbol<'scope>>,
 }
 
 #[repr(C)]
-#[derive(
-    Clone, Debug, Unbox, ValidLayout, Typecheck, ValidField, ConstructType, CCallArg, CCallReturn,
-)]
-#[jlrs(julia_type = "Main.WithTask")]
-pub struct WithTask<'scope, 'data> {
-    pub a: ::std::option::Option<::jlrs::data::managed::value::WeakValue<'scope, 'data>>,
-}
-
-#[repr(C)]
-#[derive(
-    Clone, Debug, Unbox, ValidLayout, Typecheck, ValidField, ConstructType, CCallArg, CCallReturn,
-)]
+#[derive(Clone, Debug, Unbox, ValidLayout, Typecheck, ValidField, ConstructType, CCallArg)]
 #[jlrs(julia_type = "Main.WithTypeMapEntry")]
 pub struct WithTypeMapEntry<'scope, 'data> {
     pub a: ::std::option::Option<::jlrs::data::managed::value::WeakValue<'scope, 'data>>,
 }
 
 #[repr(C)]
-#[derive(
-    Clone, Debug, Unbox, ValidLayout, Typecheck, ValidField, ConstructType, CCallArg, CCallReturn,
-)]
+#[derive(Clone, Debug, Unbox, ValidLayout, Typecheck, ValidField, ConstructType, CCallArg)]
 #[jlrs(julia_type = "Main.WithTypeMapLevel")]
 pub struct WithTypeMapLevel<'scope, 'data> {
     pub a: ::std::option::Option<::jlrs::data::managed::value::WeakValue<'scope, 'data>>,
 }
 
 #[repr(C)]
-#[derive(
-    Clone, Debug, Unbox, ValidLayout, Typecheck, ValidField, ConstructType, CCallArg, CCallReturn,
-)]
+#[derive(Clone, Debug, Unbox, ValidLayout, Typecheck, ValidField, ConstructType, CCallArg)]
 #[jlrs(julia_type = "Main.WithTypeName")]
 pub struct WithTypeName<'scope> {
     pub a: ::std::option::Option<::jlrs::data::managed::type_name::WeakTypeName<'scope>>,
 }
 
 #[repr(C)]
-#[derive(
-    Clone, Debug, Unbox, ValidLayout, Typecheck, ValidField, ConstructType, CCallArg, CCallReturn,
-)]
+#[derive(Clone, Debug, Unbox, ValidLayout, Typecheck, ValidField, ConstructType, CCallArg)]
 #[jlrs(julia_type = "Main.WithTypeVar")]
 pub struct WithTypeVar<'scope> {
     pub a: ::std::option::Option<::jlrs::data::managed::type_var::WeakTypeVar<'scope>>,
 }
 
 #[repr(C)]
-#[derive(
-    Clone, Debug, Unbox, ValidLayout, Typecheck, ValidField, ConstructType, CCallArg, CCallReturn,
-)]
+#[derive(Clone, Debug, Unbox, ValidLayout, Typecheck, ValidField, ConstructType, CCallArg)]
 #[jlrs(julia_type = "Main.WithUnion")]
 pub struct WithUnion<'scope> {
     pub a: ::std::option::Option<::jlrs::data::managed::union::WeakUnion<'scope>>,
 }
 
 #[repr(C)]
-#[derive(
-    Clone, Debug, Unbox, ValidLayout, Typecheck, ValidField, ConstructType, CCallArg, CCallReturn,
-)]
+#[derive(Clone, Debug, Unbox, ValidLayout, Typecheck, ValidField, ConstructType, CCallArg)]
 #[jlrs(julia_type = "Main.WithUnionAll")]
 pub struct WithUnionAll<'scope> {
     pub a: ::std::option::Option<::jlrs::data::managed::union_all::WeakUnionAll<'scope>>,
 }
 
 #[repr(C)]
-#[derive(Clone, Debug, Unbox, ValidLayout, Typecheck, ValidField, IsBits, PartialEq)]
+#[derive(Clone, Debug, Unbox, ValidLayout, Typecheck, ValidField, IsBits)]
 #[jlrs(julia_type = "Main.WithValueType")]
 pub struct WithValueType {
     pub a: i64,
@@ -839,91 +850,18 @@ pub struct WithValueTypeTypeConstructor<N> {
     _n: ::std::marker::PhantomData<N>,
 }
 
-#[derive(ConstructType)]
-#[jlrs(julia_type = "Main.AnAbstractType")]
-pub struct AnAbstractType {}
-
-#[derive(ConstructType)]
-#[jlrs(julia_type = "Main.AnAbstractUnionAll")]
-pub struct AnAbstractUnionAll<T> {
-    _t: ::std::marker::PhantomData<T>,
-}
-
 #[repr(C)]
 #[derive(
     Clone, Debug, Unbox, ValidLayout, Typecheck, ValidField, ConstructType, CCallArg, CCallReturn,
 )]
-#[jlrs(julia_type = "Main.HasAbstractField")]
-pub struct HasAbstractField<'scope, 'data> {
-    pub a: ::std::option::Option<::jlrs::data::managed::value::WeakValue<'scope, 'data>>,
-}
-
-#[repr(C)]
-#[derive(
-    Clone, Debug, Unbox, ValidLayout, Typecheck, ValidField, ConstructType, CCallArg, CCallReturn,
-)]
-#[jlrs(julia_type = "Main.HasAbstractUnionAllField")]
-pub struct HasAbstractUnionAllField<'scope, 'data> {
-    pub a: ::std::option::Option<::jlrs::data::managed::value::WeakValue<'scope, 'data>>,
-}
-
-#[derive(ConstructType)]
-#[jlrs(julia_type = "Main.HasAtomicField")]
-pub struct HasAtomicFieldTypeConstructor {}
-
-#[derive(ConstructType)]
-#[jlrs(julia_type = "Main.HasCustomAtomicField")]
-pub struct HasCustomAtomicFieldTypeConstructor {}
-
-#[repr(C)]
-#[derive(
-    Clone,
-    Debug,
-    Unbox,
-    ValidLayout,
-    Typecheck,
-    ValidField,
-    IsBits,
-    ConstructType,
-    CCallArg,
-    CCallReturn,
-)]
-#[jlrs(julia_type = "Main.HasGenericAbstractField")]
-pub struct HasGenericAbstractField<T> {
-    pub a: T,
-}
-
-#[repr(C)]
-#[derive(Clone, Debug, Unbox, ValidLayout, Typecheck, ValidField, IsBits)]
-#[jlrs(julia_type = "Main.HasGenericAbstractUnionAllField")]
-pub struct HasGenericAbstractUnionAllField<U> {
-    pub a: U,
-}
-
-#[derive(ConstructType)]
-#[jlrs(julia_type = "Main.HasGenericAbstractUnionAllField")]
-pub struct HasGenericAbstractUnionAllFieldTypeConstructor<T, U> {
-    _t: ::std::marker::PhantomData<T>,
-    _u: ::std::marker::PhantomData<U>,
-}
-
-#[repr(C)]
-#[derive(
-    Clone,
-    Debug,
-    Unbox,
-    ValidLayout,
-    Typecheck,
-    IntoJulia,
-    ValidField,
-    IsBits,
-    ConstructType,
-    CCallArg,
-    CCallReturn,
-)]
-#[jlrs(julia_type = "Main.WithInt32")]
-pub struct WithInt32 {
-    pub int32: i32,
+#[jlrs(julia_type = "Main.DoubleUVariant")]
+pub struct DoubleUVariant {
+    #[jlrs(bits_union_align)]
+    _a_align: ::jlrs::data::layout::union::Align4,
+    #[jlrs(bits_union)]
+    pub a: ::jlrs::data::layout::union::TypedBitsUnion<::jlrs::UnionOf![u16, u32], 4>,
+    #[jlrs(bits_union_flag)]
+    pub a_flag: u8,
 }
 
 #[repr(C)]

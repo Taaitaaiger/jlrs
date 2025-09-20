@@ -55,10 +55,7 @@ pub struct MtHandle<'scope, 'env> {
 
 impl<'scope, 'env> MtHandle<'scope, 'env> {
     /// Prepares the environment to enable calling into Julia and calls `func`.
-    pub fn with<T, F>(&mut self, func: F) -> T
-    where
-        for<'ctx> F: FnOnce(ActiveHandle<'ctx>) -> T,
-    {
+    pub fn with<T>(&mut self, func: impl for<'ctx> FnOnce(ActiveHandle<'ctx>) -> T) -> T {
         unsafe {
             if !ADOPTED.get() {
                 adopt_thread();
