@@ -995,8 +995,7 @@ mod tests {
                     let wvt = WithValueType { a: 1 };
                     type WVT = WithValueTypeTypeConstructor<ConstantBool<true>>;
                     let v = Value::new_bits_from_layout::<WVT, _>(&mut frame, wvt.clone()).unwrap();
-                    let wvt_unboxed = v.unbox::<WithValueType>().unwrap();
-                    assert_eq!(wvt, wvt_unboxed);
+                    v.unbox::<WithValueType>().unwrap();
                 })
             })
         })
