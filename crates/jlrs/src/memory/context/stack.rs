@@ -25,7 +25,7 @@ use crate::{
     },
     gc_safe::GcSafeOnceLock,
     memory::{PTls, target::unrooted::Unrooted},
-    prelude::{LocalScope, Target},
+    prelude::{DataType, LocalScope, Target},
     private::Private,
 };
 
@@ -107,24 +107,30 @@ impl Stack {
                 return;
             }
 
+            let base = Module::base(tgt);
+            let get_fn = base.global(tgt, "get").unwrap().as_value();
             let lock_fn = module.global(tgt, "lock_init_lock").unwrap().as_value();
             let unlock_fn = module.global(tgt, "unlock_init_lock").unwrap().as_value();
+            let stacks = module.global(tgt, "STACKS").unwrap().as_value();
 
             lock_fn.call(tgt, []).unwrap();
 
-            if module.global(tgt, sym).is_ok() {
+            let stack_type = get_fn
+                .call(tgt, [stacks, sym.as_value(), Value::nothing(tgt)])
+                .unwrap()
+                .as_value();
+            if stack_type.is::<DataType>() {
                 unlock_fn.call(tgt, []).unwrap();
                 return;
             }
 
-            // Safety: create_foreign_type is called with the correct arguments, the new type is
-            // rooted until the constant has been set, and we've just checked if JlrsCore.Stack
-            // already exists.
-            //
-            // FIXME: don't set a constant in another module.
-            tgt.local_scope::<_, 2>(|mut frame| {
-                let dt = <Self as OpaqueType>::create_type(&mut frame, sym, module);
-                module.set_const(&mut frame, sym, dt.as_value()).unwrap();
+            tgt.local_scope::<_, 1>(|mut frame| {
+                let dt = <Self as OpaqueType>::create_type(&mut frame, sym, module).as_value();
+                let set_fn = base.global(tgt, "setindex!").unwrap().as_value();
+                set_fn
+                    .call(&frame, [stacks, dt, sym.as_value()])
+                    .map_err(|e| e.as_value())
+                    .unwrap();
             });
 
             unlock_fn.call(tgt, []).unwrap();
