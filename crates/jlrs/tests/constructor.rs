@@ -14,7 +14,7 @@ mod tests {
     HasConstructors() = HasConstructors(false)
     */
 
-    use jlrs::prelude::*;
+    use jlrs::{data::managed::union_all::UnionAll, prelude::*};
 
     use crate::util::JULIA;
 
@@ -141,9 +141,43 @@ mod tests {
         });
     }
 
+    fn create_dict<'target, Tgt: Target<'target>>(
+        tgt: Tgt,
+        key_ty: Value<'_, 'static>,
+        value_ty: Value<'_, 'static>,
+    ) -> ValueResult<'target, 'static, Tgt> {
+        tgt.with_local_scope::<_, 2>(|tgt, mut frame| {
+            let dict_ua = Module::base(&frame)
+                .global(&mut frame, "Dict")
+                .unwrap()
+                .cast::<UnionAll>()
+                .unwrap();
+
+            unsafe {
+                let dict_ty = dict_ua.apply_types(&mut frame, [key_ty, value_ty]).unwrap();
+                dict_ty.call(tgt, [])
+            }
+        })
+    }
+
+    fn dict_constructor() {
+        JULIA.with(|handle| {
+            handle.borrow().local_scope::<_, 2>(|mut frame| {
+                let key_ty = DataType::string_type(&frame).as_value();
+                let value_ty = DataType::int32_type(&frame).as_value();
+
+                let dict = create_dict(&mut frame, key_ty, value_ty).unwrap();
+                let dict2 = unsafe { Value::eval_string(&mut frame, "Dict{String, Int32}()").unwrap() };
+
+                assert_eq!(dict.datatype(), dict2.datatype());
+            })
+        });
+    }
+
     #[test]
     fn constructor_tests() {
         call_outer_constructor();
         call_inner_constructor();
+        dict_constructor();
     }
 }
