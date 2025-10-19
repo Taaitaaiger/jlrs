@@ -31,7 +31,7 @@ jl-sys = { path = "../jl_sys", version = "0.26"}
 [build-dependencies]
 find-julia = { path = "../../build_utils/find_julia", version = "0.1" }
 jlrs-compat = { path = "../../build_utils/jlrs_compat", version = "0.1" }
-cc = "1"
+cc = "1.2.41"
 cfg-if = "1"
 
 [package.metadata.docs.rs]
