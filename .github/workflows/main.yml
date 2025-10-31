@@ -70,7 +70,7 @@ jobs:
           cargo test --features full --verbose
 
   test-windows-gnu:
-    runs-on: windows-latest
+    runs-on: windows-2022
     continue-on-error: ${{ matrix.allow-fail }}
     strategy:
       matrix:
@@ -98,7 +98,7 @@ jobs:
           cargo test --features full --verbose
 
   test-windows-msvc:
-    runs-on: windows-latest
+    runs-on: windows-2022
     continue-on-error: ${{ matrix.allow-fail }}
     strategy:
       matrix:
@@ -183,7 +183,7 @@ jobs:
           cargo test --features full --verbose
 
   test-windows-gnu-lts:
-    runs-on: windows-latest
+    runs-on: windows-2022
     continue-on-error: ${{ matrix.allow-fail }}
     strategy:
       matrix:
@@ -208,7 +208,7 @@ jobs:
           cargo test --features full --verbose
 
   test-windows-msvc-lts:
-    runs-on: windows-latest
+    runs-on: windows-2022
     continue-on-error: ${{ matrix.allow-fail }}
     strategy:
       matrix:
@@ -260,7 +260,7 @@ jobs:
           julia JuliaModuleTest.jl
 
   julia-module-test-windows-gnu:
-    runs-on: windows-latest
+    runs-on: windows-2022
     needs: test-windows-gnu
     steps:
       - uses: actions/checkout@v4
