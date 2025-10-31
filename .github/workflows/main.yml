@@ -82,6 +82,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Set up GCC
+        uses: egor-tensin/setup-mingw@v2
+
       - name: Setup Julia environment
         uses: julia-actions/setup-julia@v2
         with:
@@ -192,6 +195,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Set up GCC
+        uses: egor-tensin/setup-mingw@v2
+
       - name: Setup Julia environment
         uses: julia-actions/setup-julia@v2
         with:
@@ -264,6 +270,9 @@ jobs:
     needs: test-windows-gnu
     steps:
       - uses: actions/checkout@v4
+
+      - name: Set up GCC
+        uses: egor-tensin/setup-mingw@v2
 
       - name: Setup Julia environment
         uses: julia-actions/setup-julia@v2
