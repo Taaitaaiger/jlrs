@@ -20,12 +20,6 @@ extern "C"
     static jl_genericmemory_typetagdata_func_t jl_genericmemory_typetagdata_func;
 #endif
 
-#if JULIA_VERSION_MINOR >= 13
-#define SEARCH_DEPS , 1
-#else
-#define SEARCH_DEPS
-#endif
-
     void jlrs_init_missing_functions(void)
     {
         void ***libjulia_internal_handle_ref_v = (void ***)jl_eval_string("cglobal(:jl_libjulia_internal_handle)");
