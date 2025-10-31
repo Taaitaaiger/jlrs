@@ -302,6 +302,15 @@ extern "C"
         return expr->head;
     }
 
+    int jlrs_dlsym(jl_libhandle handle, const char *symbol, void **value)
+    {
+#if JULIA_VERSION_MINOR >= 13
+        return jl_dlsym(handle, symbol, value, 0, 1);
+#else
+    return jl_dlsym(handle, symbol, value, 0);
+#endif
+    }
+
     jl_value_t *jlrs_arrayref(jl_array_t *a, size_t i)
     {
 #if JULIA_VERSION_MINOR >= 11

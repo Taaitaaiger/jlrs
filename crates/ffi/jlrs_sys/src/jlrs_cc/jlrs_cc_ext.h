@@ -118,6 +118,8 @@ extern "C"
     int jlrs_array_has_pointers(jl_array_t *a);
     int jlrs_array_how(jl_array_t *a);
 
+    int jlrs_dlsym(jl_libhandle handle, const char *symbol, void **value);
+
 #if JULIA_VERSION_MINOR <= 10
     const jl_datatype_layout_t *jl_datatype_layout(jl_datatype_t *t);
 #endif

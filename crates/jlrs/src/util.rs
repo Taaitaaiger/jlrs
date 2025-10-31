@@ -5,7 +5,9 @@ use std::{ffi::CStr, process::abort, ptr::null_mut, sync::atomic::AtomicPtr};
 #[cfg(not(any(windows, target_os = "windows", feature = "windows")))]
 use atomic::Ordering;
 #[cfg(not(any(windows, target_os = "windows", feature = "windows")))]
-use jl_sys::{jl_dlclose, jl_dlopen, jl_dlsym};
+use jl_sys::{jl_dlclose, jl_dlopen};
+#[cfg(not(any(windows, target_os = "windows", feature = "windows")))]
+use jlrs_sys::jlrs_dlsym;
 use jl_sys::{jl_get_pgcstack, jl_value_t};
 
 use crate::prelude::Target;
@@ -60,7 +62,7 @@ unsafe fn load_uv_async_send_func(tgt: &AtomicPtr<c_void>) -> *mut c_void {
         let mut func: *mut c_void = null_mut();
 
         const SYM: &'static CStr = c"uv_async_send";
-        let found = jl_dlsym(handle, SYM.as_ptr(), &mut func as *mut *mut c_void, 0) != 0;
+        let found = jlrs_dlsym(handle, SYM.as_ptr(), &mut func as *mut *mut c_void) != 0;
         // Should be fine to close the handle immediately
         jl_dlclose(handle);
 
