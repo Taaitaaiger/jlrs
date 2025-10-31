@@ -612,13 +612,6 @@ pub mod functions {
             flags: std::ffi::c_uint,
         ) -> *mut std::ffi::c_void;
 
-        pub fn jl_dlsym(
-            handle: *mut std::ffi::c_void,
-            symbol: *const std::ffi::c_char,
-            value: *mut *mut std::ffi::c_void,
-            throw_error: std::ffi::c_int,
-        ) -> std::ffi::c_int;
-
         pub fn jl_dlclose(handle: *mut std::ffi::c_void) -> std::ffi::c_int;
 
         pub fn jl_gc_safepoint();

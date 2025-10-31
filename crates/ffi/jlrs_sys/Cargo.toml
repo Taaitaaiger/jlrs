@@ -1,6 +1,6 @@
 [package]
 name = "jlrs-sys"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Thomas van Doornmalen <thomas.vandoornmalen@gmail.com>"]
 description = """
 Low-level extensions to the Julia C API
@@ -26,7 +26,7 @@ windows = []
 docs = []
 
 [dependencies]
-jl-sys = { path = "../jl_sys", version = "0.26"}
+jl-sys = { path = "../jl_sys", version = "0.27"}
 
 [build-dependencies]
 find-julia = { path = "../../build_utils/find_julia", version = "0.1" }

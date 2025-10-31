@@ -20,32 +20,25 @@ extern "C"
     static jl_genericmemory_typetagdata_func_t jl_genericmemory_typetagdata_func;
 #endif
 
-#if JULIA_VERSION_MINOR >= 13
-#define TRAILING ,1
-#else
-#define TRAILING
-#endif
-
     void jlrs_init_missing_functions(void)
     {
-
         void ***libjulia_internal_handle_ref_v = (void ***)jl_eval_string("cglobal(:jl_libjulia_internal_handle)");
         void *libjulia_internal_handle = **libjulia_internal_handle_ref_v;
 
-        int found_jl_lock_value = jl_dlsym(libjulia_internal_handle, "jl_lock_value", (void **)&jl_lock_value_func, 0 TRAILING);
+        int found_jl_lock_value = jlrs_dlsym(libjulia_internal_handle, "jl_lock_value", (void **)&jl_lock_value_func);
         assert(found_jl_lock_value);
 
-        int found_jl_unlock_value = jl_dlsym(libjulia_internal_handle, "jl_unlock_value", (void **)&jl_unlock_value_func, 0 TRAILING);
+        int found_jl_unlock_value = jlrs_dlsym(libjulia_internal_handle, "jl_unlock_value", (void **)&jl_unlock_value_func);
         assert(found_jl_unlock_value);
 
 #if JULIA_VERSION_MINOR >= 11
-        int found_jl_memoryrefindex = jl_dlsym(libjulia_internal_handle, "jl_memoryrefindex", (void **)&jl_memoryrefindex_func, 0 TRAILING);
+        int found_jl_memoryrefindex = jlrs_dlsym(libjulia_internal_handle, "jl_memoryrefindex", (void **)&jl_memoryrefindex_func);
         assert(found_jl_memoryrefindex);
 
-        int found_jl_memoryrefset = jl_dlsym(libjulia_internal_handle, "jl_memoryrefset", (void **)&jl_memoryrefset_func, 0 TRAILING);
+        int found_jl_memoryrefset = jlrs_dlsym(libjulia_internal_handle, "jl_memoryrefset", (void **)&jl_memoryrefset_func);
         assert(found_jl_memoryrefset);
 
-        int found_jl_genericmemory_typetagdata = jl_dlsym(libjulia_internal_handle, "jl_genericmemory_typetagdata", (void **)&jl_genericmemory_typetagdata_func, 0 TRAILING);
+        int found_jl_genericmemory_typetagdata = jlrs_dlsym(libjulia_internal_handle, "jl_genericmemory_typetagdata", (void **)&jl_genericmemory_typetagdata_func);
         assert(found_jl_genericmemory_typetagdata);
 #endif
     }

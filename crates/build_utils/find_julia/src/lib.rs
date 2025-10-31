@@ -138,16 +138,16 @@ impl Version {
         if self.is_dev() {
             println!(
                 "cargo::warning=Detected development version of Julia {major}.{minor}.{patch}, \
-            bindings may not be up-to-date. Please report any issues you encounter at \
-            https://www.github.com/Taaitaaiger/jlrs/issues"
+                bindings may not be up-to-date. Please report any issues you encounter at \
+                https://www.github.com/Taaitaaiger/jlrs/issues"
             );
         }
 
         if minor > max_minor_version {
             println!(
                 "cargo::warning=Detected unsupported version of Julia {major}.{minor}.{patch}, \
-                    assuming compatibility with 1.{max_minor_version}. Please report any issues you
-                    encounter at https://www.github.com/Taaitaaiger/jlrs/issues"
+                assuming compatibility with 1.{max_minor_version}. Please report any issues you \
+                encounter at https://www.github.com/Taaitaaiger/jlrs/issues"
             );
 
             let mut version = self.clone();

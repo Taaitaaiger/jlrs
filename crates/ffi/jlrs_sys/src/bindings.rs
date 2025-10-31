@@ -262,5 +262,11 @@ pub mod jlrs_cc {
         pub fn jlrs_set_nthreads_per_pool(nthreads_per_pool: *const i16);
 
         pub fn jlrs_init_missing_functions();
+
+        pub fn jlrs_dlsym(
+            handle: *mut std::ffi::c_void,
+            symbol: *const std::ffi::c_char,
+            value: *mut *mut std::ffi::c_void,
+        ) -> std::ffi::c_int;
     }
 }
