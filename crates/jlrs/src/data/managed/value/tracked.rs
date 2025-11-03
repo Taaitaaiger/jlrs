@@ -20,7 +20,6 @@ use crate::{
     private::Private,
 };
 
-// TODO: Clone
 /// Immutable tracked data.
 #[repr(transparent)]
 pub struct Tracked<'tracked, 'scope, 'data, T> {
@@ -67,6 +66,26 @@ impl<'tracked, 'scope, 'data, T: ValidLayout> Deref for Tracked<'tracked, 'scope
 unsafe impl<'tracked, 'scope, 'data, T: ValidLayout + Send> Send
     for Tracked<'tracked, 'scope, 'data, T>
 {
+}
+
+impl<T> Clone for Tracked<'_, '_, '_, T> {
+    fn clone(&self) -> Self {
+        unsafe {
+            let v = Value::wrap_non_null(
+                NonNull::new_unchecked(self.tracked as *const _ as *mut jl_value_t),
+                Private,
+            );
+
+            if v.datatype().mutable() {
+                Ledger::try_borrow_shared(v).unwrap();
+            }
+        }
+        Self {
+            tracked: self.tracked,
+            _s: PhantomData,
+            _d: PhantomData,
+        }
+    }
 }
 
 impl<T> Drop for Tracked<'_, '_, '_, T> {
