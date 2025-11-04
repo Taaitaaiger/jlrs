@@ -851,11 +851,11 @@ fn invoke_fn_move_self_method_fragment(
     let call_expr: Expr = if gc_safe {
         parse_quote! {
             ::jlrs::memory::gc::gc_safe(|| {
-                this.clone().#name(#names)
+                (*this).clone().#name(#names)
             })
         }
     } else {
-        parse_quote! { this.clone().#name(#names) }
+        parse_quote! { (*this).clone().#name(#names) }
     };
 
     parse_quote_spanned! {
@@ -912,11 +912,11 @@ fn invoke_fn_move_self_method_fragment_in_env(
     let call_expr: Expr = if gc_safe {
         parse_quote! {
             ::jlrs::memory::gc::gc_safe(|| {
-                this.clone().#name(#names)
+                (*this).clone().#name(#names)
             })
         }
     } else {
-        parse_quote! { this.clone().#name(#names) }
+        parse_quote! { (*this).clone().#name(#names) }
     };
 
     parse_quote_spanned! {
