@@ -142,6 +142,13 @@ end
     @test JuliaModuleTest.extract_inner(foreign_thing) == UInt32(1)
 end
 
+@testset "Agent Environment" begin
+    agent = JuliaModuleTest.Agent((x) -> JuliaModuleTest.Action("a"))
+    n = UInt(1000)
+    result = JuliaModuleTest.play(agent, n)
+    @test length(result) == 2 * n - 1
+end
+
 @testset "Associated function" begin
     @test JuliaModuleTest.assoc_func() == 1
     @inferred JuliaModuleTest.assoc_func()

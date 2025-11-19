@@ -7,6 +7,7 @@ use jlrs::{
             value::{
                 typed::{TypedValue, TypedValueRet}, ValueRet
             },
+            string::StringRet,
         },
         types::{
             abstract_type::{AnyType, Number},
@@ -116,6 +117,15 @@ julia_module! {
     in ForeignThing fn set(&mut self, value: Value) as set_inner!;
 
     in UnexportedType fn assoc_func() -> isize;
+
+    struct Environment;
+    struct Action;
+    in Action fn new(s: JuliaString<'_>) -> JlrsResult<TypedValueRet<Action>> as Action;
+
+    struct Agent;
+    in Agent fn new(callback: Value<'_, 'static>) -> JlrsResult<TypedValueRet<Agent>> as Agent;
+
+	fn play(agent: TypedValue<'_, '_, Agent>, steps: usize) -> JlrsResult<StringRet>;
 
     for T in [f64, f32, f64] {
         fn has_generic(t: T) -> T;
