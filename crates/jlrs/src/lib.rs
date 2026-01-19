@@ -996,9 +996,9 @@ use data::{
 };
 use jl_sys::{jl_gc_set_cb_post_gc, jl_gc_set_cb_pre_gc, jl_gc_set_cb_root_scanner};
 use jlrs_sys::jlrs_init_missing_functions;
-use lock_api::MutexGuard;
+use lock_api::RwLockReadGuard;
 use memory::get_tls;
-use parking_lot::{Condvar, Mutex};
+use parking_lot::RwLock;
 use prelude::Managed;
 use semver::Version;
 
@@ -1200,7 +1200,7 @@ unsafe extern "C" fn root_scanner(full: c_int) {
 Records the status of the garbage collector so we do not enter GC unsafe zones
 and trigger a segmentation fault.
  */
-pub(crate) static GC_LOCK: (Mutex<bool>, Condvar) = (Mutex::new(false), Condvar::new());
+pub(crate) static GC_LOCK: RwLock<bool> = RwLock::new(false);
 
 #[allow(unused)]
 pub(crate) fn init_gc_locks() {
@@ -1211,25 +1211,19 @@ pub(crate) fn init_gc_locks() {
 }
 
 unsafe extern "C" fn cb_pre_gc(_full: std::ffi::c_int) {
-    let mut guard = GC_LOCK.0.lock();
+    let mut guard = GC_LOCK.write();
 
     *guard = true;
 
     std::mem::forget(guard);
 }
 unsafe extern "C" fn cb_post_gc(_full: std::ffi::c_int) {
-    let mut guard = unsafe { GC_LOCK.0.make_guard_unchecked() };
+    let mut guard = unsafe { GC_LOCK.make_write_guard_unchecked() };
 
     *guard = false;
-
-    GC_LOCK.1.notify_all();
 }
 
 /// Wait until garbage collection finishes
-pub(crate) fn wait_gc() -> MutexGuard<'static, parking_lot::RawMutex, bool> {
-    let mut is_gc = GC_LOCK.0.lock();
-    if *is_gc {
-        GC_LOCK.1.wait(&mut is_gc);
-    }
-    is_gc
+pub(crate) fn wait_gc() -> RwLockReadGuard<'static, parking_lot::RawRwLock, bool> {
+    GC_LOCK.read()
 }
