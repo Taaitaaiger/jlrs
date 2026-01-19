@@ -569,6 +569,9 @@ pub mod functions {
 
         pub fn jl_ver_string() -> *const std::ffi::c_char;
 
+        pub fn jl_gc_set_cb_pre_gc(cb: *const extern "C" fn(std::ffi::c_int) -> (), enable: std::ffi::c_int);
+        pub fn jl_gc_set_cb_post_gc(cb: *const extern "C" fn(std::ffi::c_int) -> (), enable: std::ffi::c_int);
+
         pub fn jl_new_foreign_type(
             name: *mut crate::types::jl_sym_t,
             module: *mut crate::types::jl_module_t,
