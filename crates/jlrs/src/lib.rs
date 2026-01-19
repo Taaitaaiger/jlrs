@@ -994,9 +994,11 @@ use data::{
     managed::module::mark_global_cache, static_data::mark_static_data_cache,
     types::construct_type::mark_constructed_type_cache,
 };
-use jl_sys::jl_gc_set_cb_root_scanner;
+use jl_sys::{jl_gc_set_cb_post_gc, jl_gc_set_cb_pre_gc, jl_gc_set_cb_root_scanner};
 use jlrs_sys::jlrs_init_missing_functions;
+use lock_api::MutexGuard;
 use memory::get_tls;
+use parking_lot::{Condvar, Mutex};
 use prelude::Managed;
 use semver::Version;
 
@@ -1167,6 +1169,7 @@ pub(crate) unsafe fn init_jlrs(install_jlrs_core: &InstallJlrsCore, allow_overri
             );
         }
 
+        init_gc_locks();
         init_ledger();
         Stack::init(&unrooted);
     }
@@ -1191,4 +1194,42 @@ unsafe extern "C" fn root_scanner(full: c_int) {
         mark_global_cache(ptls, full);
         mark_static_data_cache(ptls, full);
     }
+}
+
+/**
+Records the status of the garbage collector so we do not enter GC unsafe zones
+and trigger a segmentation fault.
+ */
+pub(crate) static GC_LOCK: (Mutex<bool>, Condvar) = (Mutex::new(false), Condvar::new());
+
+#[allow(unused)]
+pub(crate) fn init_gc_locks() {
+    unsafe {
+        jl_gc_set_cb_pre_gc(cb_pre_gc, 1);
+        jl_gc_set_cb_post_gc(cb_post_gc, 1);
+    }
+}
+
+unsafe extern "C" fn cb_pre_gc(_full: std::ffi::c_int) {
+    let mut guard = GC_LOCK.0.lock();
+
+    *guard = true;
+
+    std::mem::forget(guard);
+}
+unsafe extern "C" fn cb_post_gc(_full: std::ffi::c_int) {
+    let mut guard = unsafe { GC_LOCK.0.make_guard_unchecked() };
+
+    *guard = false;
+
+    GC_LOCK.1.notify_all();
+}
+
+/// Wait until garbage collection finishes
+pub(crate) fn wait_gc() -> MutexGuard<'static, parking_lot::RawMutex, bool> {
+    let mut is_gc = GC_LOCK.0.lock();
+    if *is_gc {
+        GC_LOCK.1.wait(&mut is_gc);
+    }
+    is_gc
 }
