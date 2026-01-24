@@ -294,12 +294,13 @@ pub(crate) unsafe fn gc_safe_with<F: FnOnce() -> T, T>(ptls: PTls, f: F) -> T {
 #[inline]
 pub unsafe fn gc_unsafe<F: for<'scope> FnOnce(Unrooted<'scope>) -> T, T>(f: F) -> T {
     unsafe {
-        let _ = crate::wait_gc();
+        let guard = crate::wait_gc();
         debug_assert!(!jl_get_pgcstack().is_null());
         let ptls = get_tls();
 
         let unrooted = Unrooted::new();
         let state = jlrs_gc_unsafe_enter(ptls);
+        drop(guard);
         let res = catch_unwind(AssertUnwindSafe(|| f(unrooted)));
         jlrs_gc_unsafe_leave(ptls, state);
 
@@ -316,9 +317,10 @@ pub(crate) unsafe fn gc_unsafe_with<F: for<'scope> FnOnce(Unrooted<'scope>) -> T
     f: F,
 ) -> T {
     unsafe {
-        let _ = crate::wait_gc();
+        let guard = crate::wait_gc();
         let state = jlrs_gc_unsafe_enter(ptls);
         let unrooted = Unrooted::new();
+        drop(guard);
         let res = catch_unwind(AssertUnwindSafe(|| f(unrooted)));
         jlrs_gc_unsafe_leave(ptls, state);
 
