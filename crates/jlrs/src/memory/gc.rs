@@ -258,6 +258,7 @@ pub unsafe fn gc_safe<F: FnOnce() -> T, T>(f: F) -> T {
         let ptls = get_tls();
         let state = jlrs_gc_safe_enter(ptls);
         let res = catch_unwind(AssertUnwindSafe(f));
+        let _guard = crate::wait_gc();
         jlrs_gc_safe_leave(ptls, state);
 
         match res {
@@ -273,6 +274,7 @@ pub(crate) unsafe fn gc_safe_with<F: FnOnce() -> T, T>(ptls: PTls, f: F) -> T {
     unsafe {
         let state = jlrs_gc_safe_enter(ptls);
         let res = catch_unwind(AssertUnwindSafe(f));
+        let _guard = crate::wait_gc();
         jlrs_gc_safe_leave(ptls, state);
 
         match res {
