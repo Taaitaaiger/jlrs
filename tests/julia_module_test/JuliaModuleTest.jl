@@ -144,7 +144,7 @@ end
 
 @testset "Agent Environment" begin
     agent = JuliaModuleTest.Agent((x) -> JuliaModuleTest.Action("a"))
-    n = UInt(1000)
+    n = 1000
     result = JuliaModuleTest.play(agent, n)
     @test length(result) == 2 * n - 1
 end

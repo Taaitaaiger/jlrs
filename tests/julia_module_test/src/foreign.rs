@@ -1,12 +1,16 @@
 use std::{collections::HashMap, ops::AddAssign};
 
+use jl_sys::{jl_adopt_thread, jl_enter_threaded_region};
 use jlrs::{
     call::Call,
     data::{
-        managed::string::StringRet,
-        managed::value::{
-            typed::{TypedValue, TypedValueRet},
-            ValueRet,
+        managed::{
+            string::StringRet,
+            value::{
+                ValueRet,
+                tracked::Tracked,
+                typed::{TypedValue, TypedValueRet},
+            },
         },
         types::{construct_type::ConstructType, foreign_type::mark::Mark},
     },
@@ -16,6 +20,7 @@ use jlrs::{
     },
     weak_handle_unchecked,
 };
+use jlrs_sys::{jlrs_gc_safe_enter, jlrs_get_ptls_states, jlrs_ptls_from_gcstack};
 
 #[derive(Clone, Debug, OpaqueType)]
 pub struct OpaqueInt {
@@ -170,6 +175,12 @@ impl UnexportedType {
 pub struct Environment {
     s: String,
 }
+impl Environment {
+    pub fn to_string(&self) -> StringRet {
+        let handle = unsafe { weak_handle_unchecked!() };
+        JuliaString::new(handle, self.s.clone()).leak()
+    }
+}
 
 #[repr(C)]
 #[derive(Clone, Debug, OpaqueType)]
@@ -203,13 +214,27 @@ impl Agent {
         Ok(TypedValue::new(handle, data).leak())
     }
     fn act(&self, env: Environment) -> Action {
+        use jlrs::memory::gc::Gc;
         unsafe {
             gc::gc_unsafe(|handle| {
                 handle.local_scope::<_, 3>(|mut frame| {
                     let callback = self.callback.as_value();
-                    let env = Value::new(&mut frame, env);
-                    let result = callback.call(&mut frame, [env]).expect("Error 1");
-                    result.leak().as_value().unbox::<Action>().unwrap()
+                    let s = JuliaString::new(&mut frame, env.s).as_value();
+                    let result = callback.call(&mut frame, [s]).expect("Error 1");
+                    result.leak().as_value().unbox::<Action>().expect("Not an action")
+                })
+            })
+        }
+    }
+    async fn async_act(&self, env: Environment) -> Action {
+        let handle = unsafe { weak_handle_unchecked!() };
+        unsafe {
+            gc::gc_unsafe(|handle| {
+                handle.local_scope::<_, 3>(|mut frame| {
+                    let callback = self.callback.as_value();
+                    let s = JuliaString::new(&mut frame, env.s).as_value();
+                    let result = gc::gc_safe(|| { callback.call(&mut frame, [s]) }).expect("Error 1");
+                    result.leak().as_value().unbox::<Action>().expect("Not an action")
                 })
             })
         }
@@ -225,9 +250,98 @@ fn play_loop(agent: Agent, steps: usize) -> String {
     }
     actions.join("/")
 }
-pub fn play(agent: TypedValue<'_, '_, Agent>, steps: usize) -> JlrsResult<StringRet> {
+pub fn play(agent: TypedValue<'_, '_, Agent>, steps: isize) -> JlrsResult<StringRet> {
     let agent_r = agent.unbox::<Agent>()?;
     let handle = unsafe { weak_handle_unchecked!() };
-    let t = unsafe { gc::gc_safe(|| play_loop(agent_r, steps)) };
+    let t = unsafe { gc::gc_safe(|| play_loop(agent_r, steps as usize)) };
+    Ok(JuliaString::new(handle, t).leak())
+}
+
+#[derive(OpaqueType)]
+pub struct Playground {
+    runtime: tokio::runtime::Runtime,
+}
+
+impl Playground {
+    pub fn new() -> TypedValueRet<Self> {
+        let handle = unsafe { weak_handle_unchecked!() };
+        let runtime = tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(16)
+            .on_thread_start(|| {
+                let pgcstack = unsafe { jl_adopt_thread() };
+                let mut ptls = unsafe { jlrs_get_ptls_states() };
+                if ptls.is_null() {
+                    ptls = unsafe { jlrs_ptls_from_gcstack(pgcstack) };
+                }
+                unsafe { jlrs_gc_safe_enter(ptls) };
+                unsafe { jl_enter_threaded_region() };
+            })
+            .on_thread_stop(|| {
+                let ptls = unsafe { jlrs_get_ptls_states() };
+                unsafe { jlrs_gc_safe_enter(ptls) };
+            })
+            .thread_name("trilliumjl")
+            .build()
+            .expect("Can't build");
+        let data = Self { runtime };
+        TypedValue::new(handle, data).leak()
+    }
+}
+
+async fn multithreaded_play_loop(agent: Agent, steps: usize) -> String {
+    use std::sync::Arc;
+    use tokio::sync::{mpsc, Barrier};
+
+    let mut handles = vec![];
+    let (action_tx, mut action_rx) = mpsc::channel(10);
+    let barrier = Arc::new(Barrier::new(steps));
+    for i in 0..steps {
+        let action_tx = action_tx.clone();
+        let agent = agent.clone();
+        let barrier = barrier.clone();
+        let handle = tokio::task::spawn(async move {
+            let s = (i + steps).to_string().repeat(100);
+            let _wait_result = barrier.wait().await;
+            let Action { s } = agent.async_act(Environment { s }).await;
+            let _ = action_tx.send(s).await;
+        });
+        handles.push(handle);
+    }
+    let mut acc = String::new();
+    for _i in 0..(steps / 2) {
+        let Some(s) = action_rx.recv().await else {
+            unreachable!();
+        };
+        acc = acc + &s;
+    }
+    handles.retain(|h| {
+        if h.is_finished() {
+            false
+        } else {
+            h.abort();
+            true
+        }
+    });
+    for h in handles.into_iter() {
+        let _ = h.await;
+    }
+    return acc;
+}
+
+pub fn multithreaded_play(
+    agent: TypedValue<'_, '_, Agent>,
+    steps: isize,
+    runtime: TypedValue<'_, '_, Playground>,
+) -> JlrsResult<StringRet> {
+    let agent_r = agent.unbox::<Agent>()?;
+    let runtime: Tracked<Playground> = unsafe { runtime.track_shared() }?;
+    let t = unsafe {
+        gc::gc_safe(|| {
+            runtime
+                .runtime
+                .block_on(multithreaded_play_loop(agent_r, steps as usize))
+        })
+    };
+    let handle = unsafe { weak_handle_unchecked!() };
     Ok(JuliaString::new(handle, t).leak())
 }

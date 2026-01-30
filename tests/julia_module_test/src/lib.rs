@@ -119,13 +119,19 @@ julia_module! {
     in UnexportedType fn assoc_func() -> isize;
 
     struct Environment;
+    #[untracked_self]
+	in Environment fn to_string(&self) -> StringRet as Base.string;
     struct Action;
     in Action fn new(s: JuliaString<'_>) -> JlrsResult<TypedValueRet<Action>> as Action;
 
     struct Agent;
     in Agent fn new(callback: Value<'_, 'static>) -> JlrsResult<TypedValueRet<Agent>> as Agent;
 
-	fn play(agent: TypedValue<'_, '_, Agent>, steps: usize) -> JlrsResult<StringRet>;
+    struct Playground;
+    in Playground fn new() -> TypedValueRet<Playground> as Playground;
+
+	fn play(agent: TypedValue<'_, '_, Agent>, steps: isize) -> JlrsResult<StringRet>;
+	fn multithreaded_play(agent: TypedValue<'_, '_, Agent>, steps: isize, playground: TypedValue<'_, '_, Playground>) -> JlrsResult<StringRet> as play;
 
     for T in [f64, f32, f64] {
         fn has_generic(t: T) -> T;
