@@ -56,22 +56,26 @@ extern "C"
     const jl_datatype_layout_t *jlrs_datatype_layout(jl_datatype_t *t) { return jl_datatype_layout(t); }
     int8_t jlrs_gc_safe_enter(jl_ptls_t ptls)
     {
-        return jl_gc_safe_enter(ptls);
+        int8_t old_state = jl_atomic_load_relaxed(&ptls->gc_state);
+        jl_atomic_store_release(&ptls->gc_state, JL_GC_STATE_SAFE);
+        return old_state;
     }
 
     int8_t jlrs_gc_unsafe_enter(jl_ptls_t ptls)
     {
-        return jl_gc_unsafe_enter(ptls);
+        int8_t old_state = jl_atomic_load_relaxed(&ptls->gc_state);
+        jl_atomic_store_release(&ptls->gc_state, JL_GC_STATE_UNSAFE);
+        return old_state;
     }
 
     void jlrs_gc_safe_leave(jl_ptls_t ptls, int8_t state)
     {
-        jl_gc_safe_leave(ptls, state);
+        jl_atomic_store_release(&ptls->gc_state, state);
     }
 
     void jlrs_gc_unsafe_leave(jl_ptls_t ptls, int8_t state)
     {
-        jl_gc_unsafe_leave(ptls, state);
+        jl_atomic_store_release(&ptls->gc_state, state);
     }
 #ifdef __cplusplus
 }

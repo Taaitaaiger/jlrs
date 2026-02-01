@@ -802,7 +802,11 @@
 //!
 //! // This function will be provided to Julia as a pointer, so its name can be mangled.
 //! unsafe extern "C" fn call_me(arg: Bool) -> isize {
-//!     if arg.as_bool() { 1 } else { -1 }
+//!     if arg.as_bool() {
+//!         1
+//!     } else {
+//!         -1
+//!     }
 //! }
 //!
 //! # fn main() {
@@ -996,9 +1000,8 @@ use data::{
 };
 use jl_sys::{jl_gc_set_cb_post_gc, jl_gc_set_cb_pre_gc, jl_gc_set_cb_root_scanner};
 use jlrs_sys::jlrs_init_missing_functions;
-use lock_api::RwLockReadGuard;
 use memory::get_tls;
-use parking_lot::RwLock;
+use parking_lot::{Condvar, Mutex, RwLock, RwLockReadGuard};
 use prelude::Managed;
 use semver::Version;
 
@@ -1198,9 +1201,19 @@ unsafe extern "C" fn root_scanner(full: c_int) {
 
 /**
 Records the status of the garbage collector so we do not enter GC unsafe zones
-and trigger a segmentation fault.
+while the GC is running and trigger a segmentation fault.
+
+This uses an intentionally unfair mutex setup since the GC must take priority to
+any thread setting the GC state to avoid a deadlock.
+
+The GC is favoured to enter a GC critical section.
  */
-pub(crate) static GC_LOCK: RwLock<bool> = RwLock::new(false);
+static GC_LOCK: (Condvar, Mutex<bool>, AtomicBool, RwLock<()>) = (
+    Condvar::new(),
+    Mutex::new(false),
+    AtomicBool::new(false),
+    RwLock::new(()),
+);
 
 #[allow(unused)]
 pub(crate) fn init_gc_locks() {
@@ -1211,19 +1224,37 @@ pub(crate) fn init_gc_locks() {
 }
 
 unsafe extern "C" fn cb_pre_gc(_full: std::ffi::c_int) {
-    let mut guard = GC_LOCK.write();
-
-    *guard = true;
+    GC_LOCK.2.store(true, Ordering::Relaxed);
+    let guard = GC_LOCK.3.write();
 
     std::mem::forget(guard);
 }
 unsafe extern "C" fn cb_post_gc(_full: std::ffi::c_int) {
-    let mut guard = unsafe { GC_LOCK.make_write_guard_unchecked() };
+    let mut inner_guard = GC_LOCK.1.lock();
 
-    *guard = false;
+    let guard = unsafe { GC_LOCK.3.make_write_guard_unchecked() };
+    //let mut inner_guard = unsafe { GC_LOCK.1.make_guard_unchecked() };
+
+    *inner_guard = false;
+
+    GC_LOCK.2.store(false, Ordering::Relaxed);
+    // Notify all GC waiters
+    GC_LOCK.0.notify_all();
+    drop(guard);
 }
 
 /// Wait until garbage collection finishes
-pub(crate) fn wait_gc() -> RwLockReadGuard<'static, parking_lot::RawRwLock, bool> {
-    GC_LOCK.read()
+pub(crate) fn wait_gc() -> RwLockReadGuard<'static, ()> {
+    unsafe { jl_sys::jl_gc_safepoint() };
+    let mut guard = GC_LOCK.3.read();
+
+    while GC_LOCK.2.load(Ordering::Relaxed) {
+        let inner_guard = GC_LOCK.1.lock();
+        RwLockReadGuard::unlocked(&mut guard, || {
+            let mut inner_guard = inner_guard;
+            GC_LOCK.0.wait(&mut inner_guard);
+        });
+    }
+
+    guard
 }

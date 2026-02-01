@@ -214,7 +214,6 @@ impl Agent {
         Ok(TypedValue::new(handle, data).leak())
     }
     fn act(&self, env: Environment) -> Action {
-        use jlrs::memory::gc::Gc;
         unsafe {
             gc::gc_unsafe(|handle| {
                 handle.local_scope::<_, 3>(|mut frame| {
@@ -227,13 +226,15 @@ impl Agent {
         }
     }
     async fn async_act(&self, env: Environment) -> Action {
-        let handle = unsafe { weak_handle_unchecked!() };
         unsafe {
             gc::gc_unsafe(|handle| {
                 handle.local_scope::<_, 3>(|mut frame| {
                     let callback = self.callback.as_value();
-                    let s = JuliaString::new(&mut frame, env.s).as_value();
-                    let result = gc::gc_safe(|| { callback.call(&mut frame, [s]) }).expect("Error 1");
+                    //let result = callback.call(&mut frame, [s]).expect("Error 1");
+                    let result = gc::gc_safe(|| {
+                        let s = JuliaString::new(&mut frame, env.s).as_value();
+                        callback.call(&mut frame, [s])
+                    }).expect("Error 1");
                     result.leak().as_value().unbox::<Action>().expect("Not an action")
                 })
             })
@@ -266,13 +267,10 @@ impl Playground {
     pub fn new() -> TypedValueRet<Self> {
         let handle = unsafe { weak_handle_unchecked!() };
         let runtime = tokio::runtime::Builder::new_multi_thread()
-            .worker_threads(16)
+            .worker_threads(8)
             .on_thread_start(|| {
                 let pgcstack = unsafe { jl_adopt_thread() };
-                let mut ptls = unsafe { jlrs_get_ptls_states() };
-                if ptls.is_null() {
-                    ptls = unsafe { jlrs_ptls_from_gcstack(pgcstack) };
-                }
+                let ptls = unsafe { jlrs_ptls_from_gcstack(pgcstack) };
                 unsafe { jlrs_gc_safe_enter(ptls) };
                 unsafe { jl_enter_threaded_region() };
             })
@@ -280,7 +278,7 @@ impl Playground {
                 let ptls = unsafe { jlrs_get_ptls_states() };
                 unsafe { jlrs_gc_safe_enter(ptls) };
             })
-            .thread_name("trilliumjl")
+            .thread_name("spawned")
             .build()
             .expect("Can't build");
         let data = Self { runtime };

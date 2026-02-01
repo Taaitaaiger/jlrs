@@ -21,7 +21,9 @@ using Random
         end
         JuliaModuleTest.Action(string(string(r), s))
     end
-    n = 100
+    n = 200
     playground = JuliaModuleTest.Playground()
-    result = JuliaModuleTest.play(agent, n, playground)
+    Threads.@threads for _ in 1:5
+        result = JuliaModuleTest.play(agent, n, playground)
+    end
 end

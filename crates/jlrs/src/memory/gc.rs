@@ -2,7 +2,7 @@
 
 use std::{
     marker::PhantomData,
-    panic::{AssertUnwindSafe, catch_unwind, resume_unwind},
+    panic::{catch_unwind, resume_unwind, AssertUnwindSafe},
 };
 
 pub use jl_sys::GcCollection;
@@ -15,8 +15,9 @@ use jlrs_sys::{
 };
 
 use super::{
-    PTls, get_tls,
-    target::{Target, unrooted::Unrooted},
+    get_tls,
+    target::{unrooted::Unrooted, Target},
+    PTls,
 };
 use crate::{
     call::Call,
@@ -136,6 +137,7 @@ pub trait Gc: private::GcPriv {
     /// by this function.
     #[inline]
     unsafe fn gc_safe_enter() -> i8 {
+        let _guard = crate::wait_gc();
         unsafe {
             let ptls = get_tls();
             jlrs_gc_safe_enter(ptls)
@@ -149,6 +151,7 @@ pub trait Gc: private::GcPriv {
     /// Must be called with the state returned by a matching call to [`Gc::gc_safe_enter`].
     #[inline]
     unsafe fn gc_safe_leave(state: i8) {
+        let _guard = crate::wait_gc();
         unsafe {
             let ptls = get_tls();
             jlrs_gc_safe_leave(ptls, state)
@@ -168,7 +171,7 @@ pub trait Gc: private::GcPriv {
     /// returned by this function.
     #[inline]
     unsafe fn gc_unsafe_enter() -> i8 {
-        let _ = crate::wait_gc();
+        let _guard = crate::wait_gc();
         unsafe {
             let ptls = get_tls();
             jlrs_gc_unsafe_enter(ptls)
@@ -182,6 +185,7 @@ pub trait Gc: private::GcPriv {
     /// Must be called with the state returned by a matching call to [`Gc::gc_unsafe_enter`].
     #[inline]
     unsafe fn gc_unsafe_leave(state: i8) {
+        let _guard = crate::wait_gc();
         unsafe {
             let ptls = get_tls();
             jlrs_gc_unsafe_leave(ptls, state)
@@ -258,8 +262,10 @@ pub unsafe fn gc_safe<F: FnOnce() -> T, T>(f: F) -> T {
         let ptls = get_tls();
         let state = jlrs_gc_safe_enter(ptls);
         let res = catch_unwind(AssertUnwindSafe(f));
-        let _guard = crate::wait_gc();
+
+        let guard = crate::wait_gc();
         jlrs_gc_safe_leave(ptls, state);
+        drop(guard);
 
         match res {
             Ok(res) => res,
@@ -296,15 +302,19 @@ pub(crate) unsafe fn gc_safe_with<F: FnOnce() -> T, T>(ptls: PTls, f: F) -> T {
 #[inline]
 pub unsafe fn gc_unsafe<F: for<'scope> FnOnce(Unrooted<'scope>) -> T, T>(f: F) -> T {
     unsafe {
-        let guard = crate::wait_gc();
         debug_assert!(!jl_get_pgcstack().is_null());
         let ptls = get_tls();
 
         let unrooted = Unrooted::new();
+        let guard = crate::wait_gc();
         let state = jlrs_gc_unsafe_enter(ptls);
         drop(guard);
+
         let res = catch_unwind(AssertUnwindSafe(|| f(unrooted)));
+        let guard = crate::wait_gc();
         jlrs_gc_unsafe_leave(ptls, state);
+
+        drop(guard);
 
         match res {
             Ok(res) => res,
