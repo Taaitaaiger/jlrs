@@ -1,5 +1,8 @@
 #include "jlrs_cc.h"
 
+#define JL_GC_STATE_UNSAFE 0
+#define JL_GC_STATE_SAFE 2
+
 #ifdef __cplusplus
 extern "C"
 {
