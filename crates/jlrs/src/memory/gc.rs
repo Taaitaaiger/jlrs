@@ -11,7 +11,7 @@ use jl_sys::{
     jl_gc_mark_queue_objarray, jl_gc_safepoint, jl_get_pgcstack,
 };
 use jlrs_sys::{
-    jlrs_gc_safe_enter, jlrs_gc_safe_leave, jlrs_gc_unsafe_enter, jlrs_gc_unsafe_leave, jlrs_gc_wb,
+    jlrs_gc_safe_enter, jlrs_gc_safe_leave, jlrs_gc_safepoint, jlrs_gc_unsafe_enter, jlrs_gc_unsafe_leave, jlrs_gc_wb
 };
 
 use super::{
@@ -260,7 +260,11 @@ pub unsafe fn gc_safe<F: FnOnce() -> T, T>(f: F) -> T {
         }
 
         let ptls = get_tls();
+
+        let guard = crate::wait_gc();
         let state = jlrs_gc_safe_enter(ptls);
+        drop(guard);
+
         let res = catch_unwind(AssertUnwindSafe(f));
 
         let guard = crate::wait_gc();
@@ -280,8 +284,10 @@ pub(crate) unsafe fn gc_safe_with<F: FnOnce() -> T, T>(ptls: PTls, f: F) -> T {
     unsafe {
         let state = jlrs_gc_safe_enter(ptls);
         let res = catch_unwind(AssertUnwindSafe(f));
-        let _guard = crate::wait_gc();
+
+        let guard = crate::wait_gc();
         jlrs_gc_safe_leave(ptls, state);
+        drop(guard);
 
         match res {
             Ok(res) => res,
@@ -304,11 +310,13 @@ pub unsafe fn gc_unsafe<F: for<'scope> FnOnce(Unrooted<'scope>) -> T, T>(f: F) -
     unsafe {
         debug_assert!(!jl_get_pgcstack().is_null());
         let ptls = get_tls();
-
         let unrooted = Unrooted::new();
+
         let guard = crate::wait_gc();
         let state = jlrs_gc_unsafe_enter(ptls);
         drop(guard);
+
+        jlrs_gc_safepoint(ptls);
 
         let res = catch_unwind(AssertUnwindSafe(|| f(unrooted)));
         let guard = crate::wait_gc();
@@ -331,10 +339,16 @@ pub(crate) unsafe fn gc_unsafe_with<F: for<'scope> FnOnce(Unrooted<'scope>) -> T
     unsafe {
         let guard = crate::wait_gc();
         let state = jlrs_gc_unsafe_enter(ptls);
-        let unrooted = Unrooted::new();
         drop(guard);
+
+        let unrooted = Unrooted::new();
         let res = catch_unwind(AssertUnwindSafe(|| f(unrooted)));
+
+        let guard = crate::wait_gc();
         jlrs_gc_unsafe_leave(ptls, state);
+        drop(guard);
+
+        jlrs_gc_safepoint(ptls);
 
         match res {
             Ok(res) => res,

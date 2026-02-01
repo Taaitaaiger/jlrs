@@ -37,6 +37,7 @@ extern "C"
     size_t jlrs_unbox_ulong(jl_value_t *x);
     jl_task_t *jlrs_current_task();
     const jl_datatype_layout_t *jlrs_datatype_layout(jl_datatype_t *t);
+    void jlrs_gc_safepoint(jl_ptls_t ptls);
     int8_t jlrs_gc_safe_enter(jl_ptls_t ptls);
     int8_t jlrs_gc_unsafe_enter(jl_ptls_t ptls);
     void jlrs_gc_safe_leave(jl_ptls_t ptls, int8_t state);

@@ -156,6 +156,8 @@ pub mod jlrs_cc {
 
         pub fn jlrs_set_nthreads(nthreads: i16);
 
+        pub fn jlrs_gc_safepoint(ptls: *mut crate::types::jl_tls_states_t);
+
         pub fn jlrs_gc_safe_enter(ptls: *mut crate::types::jl_tls_states_t) -> i8;
 
         pub fn jlrs_gc_unsafe_enter(ptls: *mut crate::types::jl_tls_states_t) -> i8;

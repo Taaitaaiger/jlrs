@@ -57,6 +57,10 @@ extern "C"
         return container_of(pgcstack, jl_task_t, gcstack);
     }
     const jl_datatype_layout_t *jlrs_datatype_layout(jl_datatype_t *t) { return jl_datatype_layout(t); }
+    void jlrs_gc_safepoint(jl_ptls_t ptls)
+    {
+        jl_gc_safepoint_(ptls);
+    }
     int8_t jlrs_gc_safe_enter(jl_ptls_t ptls)
     {
         int8_t old_state = jl_atomic_load_relaxed(&ptls->gc_state);
