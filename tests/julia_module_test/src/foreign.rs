@@ -231,8 +231,8 @@ impl Agent {
                 handle.local_scope::<_, 3>(|mut frame| {
                     let callback = self.callback.as_value();
                     //let result = callback.call(&mut frame, [s]).expect("Error 1");
+                    let s = JuliaString::new(&mut frame, env.s).as_value();
                     let result = gc::gc_safe(|| {
-                        let s = JuliaString::new(&mut frame, env.s).as_value();
                         callback.call(&mut frame, [s])
                     }).expect("Error 1");
                     result.leak().as_value().unbox::<Action>().expect("Not an action")
