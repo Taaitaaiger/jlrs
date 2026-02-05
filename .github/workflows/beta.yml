@@ -64,7 +64,7 @@ jobs:
           cargo test --features full --verbose
 
   test-windows-gnu:
-    runs-on: windows-latest
+    runs-on: windows-2022
     continue-on-error: ${{ matrix.allow-fail }}
     strategy:
       matrix:
@@ -89,7 +89,7 @@ jobs:
           cargo test --features full --verbose
 
   test-windows-msvc:
-    runs-on: windows-latest
+    runs-on: windows-2022
     continue-on-error: ${{ matrix.allow-fail }}
     strategy:
       matrix:
