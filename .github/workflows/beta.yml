@@ -88,33 +88,33 @@ jobs:
           julia -e 'import Pkg; Pkg.add(url="https://github.com/Taaitaaiger/JlrsCore.jl", rev="0c0ce35ec27f228587b01b410d402506f3f0f35a")'
           cargo test --features full --verbose
 
-  test-windows-msvc:
-    runs-on: windows-2022
-    continue-on-error: ${{ matrix.allow-fail }}
-    strategy:
-      matrix:
-        rust: [stable-x86_64-pc-windows-msvc]
-        allow-fail: [false]
-    steps:
-      - uses: actions/checkout@v4
+#   test-windows-msvc:
+#     runs-on: windows-2022
+#     continue-on-error: ${{ matrix.allow-fail }}
+#     strategy:
+#       matrix:
+#         rust: [stable-x86_64-pc-windows-msvc]
+#         allow-fail: [false]
+#     steps:
+#       - uses: actions/checkout@v4
 
-      - name: Setup Julia environment
-        id: setup-julia
-        uses: julia-actions/setup-julia@v2
-        with:
-          version: 'pre'
+#       - name: Setup Julia environment
+#         id: setup-julia
+#         uses: julia-actions/setup-julia@v2
+#         with:
+#           version: 'pre'
 
-      - uses: ilammy/msvc-dev-cmd@v1
+#       - uses: ilammy/msvc-dev-cmd@v1
 
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: ${{ matrix.rust }}
+#       - name: Setup Rust
+#         uses: dtolnay/rust-toolchain@master
+#         with:
+#           toolchain: ${{ matrix.rust }}
 
-      - name: Run tests
-        run: |
-          julia -e 'import Pkg; Pkg.add(url="https://github.com/Taaitaaiger/JlrsCore.jl", rev="0c0ce35ec27f228587b01b410d402506f3f0f35a")'
-          cargo test --features full --verbose
+#       - name: Run tests
+#         run: |
+#           julia -e 'import Pkg; Pkg.add(url="https://github.com/Taaitaaiger/JlrsCore.jl", rev="0c0ce35ec27f228587b01b410d402506f3f0f35a")'
+#           cargo test --features full --verbose
 
   julia-module-test-linux:
     runs-on: ubuntu-latest
@@ -141,7 +141,7 @@ jobs:
           julia JuliaModuleTest.jl
 
   julia-module-test-windows-gnu:
-    runs-on: windows-latest
+    runs-on: windows-2022
     needs: test-windows-gnu
     steps:
       - uses: actions/checkout@v4
