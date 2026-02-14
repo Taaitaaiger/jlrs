@@ -20,7 +20,7 @@ use self::{constant_bytes::*, version::emit_if_compatible};
 /// The syntax is as follows:
 ///
 /// ```ignore
-/// julia_macro! {
+/// julia_module! {
 ///     // init_function_name is the name of the generated initialization function.
 ///     //
 ///     // The name of the generated function must be unique, it's recommended you prefix it with
