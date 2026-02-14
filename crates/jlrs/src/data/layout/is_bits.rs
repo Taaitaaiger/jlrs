@@ -13,11 +13,13 @@ unsafe impl IsBits for i16 {}
 unsafe impl IsBits for i32 {}
 unsafe impl IsBits for i64 {}
 unsafe impl IsBits for isize {}
+unsafe impl IsBits for i128 {}
 unsafe impl IsBits for u8 {}
 unsafe impl IsBits for u16 {}
 unsafe impl IsBits for u32 {}
 unsafe impl IsBits for u64 {}
 unsafe impl IsBits for usize {}
+unsafe impl IsBits for u128 {}
 unsafe impl IsBits for f32 {}
 unsafe impl IsBits for f64 {}
 unsafe impl<T: 'static> IsBits for *mut T {}
