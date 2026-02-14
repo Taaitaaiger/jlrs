@@ -101,6 +101,8 @@ impl_ccall_arg!(i64);
 impl_ccall_arg!(isize);
 impl_ccall_arg!(f32);
 impl_ccall_arg!(f64);
+impl_ccall_arg!(u128);
+impl_ccall_arg!(i128);
 
 unsafe impl<T: CCallReturn> CCallReturn for Result<T, ValueRet> {
     type FunctionReturnType = T::FunctionReturnType;
