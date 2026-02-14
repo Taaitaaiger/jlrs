@@ -270,6 +270,18 @@ struct WithElidedInUnion
     a::Union{Int16, Elided{true, Elided{1, Int64}}, Float64}
 end
 
+struct WithU128
+    a::Int8
+    b::UInt128
+    c::Int8
+end
+
+struct WithI128
+    a::Int8
+    b::Int128
+    c::Int8
+end
+
 #reflect([
 #    BitsCharBitsIntChar,
 #    BitsCharFloat32Float64,

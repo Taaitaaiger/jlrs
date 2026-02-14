@@ -194,7 +194,7 @@ unsafe impl ValidField for u128 {
     fn valid_field(v: Value) -> bool {
         if v.is::<DataType>() {
             let dt = unsafe { v.cast_unchecked::<DataType>() };
-            dt.is::<i128>()
+            dt.is::<u128>()
         } else {
             false
         }
