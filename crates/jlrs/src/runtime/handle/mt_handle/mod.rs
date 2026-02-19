@@ -245,9 +245,10 @@ unsafe fn drop_handle() {
                 }
 
                 jlrs_gc_safe_enter(ptls);
-                notify(&EXIT_LOCK);
             })
             .join();
+
+            notify(&EXIT_LOCK);
         }
     }
 }
