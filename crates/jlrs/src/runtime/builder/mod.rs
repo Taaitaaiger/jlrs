@@ -273,7 +273,9 @@ unsafe fn init_runtime(options: &Builder) {
     unsafe {
         set_n_threads(options);
         init_julia(options);
-        init_jlrs(&options.install_jlrs_core, true);
+
+        let environment = options.environment.as_ref().map(|p| p.as_path());
+        init_jlrs(&options.install_jlrs_core, environment, true);
     }
 }
 

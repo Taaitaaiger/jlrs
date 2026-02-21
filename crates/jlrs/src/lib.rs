@@ -1072,7 +1072,7 @@ impl InstallJlrsCore {
             None => "".to_string(),
             Some(path) => {
                 let str = path.to_str().expect("Environment path is UTF-8.");
-                format!("Pkg.activate({});", str)
+                format!("Pkg.activate(raw\"{}\");", str)
             }
         };
 
