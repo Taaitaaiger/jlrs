@@ -1071,7 +1071,7 @@ impl InstallJlrsCore {
             let unrooted = Unrooted::new();
             let cmd = match self {
             InstallJlrsCore::Default => {
-                "try; using JlrsCore; catch; import Pkg; Pkg.add(\"JlrsCore\"); using JlrsCore; end"
+                r#"import Pkg; Pkg.activate(raw"C:\Users\damian.birchler\src\private\julia4trnsys\julia4trnsys\julia"); try; using JlrsCore; catch; Pkg.add("JlrsCore"); using JlrsCore; end"#
                     .to_string()
             }
             InstallJlrsCore::Git { repo, revision } => {
