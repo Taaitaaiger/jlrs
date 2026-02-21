@@ -3,7 +3,7 @@
 use std::{
     cell::RefCell,
     collections::VecDeque,
-    ffi::{CStr, c_void},
+    ffi::c_void,
     path::Path,
     ptr::NonNull,
     rc::Rc,
@@ -516,13 +516,13 @@ unsafe fn set_custom_fns() {
     unsafe {
         let handle = weak_handle_unchecked!();
 
-        let cmd = CStr::from_bytes_with_nul_unchecked(b"const JlrsThreads = JlrsCore.Threads\0");
         handle.local_scope::<_, 2>(|mut frame| {
-            Value::eval_cstring(&mut frame, cmd).expect("using JlrsCore threw an exception");
-
             let wake_rust = Value::new(&mut frame, wake_task as *mut c_void);
             Module::main(&frame)
-                .submodule(&frame, "JlrsThreads")
+                .submodule(&frame, "JlrsCore")
+                .unwrap()
+                .as_managed()
+                .submodule(&frame, "Threads")
                 .unwrap()
                 .as_managed()
                 .global(&frame, "wakerust")
