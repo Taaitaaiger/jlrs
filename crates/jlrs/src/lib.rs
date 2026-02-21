@@ -987,8 +987,8 @@
 use std::{
     env,
     ffi::c_int,
-    sync::atomic::{AtomicBool, Ordering},
     path::Path,
+    sync::atomic::{AtomicBool, Ordering},
 };
 
 use data::{
@@ -1081,23 +1081,30 @@ impl InstallJlrsCore {
         unsafe {
             let unrooted = Unrooted::new();
             let cmd = match self {
-            InstallJlrsCore::Default => {
-                format!("{}; try; using JlrsCore; catch; Pkg.add(\"JlrsCore\"); using JlrsCore; end", import_pkg_and_activate_env)
-            }
-            InstallJlrsCore::Git { repo, revision } => {
-                format!("{}; Pkg.add(url=\"{repo}\", rev=\"{revision}\"); using JlrsCore", import_pkg_and_activate_env)
-            }
-            InstallJlrsCore::Version {
-                major,
-                minor,
-                patch,
-            } => {
-                format!(
-                    "{}; Pkg.add(name=\"JlrsCore\", version=\"{major}.{minor}.{patch}\"); using JlrsCore", import_pkg_and_activate_env
-                )
-            }
-            InstallJlrsCore::No => "using JlrsCore".to_string(),
-        };
+                InstallJlrsCore::Default => {
+                    format!(
+                        "{}; try; using JlrsCore; catch; Pkg.add(\"JlrsCore\"); using JlrsCore; end",
+                        import_pkg_and_activate_env
+                    )
+                }
+                InstallJlrsCore::Git { repo, revision } => {
+                    format!(
+                        "{}; Pkg.add(url=\"{repo}\", rev=\"{revision}\"); using JlrsCore",
+                        import_pkg_and_activate_env
+                    )
+                }
+                InstallJlrsCore::Version {
+                    major,
+                    minor,
+                    patch,
+                } => {
+                    format!(
+                        "{}; Pkg.add(name=\"JlrsCore\", version=\"{major}.{minor}.{patch}\"); using JlrsCore",
+                        import_pkg_and_activate_env
+                    )
+                }
+                InstallJlrsCore::No => "using JlrsCore".to_string(),
+            };
 
             let cmd = format!(
                 "if !haskey(Base.loaded_modules, Base.PkgId(Base.UUID(\"29be08bc-e5fd-4da2-bbc1-72011c6ea2c9\"), \"JlrsCore\")); {cmd}; end"
@@ -1147,7 +1154,11 @@ fn preferred_jlrs_core_version() -> Option<InstallJlrsCore> {
     )),
     allow(unused)
 )]
-pub(crate) unsafe fn init_jlrs(install_jlrs_core: &InstallJlrsCore, environment: Option<&Path>, allow_override: bool) {
+pub(crate) unsafe fn init_jlrs(
+    install_jlrs_core: &InstallJlrsCore,
+    environment: Option<&Path>,
+    allow_override: bool,
+) {
     unsafe {
         static IS_INIT: AtomicBool = AtomicBool::new(false);
 
