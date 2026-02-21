@@ -34,6 +34,7 @@ use crate::{InstallJlrsCore, init_jlrs};
 /// the builder can be upgraded to an [`AsyncBuilder`] by calling
 /// [`Builder::async_runtime`] and providing a backing runtime.
 pub struct Builder {
+    pub(crate) environment: Option<PathBuf>,
     pub(crate) image: Option<(PathBuf, PathBuf)>,
     pub(crate) install_jlrs_core: InstallJlrsCore,
     pub(crate) n_threads: usize,
@@ -47,6 +48,7 @@ impl Builder {
     /// and don't start any additional threads.
     pub const fn new() -> Self {
         Builder {
+            environment: None,
             image: None,
             install_jlrs_core: InstallJlrsCore::Default,
             n_threads: 0,
@@ -102,6 +104,12 @@ impl Builder {
     #[inline]
     pub const fn n_interactive_threads(mut self, n: usize) -> Self {
         self.n_threadsi = n;
+        self
+    }
+
+    #[inline]
+    pub fn environment(mut self, environment: &Path) -> Self {
+        self.environment = Some(environment.to_path_buf());
         self
     }
 

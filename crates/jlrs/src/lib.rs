@@ -988,6 +988,7 @@ use std::{
     env,
     ffi::c_int,
     sync::atomic::{AtomicBool, Ordering},
+    path::Path,
 };
 
 use data::{
@@ -1066,16 +1067,25 @@ impl InstallJlrsCore {
         )),
         allow(unused)
     )]
-    unsafe fn use_or_install(&self) {
+    unsafe fn use_or_install(&self, environment: Option<&Path>) {
+        let activate_env_if_any = match environment {
+            None => "".to_string(),
+            Some(path) => {
+                let str = path.to_str().expect("Environment path is UTF-8.");
+                format!("Pkg.activate({});", str)
+            }
+        };
+
+        let import_pkg_and_activate_env = format!("import Pkg; {}", activate_env_if_any);
+
         unsafe {
             let unrooted = Unrooted::new();
             let cmd = match self {
             InstallJlrsCore::Default => {
-                r#"import Pkg; Pkg.activate(raw"C:\Users\damian.birchler\src\private\julia4trnsys\julia4trnsys\julia"); try; using JlrsCore; catch; Pkg.add("JlrsCore"); using JlrsCore; end"#
-                    .to_string()
+                format!("{}; try; using JlrsCore; catch; Pkg.add(\"JlrsCore\"); using JlrsCore; end", import_pkg_and_activate_env)
             }
             InstallJlrsCore::Git { repo, revision } => {
-                format!("import Pkg; Pkg.add(url=\"{repo}\", rev=\"{revision}\"); using JlrsCore")
+                format!("{}; Pkg.add(url=\"{repo}\", rev=\"{revision}\"); using JlrsCore", import_pkg_and_activate_env)
             }
             InstallJlrsCore::Version {
                 major,
@@ -1083,7 +1093,7 @@ impl InstallJlrsCore {
                 patch,
             } => {
                 format!(
-                    "import Pkg; Pkg.add(name=\"JlrsCore\", version=\"{major}.{minor}.{patch}\"); using JlrsCore"
+                    "{}; Pkg.add(name=\"JlrsCore\", version=\"{major}.{minor}.{patch}\"); using JlrsCore", import_pkg_and_activate_env
                 )
             }
             InstallJlrsCore::No => "using JlrsCore".to_string(),
@@ -1137,7 +1147,7 @@ fn preferred_jlrs_core_version() -> Option<InstallJlrsCore> {
     )),
     allow(unused)
 )]
-pub(crate) unsafe fn init_jlrs(install_jlrs_core: &InstallJlrsCore, allow_override: bool) {
+pub(crate) unsafe fn init_jlrs(install_jlrs_core: &InstallJlrsCore, environment: Option<&Path>, allow_override: bool) {
     unsafe {
         static IS_INIT: AtomicBool = AtomicBool::new(false);
 
@@ -1151,12 +1161,12 @@ pub(crate) unsafe fn init_jlrs(install_jlrs_core: &InstallJlrsCore, allow_overri
 
         if let Some(preferred_version) = preferred_jlrs_core_version() {
             if allow_override {
-                preferred_version.use_or_install();
+                preferred_version.use_or_install(environment);
             } else {
-                install_jlrs_core.use_or_install();
+                install_jlrs_core.use_or_install(environment);
             }
         } else {
-            install_jlrs_core.use_or_install();
+            install_jlrs_core.use_or_install(environment);
         }
 
         let unrooted = Unrooted::new();
