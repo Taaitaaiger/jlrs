@@ -963,3 +963,81 @@ pub struct WithElidedInUnion {
     #[jlrs(bits_union_flag)]
     pub a_flag: u8,
 }
+
+#[repr(C)]
+#[derive(
+    Clone,
+    Debug,
+    Unbox,
+    ValidLayout,
+    Typecheck,
+    IntoJulia,
+    ValidField,
+    IsBits,
+    ConstructType,
+    CCallArg,
+    CCallReturn,
+)]
+#[jlrs(julia_type = "Main.WithU128")]
+pub struct WithU128 {
+    pub a: i8,
+    pub b: u128,
+    pub c: i8,
+}
+
+impl WithU128 {
+    pub fn new(a: i8, b: u128, c: i8) -> WithU128 {
+        WithU128 { a, b, c }
+    }
+
+    pub fn a(&self) -> i8 {
+        self.a
+    }
+
+    pub fn b(&self) -> u128 {
+        self.b
+    }
+
+    pub fn c(&self) -> i8 {
+        self.c
+    }
+}
+
+#[repr(C)]
+#[derive(
+    Clone,
+    Debug,
+    Unbox,
+    ValidLayout,
+    Typecheck,
+    IntoJulia,
+    ValidField,
+    IsBits,
+    ConstructType,
+    CCallArg,
+    CCallReturn,
+)]
+#[jlrs(julia_type = "Main.WithI128")]
+pub struct WithI128 {
+    pub a: i8,
+    pub b: i128,
+    pub c: i8,
+}
+
+impl WithI128 {
+    pub fn new(a: i8, b: i128, c: i8) -> WithI128 {
+        WithI128 { a, b, c }
+    }
+
+    pub fn a(&self) -> i8 {
+        self.a
+    }
+
+    pub fn b(&self) -> i128 {
+        self.b
+    }
+
+    pub fn c(&self) -> i8 {
+        self.c
+    }
+}

@@ -167,7 +167,8 @@ mod tests {
                 let value_ty = DataType::int32_type(&frame).as_value();
 
                 let dict = create_dict(&mut frame, key_ty, value_ty).unwrap();
-                let dict2 = unsafe { Value::eval_string(&mut frame, "Dict{String, Int32}()").unwrap() };
+                let dict2 =
+                    unsafe { Value::eval_string(&mut frame, "Dict{String, Int32}()").unwrap() };
 
                 assert_eq!(dict.datatype(), dict2.datatype());
             })

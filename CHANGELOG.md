@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.23
+
+- Implement `Clone` for `Tracked`.
+
+- Support for `u128` and `i128`. The traits `Unbox`, `IntoJulia`, `Typecheck`, `ValidLayout`, `ValidField`, `ConstructType`, `IsBits`, `CCallArg`, `CCallReturn`, `PrimitiveType`, `IsBits`, and `IntegerType` have been implemented for these types.
+
 ## v0.22
 
 - Several aliases for `JuliaResult` have been added so they can be more easily returned from an exported funtion.
@@ -93,8 +99,6 @@
 - jl-sys has been split into jl-sys and jlrs-sys. All extensions have been moved to jlrs-sys.
 
 - The exception handler of `catch_exceptions` now takes an `Exception` and is called in the catch block.
-
-- Implement `Clone` for `Tracked`.
 
 ## v0.21
 

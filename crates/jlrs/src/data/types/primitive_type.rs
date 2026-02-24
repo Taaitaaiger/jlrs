@@ -36,22 +36,26 @@ impl_primitive_type!(u16, Unsigned);
 impl_primitive_type!(u32, Unsigned);
 impl_primitive_type!(u64, Unsigned);
 impl_primitive_type!(usize, Unsigned);
+impl_primitive_type!(u128, Unsigned);
 impl_primitive_type!(i8, Signed);
 impl_primitive_type!(i16, Signed);
 impl_primitive_type!(i32, Signed);
 impl_primitive_type!(i64, Signed);
 impl_primitive_type!(isize, Signed);
+impl_primitive_type!(i128, Signed);
 
 unsafe impl IntegerType for u8 {}
 unsafe impl IntegerType for u16 {}
 unsafe impl IntegerType for u32 {}
 unsafe impl IntegerType for u64 {}
 unsafe impl IntegerType for usize {}
+unsafe impl IntegerType for u128 {}
 unsafe impl IntegerType for i8 {}
 unsafe impl IntegerType for i16 {}
 unsafe impl IntegerType for i32 {}
 unsafe impl IntegerType for i64 {}
 unsafe impl IntegerType for isize {}
+unsafe impl IntegerType for i128 {}
 
 impl_primitive_type!(bool, Integer);
 impl_primitive_type!(Bool, Integer);

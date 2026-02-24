@@ -13,6 +13,16 @@ using Test
     @test JuliaModuleTest.takes_usize_returns_usize(UInt(3)) == 4
     @inferred JuliaModuleTest.takes_usize_returns_usize(UInt(3))
 
+    v1 = UInt128(1)
+    v2 = UInt128(0xFFFFFFFFFFFFFFFF1)
+    @test JuliaModuleTest.u128_sum(v1, v2) == v1 + v2
+    @inferred JuliaModuleTest.u128_sum(v1, v2)
+
+    v1 = Int128(-1)
+    v2 = Int128(0xFFFFFFFFFFFFFFFF1)
+    @test JuliaModuleTest.i128_sum(v1, v2) == v1 + v2
+    @inferred JuliaModuleTest.i128_sum(v1, v2)
+
     @test JuliaModuleTest.takes_ref_usize(UInt(3)) == 4
     @test JuliaModuleTest.takes_ref_module(Main) == 0
     @test JuliaModuleTest.takes_ref_any(Main) == 0
