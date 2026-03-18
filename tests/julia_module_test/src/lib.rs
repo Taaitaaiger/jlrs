@@ -4,10 +4,11 @@ use jlrs::{
             array::{ArrayRet, RankedArrayRet, TypedArrayRet, TypedRankedArrayRet},
             ccall_ref::{CCallRef, CCallRefRet},
             named_tuple::{NamedTuple, NamedTupleRet},
-            value::{
-                typed::{TypedValue, TypedValueRet}, ValueRet
-            },
             string::StringRet,
+            value::{
+                typed::{TypedValue, TypedValueRet},
+                ValueRet,
+            },
         },
         types::{
             abstract_type::{AnyType, Number},
@@ -42,9 +43,9 @@ julia_module! {
     become julia_module_tests_init_fn;
 
     fn takes_no_args_returns_nothing();
-    fn  takes_no_args_returns_usize() -> usize;
+    fn takes_no_args_returns_usize() -> usize;
 
-    fn takes_usize_returns_usize(a: usize) -> usize;
+    pub fn takes_usize_returns_usize(a: usize) -> usize;
     fn takes_array(a: Array) -> usize;
     fn takes_ranked_array(a: RankedArray<1>) -> usize;
     fn takes_typed_array(a: TypedArray<u32>) -> usize;
@@ -95,8 +96,8 @@ julia_module! {
         a: TypedArray<tvar!('T')>,
     ) -> ValueRet use RestrictedEnv;
 
-    struct OpaqueInt;
-    in OpaqueInt fn new(value: i32) -> TypedValueRet<OpaqueInt> as OpaqueInt;
+    pub struct OpaqueInt;
+    in OpaqueInt pub fn new(value: i32) -> TypedValueRet<OpaqueInt> as OpaqueInt;
     in OpaqueInt fn increment(&mut self) as increment!;
     #[untracked_self]
     in OpaqueInt fn increment(&mut self) as increment_unchecked!;
@@ -125,14 +126,14 @@ julia_module! {
     struct Agent;
     in Agent fn new(callback: Value<'_, 'static>) -> JlrsResult<TypedValueRet<Agent>> as Agent;
 
-	fn play(agent: TypedValue<'_, '_, Agent>, steps: usize) -> JlrsResult<StringRet>;
+    fn play(agent: TypedValue<'_, '_, Agent>, steps: usize) -> JlrsResult<StringRet>;
 
     for T in [f64, f32, f64] {
         fn has_generic(t: T) -> T;
 
         struct POpaque<T>;
 
-        in POpaque<T> fn new(value: T) -> TypedValueRet<POpaque<T>> as POpaque;
+        in POpaque<T> pub fn new(value: T) -> TypedValueRet<POpaque<T>> as POpaque;
         in POpaque<T> fn get(&self) -> T as popaque_get;
         in POpaque<T> fn get_cloned(self) -> T as popaque_get_cloned;
         in POpaque<T> fn set(&mut self, value: T) as popaque_set;
@@ -140,7 +141,7 @@ julia_module! {
         for U in [T, i32] {
             struct POpaqueTwo<T, U>;
 
-            in POpaqueTwo<T, U> fn new(value: T, value2: U) -> TypedValueRet<POpaqueTwo<T, U>> as POpaqueTwo;
+            in POpaqueTwo<T, U> pub fn new(value: T, value2: U) -> TypedValueRet<POpaqueTwo<T, U>> as POpaqueTwo;
             in POpaqueTwo<T, U> fn get_v1(&self) -> T as get_v1;
             in POpaqueTwo<T, U> fn get_v2(&self) -> U as get_v2;
 
@@ -169,8 +170,8 @@ julia_module! {
         v: TypedValue<'_, 'static, FourGenericsI<i32, i32, i32, tvar!('D')>>,
     ) -> TypedValueRet<FourGenericsI<i32, i32, i32, tvar!('D')>> use tvars!(tvar!('D'));
 
-    const CONST_U8: u8;
-    const STATIC_U8: u8 as CONST_STATIC_U8;
+    pub const CONST_U8: u8;
+    pub const STATIC_U8: u8 as CONST_STATIC_U8;
 
     type POpaque64 = POpaque<f64>;
     in POpaque<f64> pub fn new(value: f64) -> TypedValueRet<POpaque<f64>> as POpaque64;
