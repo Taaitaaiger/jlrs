@@ -269,6 +269,44 @@ mod tests {
         });
     }
 
+    fn box_unbox_u128() {
+        JULIA.with(|handle| {
+            handle.borrow().local_scope::<_, 4>(|mut frame| {
+                let i = 1u128;
+                let vi = Value::new(&mut frame, i);
+                let j = 0xFFFFFFFFFFFFFFFF1u128;
+                let vj = Value::new(&mut frame, j);
+
+                let add_func = Module::main(&frame).global(&mut frame, "+").unwrap();
+
+                unsafe {
+                    let res = add_func.call(&mut frame, [vi, vj]).unwrap();
+                    let vsum = res.unbox::<u128>().unwrap();
+                    assert_eq!(vsum, i + j);
+                }
+            });
+        });
+    }
+
+    fn box_unbox_i128() {
+        JULIA.with(|handle| {
+            handle.borrow().local_scope::<_, 4>(|mut frame| {
+                let i = -1i128;
+                let vi = Value::new(&mut frame, i);
+                let j = 0xFFFFFFFFFFFFFFFF1i128;
+                let vj = Value::new(&mut frame, j);
+
+                let add_func = Module::main(&frame).global(&mut frame, "+").unwrap();
+
+                unsafe {
+                    let res = add_func.call(&mut frame, [vi, vj]).unwrap();
+                    let vsum = res.unbox::<i128>().unwrap();
+                    assert_eq!(vsum, i + j);
+                }
+            });
+        });
+    }
+
     #[test]
     fn primitives_test() {
         create_and_cast_uints();
@@ -295,5 +333,7 @@ mod tests {
         cannot_cast_char_as_bool();
         cannot_cast_f32_as_64();
         cannot_cast_f64_as_32();
+        box_unbox_u128();
+        box_unbox_i128();
     }
 }

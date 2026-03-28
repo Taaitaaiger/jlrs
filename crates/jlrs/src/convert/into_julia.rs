@@ -170,3 +170,33 @@ unsafe impl<T: IntoJulia + ConstructType> IntoJulia for *mut T {
         })
     }
 }
+
+unsafe impl IntoJulia for u128 {
+    fn julia_type<'scope, Tgt>(target: Tgt) -> DataTypeData<'scope, Tgt>
+    where
+        Tgt: Target<'scope>,
+    {
+        unsafe {
+            Self::base_type(&target)
+                .unwrap()
+                .assume_owned()
+                .cast_unchecked::<DataType>()
+                .root(target)
+        }
+    }
+}
+
+unsafe impl IntoJulia for i128 {
+    fn julia_type<'scope, Tgt>(target: Tgt) -> DataTypeData<'scope, Tgt>
+    where
+        Tgt: Target<'scope>,
+    {
+        unsafe {
+            Self::base_type(&target)
+                .unwrap()
+                .assume_owned()
+                .cast_unchecked::<DataType>()
+                .root(target)
+        }
+    }
+}

@@ -42,9 +42,11 @@ julia_module! {
     become julia_module_tests_init_fn;
 
     fn takes_no_args_returns_nothing();
-    fn  takes_no_args_returns_usize() -> usize;
+    fn takes_no_args_returns_usize() -> usize;
 
     fn takes_usize_returns_usize(a: usize) -> usize;
+    fn u128_sum(a: u128, b: u128) -> u128;
+    fn i128_sum(a: i128, b: i128) -> i128;
     fn takes_array(a: Array) -> usize;
     fn takes_ranked_array(a: RankedArray<1>) -> usize;
     fn takes_typed_array(a: TypedArray<u32>) -> usize;
