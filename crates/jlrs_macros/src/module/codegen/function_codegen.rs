@@ -74,7 +74,7 @@ fn function_info_fragment(
     let invoke_fn = invoke_fn_template(ir);
 
     let expr = parse_quote! {
-        frame.local_scope::<_, 8>(|mut frame| {
+        frame.local_scope::<_, 9>(#[inline(never)] |mut frame| {
             // Root 1
             let mut output = frame.output();
 
@@ -112,11 +112,16 @@ fn function_info_fragment(
 
                     #(
                         {
-                            frame.local_scope::<_, 2>(|mut frame|{
+                            frame.local_scope::<_, 3>(#[inline(never)] |mut frame|{
                                 let ccall_input = #ccall_inputs.as_value();
                                 ccall_arg_types_ref.set_value(&mut output, #ccall_input_idx, ccall_input).unwrap().unwrap();
                                 let julia_input = #function_inputs.as_value();
-                                julia_arg_types_ref.set_value(&mut output, #julia_input_idx, julia_input).unwrap().unwrap();
+                                if julia_input.is::<::jlrs::data::managed::type_var::TypeVar>() {
+                                    let julia_input = ::jlrs::data::managed::union_all::tvar_to_unionall(&mut frame, julia_input);
+                                    julia_arg_types_ref.set_value(&mut output, #julia_input_idx, julia_input).unwrap().unwrap();
+                                } else {
+                                    julia_arg_types_ref.set_value(&mut output, #julia_input_idx, julia_input).unwrap().unwrap();
+                                }
                             });
                         }
                     )*
@@ -130,6 +135,9 @@ fn function_info_fragment(
                     let #module = #get_module;
 
                     // Root #8
+                    let #env = #env.filter(&mut frame, julia_arg_types);
+
+                    // Root #9
                     function_info_ty.instantiate_unchecked(&mut frame, [
                         name.as_value(),
                         ccall_arg_types.as_value(),

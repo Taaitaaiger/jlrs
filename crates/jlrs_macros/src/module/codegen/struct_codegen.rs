@@ -51,7 +51,7 @@ fn init_fn(ident: Ident, fragments: Vec<Expr>) -> ItemFn {
             frame: &Tgt,
             module: ::jlrs::data::managed::module::Module,
         ) {
-            frame.local_scope::<_, 1>(|mut frame| {
+            frame.local_scope::<_, 1>(#[inline(never)] |mut frame| {
                 let mut output = frame.output();
                 unsafe {
                     #(#fragments)*
@@ -64,7 +64,7 @@ fn init_fn(ident: Ident, fragments: Vec<Expr>) -> ItemFn {
 fn init_type_fragment(struct_ir: &StructIR, module: &Ident) -> Expr {
     let get_module = module_codegen(module, &struct_ir.export_name);
     let name = struct_ir.export_name.name_string();
-    let path = &struct_ir.key;
+    let path = struct_ir.key;
     let variants = &struct_ir.paths;
 
     parse_quote! {
@@ -85,7 +85,7 @@ fn init_type_fragment(struct_ir: &StructIR, module: &Ident) -> Expr {
 fn reinit_type_fragment(struct_ir: &StructIR, module: &Ident) -> Expr {
     let module = module_codegen(module, &struct_ir.export_name);
     let name = struct_ir.export_name.name_string();
-    let path = &struct_ir.key;
+    let path = struct_ir.key;
 
     let variant_reinit = struct_ir.paths.iter().map(|variant| {
         let expr: Expr = parse_quote! {

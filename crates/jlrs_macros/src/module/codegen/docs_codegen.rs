@@ -24,7 +24,7 @@ impl<'a> DocsCodegen<'a> {
             let doc = doc_item.doc.as_str();
 
             let expr: Expr = parse_quote! {
-                frame.local_scope::<_, 3>(|mut frame| {
+                frame.local_scope::<_, 3>(#[inline(never)] |mut frame| {
                     unsafe {
                         let #module = #get_module;
                         let item = ::jlrs::data::managed::symbol::Symbol::new(&frame, #name);

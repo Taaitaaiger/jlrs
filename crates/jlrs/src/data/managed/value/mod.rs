@@ -413,6 +413,27 @@ impl<'scope, 'data> Value<'scope, 'data> {
             type_name_ref.to_str().unwrap()
         }
     }
+
+    /// Returns `true` if this value depends on the `TypeVar` `tvar`.
+    pub fn depends_on(&self, tvar: TypeVar) -> bool {
+        unsafe {
+            if self.is::<DataType>() {
+                let dt = self.cast_unchecked::<DataType>();
+                dt.depends_on(tvar)
+            } else if self.is::<UnionAll>() {
+                let ua = self.cast_unchecked::<UnionAll>();
+                ua.depends_on(tvar)
+            } else if self.is::<Union>() {
+                let u = self.cast_unchecked::<Union>();
+                u.depends_on(tvar)
+            } else if self.is::<TypeVar>() {
+                let tv = self.cast_unchecked::<TypeVar>();
+                tv.depends_on(tvar)
+            } else {
+                false
+            }
+        }
+    }
 }
 
 /// # Type checking

@@ -1,6 +1,9 @@
 //! Construct Julia type objects from Rust types.
 
-use std::{any::TypeId, ffi::c_void, marker::PhantomData, ptr::NonNull, string::FromUtf8Error};
+use std::{
+    any::TypeId, ffi::c_void, fmt, marker::PhantomData, ptr::NonNull, string::FromUtf8Error,
+    sync::atomic::Ordering,
+};
 
 use fnv::FnvHashMap;
 use jl_sys::{
@@ -20,6 +23,7 @@ use crate::{
             Managed,
             array::dimensions::DimsExt,
             datatype::DataType,
+            erase_scope_lifetime,
             simple_vector::SimpleVector,
             type_var::{TypeVar, TypeVarData},
             union::Union,
@@ -32,7 +36,7 @@ use crate::{
         scope::{LocalScope, LocalScopeExt},
         target::{RootingTarget, Target, unrooted::Unrooted},
     },
-    prelude::{ConstructTypedArray, Symbol, WeakValue},
+    prelude::{ConstructTypedArray, Symbol, Vector, WeakValue},
     private::Private,
 };
 
@@ -585,7 +589,6 @@ impl<T1: TypeVars, R: TypeVars> TypeVars for TypeVarFragment<T1, R> {
 }
 
 /// An environment of [`TypeVar`]s, i.e. all `TypeVar`s that appear in a function signature.
-#[derive(Debug)]
 pub struct TypeVarEnv<'scope> {
     svec: SimpleVector<'scope>,
 }
@@ -615,6 +618,115 @@ impl<'scope> TypeVarEnv<'scope> {
         }
     }
 
+    /// Filter unused `TypeVar`s.
+    ///
+    /// Safety: `arg_types` must contain the argument types of a function that uses this
+    /// environment.
+    ///
+    /// If a `TypeVar` is used as the argument type of an exported function, it is exposed as a
+    /// `UnionAll`. Due to this conversion, `TypeVar`s defined by the environment may end up not
+    /// being used. To avoid exposing unused `TypeVar`s to Julia, the environment is filtered with
+    /// this method.
+    pub unsafe fn filter<'target, Tgt: Target<'target> + RootingTarget<'target>>(
+        &self,
+        target: Tgt,
+        arg_types: Vector,
+    ) -> TypeVarEnv<'target> {
+        unsafe {
+            let mut params = {
+                let data = self.svec.data();
+                let slice = data.as_atomic_slice().assume_immutable_non_null();
+                slice
+                    .iter()
+                    .map(|v| erase_scope_lifetime(*v))
+                    .map(|v| v.cast_unchecked::<TypeVar>())
+                    .map(Mask::Unused)
+                    .collect::<Vec<_>>()
+            };
+
+            if params.len() == 0 {
+                return TypeVarEnv::empty(&target);
+            }
+
+            // First we check what tvars are depended on by the arguments and mark those as used
+            let arg_accessor = arg_types.try_value_data().unwrap();
+            let arg_slice = arg_accessor.as_slice();
+            for arg_type in arg_slice {
+                let arg_type = arg_type.load(Ordering::Relaxed).unwrap().as_value();
+                for param in params.iter_mut() {
+                    match param {
+                        Mask::Used(_) => (),
+                        Mask::Unused(tvar) => {
+                            if arg_type.depends_on(*tvar) {
+                                *param = Mask::Used(*tvar)
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Remove the unused trailing parameters
+            loop {
+                match params.last() {
+                    Some(Mask::Unused(_)) => {
+                        let _ = params.pop();
+                    }
+                    Some(Mask::Used(_)) => break,
+                    None => break,
+                }
+            }
+
+            if params.len() == 0 {
+                return TypeVarEnv::empty(&target);
+            }
+
+            // Some tvars might be absent in the signature, but affect a bound of a used tvar.
+            // In the environment [T1, T2, T3], T3 can depend on T1 and T2, and T2 can depend on
+            // T1. If T2 not mentioned by any of the arguments, it will currently be marked as
+            // unused; if T3 depends on this parameter we need to mark it as used.
+
+            // We'll iterate through the environment in reverse
+            for i in (0..params.len() - 1).rev() {
+                // `head` contains all parameters that may affect the first element of `tail`
+                let (head, tail) = params.split_at_mut(i);
+                match tail.first() {
+                    Some(Mask::Used(tvar)) => {
+                        // This parameter is used at this point, so check if it depends on any
+                        // currently unused parameter.
+                        for param in head {
+                            match param {
+                                Mask::Used(_) => continue,
+                                Mask::Unused(u) => {
+                                    if u.depends_on(*tvar) {
+                                        *param = Mask::Used(*u);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Some(Mask::Unused(_)) => continue,
+                    None => continue,
+                }
+            }
+
+            // Any parameter that is unused at this point can be dropped from the environment.
+            let params = params
+                .into_iter()
+                .filter_map(|param| match param {
+                    Mask::Used(param) => Some(param),
+                    Mask::Unused(_) => None,
+                })
+                .collect::<Vec<_>>();
+
+            if params.len() == 0 {
+                return TypeVarEnv::empty(&target);
+            }
+
+            let svec = Tgt::into_concrete_type(SimpleVector::new(target, &params));
+            TypeVarEnv { svec }
+        }
+    }
+
     /// Access this environment as a `SimpleVector`.
     pub fn to_svec(&self) -> SimpleVector<'scope> {
         self.svec
@@ -628,6 +740,23 @@ impl<'scope> TypeVarEnv<'scope> {
             data.set(offset, Some(tvar.as_value())).unwrap();
         }
     }
+}
+
+impl fmt::Debug for TypeVarEnv<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let items = self.svec.data();
+        unsafe {
+            let data = items.as_atomic_slice().assume_immutable_non_null();
+            let fields = data.iter().map(|data| format!("{:?}", data));
+
+            f.debug_set().entries(fields).finish()
+        }
+    }
+}
+
+enum Mask<T> {
+    Used(T),
+    Unused(T),
 }
 
 macro_rules! impl_construct_julia_type_constant {

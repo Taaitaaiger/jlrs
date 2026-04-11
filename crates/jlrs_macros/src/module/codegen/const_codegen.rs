@@ -21,7 +21,7 @@ impl<'a> ConstCodegen<'a> {
             let ty = &constant.ty;
 
             let expr: Expr = parse_quote! {
-                frame.local_scope::<_, 2>(move |mut frame| {
+                frame.local_scope::<_, 2>(#[inline(never)] move |mut frame| {
                     let v: #ty = #name;
                     let value = ::jlrs::data::managed::value::Value::new(&mut frame, v);
                     module.set_const(&mut frame, #rename, value).unwrap();

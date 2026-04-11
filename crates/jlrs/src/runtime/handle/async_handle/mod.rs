@@ -518,10 +518,7 @@ unsafe fn set_custom_fns() {
 
         handle.local_scope::<_, 2>(|mut frame| {
             let wake_rust = Value::new(&mut frame, wake_task as *mut c_void);
-            Module::main(&frame)
-                .submodule(&frame, "JlrsCore")
-                .unwrap()
-                .as_managed()
+            Module::jlrs_core(&frame)
                 .submodule(&frame, "Threads")
                 .unwrap()
                 .as_managed()

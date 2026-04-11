@@ -11,7 +11,7 @@ use super::{
 };
 use crate::{
     catch::{catch_exceptions, unwrap_exc},
-    data::managed::{Managed, private::ManagedPriv, value::Value},
+    data::managed::{Managed, private::ManagedPriv, type_var::TypeVar, value::Value},
     impl_julia_typecheck,
     memory::target::{Target, TargetResult},
     private::Private,
@@ -139,6 +139,11 @@ impl<'scope> Union<'scope> {
             debug_assert!(!b.is_null());
             Value::wrap_non_null(NonNull::new_unchecked(b), Private)
         }
+    }
+
+    /// Returns `true` if this `Union` depends on the `TypeVar` `tvar`.
+    pub fn depends_on(&self, tvar: TypeVar) -> bool {
+        self.a().depends_on(tvar) || self.b().depends_on(tvar)
     }
 }
 

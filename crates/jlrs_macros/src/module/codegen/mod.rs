@@ -49,7 +49,16 @@ pub fn codegen(ir: JuliaModuleIR) -> TokenStream {
             module: ::jlrs::data::managed::module::Module,
             precompiling: u8,
         ) -> ::jlrs::data::managed::value::ValueRet {
+            static IS_INIT: ::std::sync::atomic::AtomicBool = ::std::sync::atomic::AtomicBool::new(false);
+            if IS_INIT.compare_exchange(false, true, ::std::sync::atomic::Ordering::Relaxed, ::std::sync::atomic::Ordering::Relaxed).is_err() {
+                let unrooted = <::jlrs::data::managed::module::Module as ::jlrs::data::managed::Managed>::unrooted_target(module);
+                return ::jlrs::data::managed::value::Value::nothing(&unrooted).as_weak().leak();
+            }
+
+            
             unsafe {
+                ::jlrs::data::static_data::set_loading_package(Some(module));
+
                 #struct_init_fn
 
                 #struct_reinit_fn
@@ -62,15 +71,9 @@ pub fn codegen(ir: JuliaModuleIR) -> TokenStream {
 
                 #docs_init_fn
 
-                static IS_INIT: ::std::sync::atomic::AtomicBool = ::std::sync::atomic::AtomicBool::new(false);
-                if IS_INIT.compare_exchange(false, true, ::std::sync::atomic::Ordering::Relaxed, ::std::sync::atomic::Ordering::Relaxed).is_err() {
-                    let unrooted = <::jlrs::data::managed::module::Module as ::jlrs::data::managed::Managed>::unrooted_target(module);
-                    return ::jlrs::data::managed::value::Value::nothing(&unrooted).as_weak().leak();
-                }
-
                 ::jlrs::runtime::handle::ccall::init_jlrs_wrapped(&::jlrs::InstallJlrsCore::No);
 
-                match ::jlrs::weak_handle!() {
+                let module_info = match ::jlrs::weak_handle!() {
                     Ok(handle) => {
                         handle.local_scope::<_, 2>(|mut frame| {
                             let wrap_mod = ::jlrs::data::managed::module::Module::jlrs_core(&frame)
@@ -96,6 +99,10 @@ pub fn codegen(ir: JuliaModuleIR) -> TokenStream {
                                 .as_value()
                                 .cast_unchecked::<::jlrs::data::managed::datatype::DataType>();
 
+                            let supports_export = wrap_mod
+                                .global(&frame, "SUPPORTS_EXPORT")
+                                .is_ok();
+
                             if precompiling == 1 {
                                 #struct_init_fn_ident(&frame, module);
                                 #const_init_fn_ident(&frame, module);
@@ -111,11 +118,19 @@ pub fn codegen(ir: JuliaModuleIR) -> TokenStream {
                             if precompiling == 1 {
                                 #docs_init_fn_ident(&frame, &mut doc_items, module, doc_item_ty);
                             }
-                            module_info_ty.instantiate_unchecked(&frame, [arr.as_value(), doc_items.as_value()]).leak()
+
+                            if !supports_export {
+                                module_info_ty.instantiate_unchecked(&frame, [arr.as_value(), doc_items.as_value()]).leak()
+                            } else {
+                                module_info_ty.instantiate_unchecked(&frame, [arr.as_value(), doc_items.as_value()]).leak()
+                            }
                         })
                     },
                     Err(_) => panic!("Not called from Julia, or Julia is in a GC-safe state"),
-                }
+                };
+
+                ::jlrs::data::static_data::set_loading_package(None);
+                module_info
             }
         }
     }

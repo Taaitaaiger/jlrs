@@ -21,6 +21,7 @@ use crate::{
     },
     error::{AccessError, JlrsResult},
     memory::target::{Target, TargetResult, unrooted::Unrooted},
+    prelude::LocalScopeExt,
     private::Private,
 };
 
@@ -116,6 +117,24 @@ where
 pub struct SimpleVector<'scope>(NonNull<jl_svec_t>, PhantomData<&'scope ()>);
 
 impl<'scope> SimpleVector<'scope> {
+    /// Create a new `SimpleVector` that contains every element in `elems`.
+    pub fn new<'elem, Tgt, T>(target: Tgt, elems: &[T]) -> SimpleVectorData<'scope, Tgt>
+    where
+        Tgt: Target<'scope>,
+        T: Managed<'elem, 'static>,
+    {
+        target.with_local_scope::<_, 1>(|target, mut frame| unsafe {
+            let svec = SimpleVector::with_capacity_uninit(&mut frame, elems.len());
+            {
+                let data = svec.data();
+                for (idx, elem) in elems.iter().copied().enumerate() {
+                    data.set(idx, Some(elem.as_value())).unwrap();
+                }
+            }
+
+            svec.root(target)
+        })
+    }
     /// Create a new `SimpleVector` that can hold `n` values.
     #[inline]
     pub fn with_capacity<Tgt>(target: Tgt, n: usize) -> SimpleVectorData<'scope, Tgt>

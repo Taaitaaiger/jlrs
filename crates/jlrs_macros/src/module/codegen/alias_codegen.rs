@@ -20,7 +20,7 @@ impl<'a> AliasCodegen<'a> {
             let ty = &alias.ty;
 
             let expr: Expr = parse_quote! {
-                frame.local_scope::<_, 2>(move |mut frame| {
+                frame.local_scope::<_, 2>(#[inline(never)] move |mut frame| {
                     let value = <#ty as ::jlrs::data::types::construct_type::ConstructType>::construct_type(&mut frame);
                     module.set_const(&mut frame, #name, value).unwrap();
                 })
