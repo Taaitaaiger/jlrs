@@ -9,7 +9,6 @@ panic = "abort"
 [profile.dev]
 panic = "abort"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [features]
 windows = ["jlrs/windows"]
 lto = ["jlrs/lto"]

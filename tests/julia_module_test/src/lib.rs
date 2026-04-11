@@ -42,9 +42,27 @@ use typed_value::*;
 julia_module! {
     become julia_module_tests_init_fn;
 
+    ///     takes_no_args_returns_nothing
+    ///
+    /// ```jldoctest; setup = :(using JuliaModuleTest)
+    /// julia> JuliaModuleTest.takes_no_args_returns_nothing()
+    /// ```
     fn takes_no_args_returns_nothing();
+
+    ///     takes_no_args_returns_usize
+    ///
+    /// ```jldoctest; setup = :(using JuliaModuleTest)
+    /// julia> JuliaModuleTest.takes_no_args_returns_usize()
+    /// 0x0000000000000000
+    /// ```
     fn takes_no_args_returns_usize() -> usize;
 
+    ///     takes_usize_returns_usize
+    ///
+    /// ```jldoctest; setup = :(using JuliaModuleTest)
+    /// julia> JuliaModuleTest.takes_usize_returns_usize(UInt(1))
+    /// 0x0000000000000002
+    /// ```
     pub fn takes_usize_returns_usize(a: usize) -> usize;
     fn takes_array(a: Array) -> usize;
     fn takes_ranked_array(a: RankedArray<1>) -> usize;

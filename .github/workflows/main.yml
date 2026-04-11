@@ -253,11 +253,11 @@ jobs:
 
       - name: Run module tests
         run: |
-          # julia -e "import Pkg; Pkg.add(url=\"https://github.com/Taaitaaiger/JlrsCore.jl\", rev=\"0c0ce35ec27f228587b01b410d402506f3f0f35a\")"
+          julia -e "import Pkg; Pkg.add(url=\"https://github.com/Taaitaaiger/JlrsCore.jl\", rev=\"0c0ce35ec27f228587b01b410d402506f3f0f35a\")"
           cd tests/julia_module_test
           cargo build
-          cp ./target/debug/libjulia_module_test.so .
-          julia JuliaModuleTest.jl
+          cd ../script
+          JULIA_MODULE_TEST_LIB_DIR=$(pwd)/../julia_module_test/target/debug julia JuliaModuleTest.jl
 
   julia-module-test-windows-gnu:
     runs-on: windows-2022
@@ -277,11 +277,11 @@ jobs:
 
       - name: Run module tests
         run: |
-          julia -e 'import Pkg; Pkg.add(url="https://github.com/Taaitaaiger/JlrsCore.jl", rev="0c0ce35ec27f228587b01b410d402506f3f0f35a")'
+          julia -e "import Pkg; Pkg.add(url=\"https://github.com/Taaitaaiger/JlrsCore.jl\", rev=\"0c0ce35ec27f228587b01b410d402506f3f0f35a\")"
           cd tests/julia_module_test
           cargo build
-          cp ./target/debug/julia_module_test.* libjulia_module_test.dll
-          julia JuliaModuleTest.jl
+          cd ../script
+          JULIA_MODULE_TEST_LIB_DIR=$(pwd)/../julia_module_test/target/debug julia JuliaModuleTest.jl
 
   julia-module-test-macos:
     runs-on: macos-latest
@@ -301,11 +301,11 @@ jobs:
 
       - name: Run tests
         run: |
-          # julia -e "import Pkg; Pkg.add(url=\"https://github.com/Taaitaaiger/JlrsCore.jl\", rev=\"0c0ce35ec27f228587b01b410d402506f3f0f35a\")"
+          julia -e "import Pkg; Pkg.add(url=\"https://github.com/Taaitaaiger/JlrsCore.jl\", rev=\"0c0ce35ec27f228587b01b410d402506f3f0f35a\")"
           cd tests/julia_module_test
           cargo build
-          cp ./target/debug/libjulia_module_test.* .
-          julia JuliaModuleTest.jl
+          cd ../script
+          JULIA_MODULE_TEST_LIB_DIR=$(pwd)/../julia_module_test/target/debug julia JuliaModuleTest.jl
 
   docs:
     runs-on: ubuntu-latest

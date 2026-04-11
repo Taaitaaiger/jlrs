@@ -12,23 +12,24 @@ impl<'a> Documentation<'a> {
             return Ok(None);
         }
 
-        let (first, trailing) = attrs.split_at(1);
-        let mut lines = Vec::with_capacity(1 + trailing.len());
-        match &first[0].meta {
-            Meta::NameValue(nv) => match &nv.value {
-                Expr::Lit(PatLit {
-                    lit: Lit::Str(lit_str),
-                    ..
-                }) => {
-                    debug_assert!(nv.path.is_ident("doc"));
-                    lines.push(lit_str.value());
-                }
-                _ => Err(Error::new(
-                    first[0].span(),
-                    "Unexpected literal in documentation",
-                ))?,
-            },
-            _ => unreachable!(),
+        let mut lines = Vec::with_capacity(attrs.len());
+        for attr in &attrs {
+            match &attr.meta {
+                Meta::NameValue(nv) => match &nv.value {
+                    Expr::Lit(PatLit {
+                        lit: Lit::Str(lit_str),
+                        ..
+                    }) => {
+                        debug_assert!(nv.path.is_ident("doc"));
+                        lines.push(lit_str.value());
+                    }
+                    _ => Err(Error::new(
+                        attr.span(),
+                        "Unexpected literal in documentation",
+                    ))?,
+                },
+                _ => unreachable!(),
+            }
         }
 
         Ok(Some(Documentation {
@@ -38,12 +39,11 @@ impl<'a> Documentation<'a> {
     }
 
     pub fn to_string(&self) -> String {
-        let starts_with_whitespace = self.lines.iter().all(|s| s.starts_with(' '));
-        if !starts_with_whitespace {
-            self.lines.join("\n")
+        self.lines.iter().map(|line| if line.starts_with(' ') {
+            &line[1..]
         } else {
-            self.lines.iter().map(|s| &s[1..]).join("\n")
-        }
+            line
+        }).join("\n")
     }
 }
 
@@ -172,6 +172,31 @@ mod tests {
                 assert!(attrs.gc_safe);
                 let lines = &attrs.documentation.as_ref().unwrap().lines;
                 assert_eq!(lines.len(), 1);
+            }
+            _ => assert!(false),
+        };
+    }
+
+    #[test]
+    fn multi_line_doc() {
+        let ast: JuliaModuleAst = parse_quote! {
+            become init_fn;
+
+            /// Foo
+            /// Bar
+            fn foo();
+        };
+
+        let expanded = ExpandedModule::from_ast(ast).unwrap();
+        assert_eq!(expanded.items.len(), 1);
+
+        match &expanded.items[0] {
+            ExpandedModuleItem::Function(expanded_function) => {
+                assert_eq!(expanded_function.attrs.len(), 2);
+                let attrs = Attributes::from_attributes(&expanded_function.attrs).unwrap();
+                assert_eq!(attrs.attrs.len(), 0);
+                let lines = &attrs.documentation.as_ref().unwrap().lines;
+                assert_eq!(lines.len(), 2);
             }
             _ => assert!(false),
         };

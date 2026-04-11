@@ -1,5 +1,6 @@
 include("JuliaModule.jl")
 
+using JlrsCore
 using JlrsCore.Ledger
 using Test
 
