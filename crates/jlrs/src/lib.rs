@@ -230,11 +230,11 @@
 //! If you want to embed Julia in a Rust application, you must enable a runtime and a version
 //! feature:
 //!
-//! `jlrs = {version = "0.22", features = ["local-rt"]}`
+//! `jlrs = {version = "0.23", features = ["local-rt"]}`
 //!
-//! `jlrs = {version = "0.22", features = ["tokio-rt"]}`
+//! `jlrs = {version = "0.23", features = ["tokio-rt"]}`
 //!
-//! `jlrs = {version = "0.22", features = ["multi-rt"]}`
+//! `jlrs = {version = "0.23", features = ["multi-rt"]}`
 //!
 //! When Julia is embedded in an application, it must be initialized before it can be used. A
 //! [`Builder`] is available to configure the runtime before starting it. This lets you set
