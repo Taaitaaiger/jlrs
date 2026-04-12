@@ -267,10 +267,10 @@ jobs:
       - name: Run package tests
         run: |
           cd tests/JuliaModuleTest
+          export JULIA_MODULE_TEST_LIB_DIR="${GITHUB_WORKSPACE}/tests/julia_module_test/target/debug"
           julia --project=. -e '
           using Pkg
           Pkg.instantiate()'
-          export JULIA_MODULE_TEST_LIB_DIR="${GITHUB_WORKSPACE}/tests/julia_module_test/target/debug"
           julia --project=. test/runtests.jl
 
   # julia-module-test-windows-gnu:
