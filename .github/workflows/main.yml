@@ -267,7 +267,6 @@ jobs:
           export JULIA_MODULE_TEST_LIB_DIR="${GITHUB_WORKSPACE}/tests/julia_module_test/target/debug"
           julia --project=. -e '
             using Pkg
-            Pkg.develop(PackageSpec(path=pwd()))
             Pkg.instantiate()'
           julia --project=. test/runtests.jl
 
