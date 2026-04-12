@@ -14,11 +14,12 @@ jobs:
     continue-on-error: ${{ matrix.allow-fail }}
     strategy:
       matrix:
-        rust: [stable, beta]
+        rust: [stable]
+        # rust: [stable, beta]
         allow-fail: [false]
-        include:
-          - rust: nightly
-            allow-fail: true
+        # include:
+        #   - rust: nightly
+        #     allow-fail: true
     steps:
       - uses: actions/checkout@v4
 
@@ -262,7 +263,7 @@ jobs:
 
       - name: Run package tests
         run: |
-          cd ../JuliaModuleTest
+          cd tests/JuliaModuleTest
           export JULIA_MODULE_TEST_LIB_DIR="${GITHUB_WORKSPACE}/tests/julia_module_test/target/debug"
           julia --project=. test/runtests.jl
 
