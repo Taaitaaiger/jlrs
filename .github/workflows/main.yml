@@ -300,6 +300,70 @@ jobs:
         env:
           JULIA_PKG_SERVER: ""
 
+  julia-module-test-macos:
+    runs-on: macos-latest
+    # needs: test-macos
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Julia environment
+        uses: julia-actions/setup-julia@v2
+        with:
+          version: '1.12'
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+
+      - name: Build library
+        run: |
+          cd tests/julia_module_test
+          cargo build
+
+      - name: Script tests
+        run: |
+          cd tests/script
+          julia -e "import Pkg; Pkg.add(url=\"https://github.com/Taaitaaiger/JlrsCore.jl\", rev=\"0c0ce35ec27f228587b01b410d402506f3f0f35a\")"
+          export JULIA_MODULE_TEST_LIB_DIR="${GITHUB_WORKSPACE}/tests/julia_module_test/target/debug"
+          julia JuliaModuleTest.jl
+
+      - name: Package tests
+        run: |
+          cd tests/JuliaModuleTest
+          export JULIA_MODULE_TEST_LIB_DIR="${GITHUB_WORKSPACE}/tests/julia_module_test/target/debug"
+          julia --project=. -e '
+            using Pkg
+            Pkg.instantiate()'
+          julia --project=. test/runtests.jl
+
+      - name: Instantiate docs
+        run: |
+          cd tests/JuliaModuleTest
+          julia --project=docs -e '
+            using Pkg
+            Pkg.develop(PackageSpec(path=pwd()))
+            Pkg.instantiate()'
+
+      - name: Install Documenter
+        run: |
+          julia -e "import Pkg; Pkg.add(\"Documenter\")"
+
+      - name: Doctests
+        run: |
+          cd tests/JuliaModuleTest
+          julia --project=docs -e '
+            using Documenter: doctest
+            using JuliaModuleTest
+            doctest(JuliaModuleTest)'
+
+      - name: Docs
+        run: |
+          cd tests/JuliaModuleTest
+          julia --project=docs docs/make.jl
+        env:
+          JULIA_PKG_SERVER: ""
+
   # julia-module-test-windows-gnu:
   #   runs-on: windows-2022
   #   needs: test-windows-gnu
@@ -323,31 +387,6 @@ jobs:
   #         cargo build
   #         cd ../script
   #         $env:JULIA_MODULE_TEST_LIB_DIR = "${env:GITHUB_WORKSPACE}\tests\julia_module_test\target\debug"
-  #         julia JuliaModuleTest.jl
-
-  # julia-module-test-macos:
-  #   runs-on: macos-latest
-  #   needs: test-macos
-  #   steps:
-  #     - uses: actions/checkout@v4
-
-  #     - name: Setup Julia environment
-  #       uses: julia-actions/setup-julia@v2
-  #       with:
-  #         version: '1.12'
-
-  #     - name: Setup Rust
-  #       uses:  dtolnay/rust-toolchain@master
-  #       with:
-  #         toolchain: stable
-
-  #     - name: Run tests
-  #       run: |
-  #         julia -e 'import Pkg; Pkg.add(url="https://github.com/Taaitaaiger/JlrsCore.jl", rev="0c0ce35ec27f228587b01b410d402506f3f0f35a")'
-  #         cd tests/julia_module_test
-  #         cargo build
-  #         cd ../script
-  #         export JULIA_MODULE_TEST_LIB_DIR="${GITHUB_WORKSPACE}/tests/julia_module_test/target/debug"
   #         julia JuliaModuleTest.jl
 
   # docs:
