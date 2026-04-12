@@ -17,7 +17,8 @@ end
 
 separator = Sys.iswindows() ? '\\' : '/'
 test_library_path = get(ENV, "JULIA_MODULE_TEST_LIB_DIR", ".$separator")
-@wrapmodule("$(test_library_path)libjulia_module_test", :julia_module_tests_init_fn)
+test_library_name = Sys.iswindows() ? "julia_module_test" : "libjulia_module_test"
+@wrapmodule("$(test_library_path)$(test_library_name)", :julia_module_tests_init_fn)
 
 function __init__()
     @initjlrs
