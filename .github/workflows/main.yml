@@ -247,11 +247,6 @@ jobs:
         with:
           version: '1.12'
 
-      - run: julia --color=yes -e 'using Pkg; Pkg.add("Documenter"); VERSION >= v"1.5-" && !isdir(joinpath(DEPOT_PATH[1], "registries", "General")) && Pkg.Registry.add("General")'
-        shell: bash
-        env:
-          JULIA_PKG_SERVER: ""
-
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@master
         with:
@@ -278,32 +273,28 @@ jobs:
             Pkg.instantiate()'
           julia --project=. test/runtests.jl
 
-      - name: Docs
+      - name: Instantiate docs
         run: |
           cd tests/JuliaModuleTest
-          export JULIA_MODULE_TEST_LIB_DIR="${GITHUB_WORKSPACE}/tests/julia_module_test/target/debug"
           julia --project=docs -e '
             using Pkg
             Pkg.develop(PackageSpec(path=pwd()))
             Pkg.instantiate()'
-          julia --project=docs docs/make.jl
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }}
-
-      - run: julia --color=yes -e 'using Pkg; Pkg.add("Documenter"); VERSION >= v"1.5-" && !isdir(joinpath(DEPOT_PATH[1], "registries", "General")) && Pkg.Registry.add("General")'
-        shell: bash
-        env:
-          JULIA_PKG_SERVER: ""
 
       - name: Doctests
         run: |
           cd tests/JuliaModuleTest
-          export JULIA_MODULE_TEST_LIB_DIR="${GITHUB_WORKSPACE}/tests/julia_module_test/target/debug"
           julia --project=docs -e '
             using Documenter: doctest
             using JuliaModuleTest
             doctest(JuliaModuleTest)'
+
+      - name: Docs
+        run: julia --project=docs docs/make.jl
+        env:
+          JULIA_PKG_SERVER: ""
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }}
 
   # julia-module-test-windows-gnu:
   #   runs-on: windows-2022
