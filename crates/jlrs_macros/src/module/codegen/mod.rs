@@ -55,7 +55,6 @@ pub fn codegen(ir: JuliaModuleIR) -> TokenStream {
                 return ::jlrs::data::managed::value::Value::nothing(&unrooted).as_weak().leak();
             }
 
-            
             unsafe {
                 ::jlrs::data::static_data::set_loading_package(Some(module));
 

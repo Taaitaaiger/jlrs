@@ -5,15 +5,15 @@ struct FourGenericsI{A, B, C, D}
     a::A
     b::B
     c::C
-    d::D 
+    d::D
 end
- 
+
 mutable struct FourGenericsM{A, B, C, D}
     a::A
     b::B
     c::C
     d::D
-end 
+end
 
 separator = Sys.iswindows() ? '\\' : '/'
 test_library_dir = get(ENV, "JULIA_MODULE_TEST_LIB_DIR", ".")
