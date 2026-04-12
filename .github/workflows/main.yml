@@ -291,7 +291,9 @@ jobs:
             doctest(JuliaModuleTest)'
 
       - name: Docs
-        run: julia --project=docs docs/make.jl
+        run: |
+          cd tests/JuliaModuleTest
+          julia --project=docs docs/make.jl
         env:
           JULIA_PKG_SERVER: ""
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
