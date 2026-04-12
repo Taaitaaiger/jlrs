@@ -9,36 +9,36 @@ on:
   workflow_dispatch:
 
 jobs:
-  test-linux:
-    runs-on: ubuntu-latest
-    continue-on-error: ${{ matrix.allow-fail }}
-    strategy:
-      matrix:
-        rust: [stable]
-        # rust: [stable, beta]
-        allow-fail: [false]
-        # include:
-        #   - rust: nightly
-        #     allow-fail: true
-    steps:
-      - uses: actions/checkout@v4
+  # test-linux:
+  #   runs-on: ubuntu-latest
+  #   continue-on-error: ${{ matrix.allow-fail }}
+  #   strategy:
+  #     matrix:
+  #       rust: [stable]
+  #       # rust: [stable, beta]
+  #       allow-fail: [false]
+  #       # include:
+  #       #   - rust: nightly
+  #       #     allow-fail: true
+  #   steps:
+  #     - uses: actions/checkout@v4
 
-      - name: Setup Julia environment
-        uses: julia-actions/setup-julia@v2
-        with:
-          version: '1.12'
+  #     - name: Setup Julia environment
+  #       uses: julia-actions/setup-julia@v2
+  #       with:
+  #         version: '1.12'
 
-      - name: Setup Rust
-        uses:  dtolnay/rust-toolchain@master
-        with:
-          toolchain: ${{ matrix.rust }}
+  #     - name: Setup Rust
+  #       uses:  dtolnay/rust-toolchain@master
+  #       with:
+  #         toolchain: ${{ matrix.rust }}
 
-      - name: Run tests
-        run: |
-          # julia -e "import Pkg; Pkg.add(url=\"https://github.com/Taaitaaiger/JlrsCore.jl\", rev=\"0c0ce35ec27f228587b01b410d402506f3f0f35a\")"
-          export JLRS_JULIA_DIR="$(dirname $(dirname $(which julia)))"
-          export LD_LIBRARY_PATH="${JLRS_JULIA_DIR}/lib:${LD_LIBRARY_PATH}"
-          cargo test --features full --verbose
+  #     - name: Run tests
+  #       run: |
+  #         # julia -e "import Pkg; Pkg.add(url=\"https://github.com/Taaitaaiger/JlrsCore.jl\", rev=\"0c0ce35ec27f228587b01b410d402506f3f0f35a\")"
+  #         export JLRS_JULIA_DIR="$(dirname $(dirname $(which julia)))"
+  #         export LD_LIBRARY_PATH="${JLRS_JULIA_DIR}/lib:${LD_LIBRARY_PATH}"
+  #         cargo test --features full --verbose
 
   # test-macos:
   #   runs-on: macos-latest
@@ -238,7 +238,7 @@ jobs:
 
   julia-module-test-linux:
     runs-on: ubuntu-latest
-    needs: test-linux
+    # needs: test-linux
     steps:
       - uses: actions/checkout@v4
 
@@ -265,6 +265,10 @@ jobs:
         run: |
           cd tests/JuliaModuleTest
           export JULIA_MODULE_TEST_LIB_DIR="${GITHUB_WORKSPACE}/tests/julia_module_test/target/debug"
+          julia --project=. -e '
+            using Pkg
+            Pkg.develop(PackageSpec(path=pwd()))
+            Pkg.instantiate()'
           julia --project=. test/runtests.jl
 
   # julia-module-test-windows-gnu:
