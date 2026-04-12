@@ -19,174 +19,289 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # - name: Setup Julia environment
-      #   uses: julia-actions/setup-julia@v2
-      #   with:
-      #     version: 'pre'
+      - name: Setup Julia environment
+        uses: julia-actions/setup-julia@v2
+        with:
+          version: 'pre'
 
-      # - name: Setup Rust
-      #   uses: dtolnay/rust-toolchain@master
-      #   with:
-      #     toolchain: ${{ matrix.rust }}
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ matrix.rust }}
 
-      # - name: Run tests
-      #   run: |
-      #     julia -e "import Pkg; Pkg.add(url=\"https://github.com/Taaitaaiger/JlrsCore.jl\", rev=\"0c0ce35ec27f228587b01b410d402506f3f0f35a\")"
-      #     export JLRS_JULIA_DIR="$(dirname $(dirname $(which julia)))"
-      #     export LD_LIBRARY_PATH="${JLRS_JULIA_DIR}/lib:${LD_LIBRARY_PATH}"
-      #     cargo test --features full --verbose
+      - name: Run tests
+        run: |
+          julia -e "import Pkg; Pkg.add(url=\"https://github.com/Taaitaaiger/JlrsCore.jl\", rev=\"0c0ce35ec27f228587b01b410d402506f3f0f35a\")"
+          export JLRS_JULIA_DIR="$(dirname $(dirname $(which julia)))"
+          export LD_LIBRARY_PATH="${JLRS_JULIA_DIR}/lib:${LD_LIBRARY_PATH}"
+          cargo test --features full --verbose
 
-  # test-macos:
-  #   runs-on: macos-latest
-  #   continue-on-error: ${{ matrix.allow-fail }}
-  #   strategy:
-  #     matrix:
-  #       rust: [stable]
-  #       allow-fail: [false]
-  #   steps:
-  #     - uses: actions/checkout@v4
+  test-macos:
+    runs-on: macos-latest
+    continue-on-error: ${{ matrix.allow-fail }}
+    strategy:
+      matrix:
+        rust: [stable]
+        allow-fail: [false]
+    steps:
+      - uses: actions/checkout@v4
 
-  #     - name: Setup Julia environment
-  #       uses: julia-actions/setup-julia@v2
-  #       with:
-  #         version: 'pre'
+      - name: Setup Julia environment
+        uses: julia-actions/setup-julia@v2
+        with:
+          version: 'pre'
 
-  #     - name: Setup Rust
-  #       uses:  dtolnay/rust-toolchain@master
-  #       with:
-  #         toolchain: ${{ matrix.rust }}
+      - name: Setup Rust
+        uses:  dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ matrix.rust }}
 
-  #     - name: Run tests
-  #       run: |
-  #         julia -e "import Pkg; Pkg.add(url=\"https://github.com/Taaitaaiger/JlrsCore.jl\", rev=\"0c0ce35ec27f228587b01b410d402506f3f0f35a\")"
-  #         export JLRS_JULIA_DIR="$(dirname $(dirname $(which julia)))"
-  #         export DYLD_LIBRARY_PATH="${JLRS_JULIA_DIR}/lib:${DYLD_LIBRARY_PATH}"
-  #         cargo test --features full --verbose
+      - name: Run tests
+        run: |
+          julia -e "import Pkg; Pkg.add(url=\"https://github.com/Taaitaaiger/JlrsCore.jl\", rev=\"0c0ce35ec27f228587b01b410d402506f3f0f35a\")"
+          export JLRS_JULIA_DIR="$(dirname $(dirname $(which julia)))"
+          export DYLD_LIBRARY_PATH="${JLRS_JULIA_DIR}/lib:${DYLD_LIBRARY_PATH}"
+          cargo test --features full --verbose
 
-  # test-windows-gnu:
-  #   runs-on: windows-2022
-  #   continue-on-error: ${{ matrix.allow-fail }}
-  #   strategy:
-  #     matrix:
-  #       rust: [stable-x86_64-pc-windows-gnu]
-  #       allow-fail: [false]
-  #   steps:
-  #     - uses: actions/checkout@v4
+  test-windows-gnu:
+    runs-on: windows-2022
+    continue-on-error: ${{ matrix.allow-fail }}
+    strategy:
+      matrix:
+        rust: [stable-x86_64-pc-windows-gnu]
+        allow-fail: [false]
+    steps:
+      - uses: actions/checkout@v4
 
-  #     - name: Setup Julia environment
-  #       uses: julia-actions/setup-julia@v2
-  #       with:
-  #         version: 'pre'
+      - name: Setup Julia environment
+        uses: julia-actions/setup-julia@v2
+        with:
+          version: 'pre'
 
-  #     - name: Setup Rust
-  #       uses: dtolnay/rust-toolchain@master
-  #       with:
-  #         toolchain: ${{ matrix.rust }}
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ matrix.rust }}
 
-  #     - name: Run tests
-  #       run: |
-  #         julia -e 'import Pkg; Pkg.add(url="https://github.com/Taaitaaiger/JlrsCore.jl", rev="0c0ce35ec27f228587b01b410d402506f3f0f35a")'
-  #         cargo test --features full --verbose
+      - name: Run tests
+        run: |
+          julia -e 'import Pkg; Pkg.add(url="https://github.com/Taaitaaiger/JlrsCore.jl", rev="0c0ce35ec27f228587b01b410d402506f3f0f35a")'
+          cargo test --features full --verbose
 
-  # test-windows-msvc:
-  #   runs-on: windows-2022
-  #   continue-on-error: ${{ matrix.allow-fail }}
-  #   strategy:
-  #     matrix:
-  #       rust: [stable-x86_64-pc-windows-msvc]
-  #       allow-fail: [false]
-  #   steps:
-  #     - uses: actions/checkout@v4
+  test-windows-msvc:
+    runs-on: windows-2022
+    continue-on-error: ${{ matrix.allow-fail }}
+    strategy:
+      matrix:
+        rust: [stable-x86_64-pc-windows-msvc]
+        allow-fail: [false]
+    steps:
+      - uses: actions/checkout@v4
 
-  #     - name: Setup Julia environment
-  #       id: setup-julia
-  #       uses: julia-actions/setup-julia@v2
-  #       with:
-  #         version: 'pre'
+      - name: Setup Julia environment
+        id: setup-julia
+        uses: julia-actions/setup-julia@v2
+        with:
+          version: 'pre'
 
-  #     - uses: ilammy/msvc-dev-cmd@v1
+      - uses: ilammy/msvc-dev-cmd@v1
 
-  #     - name: Setup Rust
-  #       uses: dtolnay/rust-toolchain@master
-  #       with:
-  #         toolchain: ${{ matrix.rust }}
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ matrix.rust }}
 
-  #     - name: Run tests
-  #       run: |
-  #         julia -e 'import Pkg; Pkg.add(url="https://github.com/Taaitaaiger/JlrsCore.jl", rev="0c0ce35ec27f228587b01b410d402506f3f0f35a")'
-  #         cargo test --features full --verbose
+      - name: Run tests
+        run: |
+          julia -e 'import Pkg; Pkg.add(url="https://github.com/Taaitaaiger/JlrsCore.jl", rev="0c0ce35ec27f228587b01b410d402506f3f0f35a")'
+          cargo test --features full --verbose
 
-  # julia-module-test-linux:
-  #   runs-on: ubuntu-latest
-  #   needs: test-linux
-  #   steps:
-  #     - uses: actions/checkout@v4
+  julia-module-test-linux:
+    runs-on: ubuntu-latest
+    needs: test-linux
+    steps:
+      - uses: actions/checkout@v6
 
-  #     - name: Setup Julia environment
-  #       uses: julia-actions/setup-julia@v2
-  #       with:
-  #         version: 'pre'
+      - name: Setup Julia environment
+        uses: julia-actions/setup-julia@v2
+        with:
+          version: 'pre'
 
-  #     - name: Setup Rust
-  #       uses: dtolnay/rust-toolchain@master
-  #       with:
-  #         toolchain: stable
-      
-  #     - name: Run module tests
-  #       run: |
-  #         julia -e "import Pkg; Pkg.add(url=\"https://github.com/Taaitaaiger/JlrsCore.jl\", rev=\"0c0ce35ec27f228587b01b410d402506f3f0f35a\")"
-  #         cd tests/julia_module_test
-  #         cargo build
-  #         cd ../script
-  #         export JULIA_MODULE_TEST_LIB_DIR="${GITHUB_WORKSPACE}/tests/julia_module_test/target/debug"
-  #         julia JuliaModuleTest.jl
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
 
-  # julia-module-test-windows-gnu:
-  #   runs-on: windows-2022
-  #   needs: test-windows-gnu
-  #   steps:
-  #     - uses: actions/checkout@v4
+      - name: Build library
+        run: |
+          cd tests/julia_module_test
+          cargo build
 
-  #     - name: Setup Julia environment
-  #       uses: julia-actions/setup-julia@v2
-  #       with:
-  #         version: 'pre'
+      - name: Script tests
+        run: |
+          cd tests/script
+          julia -e "import Pkg; Pkg.add(url=\"https://github.com/Taaitaaiger/JlrsCore.jl\", rev=\"0c0ce35ec27f228587b01b410d402506f3f0f35a\")"
+          export JULIA_MODULE_TEST_LIB_DIR="${GITHUB_WORKSPACE}/tests/julia_module_test/target/debug"
+          julia JuliaModuleTest.jl
 
-  #     - name: Setup Rust
-  #       uses: dtolnay/rust-toolchain@master
-  #       with:
-  #         toolchain: stable-x86_64-pc-windows-gnu
+      - name: Package tests
+        run: |
+          cd tests/JuliaModuleTest
+          export JULIA_MODULE_TEST_LIB_DIR="${GITHUB_WORKSPACE}/tests/julia_module_test/target/debug"
+          julia --project=. -e '
+            using Pkg
+            Pkg.instantiate()'
+          julia --project=. test/runtests.jl
 
-  #     - name: Run module tests
-  #       run: |
-  #         julia -e 'import Pkg; Pkg.add(url="https://github.com/Taaitaaiger/JlrsCore.jl", rev="0c0ce35ec27f228587b01b410d402506f3f0f35a")'
-  #         cd tests/julia_module_test
-  #         cargo build
-  #         cd ../script
-  #         $env:JULIA_MODULE_TEST_LIB_DIR = "${env:GITHUB_WORKSPACE}\tests\julia_module_test\target\debug"
-  #         julia JuliaModuleTest.jl
+      - name: Instantiate docs
+        run: |
+          cd tests/JuliaModuleTest
+          julia --project=docs -e '
+            using Pkg
+            Pkg.develop(PackageSpec(path=pwd()))
+            Pkg.instantiate()'
 
-  # julia-module-test-macos:
-  #   runs-on: macos-latest
-  #   needs: test-macos
-  #   steps:
-  #     - uses: actions/checkout@v4
+      - name: Install Documenter
+        run: |
+          julia -e "import Pkg; Pkg.add(\"Documenter\")"
 
-  #     - name: Setup Julia environment
-  #       uses: julia-actions/setup-julia@v2
-  #       with:
-  #         version: 'pre'
+      - name: Doctests
+        run: |
+          cd tests/JuliaModuleTest
+          julia --project=docs -e '
+            using Documenter: doctest
+            using JuliaModuleTest
+            doctest(JuliaModuleTest)'
 
-  #     - name: Setup Rust
-  #       uses:  dtolnay/rust-toolchain@master
-  #       with:
-  #         toolchain: stable
+      - name: Docs
+        run: |
+          cd tests/JuliaModuleTest
+          julia --project=docs docs/make.jl
+        env:
+          JULIA_PKG_SERVER: ""
 
-  #     - name: Run tests
-  #       run: |
-  #         julia -e 'import Pkg; Pkg.add(url="https://github.com/Taaitaaiger/JlrsCore.jl", rev="0c0ce35ec27f228587b01b410d402506f3f0f35a")'
-  #         cd tests/julia_module_test
-  #         cargo build
-  #         cd ../script
-  #         export JULIA_MODULE_TEST_LIB_DIR="${GITHUB_WORKSPACE}/tests/julia_module_test/target/debug"
-  #         julia JuliaModuleTest.jl
+  julia-module-test-macos:
+    runs-on: macos-latest
+    needs: test-macos
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Julia environment
+        uses: julia-actions/setup-julia@v2
+        with:
+          version: 'pre'
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+
+      - name: Build library
+        run: |
+          cd tests/julia_module_test
+          cargo build
+
+      - name: Script tests
+        run: |
+          cd tests/script
+          julia -e "import Pkg; Pkg.add(url=\"https://github.com/Taaitaaiger/JlrsCore.jl\", rev=\"0c0ce35ec27f228587b01b410d402506f3f0f35a\")"
+          export JULIA_MODULE_TEST_LIB_DIR="${GITHUB_WORKSPACE}/tests/julia_module_test/target/debug"
+          julia JuliaModuleTest.jl
+
+      - name: Package tests
+        run: |
+          cd tests/JuliaModuleTest
+          export JULIA_MODULE_TEST_LIB_DIR="${GITHUB_WORKSPACE}/tests/julia_module_test/target/debug"
+          julia --project=. -e '
+            using Pkg
+            Pkg.instantiate()'
+          julia --project=. test/runtests.jl
+
+      - name: Instantiate docs
+        run: |
+          cd tests/JuliaModuleTest
+          julia --project=docs -e '
+            using Pkg
+            Pkg.develop(PackageSpec(path=pwd()))
+            Pkg.instantiate()'
+
+      - name: Install Documenter
+        run: |
+          julia -e "import Pkg; Pkg.add(\"Documenter\")"
+
+      - name: Doctests
+        run: |
+          cd tests/JuliaModuleTest
+          julia --project=docs -e '
+            using Documenter: doctest
+            using JuliaModuleTest
+            doctest(JuliaModuleTest)'
+
+      - name: Docs
+        run: |
+          cd tests/JuliaModuleTest
+          julia --project=docs docs/make.jl
+        env:
+          JULIA_PKG_SERVER: ""
+
+  julia-module-test-windows-gnu:
+    runs-on: windows-2022
+    needs: test-windows-gnu
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Julia environment
+        uses: julia-actions/setup-julia@v2
+        with:
+          version: 'pre'
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable-x86_64-pc-windows-gnu
+
+      - name: Build library
+        run: |
+          cd tests/julia_module_test
+          cargo build
+
+      - name: Script tests
+        run: |
+          cd tests/script
+          julia -e 'import Pkg; Pkg.add(url="https://github.com/Taaitaaiger/JlrsCore.jl", rev="0c0ce35ec27f228587b01b410d402506f3f0f35a")'
+          $env:JULIA_MODULE_TEST_LIB_DIR = "${env:GITHUB_WORKSPACE}\tests\julia_module_test\target\debug"
+          julia JuliaModuleTest.jl
+
+      - name: Package tests
+        run: |
+          cd tests/JuliaModuleTest
+          $env:JULIA_MODULE_TEST_LIB_DIR = "${env:GITHUB_WORKSPACE}\tests\julia_module_test\target\debug"
+          julia --project=. -e '
+            using Pkg
+            Pkg.instantiate()'
+          julia --project=. test/runtests.jl
+
+      - name: Instantiate docs
+        run: |
+          cd tests/JuliaModuleTest
+          julia --project=docs -e '
+            using Pkg
+            Pkg.develop(PackageSpec(path=pwd()))
+            Pkg.instantiate()'
+
+      - name: Install Documenter
+        run: |
+          julia -e 'import Pkg; Pkg.add("Documenter")'
+
+      - name: Doctests
+        run: |
+          cd tests/JuliaModuleTest
+          julia --project=docs -e '
+            using Documenter: doctest
+            using JuliaModuleTest
+            doctest(JuliaModuleTest)'
+
+      - name: Docs
+        run: |
+          cd tests/JuliaModuleTest
+          julia --project=docs docs/make.jl
