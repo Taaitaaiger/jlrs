@@ -252,22 +252,25 @@ jobs:
         with:
           toolchain: stable
 
-      - name: Run module tests
+      - name: Build library
         run: |
-          julia -e "import Pkg; Pkg.add(url=\"https://github.com/Taaitaaiger/JlrsCore.jl\", rev=\"0c0ce35ec27f228587b01b410d402506f3f0f35a\")"
           cd tests/julia_module_test
           cargo build
-          cd ../script
+
+      - name: Run script tests
+        run: |
+          cd tests/script
+          julia -e "import Pkg; Pkg.add(url=\"https://github.com/Taaitaaiger/JlrsCore.jl\", rev=\"0c0ce35ec27f228587b01b410d402506f3f0f35a\")"
           export JULIA_MODULE_TEST_LIB_DIR="${GITHUB_WORKSPACE}/tests/julia_module_test/target/debug"
           julia JuliaModuleTest.jl
 
       - name: Run package tests
         run: |
           cd tests/JuliaModuleTest
-          export JULIA_MODULE_TEST_LIB_DIR="${GITHUB_WORKSPACE}/tests/julia_module_test/target/debug"
           julia --project=. -e '
-            using Pkg
-            Pkg.instantiate()'
+          using Pkg
+          Pkg.instantiate()'
+          export JULIA_MODULE_TEST_LIB_DIR="${GITHUB_WORKSPACE}/tests/julia_module_test/target/debug"
           julia --project=. test/runtests.jl
 
   # julia-module-test-windows-gnu:
