@@ -6,9 +6,9 @@ use std::{ffi::CStr, process::abort, ptr::null_mut, sync::atomic::AtomicPtr};
 use atomic::Ordering;
 #[cfg(not(any(windows, target_os = "windows", feature = "windows")))]
 use jl_sys::{jl_dlclose, jl_dlopen};
+use jl_sys::{jl_get_pgcstack, jl_value_t};
 #[cfg(not(any(windows, target_os = "windows", feature = "windows")))]
 use jlrs_sys::jlrs_dlsym;
-use jl_sys::{jl_get_pgcstack, jl_value_t};
 
 use crate::prelude::Target;
 

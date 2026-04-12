@@ -27,7 +27,7 @@ use crate::{
         cache::Cache,
         layout::nothing::Nothing,
         managed::{private::ManagedPriv, symbol::Symbol, union_all::UnionAll, value::Value},
-        static_data::StaticRef,
+        static_data::{StaticRef, top_module},
         types::{construct_type::ConstructType, typecheck::Typecheck},
     },
     error::{AccessError, JlrsResult, TypeError},
@@ -129,21 +129,7 @@ impl<'scope> Module<'scope> {
             let n_parts = parts.clone().count();
             let module_name = parts.next().unwrap();
 
-            let mut module = match module_name {
-                "Main" => Module::main(&target),
-                "Base" => Module::base(&target),
-                "Core" => Module::core(&target),
-                "JlrsCore" => Module::jlrs_core(&target),
-                module => {
-                    if let Some(module) = Module::package_root_module(&target, module) {
-                        module
-                    } else {
-                        Err(AccessError::ModuleNotFound {
-                            module: module_name.into(),
-                        })?
-                    }
-                }
-            };
+            let mut module = top_module(target, module_name)?;
 
             let item = match n_parts {
                 1 => module.as_value().cast::<T>()?,

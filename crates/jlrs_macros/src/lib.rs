@@ -10,6 +10,11 @@ use proc_macro::TokenStream;
 #[cfg(feature = "ccall")]
 use self::module::*;
 use self::{constant_bytes::*, version::emit_if_compatible};
+#[cfg(feature = "ccall")]
+use crate::{
+    ast::expanded::ExpandedModule, ast::raw::JuliaModuleAst, codegen::codegen, ir::JuliaModuleIR,
+    model::JuliaModuleModel,
+};
 
 /// Export functions, types and constants defined in Rust as a Julia module.
 ///
@@ -120,11 +125,20 @@ use self::{constant_bytes::*, version::emit_if_compatible};
 #[proc_macro]
 #[cfg(feature = "ccall")]
 pub fn julia_module(item: TokenStream) -> TokenStream {
-    let input = syn::parse_macro_input!(item as JuliaModule);
-    match input.generate_init_code() {
-        Ok(a) => a,
-        Err(b) => b.to_compile_error().into(),
-    }
+    let ast = syn::parse_macro_input!(item as JuliaModuleAst);
+
+    let expanded = match ExpandedModule::from_ast(ast) {
+        Ok(expanded) => expanded,
+        Err(e) => return e.to_compile_error().into(),
+    };
+
+    let model = match JuliaModuleModel::from_expanded(&expanded) {
+        Ok(model) => model,
+        Err(e) => return e.to_compile_error().into(),
+    };
+
+    let ir = JuliaModuleIR::from_model(&model);
+    codegen(ir).into()
 }
 
 /// Encode the literal string passed to this macro as [`ConstantBytes`].

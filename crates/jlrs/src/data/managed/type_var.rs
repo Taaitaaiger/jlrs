@@ -154,6 +154,11 @@ impl<'scope> TypeVar<'scope> {
             WeakValue::wrap(NonNull::new_unchecked(ub)).root(target)
         }
     }
+
+    /// Returns `true` if this `TypeVar` depends on the `TypeVar` `tvar`.
+    pub fn depends_on(&self, tvar: TypeVar) -> bool {
+        self.name() == tvar.name() || self.has_indirect_typevar(tvar)
+    }
 }
 
 impl_julia_typecheck!(TypeVar<'scope>, jl_tvar_type, 'scope);

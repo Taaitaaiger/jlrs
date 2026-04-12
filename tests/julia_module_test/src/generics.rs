@@ -20,7 +20,7 @@ use jlrs::{
     CCallArg,
     CCallReturn,
 )]
-#[jlrs(julia_type = "Main.JuliaModuleTest.FourGenericsI")]
+#[jlrs(julia_type = "JuliaModuleTest.FourGenericsI")]
 pub struct FourGenericsI<A, B, C, D> {
     pub a: A,
     pub b: B,
@@ -30,7 +30,7 @@ pub struct FourGenericsI<A, B, C, D> {
 
 #[repr(C)]
 #[derive(Clone, Debug, Unbox, ValidLayout, Typecheck, ConstructType)]
-#[jlrs(julia_type = "Main.JuliaModuleTest.FourGenericsM")]
+#[jlrs(julia_type = "JuliaModuleTest.FourGenericsM")]
 pub struct FourGenericsM<A, B, C, D> {
     pub a: A,
     pub b: B,

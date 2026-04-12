@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.23
+
+- Implement `Clone` for `Tracked`. Note that this will break your code if the tracked type implements `Clone`, and the tracked handle was used to clone the data; this will now return a cloned handle, instead of the cloned underlying type.
+
+- `julia_module!` has been reimplemented, several bugs are fixed that surface in precompiled packages.
+
 ## v0.22
 
 - Several aliases for `JuliaResult` have been added so they can be more easily returned from an exported funtion.
@@ -93,8 +99,6 @@
 - jl-sys has been split into jl-sys and jlrs-sys. All extensions have been moved to jlrs-sys.
 
 - The exception handler of `catch_exceptions` now takes an `Exception` and is called in the catch block.
-
-- Implement `Clone` for `Tracked`.
 
 ## v0.21
 

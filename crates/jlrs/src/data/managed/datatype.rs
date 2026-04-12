@@ -602,6 +602,16 @@ impl DataType<'_> {
             }
         })
     }
+
+    /// Returns `true` if this type depends on the `TypeVar` `tvar`.
+    pub fn depends_on(&self, tvar: TypeVar) -> bool {
+        let parameters = self.parameters();
+        unsafe {
+            let data = parameters.data();
+            let slice = data.as_atomic_slice().assume_immutable_non_null();
+            slice.iter().any(|v| v.depends_on(tvar))
+        }
+    }
 }
 
 impl<'target> DataType<'target> {

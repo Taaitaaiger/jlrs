@@ -189,6 +189,11 @@ impl<'scope> UnionAll<'scope> {
             body.root(target)
         })
     }
+
+    /// Returns `true` if this `UnionAll` depends on the `TypeVar` `tvar`.
+    pub fn depends_on(&self, tvar: TypeVar) -> bool {
+        self.body().depends_on(tvar) || self.var().depends_on(tvar)
+    }
 }
 
 impl<'base> UnionAll<'base> {
@@ -358,3 +363,15 @@ pub type UnionAllResult<'target, Tgt> = TargetResult<'target, 'static, UnionAll<
 
 impl_ccall_arg_managed!(UnionAll, 1);
 impl_into_typed!(UnionAll);
+
+pub unsafe fn tvar_to_unionall<'target, Tgt: Target<'target>>(
+    target: Tgt,
+    body: Value<'_, 'static>,
+) -> ValueData<'target, 'static, Tgt> {
+    unsafe {
+        let tvar = body.cast_unchecked::<TypeVar>();
+        UnionAll::new_unchecked(&target, tvar, body)
+            .as_value()
+            .root(target)
+    }
+}
