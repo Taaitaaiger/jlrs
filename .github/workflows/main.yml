@@ -257,7 +257,8 @@ jobs:
           cd tests/julia_module_test
           cargo build
           cd ../script
-          JULIA_MODULE_TEST_LIB_DIR=$(pwd)/../julia_module_test/target/debug julia JuliaModuleTest.jl
+          export JULIA_MODULE_TEST_LIB_DIR="${GITHUB_WORKSPACE}/tests/julia_module_test/target/debug"
+          julia JuliaModuleTest.jl
 
   julia-module-test-windows-gnu:
     runs-on: windows-2022
@@ -281,7 +282,8 @@ jobs:
           cd tests/julia_module_test
           cargo build
           cd ../script
-          JULIA_MODULE_TEST_LIB_DIR=$(pwd)/../julia_module_test/target/debug julia JuliaModuleTest.jl
+          echo "JULIA_MODULE_TEST_LIB_DIR=${env:GITHUB_WORKSPACE}/tests/julia_module_test/target/debug" | Out-File -FilePath $env:GITHUB_ENV -Append
+          julia JuliaModuleTest.jl
 
   julia-module-test-macos:
     runs-on: macos-latest
@@ -305,7 +307,8 @@ jobs:
           cd tests/julia_module_test
           cargo build
           cd ../script
-          JULIA_MODULE_TEST_LIB_DIR=$(pwd)/../julia_module_test/target/debug julia JuliaModuleTest.jl
+          export JULIA_MODULE_TEST_LIB_DIR="${GITHUB_WORKSPACE}/tests/julia_module_test/target/debug"
+          julia JuliaModuleTest.jl
 
   docs:
     runs-on: ubuntu-latest
