@@ -1,8 +1,8 @@
 push!(LOAD_PATH,"../src/")
 
-using Documenter, JuliaModuleTest
+using Documenter, JuliaModuleTest, Documenter.Remotes
 makedocs(
     sitename="JuliaModuleTest",
     modules = [JuliaModuleTest],
-    repo = GitHub("Taaitaaiger", "jlrs")
+    repo = Remotes.GitHub("Taaitaaiger", "jlrs")
 )
