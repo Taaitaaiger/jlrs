@@ -283,6 +283,7 @@ jobs:
 
       - name: Doctests
         run: |
+          julia -e "import Pkg; Pkg.add(\"Documenter\")"
           cd tests/JuliaModuleTest
           julia --project=docs -e '
             using Documenter: doctest
