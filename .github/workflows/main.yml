@@ -247,6 +247,11 @@ jobs:
         with:
           version: '1.12'
 
+      - run: julia --color=yes -e 'using Pkg; Pkg.add("Documenter"); VERSION >= v"1.5-" && !isdir(joinpath(DEPOT_PATH[1], "registries", "General")) && Pkg.Registry.add("General")'
+        shell: bash
+        env:
+          JULIA_PKG_SERVER: ""
+
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@master
         with:
@@ -257,21 +262,48 @@ jobs:
           cd tests/julia_module_test
           cargo build
 
-      - name: Run script tests
+      - name: Script tests
         run: |
           cd tests/script
           julia -e "import Pkg; Pkg.add(url=\"https://github.com/Taaitaaiger/JlrsCore.jl\", rev=\"0c0ce35ec27f228587b01b410d402506f3f0f35a\")"
           export JULIA_MODULE_TEST_LIB_DIR="${GITHUB_WORKSPACE}/tests/julia_module_test/target/debug"
           julia JuliaModuleTest.jl
 
-      - name: Run package tests
+      - name: Package tests
         run: |
           cd tests/JuliaModuleTest
           export JULIA_MODULE_TEST_LIB_DIR="${GITHUB_WORKSPACE}/tests/julia_module_test/target/debug"
           julia --project=. -e '
-          using Pkg
-          Pkg.instantiate()'
+            using Pkg
+            Pkg.instantiate()'
           julia --project=. test/runtests.jl
+
+      - name: Docs
+        run: |
+          cd tests/JuliaModuleTest
+          export JULIA_MODULE_TEST_LIB_DIR="${GITHUB_WORKSPACE}/tests/julia_module_test/target/debug"
+          julia --project=docs -e '
+            using Pkg
+            Pkg.develop(PackageSpec(path=pwd()))
+            Pkg.instantiate()'
+          julia --project=docs docs/make.jl
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }}
+
+      - run: julia --color=yes -e 'using Pkg; Pkg.add("Documenter"); VERSION >= v"1.5-" && !isdir(joinpath(DEPOT_PATH[1], "registries", "General")) && Pkg.Registry.add("General")'
+        shell: bash
+        env:
+          JULIA_PKG_SERVER: ""
+
+      - name: Doctests
+        run: |
+          cd tests/JuliaModuleTest
+          export JULIA_MODULE_TEST_LIB_DIR="${GITHUB_WORKSPACE}/tests/julia_module_test/target/debug"
+          julia --project=docs -e '
+            using Documenter: doctest
+            using JuliaModuleTest
+            doctest(JuliaModuleTest)'
 
   # julia-module-test-windows-gnu:
   #   runs-on: windows-2022
