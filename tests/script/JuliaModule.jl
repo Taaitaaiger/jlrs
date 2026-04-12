@@ -15,8 +15,9 @@ mutable struct FourGenericsM{A, B, C, D}
     d::D
 end 
 
-test_library_path = get(ENV, "JULIA_MODULE_TEST_LIB_DIR", ".")
-@wrapmodule("$test_library_path/libjulia_module_test", :julia_module_tests_init_fn)
+separator = Sys.iswindows() ? '\\' : '/'
+test_library_path = get(ENV, "JULIA_MODULE_TEST_LIB_DIR", ".$separator")
+@wrapmodule("$(test_library_path)libjulia_module_test", :julia_module_tests_init_fn)
 
 function __init__()
     @initjlrs
