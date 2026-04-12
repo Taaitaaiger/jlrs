@@ -281,9 +281,12 @@ jobs:
             Pkg.develop(PackageSpec(path=pwd()))
             Pkg.instantiate()'
 
-      - name: Doctests
+      - name: Install Documenter
         run: |
           julia -e "import Pkg; Pkg.add(\"Documenter\")"
+
+      - name: Doctests
+        run: |
           cd tests/JuliaModuleTest
           julia --project=docs -e '
             using Documenter: doctest
