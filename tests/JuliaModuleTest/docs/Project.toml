@@ -1,0 +1,5 @@
+[deps]
+JuliaModuleTest = "61727b1b-1923-47f0-bc7b-0f086361f7f4"
+
+[sources]
+JuliaModuleTest = {path = "/home/thomas/Projects/Rust/jlrs/tests/JuliaPackageTest"}
