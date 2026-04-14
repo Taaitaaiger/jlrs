@@ -31,7 +31,7 @@ impl<'a> DocsCodegen<'a> {
                         let signature = ::jlrs::data::managed::value::Value::bottom_type(&frame);
                         let doc = ::jlrs::data::managed::string::JuliaString::new(&mut frame, #doc);
 
-                        let doc_it = doc_item_ty.instantiate_unchecked(&mut frame, [#module.as_value(), item.as_value(), signature, doc.as_value()]);
+                        let doc_it = doc_item_ty.as_value().call(&mut frame, [#module.as_value(), item.as_value(), signature, doc.as_value()]).unwrap();
                         accessor.set_value(&mut frame, #index, doc_it).unwrap().unwrap();
                     }
                 })

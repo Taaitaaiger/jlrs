@@ -119,9 +119,9 @@ pub fn codegen(ir: JuliaModuleIR) -> TokenStream {
                             }
 
                             if !supports_export {
-                                module_info_ty.instantiate_unchecked(&frame, [arr.as_value(), doc_items.as_value()]).leak()
+                                module_info_ty.as_value().call(&frame, [arr.as_value(), doc_items.as_value()]).unwrap().leak()
                             } else {
-                                module_info_ty.instantiate_unchecked(&frame, [arr.as_value(), doc_items.as_value()]).leak()
+                                module_info_ty.as_value().call(&frame, [arr.as_value(), doc_items.as_value()]).unwrap().leak()
                             }
                         })
                     },
