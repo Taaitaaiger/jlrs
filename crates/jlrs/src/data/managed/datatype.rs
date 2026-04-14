@@ -501,8 +501,34 @@ impl<'scope> DataType<'scope> {
     ///
     /// Safety: an exception must not be thrown if this method is called from a `ccall`ed
     /// function. Only `new` is called, not a constructor.
+    #[deprecated(
+        note = "This method will become private in the future, call the type's constructor instead by converting it to a `Value` and calling it as a function.",
+        since = "0.23.0"
+    )]
     #[inline]
     pub unsafe fn instantiate_unchecked<'target, 'value, 'data, V, Tgt>(
+        self,
+        target: Tgt,
+        values: V,
+    ) -> ValueData<'target, 'data, Tgt>
+    where
+        Tgt: Target<'target>,
+        V: AsRef<[Value<'value, 'data>]>,
+    {
+        unsafe {
+            let values = values.as_ref();
+            let value = jl_new_structv(
+                self.unwrap(Private),
+                values.as_ptr() as *mut _,
+                values.len() as _,
+            );
+
+            target.data_from_ptr(NonNull::new_unchecked(value), Private)
+        }
+    }
+
+    #[inline]
+    pub(crate) unsafe fn instantiate_unchecked_priv<'target, 'value, 'data, V, Tgt>(
         self,
         target: Tgt,
         values: V,
