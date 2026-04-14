@@ -9,17 +9,17 @@ use std::{
 
 use jl_sys::{jl_gensym, jl_sym_t, jl_symbol_n, jl_symbol_type, jl_tagged_gensym};
 use jlrs_sys::{jlrs_symbol_hash, jlrs_symbol_name};
-use rustc_hash::{FxBuildHasher, FxHashMap};
 
 use self::static_symbol::{StaticSymbol, Sym};
 use super::Weak;
 use crate::{
     catch::{catch_exceptions, unwrap_exc},
     data::{
-        cache::Cache,
-        managed::{erase_scope_lifetime, private::ManagedPriv},
+        cache::{CacheMap, FxCache},
+        managed::private::ManagedPriv,
     },
     error::{JlrsError, JlrsResult},
+    gc_safe::GcSafeOnceLock,
     impl_julia_typecheck,
     memory::target::{Target, TargetException, TargetResult, unrooted::Unrooted},
     private::Private,
@@ -27,7 +27,13 @@ use crate::{
 
 pub mod static_symbol;
 
-static CACHE: SymbolCache = SymbolCache::new();
+type CacheInner = FxCache<Box<[u8]>, Symbol<'static>>;
+type Cache = GcSafeOnceLock<CacheInner>;
+pub(crate) static CACHE: Cache = Cache::new();
+
+pub(crate) fn init_symbol_cache() {
+    CACHE.get_or_init(|| CacheInner::new());
+}
 
 /// `Symbol`s are used Julia to represent identifiers, `:x` represents the `Symbol` `x`. Things
 /// that can be accessed using a `Symbol` include submodules, functions, and globals. However,
@@ -49,16 +55,17 @@ impl<'scope> Symbol<'scope> {
         Tgt: Target<'scope>,
     {
         let bytes = symbol.as_ref().as_bytes();
+        let cache = unsafe { CACHE.get_unchecked() };
 
-        if let Some(sym) = CACHE.find(bytes) {
-            return sym;
+        if let Some(sym) = cache.get(bytes) {
+            return sym.value().clone();
         }
 
         // Safety: Can only be called from a thread known to Julia, symbols are globally rooted
         unsafe {
             let sym = jl_symbol_n(bytes.as_ptr().cast(), bytes.len());
             let sym = Symbol::wrap_non_null(NonNull::new_unchecked(sym), Private);
-            CACHE.insert(bytes.into(), sym);
+            cache.insert(bytes.into(), sym);
             sym
         }
     }
@@ -70,10 +77,11 @@ impl<'scope> Symbol<'scope> {
         Tgt: Target<'scope>,
     {
         let bytes = symbol.as_ref();
+        let cache = unsafe { CACHE.get_unchecked() };
 
-        if let Some(sym) = CACHE.find(bytes) {
+        if let Some(sym) = cache.get(bytes) {
             unsafe {
-                return target.exception_from_ptr(Ok(sym), Private);
+                return target.exception_from_ptr(Ok(sym.value().clone()), Private);
             }
         }
 
@@ -83,7 +91,7 @@ impl<'scope> Symbol<'scope> {
             match catch_exceptions(callback, unwrap_exc) {
                 Ok(sym) => {
                     let sym = Symbol::wrap_non_null(NonNull::new_unchecked(sym), Private);
-                    CACHE.insert(bytes.into(), sym);
+                    cache.insert(bytes.into(), sym);
                     Ok(sym)
                 }
                 Err(e) => target.exception_from_ptr(Err(e), Private),
@@ -102,15 +110,16 @@ impl<'scope> Symbol<'scope> {
     {
         let bytes = symbol.as_ref();
 
-        if let Some(sym) = CACHE.find(bytes) {
-            return sym;
+        let cache = unsafe { CACHE.get_unchecked() };
+        if let Some(sym) = cache.get(bytes) {
+            return sym.value().clone();
         }
 
         // Safety: Can only be called from a thread known to Julia, symbols are globally rooted
         unsafe {
             let sym = jl_symbol_n(bytes.as_ptr().cast(), bytes.len());
             let sym = Symbol::wrap_non_null(NonNull::new_unchecked(sym), Private);
-            CACHE.insert(bytes.into(), sym);
+            cache.insert(bytes.into(), sym);
             sym
         }
     }
@@ -278,36 +287,3 @@ pub type SymbolUnbound = Symbol<'static>;
 
 impl_ccall_arg_managed!(Symbol, 1);
 impl_into_typed!(Symbol);
-
-struct SymbolCache {
-    inner: Cache<FxHashMap<Vec<u8>, Symbol<'static>>>,
-}
-
-impl SymbolCache {
-    const fn new() -> Self {
-        let map = std::collections::HashMap::with_hasher(FxBuildHasher);
-        let inner = Cache::new(map);
-
-        SymbolCache { inner }
-    }
-
-    #[inline]
-    fn find(&self, key: &[u8]) -> Option<Symbol<'static>> {
-        unsafe {
-            self.inner.read(
-                #[inline]
-                |cache| cache.cache().get(key).copied(),
-            )
-        }
-    }
-
-    #[inline]
-    fn insert(&self, key: Vec<u8>, sym: Symbol) {
-        unsafe {
-            self.inner.write(
-                #[inline]
-                |cache| cache.cache_mut().insert(key, erase_scope_lifetime(sym)),
-            )
-        };
-    }
-}

@@ -39,11 +39,16 @@ impl<'a> Documentation<'a> {
     }
 
     pub fn to_string(&self) -> String {
-        self.lines.iter().map(|line| if line.starts_with(' ') {
-            &line[1..]
-        } else {
-            line
-        }).join("\n")
+        self.lines
+            .iter()
+            .map(|line| {
+                if line.starts_with(' ') {
+                    &line[1..]
+                } else {
+                    line
+                }
+            })
+            .join("\n")
     }
 }
 

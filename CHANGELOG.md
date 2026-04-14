@@ -6,6 +6,8 @@
 
 - `julia_module!` has been reimplemented, several bugs are fixed that surface in precompiled packages.
 
+- Internal caches use dashmap instead of a single-bucket `HashMap`.
+
 ## v0.22
 
 - Several aliases for `JuliaResult` have been added so they can be more easily returned from an exported funtion.

@@ -6,8 +6,8 @@ use jlrs::{
             named_tuple::{NamedTuple, NamedTupleRet},
             string::StringRet,
             value::{
-                typed::{TypedValue, TypedValueRet},
                 ValueRet,
+                typed::{TypedValue, TypedValueRet},
             },
         },
         types::{
