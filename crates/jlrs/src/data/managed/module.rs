@@ -13,7 +13,6 @@ use jl_sys::{
     jl_module_type, jl_set_global,
 };
 use jlrs_sys::{jlrs_module_name, jlrs_module_parent};
-use rustc_hash::FxHashMap;
 
 use super::{
     Managed, Weak, erase_scope_lifetime,
@@ -24,7 +23,7 @@ use crate::{
     catch::{catch_exceptions, unwrap_exc},
     convert::to_symbol::ToSymbol,
     data::{
-        cache::Cache,
+        cache::{CacheMap, FxCache},
         layout::nothing::Nothing,
         managed::{private::ManagedPriv, symbol::Symbol, union_all::UnionAll, value::Value},
         static_data::{StaticRef, top_module},
@@ -35,22 +34,31 @@ use crate::{
     impl_julia_typecheck, inline_static_ref,
     memory::{
         PTls,
+        gc::mark_queue_obj,
         target::{Target, TargetException, TargetResult},
     },
     prelude::DataType,
     private::Private,
 };
 
-type CacheImpl = Cache<FxHashMap<Box<[u8]>, (TypeId, ValueUnbound)>>;
+type CacheInner = FxCache<Box<[u8]>, (TypeId, ValueUnbound)>;
+type Cache = GcSafeOnceLock<CacheInner>;
+pub(crate) static CACHE: Cache = Cache::new();
 
-static CACHE: CacheImpl = CacheImpl::new({
-    let hasher = rustc_hash::FxBuildHasher;
-    std::collections::HashMap::with_hasher(hasher)
-});
+pub(crate) fn init_module_cache() {
+    CACHE.get_or_init(|| CacheInner::new());
+}
 
 pub(crate) unsafe fn mark_global_cache(ptls: PTls, full: bool) {
     unsafe {
-        CACHE.mark(ptls, full);
+        let cache = CACHE.get_unchecked();
+        if full || cache.is_dirty() {
+            for item_ref in cache.iter() {
+                let value = item_ref.value().1;
+                mark_queue_obj(ptls, value.as_weak());
+            }
+            cache.clear_dirty();
+        }
     }
 }
 
@@ -103,26 +111,19 @@ impl<'scope> Module<'scope> {
     {
         unsafe {
             let tid = T::type_id();
-            let cache = &CACHE;
+            let cache = CACHE.get_unchecked();
 
             let path = path.as_ref();
-            let res = cache.read(|cache| -> JlrsResult<Option<_>> {
-                if let Some(cached) = cache.cache().get(path.as_bytes()) {
-                    if cached.0 == tid {
-                        return Ok(Some(cached.1.cast_unchecked()));
-                    } else {
-                        let ty = T::construct_type(target).as_value();
-                        Err(TypeError::NotA {
-                            value: cached.1.display_string_or("<Cannot display value>"),
-                            field_type: ty.display_string_or("<Cannot display type>"),
-                        })?
-                    }
+            if let Some(cached) = cache.get(path.as_bytes()) {
+                if cached.0 == tid {
+                    return Ok(cached.1.cast_unchecked::<T>());
+                } else {
+                    let ty = T::construct_type(target).as_value();
+                    Err(TypeError::NotA {
+                        value: cached.1.display_string_or("<Cannot display value>"),
+                        field_type: ty.display_string_or("<Cannot display type>"),
+                    })?
                 }
-                Ok(None)
-            })?;
-
-            if let Some(res) = res {
-                return Ok(res);
             }
 
             let mut parts = path.split('.');
@@ -151,14 +152,7 @@ impl<'scope> Module<'scope> {
                 }
             };
 
-            cache.write(|cache| {
-                cache.roots_mut().insert(item.as_value());
-                cache.cache_mut().insert(
-                    path.as_bytes().into(),
-                    (tid, erase_scope_lifetime(item.as_value())),
-                );
-            });
-
+            cache.insert(path.as_bytes().into(), (tid, erase_scope_lifetime(item.as_value())));
             Ok(item)
         }
     }

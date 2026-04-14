@@ -14,26 +14,39 @@ use std::{
 use jl_sys::{jl_module_t, jl_sym_t, jl_symbol_n, jl_value_t};
 
 use super::{
-    cache::Cache,
     managed::private::ManagedPriv,
     types::{construct_type::ConstructType, typecheck::Typecheck},
 };
 use crate::{
-    data::managed::{Managed, module::Module, value::ValueUnbound},
+    data::{
+        cache::{CacheMap, FnvCache},
+        managed::{Managed, module::Module, value::ValueUnbound},
+    },
     error::JlrsResult,
     gc_safe::GcSafeOnceLock,
-    memory::{PTls, target::Target},
+    memory::{PTls, gc::mark_queue_obj, target::Target},
     prelude::{Symbol, Value, WeakModule},
     private::Private,
 };
 
-type CacheImpl = Cache<()>;
+type CacheInner = FnvCache<usize, ValueUnbound>;
+type Cache = GcSafeOnceLock<CacheInner>;
+pub(crate) static CACHE: Cache = Cache::new();
 
-static CACHE: CacheImpl = CacheImpl::new(());
+pub(crate) fn init_static_data_cache() {
+    CACHE.get_or_init(|| CacheInner::new());
+}
 
 pub(crate) unsafe fn mark_static_data_cache(ptls: PTls, full: bool) {
     unsafe {
-        CACHE.mark(ptls, full);
+        let cache = CACHE.get_unchecked();
+        if full || cache.is_dirty() {
+            for item_ref in cache.iter() {
+                let value = item_ref.value();
+                mark_queue_obj(ptls, value.as_weak());
+            }
+            cache.clear_dirty();
+        }
     }
 }
 
@@ -163,18 +176,15 @@ where
                     .global(target, split_path[n_parts - 1])
                     .unwrap()
                     .leak()
-                    .as_value()
-                    .cast::<T>()
-                    .unwrap();
+                    .as_value();
 
-                CACHE.write(|cache| {
-                    cache.roots_mut().insert(global.as_value());
-                });
+                let key = global.as_weak().ptr().as_ptr().addr();
+                CACHE.get_unchecked().insert(key, global);
 
-                return StaticDataInner(global.as_value(), PhantomData);
+                return StaticDataInner(global, PhantomData);
             });
 
-            global.0.cast_unchecked()
+            global.0.cast::<T>().unwrap()
         }
     }
 }
@@ -332,15 +342,12 @@ where
                 .global(target, split_path[n_parts - 1])
                 .unwrap()
                 .leak()
-                .as_value()
-                .cast::<T>()
-                .unwrap();
+                .as_value();
 
-            CACHE.write(|cache| {
-                cache.roots_mut().insert(global.as_value());
-            });
+            let key = global.as_weak().ptr().as_ptr().addr();
+            CACHE.get_unchecked().insert(key, global);
 
-            let ptr = global.unwrap(Private);
+            let ptr = global.cast::<T>().unwrap().unwrap(Private);
             self.global.store(ptr, Ordering::Relaxed);
             T::wrap_non_null(NonNull::new_unchecked(ptr), Private)
         }
@@ -370,18 +377,15 @@ where
         Tgt: Target<'target>,
     {
         unsafe {
-            let v = Value::eval_string(target, self.path)
+            let global = Value::eval_string(target, self.path)
                 .unwrap()
                 .leak()
-                .as_value()
-                .cast::<T>()
-                .unwrap();
+                .as_value();
 
-            CACHE.write(|cache| {
-                cache.roots_mut().insert(v.as_value());
-            });
+            let key = global.as_weak().ptr().as_ptr().addr();
+            CACHE.get_unchecked().insert(key, global);
 
-            let ptr = v.unwrap(Private);
+            let ptr = global.cast::<T>().unwrap().unwrap(Private);
             self.global.store(ptr, Ordering::Relaxed);
             T::wrap_non_null(NonNull::new_unchecked(ptr), Private)
         }
@@ -429,13 +433,15 @@ where
         Tgt: Target<'target>,
     {
         unsafe {
-            let v = T::construct_type(target).as_value();
-            CACHE.write(|cache| {
-                cache.roots_mut().insert(v);
-            });
-            self.global.store(v.unwrap(Private), Ordering::Relaxed);
+            let global = T::construct_type(target).as_value().leak().as_value();
+            let key = global.as_weak().ptr().as_ptr().addr();
+            let cache = CACHE.get_unchecked();
+            cache.insert(key, global);
 
-            v
+            let ptr = global.unwrap(Private);
+            self.global.store(ptr, Ordering::Relaxed);
+
+            global
         }
     }
 }

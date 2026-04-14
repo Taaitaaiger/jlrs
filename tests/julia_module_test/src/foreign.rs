@@ -3,10 +3,12 @@ use std::{collections::HashMap, ops::AddAssign};
 use jlrs::{
     call::Call,
     data::{
-        managed::string::StringRet,
-        managed::value::{
-            typed::{TypedValue, TypedValueRet},
-            ValueRet,
+        managed::{
+            string::StringRet,
+            value::{
+                ValueRet,
+                typed::{TypedValue, TypedValueRet},
+            },
         },
         types::{construct_type::ConstructType, foreign_type::mark::Mark},
     },
