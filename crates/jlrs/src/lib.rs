@@ -1001,7 +1001,17 @@ use prelude::Managed;
 use semver::Version;
 
 use crate::{
-    data::{managed::{module::{JlrsCore, init_module_cache}, symbol::init_symbol_cache, value::Value}, static_data::init_static_data_cache, types::{construct_type::init_constructed_type_cache, foreign_type::init_foreign_type_cache}},
+    data::{
+        managed::{
+            module::{JlrsCore, init_module_cache},
+            symbol::init_symbol_cache,
+            value::Value,
+        },
+        static_data::init_static_data_cache,
+        types::{
+            construct_type::init_constructed_type_cache, foreign_type::init_foreign_type_cache,
+        },
+    },
     memory::{
         context::{ledger::init_ledger, stack::Stack},
         target::unrooted::Unrooted,

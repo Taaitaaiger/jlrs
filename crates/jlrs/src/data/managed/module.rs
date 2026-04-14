@@ -152,7 +152,10 @@ impl<'scope> Module<'scope> {
                 }
             };
 
-            cache.insert(path.as_bytes().into(), (tid, erase_scope_lifetime(item.as_value())));
+            cache.insert(
+                path.as_bytes().into(),
+                (tid, erase_scope_lifetime(item.as_value())),
+            );
             Ok(item)
         }
     }

@@ -905,10 +905,7 @@ unsafe impl<T: OpaqueType> ConstructType for T {
     {
         let cache = unsafe { CACHE.get_unchecked() };
         let key = TypeId::of::<T>();
-        cache.get(&key)
-            .unwrap()
-            .as_value()
-            .root(target)
+        cache.get(&key).unwrap().as_value().root(target)
     }
 
     fn base_type<'target, Tgt>(_target: &Tgt) -> Option<Value<'target, 'static>>
@@ -929,10 +926,7 @@ unsafe impl<T: OpaqueType> ConstructType for T {
     {
         let cache = unsafe { CACHE.get_unchecked() };
         let key = TypeId::of::<T>();
-        cache.get(&key)
-            .unwrap()
-            .as_value()
-            .root(target)
+        cache.get(&key).unwrap().as_value().root(target)
     }
 }
 
