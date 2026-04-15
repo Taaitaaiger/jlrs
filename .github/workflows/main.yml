@@ -177,7 +177,7 @@ jobs:
 
       - name: Run tests
         run: |
-          # julia -e "import Pkg; Pkg.add(url=\"https://github.com/Taaitaaiger/JlrsCore.jl\", rev=\"966876fc033987aafccb7385df4ae6ce026e75e5\")"
+          julia -e "import Pkg; Pkg.add(url=\"https://github.com/Taaitaaiger/JlrsCore.jl\", rev=\"966876fc033987aafccb7385df4ae6ce026e75e5\")"
           export JLRS_JULIA_DIR="$(dirname $(dirname $(which julia)))"
           export DYLD_LIBRARY_PATH="${JLRS_JULIA_DIR}/lib:${DYLD_LIBRARY_PATH}"
           cargo test --features full --verbose
