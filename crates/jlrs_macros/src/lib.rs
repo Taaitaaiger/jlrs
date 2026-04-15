@@ -121,6 +121,14 @@ use crate::{
 /// but restricts the type of the data in the generated function to the type constructed from the
 /// `TypedValue`'s type parameter.
 ///
+/// Any item marked as `pub`, e.g. `pub fn ...` or `pub struct ...`, is exported by the generated
+/// module. For functions, several requirements must be met or the code will be rejected by the
+/// compiler:
+///
+/// - The item must be exported from the current module, `fn foo() as Foo.Bar` will be rejected.
+///
+/// - If a function is exported, all items with the same name must be marked as public.
+///
 /// [`AsyncCondition`]: https://docs.julialang.org/en/v1/base/base/#Base.AsyncCondition
 #[proc_macro]
 #[cfg(feature = "ccall")]

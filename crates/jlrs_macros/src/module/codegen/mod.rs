@@ -5,8 +5,7 @@ use quote::quote;
 
 use crate::{
     codegen::{
-        alias_codegen::AliasCodegen, const_codegen::ConstCodegen, docs_codegen::DocsCodegen,
-        function_codegen::FunctionCodegen, struct_codegen::StructCodegen,
+        alias_codegen::AliasCodegen, const_codegen::ConstCodegen, docs_codegen::DocsCodegen, exports_codegen::ExportsCodegen, function_codegen::FunctionCodegen, struct_codegen::StructCodegen
     },
     ir::JuliaModuleIR,
 };
@@ -17,6 +16,7 @@ mod docs_codegen;
 mod function_codegen;
 mod name_codegen;
 mod struct_codegen;
+pub mod exports_codegen;
 
 pub fn codegen(ir: JuliaModuleIR) -> TokenStream {
     let init_fn_ident = &ir.init_fn;
@@ -42,6 +42,10 @@ pub fn codegen(ir: JuliaModuleIR) -> TokenStream {
     let docs_codegen = DocsCodegen::new(init_fn_ident, &ir.docs_ir);
     let docs_init_fn = docs_codegen.init_fn();
     let docs_init_fn_ident = &docs_init_fn.sig.ident;
+
+    let exports_codegen = ExportsCodegen::new(init_fn_ident, &ir.exports_ir);
+    let exports_init_fn = exports_codegen.init_fn();
+    let exports_init_fn_ident = &exports_init_fn.sig.ident;
 
     quote! {
         #[unsafe(no_mangle)]
@@ -70,11 +74,13 @@ pub fn codegen(ir: JuliaModuleIR) -> TokenStream {
 
                 #docs_init_fn
 
+                #exports_init_fn
+
                 ::jlrs::runtime::handle::ccall::init_jlrs_wrapped(&::jlrs::InstallJlrsCore::No);
 
                 let module_info = match ::jlrs::weak_handle!() {
                     Ok(handle) => {
-                        handle.local_scope::<_, 2>(|mut frame| {
+                        handle.local_scope::<_, 3>(|mut frame| {
                             let wrap_mod = ::jlrs::data::managed::module::Module::jlrs_core(&frame)
                                 .submodule(&frame, "Wrap")
                                 .unwrap()
@@ -98,10 +104,6 @@ pub fn codegen(ir: JuliaModuleIR) -> TokenStream {
                                 .as_value()
                                 .cast_unchecked::<::jlrs::data::managed::datatype::DataType>();
 
-                            let supports_export = wrap_mod
-                                .global(&frame, "SUPPORTS_EXPORT")
-                                .is_ok();
-
                             if precompiling == 1 {
                                 #struct_init_fn_ident(&frame, module);
                                 #const_init_fn_ident(&frame, module);
@@ -114,15 +116,13 @@ pub fn codegen(ir: JuliaModuleIR) -> TokenStream {
                             #function_init_fn_ident(&frame, &mut arr, module, function_info_ty);
 
                             let mut doc_items = ::jlrs::data::managed::array::Vector::new_for_unchecked(&mut frame, doc_item_ty.as_value(), 0);
+                            let mut exports = ::jlrs::data::managed::array::VectorAny::new_unchecked(&mut frame, 0);
                             if precompiling == 1 {
                                 #docs_init_fn_ident(&frame, &mut doc_items, module, doc_item_ty);
+                                #exports_init_fn_ident(&frame, &mut exports);
                             }
 
-                            if !supports_export {
-                                module_info_ty.as_value().call(&frame, [arr.as_value(), doc_items.as_value()]).unwrap().leak()
-                            } else {
-                                module_info_ty.as_value().call(&frame, [arr.as_value(), doc_items.as_value()]).unwrap().leak()
-                            }
+                            module_info_ty.as_value().call(&frame, [arr.as_value(), doc_items.as_value(), exports.as_value()]).unwrap().leak()
                         })
                     },
                     Err(_) => panic!("Not called from Julia, or Julia is in a GC-safe state"),

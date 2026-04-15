@@ -9,7 +9,7 @@ use crate::module::{
 };
 
 pub struct ConstModel<'a> {
-    pub _public: bool,
+    pub public: bool,
     pub original_name: &'a Ident,
     pub export_name: ExportName<'a>,
     pub documentation: Option<Documentation<'a>>,
@@ -39,7 +39,7 @@ impl<'a> ConstModel<'a> {
         }
 
         Ok(ConstModel {
-            _public: public,
+            public,
             original_name,
             export_name,
             documentation: attrs.documentation,
@@ -76,7 +76,7 @@ mod tests {
             ExpandedModuleItem::Const(expanded_const) => {
                 let model = ConstModel::from_expanded(&expanded_const).unwrap();
                 assert!(model.documentation.is_some());
-                assert!(!model._public);
+                assert!(!model.public);
             }
             _ => assert!(false),
         }
@@ -98,7 +98,7 @@ mod tests {
             ExpandedModuleItem::Const(expanded_const) => {
                 let model = ConstModel::from_expanded(&expanded_const).unwrap();
                 assert!(model.documentation.is_some());
-                assert!(model._public);
+                assert!(model.public);
             }
             _ => assert!(false),
         }

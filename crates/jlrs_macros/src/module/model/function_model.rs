@@ -36,6 +36,13 @@ impl<'a> FunctionModel<'a> {
             ))?
         }
 
+        if public && export_name.is_global() {
+            Err(Error::new(
+                expanded.original.span(),
+                "Functions can only be exported from the current module",
+            ))?
+        }
+
         let variants = FunctionVariant::from_expanded(&expanded, &attrs)?;
 
         Ok(FunctionModel {

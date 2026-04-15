@@ -28,7 +28,6 @@ using JlrsCore
     @inferred JuliaModuleTest.returns_typed_value()
 end
 
-
 @testset "Arrays" begin
     @test JuliaModuleTest.takes_array(Vector{UInt32}()) == 4
     @inferred JuliaModuleTest.takes_array(Vector{UInt32}())
