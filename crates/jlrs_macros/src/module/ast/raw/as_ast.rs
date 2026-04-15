@@ -27,6 +27,7 @@ impl Parse for AsAst {
 impl ToTokens for AsAst {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         self.as_token.to_tokens(tokens);
+        self.name_override.to_tokens(tokens);
         self.exclamation_mark_token.to_tokens(tokens);
     }
 }

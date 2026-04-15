@@ -158,7 +158,7 @@ impl<'scope, 'data> NamedTuple<'scope, 'data> {
                 let names_tup = NTuple::<Symbol, N>::construct_type(&frame)
                     .as_value()
                     .cast_unchecked::<DataType>()
-                    .instantiate_unchecked(&mut frame, &field_names);
+                    .instantiate_unchecked_priv(&mut frame, &field_names);
 
                 let field_types_tup = DataType::anytuple_type(&frame)
                     .as_value()
@@ -168,7 +168,7 @@ impl<'scope, 'data> NamedTuple<'scope, 'data> {
                     .as_value()
                     .apply_type_unchecked(&mut frame, &[names_tup, field_types_tup])
                     .cast_unchecked::<DataType>()
-                    .instantiate_unchecked(&frame, values)
+                    .instantiate_unchecked_priv(&frame, values)
                     .as_value()
                     .cast_unchecked::<NamedTuple>()
                     .root(target)
@@ -236,7 +236,7 @@ impl<'scope, 'data> NamedTuple<'scope, 'data> {
                     .as_value()
                     .apply_type_unchecked(&mut frame, syms)
                     .cast_unchecked::<DataType>()
-                    .instantiate_unchecked(&mut frame, &keys);
+                    .instantiate_unchecked_priv(&mut frame, &keys);
 
                 let field_types_tup = DataType::anytuple_type(&frame)
                     .as_value()
@@ -246,7 +246,7 @@ impl<'scope, 'data> NamedTuple<'scope, 'data> {
                     .as_value()
                     .apply_type_unchecked(&mut frame, &[names_tup, field_types_tup])
                     .cast_unchecked::<DataType>()
-                    .instantiate_unchecked(&frame, values)
+                    .instantiate_unchecked_priv(&frame, values)
                     .as_value()
                     .cast_unchecked::<NamedTuple>()
                     .root(target)
@@ -314,7 +314,7 @@ impl<'scope, 'data> NamedTuple<'scope, 'data> {
                     .as_value()
                     .apply_type_unchecked(&mut frame, syms)
                     .cast_unchecked::<DataType>()
-                    .instantiate_unchecked(&mut frame, keys_v);
+                    .instantiate_unchecked_priv(&mut frame, keys_v);
 
                 let field_types_tup = DataType::anytuple_type(&frame)
                     .as_value()
@@ -324,7 +324,7 @@ impl<'scope, 'data> NamedTuple<'scope, 'data> {
                     .as_value()
                     .apply_type_unchecked(&mut frame, &[names_tup, field_types_tup])
                     .cast_unchecked::<DataType>()
-                    .instantiate_unchecked(&frame, values)
+                    .instantiate_unchecked_priv(&frame, values)
                     .as_value()
                     .cast_unchecked::<NamedTuple>()
                     .root(target)

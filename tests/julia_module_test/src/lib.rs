@@ -129,7 +129,7 @@ julia_module! {
     in OpaqueInt fn get(&self) -> i32 as unbox_opaque_untracked;
     in OpaqueInt fn get_cloned(self) -> i32;
 
-    struct ForeignThing;
+    struct ForeignThing as Foo;
     in ForeignThing fn new(value: Value<'_, 'static>) -> TypedValueRet<ForeignThing> as ForeignThing;
 
     in ForeignThing fn get(&self) -> ValueRet as extract_inner;

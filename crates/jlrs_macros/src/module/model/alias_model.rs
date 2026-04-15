@@ -9,7 +9,7 @@ use crate::module::{
 };
 
 pub struct AliasModel<'a> {
-    pub _public: bool,
+    pub public: bool,
     pub export_name: ExportName<'a>,
     pub documentation: Option<Documentation<'a>>,
     pub ty: &'a Type,
@@ -36,7 +36,7 @@ impl<'a> AliasModel<'a> {
         }
 
         Ok(AliasModel {
-            _public: public,
+            public,
             export_name,
             documentation: attrs.documentation,
             ty,
@@ -72,7 +72,7 @@ mod tests {
             ExpandedModuleItem::Alias(expanded_alias) => {
                 let model = AliasModel::from_expanded(&expanded_alias).unwrap();
                 assert!(model.documentation.is_some());
-                assert!(!model._public);
+                assert!(!model.public);
             }
             _ => assert!(false),
         }
@@ -94,7 +94,7 @@ mod tests {
             ExpandedModuleItem::Alias(expanded_alias) => {
                 let model = AliasModel::from_expanded(&expanded_alias).unwrap();
                 assert!(model.documentation.is_some());
-                assert!(model._public);
+                assert!(model.public);
             }
             _ => assert!(false),
         }

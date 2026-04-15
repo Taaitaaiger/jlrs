@@ -4,9 +4,13 @@
 
 - Implement `Clone` for `Tracked`. Note that this will break your code if the tracked type implements `Clone`, and the tracked handle was used to clone the data; this will now return a cloned handle, instead of the cloned underlying type.
 
-- `julia_module!` has been reimplemented, several bugs are fixed that surface in precompiled packages.
+- `julia_module!` has been reimplemented and precompilation is tested, bugs that surfaced when testing precompiled packages have been fixed.
 
 - Internal caches use dashmap instead of a single-bucket `HashMap`.
+
+- Items exported with `julia_module!` can be marked as `pub` to automatically export them from the generated module.
+
+- `DataType::instantiate_unchecked` has been deprecated, call constructors instead.
 
 ## v0.22
 

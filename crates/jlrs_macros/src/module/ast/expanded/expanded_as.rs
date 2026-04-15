@@ -101,6 +101,13 @@ impl ExpandedAs {
             ExpandedAs::Global(global_name) => global_name.name_string(),
         }
     }
+
+    pub fn is_global(&self)  -> bool {
+        match self {
+            ExpandedAs::Local(_) => false,
+            ExpandedAs::Global(_) => true,
+        }
+    }
 }
 
 impl ToTokens for ExpandedAs {

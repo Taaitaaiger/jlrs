@@ -34,6 +34,13 @@ impl<'a> ExportName<'a> {
             ExportName::Override(name_override) => name_override.name_string(),
         }
     }
+
+    pub fn is_global(&self) -> bool {
+        match self {
+            ExportName::Name(_) => false,
+            ExportName::Override(expanded_as) => expanded_as.is_global(),
+        }
+    }
 }
 
 impl<'a> ToTokens for ExportName<'a> {

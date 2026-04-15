@@ -1038,7 +1038,7 @@ pub mod util;
 /// The version of the jlrs API this version of jlrs is compatible with.
 ///
 /// If this version number doesn't match `JLRS_API_VERSION` in JlrsCore.jl, initialization fails.
-pub const JLRS_API_VERSION: isize = 4;
+pub const JLRS_API_VERSION: isize = 5;
 
 /// Installation method for the JlrsCore package. If JlrsCore is already installed the installed version
 /// is used.

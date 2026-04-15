@@ -138,7 +138,7 @@ fn function_info_fragment(
                     let #env = #env.filter(&mut frame, julia_arg_types);
 
                     // Root #9
-                    function_info_ty.instantiate_unchecked(&mut frame, [
+                    function_info_ty.as_value().call(&mut frame, [
                         name.as_value(),
                         ccall_arg_types.as_value(),
                         julia_arg_types.as_value(),
@@ -147,7 +147,7 @@ fn function_info_fragment(
                         func,
                         #module.as_value(),
                         #env.to_svec().as_value(),
-                    ])
+                    ]).unwrap()
                 }
             };
 
