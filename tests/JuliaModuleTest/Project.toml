@@ -11,7 +11,7 @@ JlrsCore = "0.7"
 julia = "1.10"
 
 [sources]
-JlrsCore = {url = "https://github.com/Taaitaaiger/JlrsCore.jl", rev = "966876fc033987aafccb7385df4ae6ce026e75e5"}
+JlrsCore = {url = "https://github.com/Taaitaaiger/JlrsCore.jl", rev = "06ff2ecddee762ba62757b7aeb1e9f6ad45e8ed0"}
 # JlrsCore = {path = "../../../../Julia/JlrsCore.jl"}
 
 [extras]
