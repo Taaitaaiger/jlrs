@@ -5,7 +5,9 @@ use quote::quote;
 
 use crate::{
     codegen::{
-        alias_codegen::AliasCodegen, const_codegen::ConstCodegen, docs_codegen::DocsCodegen, exports_codegen::ExportsCodegen, function_codegen::FunctionCodegen, struct_codegen::StructCodegen
+        alias_codegen::AliasCodegen, const_codegen::ConstCodegen, docs_codegen::DocsCodegen,
+        exports_codegen::ExportsCodegen, function_codegen::FunctionCodegen,
+        struct_codegen::StructCodegen,
     },
     ir::JuliaModuleIR,
 };
@@ -13,10 +15,10 @@ use crate::{
 mod alias_codegen;
 mod const_codegen;
 mod docs_codegen;
+mod exports_codegen;
 mod function_codegen;
 mod name_codegen;
 mod struct_codegen;
-pub mod exports_codegen;
 
 pub fn codegen(ir: JuliaModuleIR) -> TokenStream {
     let init_fn_ident = &ir.init_fn;

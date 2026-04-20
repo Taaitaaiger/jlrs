@@ -12,6 +12,8 @@
 
 - `DataType::instantiate_unchecked` has been deprecated, call constructors instead.
 
+- The custom derive macros, `StaticRef`, `StaticGlobal`, and `Module::typed_global_cached` now support eliding the `Main` module. For example, instead of `Main.Foo` can now be accessed as `Foo`.
+
 ## v0.22
 
 - Several aliases for `JuliaResult` have been added so they can be more easily returned from an exported funtion.
