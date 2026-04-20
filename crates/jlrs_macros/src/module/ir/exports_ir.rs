@@ -1,11 +1,11 @@
 use crate::model::{ItemModel, export_name::ExportName};
 
 pub struct ExportsIR<'a> {
-    pub exports: Vec<&'a ExportName<'a>>
+    pub exports: Vec<&'a ExportName<'a>>,
 }
 
 impl<'a> ExportsIR<'a> {
-        pub fn from_models(models: &'a [ItemModel]) -> Self {
+    pub fn from_models(models: &'a [ItemModel]) -> Self {
         let mut exports = Vec::new();
 
         for item in models {
@@ -33,4 +33,3 @@ impl<'a> ExportsIR<'a> {
         ExportsIR { exports }
     }
 }
-

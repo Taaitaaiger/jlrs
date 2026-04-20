@@ -21,6 +21,7 @@ use jlrs::{
 
 pub mod array;
 pub mod constants;
+pub mod enums;
 pub mod exceptions;
 pub mod foreign;
 pub mod generics;
@@ -31,6 +32,7 @@ pub mod typed_value;
 
 use array::*;
 use constants::*;
+use enums::*;
 use exceptions::*;
 use foreign::*;
 use generics::*;
@@ -193,4 +195,10 @@ julia_module! {
 
     type POpaque64 = POpaque<f64>;
     in POpaque<f64> pub fn new(value: f64) -> TypedValueRet<POpaque<f64>> as POpaque64;
+
+    struct OpaqueEnum;
+    in OpaqueEnum fn new_usize(value: usize) -> TypedValueRet<OpaqueEnum> as OpaqueEnum;
+    in OpaqueEnum fn new_f64(value: f64) -> TypedValueRet<OpaqueEnum> as OpaqueEnum;
+    in OpaqueEnum fn is_usize(&self) -> bool;
+    in OpaqueEnum fn is_f64(&self) -> bool;
 }

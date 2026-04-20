@@ -26,7 +26,7 @@ use crate::{
         cache::{CacheMap, FxCache},
         layout::nothing::Nothing,
         managed::{private::ManagedPriv, symbol::Symbol, union_all::UnionAll, value::Value},
-        static_data::{StaticRef, top_module},
+        static_data::{StaticRef, get_top_item},
         types::{construct_type::ConstructType, typecheck::Typecheck},
     },
     error::{AccessError, JlrsResult, TypeError},
@@ -130,15 +130,12 @@ impl<'scope> Module<'scope> {
             let n_parts = parts.clone().count();
             let module_name = parts.next().unwrap();
 
-            let mut module = top_module(target, module_name)?;
+            let top_item = get_top_item::<_, Value>(target, module_name)?;
 
             let item = match n_parts {
-                1 => module.as_value().cast::<T>()?,
-                2 => module
-                    .global(&target, parts.next().unwrap())?
-                    .as_value()
-                    .cast::<T>()?,
+                1 => top_item.as_value().cast::<T>()?,
                 n => {
+                    let mut module = top_item.cast::<Module>()?;
                     for _ in 1..n - 1 {
                         module = module
                             .submodule(&target, parts.next().unwrap())?

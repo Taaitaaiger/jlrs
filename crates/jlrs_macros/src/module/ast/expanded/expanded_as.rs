@@ -102,7 +102,7 @@ impl ExpandedAs {
         }
     }
 
-    pub fn is_global(&self)  -> bool {
+    pub fn is_global(&self) -> bool {
         match self {
             ExpandedAs::Local(_) => false,
             ExpandedAs::Global(_) => true,

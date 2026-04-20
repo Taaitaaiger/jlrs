@@ -268,3 +268,11 @@ end
     nt2 = JuliaModuleTest.take_return_named_tuple(nt)
     @test nt2 == nt
 end
+
+@testset "Enums" begin
+    enum_usize = JuliaModuleTest.OpaqueEnum(UInt(2))
+    @test JuliaModuleTest.is_usize(enum_usize)
+
+    enum_f64 = JuliaModuleTest.OpaqueEnum(6.0)
+    @test JuliaModuleTest.is_f64(enum_f64)
+end
