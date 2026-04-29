@@ -59,11 +59,17 @@ impl<'a> CType for JlType<'a> {
 
 impl<'a> CType for FFIType<'a> {
     fn c_type(&self) -> String {
-        self.name
+        let s = self.name
             .to_string()
             .strip_prefix("c_")
             .unwrap()
-            .to_string()
+            .to_string();
+
+        if s != "uint" {
+            s
+        } else {
+            "unsigned int".into()
+        }
     }
 }
 
