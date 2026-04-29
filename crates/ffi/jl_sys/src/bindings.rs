@@ -221,8 +221,6 @@ pub mod globals {
 
 /// Functions from libjulia used by jlrs
 pub mod functions {
-    use crate::jl_gcframe_t;
-
     #[cfg_attr(
         any(windows, target_os = "windows", feature = "windows"),
         link(name = "libjulia", kind = "raw-dylib")
@@ -232,7 +230,7 @@ pub mod functions {
 
         pub fn jl_gc_is_enabled() -> std::ffi::c_int;
 
-        pub fn jl_get_pgcstack() -> *mut *mut jl_gcframe_t;
+        pub fn jl_get_pgcstack() -> *mut *mut crate::types::jl_gcframe_t;
 
         pub fn jl_gc_collect(arg0: crate::types::jl_gc_collection_t);
 
@@ -550,8 +548,6 @@ pub mod functions {
 
         pub fn jl_stderr_stream() -> *mut crate::types::JL_STREAM;
 
-        pub fn jl_stdout_obj() -> *mut crate::types::jl_value_t;
-
         pub fn jl_stderr_obj() -> *mut crate::types::jl_value_t;
 
         pub fn jl_static_show(
@@ -603,7 +599,7 @@ pub mod functions {
         );
 
         pub fn jl_gc_set_cb_root_scanner(
-            cb: crate::jl_gc_cb_root_scanner_t,
+            cb: crate::types::jl_gc_cb_root_scanner_t,
             enable: std::ffi::c_int,
         );
 
@@ -618,17 +614,12 @@ pub mod functions {
 
         pub fn jl_init();
 
-        pub fn jl_init_with_image(
-            julia_bindir: *const std::os::raw::c_char,
-            image_path: *const std::os::raw::c_char,
-        );
-
         pub fn jl_symbol(str: *const std::ffi::c_char) -> *mut crate::types::jl_sym_t;
 
         pub fn jl_egal(
             a: *const crate::types::jl_value_t,
             b: *const crate::types::jl_value_t,
-        ) -> std::os::raw::c_int;
+        ) -> std::ffi::c_int;
 
         pub fn jl_adopt_thread() -> *mut *mut crate::types::jl_gcframe_t;
 
@@ -668,6 +659,12 @@ pub mod functions {
             val: *mut crate::types::jl_value_t,
         );
 
+        #[cfg(any(julia_1_10, julia_1_11))]
+        pub fn jl_init_with_image(
+            julia_bindir: *const std::ffi::c_char,
+            image_path: *const std::ffi::c_char,
+        );
+
         // Added in Julia 1.12
 
         #[cfg(not(any(julia_1_10, julia_1_11)))]
@@ -677,6 +674,12 @@ pub mod functions {
             var: *mut crate::types::jl_sym_t,
             val: *mut crate::types::jl_value_t,
         ) -> *mut crate::types::jl_binding_partition_t;
+
+        #[cfg(not(any(julia_1_10, julia_1_11)))]
+        pub fn jl_init_with_image_file(
+            julia_bindir: *const std::ffi::c_char,
+            image_path: *const std::ffi::c_char,
+        );
     }
 }
 

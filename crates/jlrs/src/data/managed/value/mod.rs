@@ -72,7 +72,7 @@ use jl_sys::{
     jl_get_nth_field, jl_get_nth_field_noalloc, jl_has_typevar, jl_interrupt_exception, jl_isa,
     jl_memory_exception, jl_new_struct_uninit, jl_nothing, jl_object_id, jl_pair_type,
     jl_readonlymemory_exception, jl_set_nth_field, jl_stackovf_exception, jl_static_show,
-    jl_stderr_obj, jl_stderr_stream, jl_stdout_obj, jl_stdout_stream, jl_subtype, jl_true,
+    jl_stderr_obj, jl_stderr_stream, jl_stdout_stream, jl_subtype, jl_true,
     jl_typeof_str, jl_undefref_exception, jl_value_t,
 };
 use jlrs_macros::julia_version;
@@ -1434,16 +1434,6 @@ impl<'scope> Value<'scope, 'static> {
     {
         // Safety: global constant
         unsafe { Value::wrap_non_null(NonNull::new_unchecked(jl_nothing), Private) }
-    }
-
-    /// The handle to `stdout` as a Julia value.
-    #[inline]
-    pub fn stdout<Tgt>(_: &Tgt) -> Self
-    where
-        Tgt: Target<'scope>,
-    {
-        // Safety: global constant
-        unsafe { Value::wrap_non_null(NonNull::new_unchecked(jl_stdout_obj()), Private) }
     }
 
     /// The handle to `stderr` as a Julia value.
