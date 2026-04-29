@@ -1,0 +1,38 @@
+name: FFI-check
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+  workflow_dispatch:
+
+jobs:
+  test-linux:
+    runs-on: ubuntu-latest
+    continue-on-error: ${{ matrix.allow-fail }}
+    strategy:
+      matrix:
+        julia: ['1.10', '1.11', '1.12']
+        allow-fail: [false]
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Julia environment
+        uses: julia-actions/setup-julia@v2
+        with:
+          version: ${{ matrix.julia }}
+
+      - name: Setup Rust
+        uses:  dtolnay/rust-toolchain@master
+        with:
+          toolchain: 'stable'
+
+      - name: Run tests
+        run: |
+          export JLRS_JULIA_DIR="$(dirname $(dirname $(which julia)))"
+          export LD_LIBRARY_PATH="${JLRS_JULIA_DIR}/lib:${LD_LIBRARY_PATH}"
+          cd crate/ffi/ffi-validator
+          cargo run -- ../jl_sys/src/bindings.rs > test.c
