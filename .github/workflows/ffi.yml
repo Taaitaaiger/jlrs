@@ -9,13 +9,12 @@ on:
   workflow_dispatch:
 
 jobs:
-  test-linux:
-    runs-on: ubuntu-latest
-    continue-on-error: ${{ matrix.allow-fail }}
+  ffi-check:
+    runs-on: ${{ matrix.runs-on }}
     strategy:
       matrix:
         julia: ['1.10', '1.11', '1.12']
-        allow-fail: [false]
+        runs-on: [ubuntu-lastest, macos-latest]
 
     steps:
       - uses: actions/checkout@v6
