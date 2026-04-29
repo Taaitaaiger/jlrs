@@ -34,5 +34,5 @@ jobs:
         run: |
           export JLRS_JULIA_DIR="$(dirname $(dirname $(which julia)))"
           export LD_LIBRARY_PATH="${JLRS_JULIA_DIR}/lib:${LD_LIBRARY_PATH}"
-          cd crate/ffi/ffi-validator
+          cd crates/ffi/ffi-validator
           cargo run -- ../jl_sys/src/bindings.rs > test.c
