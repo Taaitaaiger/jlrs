@@ -30,9 +30,17 @@ jobs:
         with:
           toolchain: 'stable'
 
+      - name: Set up GCC
+        uses: egor-tensin/setup-gcc@v2
+        with:
+            version: latest
+            platform: x64
+
       - name: Run tests
         run: |
           export JLRS_JULIA_DIR="$(dirname $(dirname $(which julia)))"
           export LD_LIBRARY_PATH="${JLRS_JULIA_DIR}/lib:${LD_LIBRARY_PATH}"
           cd crates/ffi/ffi-validator
           cargo run -- ../jl_sys/src/bindings.rs > test.c
+          gcc -Wall -Werror -o test -fPIC -I$JULIA_DIR/include/julia -L$JULIA_DIR/lib -Wl,-rpath,$JULIA_DIR/lib test.c -ljulia
+          ./test
