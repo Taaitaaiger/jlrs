@@ -37,3 +37,32 @@ jobs:
           cargo run -- ../jl_sys/src/bindings.rs > test.c
           gcc -Wall -Werror -o test -fPIC -I$JLRS_JULIA_DIR/include/julia -L$JLRS_JULIA_DIR/lib -Wl,-rpath,$JLRS_JULIA_DIR/lib test.c -ljulia
           ./test
+
+  ffi-check-windows-gnu:
+    runs-on: windows-2022
+    strategy:
+      matrix:
+        julia: ['1.10', '1.11', '1.12']
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Julia environment
+        uses: julia-actions/setup-julia@v2
+        with:
+          version: ${{ matrix.julia }}
+
+      - name: Setup Rust
+        uses:  dtolnay/rust-toolchain@master
+        with:
+          toolchain: 'stable'
+
+      - name: Run tests
+        shell: bash
+        run: |
+          export JLRS_JULIA_DIR="$(dirname $(dirname $(which julia)))"
+          export LD_LIBRARY_PATH="${JLRS_JULIA_DIR}/lib:${LD_LIBRARY_PATH}"
+          cd crates/ffi/ffi-validator
+          cargo run -- ../jl_sys/src/bindings.rs > test.c
+          gcc -Wall -Werror -o test -fPIC -I$JLRS_JULIA_DIR/include/julia -L$JLRS_JULIA_DIR/lib -Wl,-rpath,$JLRS_JULIA_DIR/lib test.c -ljulia
+          ./test
