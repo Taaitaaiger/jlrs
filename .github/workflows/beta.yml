@@ -310,7 +310,7 @@ jobs:
     runs-on: ${{ matrix.runs-on }}
     strategy:
       matrix:
-        runs-on: [ubuntu-lastest, macos-latest]
+        runs-on: [ubuntu-latest, macos-latest]
 
     steps:
       - uses: actions/checkout@v6
