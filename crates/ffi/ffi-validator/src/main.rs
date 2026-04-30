@@ -10,10 +10,6 @@ use syn::{
 
 use crate::types::{CType, ItemType};
 
-struct BindingsModule {
-    file: SynFile,
-}
-
 const PREFIX: &'static str = "julia_1_";
 const PREFIX_LEN: usize = PREFIX.len();
 const LTS_VERSION: usize = 10;
@@ -313,7 +309,11 @@ impl<'a> FunctionsMod<'a> {
     }
 }
 
-impl BindingsModule {
+struct JlSysBindingsModule {
+    file: SynFile,
+}
+
+impl JlSysBindingsModule {
     fn globals_module(&self) -> GlobalsMod<'_> {
         for item in self.file.items.iter() {
             match item {
@@ -331,6 +331,27 @@ impl BindingsModule {
         for item in self.file.items.iter() {
             match item {
                 syn::Item::Mod(item_mod) if item_mod.ident == "functions" => {
+                    return FunctionsMod {
+                        functions: item_mod,
+                    };
+                }
+                _ => (),
+            }
+        }
+
+        unreachable!()
+    }
+}
+
+struct JlrsSysBindingsModule {
+    file: SynFile,
+}
+
+impl JlrsSysBindingsModule {
+    fn jlrs_cc_module(&self) -> FunctionsMod<'_> {
+        for item in self.file.items.iter() {
+            match item {
+                syn::Item::Mod(item_mod) if item_mod.ident == "jlrs_cc" => {
                     return FunctionsMod {
                         functions: item_mod,
                     };
@@ -379,19 +400,26 @@ fn type_path_to_string(type_path: &TypePath) -> String {
         .join("::")
 }
 
-fn print_all_types(bindings_module: &BindingsModule) {
+fn print_all_types(
+    bindings_module: &JlSysBindingsModule,
+    jlrs_sys_bindings_module: &JlrsSysBindingsModule,
+) {
     let globals_mod = bindings_module.globals_module();
     let functions_mod = bindings_module.functions_module();
+    let jlrs_cc_mod = jlrs_sys_bindings_module.jlrs_cc_module();
 
     globals_mod.print_types();
     functions_mod.print_arg_types();
     functions_mod.print_return_types();
+    jlrs_cc_mod.print_arg_types();
+    jlrs_cc_mod.print_return_types();
 }
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Args {
-    file: PathBuf,
+    jl_sys_bindings_path: PathBuf,
+    jlrs_sys_bindings_path: PathBuf,
     #[arg(short, long, help = "Print all types used by the bindings and exit")]
     print_types: bool,
 }
@@ -399,28 +427,41 @@ struct Args {
 fn main() {
     let args = Args::parse();
 
-    let bindings_module = {
-        let mut file = File::open(args.file).unwrap();
+    let jl_sys_bindings = {
+        let mut file = File::open(args.jl_sys_bindings_path).unwrap();
         let mut unparsed_bindings_module = String::new();
         file.read_to_string(&mut unparsed_bindings_module).unwrap();
-        BindingsModule {
+        JlSysBindingsModule {
+            file: syn::parse_file(&unparsed_bindings_module).unwrap(),
+        }
+    };
+
+    let jlrs_sys_bindings = {
+        let mut file = File::open(args.jlrs_sys_bindings_path).unwrap();
+        let mut unparsed_bindings_module = String::new();
+        file.read_to_string(&mut unparsed_bindings_module).unwrap();
+        JlrsSysBindingsModule {
             file: syn::parse_file(&unparsed_bindings_module).unwrap(),
         }
     };
 
     if args.print_types {
-        print_all_types(&bindings_module);
+        print_all_types(&jl_sys_bindings, &jlrs_sys_bindings);
         return;
     }
 
-    let globals = bindings_module.globals_module();
+    let globals = jl_sys_bindings.globals_module();
     let globals_test_fn = globals_test_fn(globals.globals());
 
-    let functions = bindings_module.functions_module();
+    let functions = jl_sys_bindings.functions_module();
     let functions_test_fn = functions_test_fns(functions.functions());
 
+    let jlrs_cc = jlrs_sys_bindings.jlrs_cc_module();
+    let jlrs_cc_test_fn = functions_test_fns(jlrs_cc.functions());
+
     let c_file = format!(
-        "#include <julia.h>
+        "#include <jlrs_cc.h>
+#include <jlrs_cc_fast_tls.h>
 #include <julia_gcext.h>
 #include <assert.h>
 
@@ -431,6 +472,8 @@ void jl_exit_threaded_region(void);
 {globals_test_fn}
 
 {functions_test_fn}
+
+{jlrs_cc_test_fn}
 
 int main() {{
     globals_test_fn();
