@@ -335,7 +335,7 @@ jobs:
               -o test \
               -fPIC \
               -I$JLRS_JULIA_DIR/include/julia \
-              -I../jlrs_sys/src/jlrs_cc/julia \
+              -I../jlrs_sys/src/jlrs_cc \
               -L$JLRS_JULIA_DIR/lib \
               -Wl,-rpath,$JLRS_JULIA_DIR/lib \
               test.c \
