@@ -305,3 +305,43 @@ jobs:
         run: |
           cd tests/JuliaModuleTest
           julia --project=docs docs/make.jl
+
+  ffi-check:
+    runs-on: ${{ matrix.runs-on }}
+    strategy:
+      matrix:
+        runs-on: [ubuntu-latest, macos-latest]
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Julia environment
+        uses: julia-actions/setup-julia@v2
+        with:
+          version: 'pre'
+
+      - name: Setup Rust
+        uses:  dtolnay/rust-toolchain@master
+        with:
+          toolchain: 'stable'
+
+      - name: Run tests
+        run: |
+          export JLRS_JULIA_DIR="$(dirname $(dirname $(which julia)))"
+          export LD_LIBRARY_PATH="${JLRS_JULIA_DIR}/lib:${LD_LIBRARY_PATH}"
+          cd crates/ffi/ffi-validator
+          cargo run -- ../jl_sys/src/bindings.rs ../jlrs_sys/src/bindings.rs > test.c
+          gcc -Wall -Werror -Wno-nullability-completeness \
+              -o test \
+              -fPIC \
+              -I$JLRS_JULIA_DIR/include/julia \
+              -I../jlrs_sys/src/jlrs_cc \
+              -L$JLRS_JULIA_DIR/lib \
+              -Wl,-rpath,$JLRS_JULIA_DIR/lib \
+              test.c \
+              ../jlrs_sys/src/jlrs_cc/jlrs_cc_ext.c \
+              ../jlrs_sys/src/jlrs_cc/jlrs_cc_fast_tls.c \
+              ../jlrs_sys/src/jlrs_cc/jlrs_cc_hacks.c \
+              ../jlrs_sys/src/jlrs_cc/jlrs_cc_reexport.c \
+              -ljulia
+          ./test

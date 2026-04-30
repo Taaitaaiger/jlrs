@@ -14,6 +14,8 @@
 
 - The custom derive macros, `StaticRef`, `StaticGlobal`, and `Module::typed_global_cached` now support eliding the `Main` module. For example, instead of `Main.Foo` can now be accessed as `Foo`.
 
+- `Value::stdout` has been removed; the C-function it calls has been unavailable since Julia 1.11.
+
 ## v0.22
 
 - Several aliases for `JuliaResult` have been added so they can be more easily returned from an exported funtion.

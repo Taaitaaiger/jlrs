@@ -9,4 +9,4 @@ members = [
     "crates/jlrs_macros",
     "examples",
 ]
-exclude = ["tests/julia_module_test", "benches"]
+exclude = ["crates/ffi/ffi-validator", "tests/julia_module_test", "benches"]

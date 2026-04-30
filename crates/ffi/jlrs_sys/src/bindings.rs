@@ -88,7 +88,7 @@ pub mod jlrs_cc {
             result: *mut std::ffi::c_void,
         );
 
-        pub fn jlrs_current_exception() -> *mut crate::jl_value_t;
+        pub fn jlrs_current_exception() -> *mut crate::types::jl_value_t;
 
         pub fn jlrs_try_catch(
             callback: *mut std::ffi::c_void,
@@ -136,11 +136,6 @@ pub mod jlrs_cc {
         pub fn jlrs_datatype_parameters(
             ty: *mut crate::types::jl_datatype_t,
         ) -> *mut crate::types::jl_svec_t;
-
-        pub fn jlrs_datatype_parameter(
-            ty: *mut crate::types::jl_datatype_t,
-            n: usize,
-        ) -> *mut crate::types::jl_value_t;
 
         pub fn jlrs_datatype_instance(
             ty: *mut crate::types::jl_datatype_t,

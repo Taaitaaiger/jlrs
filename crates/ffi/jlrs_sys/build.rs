@@ -107,7 +107,8 @@ fn compile_jlrs_cc(julia_dir: &JuliaDir, target: Option<BBTarget>) {
     let mut c = cc::Build::new();
     c.include(&include_dir)
         .cpp(false)
-        .flag_if_supported("-fPIC");
+        .flag_if_supported("-fPIC")
+        .flag_if_supported("-Wno-nullability-completeness");
 
     if julia_dir.is_binary_builder() {
         c.file("src/jlrs_cc/jlrs_cc_ext.c")
