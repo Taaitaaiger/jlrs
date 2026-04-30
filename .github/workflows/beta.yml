@@ -331,5 +331,5 @@ jobs:
           export LD_LIBRARY_PATH="${JLRS_JULIA_DIR}/lib:${LD_LIBRARY_PATH}"
           cd crates/ffi/ffi-validator
           cargo run -- ../jl_sys/src/bindings.rs > test.c
-          gcc -Wall -Werror -o test -fPIC -I$JLRS_JULIA_DIR/include/julia -L$JLRS_JULIA_DIR/lib -Wl,-rpath,$JLRS_JULIA_DIR/lib test.c -ljulia
+          gcc -std=gnu11 -Wall -Werror -o test -fPIC -I$JLRS_JULIA_DIR/include/julia -L$JLRS_JULIA_DIR/lib -Wl,-rpath,$JLRS_JULIA_DIR/lib test.c -ljulia
           ./test
