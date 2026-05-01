@@ -53,8 +53,7 @@ pub(crate) unsafe fn mark_global_cache(ptls: PTls, full: bool) {
     unsafe {
         let cache = CACHE.get_unchecked();
         if full || cache.is_dirty() {
-            for item_ref in cache.iter() {
-                let value = item_ref.value().1;
+            for (_tid, value) in cache.iter() {
                 mark_queue_obj(ptls, value.as_weak());
             }
             cache.clear_dirty();

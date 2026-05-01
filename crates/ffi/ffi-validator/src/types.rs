@@ -59,7 +59,8 @@ impl<'a> CType for JlType<'a> {
 
 impl<'a> CType for FFIType<'a> {
     fn c_type(&self) -> String {
-        let s = self.name
+        let s = self
+            .name
             .to_string()
             .strip_prefix("c_")
             .unwrap()
@@ -176,7 +177,9 @@ impl<'a> From<&'a TypePath> for ItemType<'a> {
                             match angle_bracketed_generic_arguments.args.first().unwrap() {
                                 syn::GenericArgument::Type(ty) => {
                                     let inner = ItemType::from(ty);
-                                    ItemType::UnsafeCellType(UnsafeCellType { inner: Box::new(inner) })
+                                    ItemType::UnsafeCellType(UnsafeCellType {
+                                        inner: Box::new(inner),
+                                    })
                                 }
                                 _ => unreachable!(),
                             }

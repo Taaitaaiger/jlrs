@@ -58,7 +58,7 @@ impl<'scope> Symbol<'scope> {
         let cache = unsafe { CACHE.get_unchecked() };
 
         if let Some(sym) = cache.get(bytes) {
-            return sym.value().clone();
+            return sym;
         }
 
         // Safety: Can only be called from a thread known to Julia, symbols are globally rooted
@@ -81,7 +81,7 @@ impl<'scope> Symbol<'scope> {
 
         if let Some(sym) = cache.get(bytes) {
             unsafe {
-                return target.exception_from_ptr(Ok(sym.value().clone()), Private);
+                return target.exception_from_ptr(Ok(sym), Private);
             }
         }
 
@@ -112,7 +112,7 @@ impl<'scope> Symbol<'scope> {
 
         let cache = unsafe { CACHE.get_unchecked() };
         if let Some(sym) = cache.get(bytes) {
-            return sym.value().clone();
+            return sym;
         }
 
         // Safety: Can only be called from a thread known to Julia, symbols are globally rooted
