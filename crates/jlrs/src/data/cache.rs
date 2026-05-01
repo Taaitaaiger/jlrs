@@ -32,7 +32,7 @@ pub(crate) trait CacheMap<'a, K: 'a + Eq + Hash, V: 'a + Clone, S: BuildHasher> 
 
     fn is_dirty(&self) -> bool;
 
-    unsafe fn iter(&'a self) -> impl Iterator<Item = V>;
+    unsafe fn map(&'a self, func: impl Fn(V));
 }
 
 impl<'a, K: 'a + Eq + Hash, V: 'a + Clone> CacheMap<'a, K, V, FxBuildHasher> for FxCache<K, V> {
@@ -58,21 +58,23 @@ impl<'a, K: 'a + Eq + Hash, V: 'a + Clone> CacheMap<'a, K, V, FxBuildHasher> for
         self.map.read().get(key).cloned()
     }
 
-    unsafe fn iter(&'a self) -> impl Iterator<Item = V> {
-        self.map
-            .read()
-            .iter()
-            .map(|(_k, v)| v.clone())
-            .collect::<Vec<V>>()
-            .into_iter()
-    }
-
     fn clear_dirty(&self) {
         self.dirty.store(false, Ordering::Relaxed);
     }
 
     fn is_dirty(&self) -> bool {
         self.dirty.load(Ordering::Relaxed)
+    }
+
+    unsafe fn map(&'a self, func: impl Fn(V)) {
+        unsafe {
+            self.map
+                .data_ptr()
+                .as_ref_unchecked()
+                .iter()
+                .map(|(_, v)| func(v.clone()))
+                .collect::<()>()
+        }
     }
 }
 
@@ -99,21 +101,23 @@ impl<'a, K: 'a + Eq + Hash, V: 'a + Clone> CacheMap<'a, K, V, FnvBuildHasher> fo
         self.map.read().get(key).cloned()
     }
 
-    unsafe fn iter(&'a self) -> impl Iterator<Item = V> {
-        self.map
-            .read()
-            .iter()
-            .map(|(_k, v)| v.clone())
-            .collect::<Vec<V>>()
-            .into_iter()
-    }
-
     fn clear_dirty(&self) {
         self.dirty.store(false, Ordering::Relaxed);
     }
 
     fn is_dirty(&self) -> bool {
         self.dirty.load(Ordering::Relaxed)
+    }
+
+    unsafe fn map(&'a self, func: impl Fn(V)) {
+        unsafe {
+            self.map
+                .data_ptr()
+                .as_ref_unchecked()
+                .iter()
+                .map(|(_, v)| func(v.clone()))
+                .collect::<()>()
+        }
     }
 }
 
