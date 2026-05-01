@@ -31,7 +31,7 @@ jobs:
 
       - name: Run tests
         run: |
-          julia -e "import Pkg; Pkg.add(url=\"https://github.com/Taaitaaiger/JlrsCore.jl\", rev=\"06ff2ecddee762ba62757b7aeb1e9f6ad45e8ed0\")"
+          julia -e "import Pkg; Pkg.add(url=\"https://github.com/Taaitaaiger/JlrsCore.jl\", rev=\"3fc603a1cf8d4e0c16a57027f15d00232f47ac4a\")"
           export JLRS_JULIA_DIR="$(dirname $(dirname $(which julia)))"
           export LD_LIBRARY_PATH="${JLRS_JULIA_DIR}/lib:${LD_LIBRARY_PATH}"
           cargo test --features full --verbose
@@ -58,7 +58,7 @@ jobs:
 
       - name: Run tests
         run: |
-          julia -e "import Pkg; Pkg.add(url=\"https://github.com/Taaitaaiger/JlrsCore.jl\", rev=\"06ff2ecddee762ba62757b7aeb1e9f6ad45e8ed0\")"
+          julia -e "import Pkg; Pkg.add(url=\"https://github.com/Taaitaaiger/JlrsCore.jl\", rev=\"3fc603a1cf8d4e0c16a57027f15d00232f47ac4a\")"
           export JLRS_JULIA_DIR="$(dirname $(dirname $(which julia)))"
           export DYLD_LIBRARY_PATH="${JLRS_JULIA_DIR}/lib:${DYLD_LIBRARY_PATH}"
           cargo test --features full --verbose
@@ -85,7 +85,7 @@ jobs:
 
       - name: Run tests
         run: |
-          julia -e 'import Pkg; Pkg.add(url="https://github.com/Taaitaaiger/JlrsCore.jl", rev="06ff2ecddee762ba62757b7aeb1e9f6ad45e8ed0")'
+          julia -e 'import Pkg; Pkg.add(url="https://github.com/Taaitaaiger/JlrsCore.jl", rev="3fc603a1cf8d4e0c16a57027f15d00232f47ac4a")'
           cargo test --features full --verbose
 
   test-windows-msvc:
@@ -113,7 +113,7 @@ jobs:
 
       - name: Run tests
         run: |
-          julia -e 'import Pkg; Pkg.add(url="https://github.com/Taaitaaiger/JlrsCore.jl", rev="06ff2ecddee762ba62757b7aeb1e9f6ad45e8ed0")'
+          julia -e 'import Pkg; Pkg.add(url="https://github.com/Taaitaaiger/JlrsCore.jl", rev="3fc603a1cf8d4e0c16a57027f15d00232f47ac4a")'
           cargo test --features full --verbose
 
   julia-module-test-linux:
@@ -140,7 +140,7 @@ jobs:
       - name: Script tests
         run: |
           cd tests/script
-          julia -e "import Pkg; Pkg.add(url=\"https://github.com/Taaitaaiger/JlrsCore.jl\", rev=\"06ff2ecddee762ba62757b7aeb1e9f6ad45e8ed0\")"
+          julia -e "import Pkg; Pkg.add(url=\"https://github.com/Taaitaaiger/JlrsCore.jl\", rev=\"3fc603a1cf8d4e0c16a57027f15d00232f47ac4a\")"
           export JULIA_MODULE_TEST_LIB_DIR="${GITHUB_WORKSPACE}/tests/julia_module_test/target/debug"
           julia JuliaModuleTest.jl
 
@@ -204,7 +204,7 @@ jobs:
       - name: Script tests
         run: |
           cd tests/script
-          julia -e "import Pkg; Pkg.add(url=\"https://github.com/Taaitaaiger/JlrsCore.jl\", rev=\"06ff2ecddee762ba62757b7aeb1e9f6ad45e8ed0\")"
+          julia -e "import Pkg; Pkg.add(url=\"https://github.com/Taaitaaiger/JlrsCore.jl\", rev=\"3fc603a1cf8d4e0c16a57027f15d00232f47ac4a\")"
           export JULIA_MODULE_TEST_LIB_DIR="${GITHUB_WORKSPACE}/tests/julia_module_test/target/debug"
           julia JuliaModuleTest.jl
 
@@ -268,7 +268,7 @@ jobs:
       - name: Script tests
         run: |
           cd tests/script
-          julia -e 'import Pkg; Pkg.add(url="https://github.com/Taaitaaiger/JlrsCore.jl", rev="06ff2ecddee762ba62757b7aeb1e9f6ad45e8ed0")'
+          julia -e 'import Pkg; Pkg.add(url="https://github.com/Taaitaaiger/JlrsCore.jl", rev="3fc603a1cf8d4e0c16a57027f15d00232f47ac4a")'
           $env:JULIA_MODULE_TEST_LIB_DIR = "${env:GITHUB_WORKSPACE}\tests\julia_module_test\target\debug"
           julia JuliaModuleTest.jl
 
