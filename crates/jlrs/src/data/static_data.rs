@@ -19,7 +19,7 @@ use super::{
 };
 use crate::{
     data::{
-        cache::{CacheMap, FnvCache},
+        cache::{CacheMap, FnvCache, new_fnv_cache},
         managed::{Managed, module::Module, value::ValueUnbound},
     },
     error::{JlrsError, JlrsResult},
@@ -29,22 +29,15 @@ use crate::{
     private::Private,
 };
 
-type CacheInner = FnvCache<usize, ValueUnbound>;
-type Cache = GcSafeOnceLock<CacheInner>;
-pub(crate) static CACHE: Cache = Cache::new();
-
-pub(crate) fn init_static_data_cache() {
-    CACHE.get_or_init(|| CacheInner::new());
-}
+pub(crate) static CACHE: FnvCache<usize, ValueUnbound> = new_fnv_cache();
 
 pub(crate) unsafe fn mark_static_data_cache(ptls: PTls, full: bool) {
     unsafe {
-        let cache = CACHE.get_unchecked();
-        if full || cache.is_dirty() {
-            cache.map(|value| {
+        if full || CACHE.is_dirty() {
+            CACHE.map(|value| {
                 mark_queue_obj(ptls, value.as_weak());
             });
-            cache.clear_dirty();
+            CACHE.clear_dirty();
         }
     }
 }
@@ -191,7 +184,7 @@ where
             };
 
             let key = global.as_weak().ptr().as_ptr().addr();
-            CACHE.get_unchecked().insert(key, global);
+            CACHE.insert(key, global);
 
             return StaticDataInner(global, PhantomData);
         });
@@ -338,7 +331,7 @@ where
                 .as_value();
 
             let key = global.as_weak().ptr().as_ptr().addr();
-            CACHE.get_unchecked().insert(key, global);
+            CACHE.insert(key, global);
 
             let ptr = global.cast::<T>().unwrap().unwrap(Private);
             self.global.store(ptr, Ordering::Relaxed);
@@ -376,7 +369,7 @@ where
                 .as_value();
 
             let key = global.as_weak().ptr().as_ptr().addr();
-            CACHE.get_unchecked().insert(key, global);
+            CACHE.insert(key, global);
 
             let ptr = global.cast::<T>().unwrap().unwrap(Private);
             self.global.store(ptr, Ordering::Relaxed);
@@ -428,8 +421,7 @@ where
         unsafe {
             let global = T::construct_type(target).as_value().leak().as_value();
             let key = global.as_weak().ptr().as_ptr().addr();
-            let cache = CACHE.get_unchecked();
-            cache.insert(key, global);
+            CACHE.insert(key, global);
 
             let ptr = global.unwrap(Private);
             self.global.store(ptr, Ordering::Relaxed);

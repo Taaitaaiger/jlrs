@@ -23,7 +23,7 @@ use crate::{
     catch::{catch_exceptions, unwrap_exc},
     convert::to_symbol::ToSymbol,
     data::{
-        cache::{CacheMap, FxCache},
+        cache::{CacheMap, FxCache, new_fx_cache},
         layout::nothing::Nothing,
         managed::{private::ManagedPriv, symbol::Symbol, union_all::UnionAll, value::Value},
         static_data::{StaticRef, get_top_item},
@@ -41,22 +41,15 @@ use crate::{
     private::Private,
 };
 
-type CacheInner = FxCache<Box<[u8]>, (TypeId, ValueUnbound)>;
-type Cache = GcSafeOnceLock<CacheInner>;
-pub(crate) static CACHE: Cache = Cache::new();
-
-pub(crate) fn init_module_cache() {
-    CACHE.get_or_init(|| CacheInner::new());
-}
+pub(crate) static CACHE: FxCache<Box<[u8]>, (TypeId, ValueUnbound)> = new_fx_cache();
 
 pub(crate) unsafe fn mark_global_cache(ptls: PTls, full: bool) {
     unsafe {
-        let cache = CACHE.get_unchecked();
-        if full || cache.is_dirty() {
-            cache.map(|(_, value)| {
+        if full || CACHE.is_dirty() {
+            CACHE.map(|(_, value)| {
                 mark_queue_obj(ptls, value.as_weak());
             });
-            cache.clear_dirty();
+            CACHE.clear_dirty();
         }
     }
 }
@@ -110,10 +103,9 @@ impl<'scope> Module<'scope> {
     {
         unsafe {
             let tid = T::type_id();
-            let cache = CACHE.get_unchecked();
 
             let path = path.as_ref();
-            if let Some(cached) = cache.get(path.as_bytes()) {
+            if let Some(cached) = CACHE.get(path.as_bytes()) {
                 if cached.0 == tid {
                     return Ok(cached.1.cast_unchecked::<T>());
                 } else {
@@ -148,7 +140,7 @@ impl<'scope> Module<'scope> {
                 }
             };
 
-            cache.insert(
+            CACHE.insert(
                 path.as_bytes().into(),
                 (tid, erase_scope_lifetime(item.as_value())),
             );
