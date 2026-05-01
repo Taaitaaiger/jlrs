@@ -77,7 +77,8 @@ impl<'a, K: 'a + Eq + Hash, V: 'a + Clone> CacheMap<'a, K, V, FxBuildHasher> for
         unsafe {
             self.map
                 .data_ptr()
-                .as_ref_unchecked()
+                .as_ref()
+                .unwrap()
                 .iter()
                 .map(|(_, v)| func(v.clone()))
                 .collect::<()>()
@@ -112,7 +113,8 @@ impl<'a, K: 'a + Eq + Hash, V: 'a + Clone> CacheMap<'a, K, V, FnvBuildHasher> fo
         unsafe {
             self.map
                 .data_ptr()
-                .as_ref_unchecked()
+                .as_ref()
+                .unwrap()
                 .iter()
                 .map(|(_, v)| func(v.clone()))
                 .collect::<()>()
