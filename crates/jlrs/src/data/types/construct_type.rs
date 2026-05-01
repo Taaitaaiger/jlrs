@@ -16,7 +16,7 @@ use super::abstract_type::{AbstractType, AnyType};
 use crate::{
     convert::to_symbol::ToSymbol,
     data::{
-        cache::{CacheMap, FnvCache},
+        cache::{CacheMap, FnvCache, new_fnv_cache},
         layout::{is_bits::IsBits, tuple::Tuple, typed_layout::HasLayout},
         managed::{
             Managed,
@@ -30,7 +30,6 @@ use crate::{
             value::{Value, ValueData, ValueUnbound},
         },
     },
-    gc_safe::GcSafeOnceLock,
     memory::{
         PTls,
         gc::mark_queue_obj,
@@ -41,22 +40,15 @@ use crate::{
     private::Private,
 };
 
-type CacheInner = FnvCache<TypeId, ValueUnbound>;
-type Cache = GcSafeOnceLock<CacheInner>;
-pub(crate) static CACHE: Cache = Cache::new();
-
-pub(crate) fn init_constructed_type_cache() {
-    CACHE.get_or_init(|| CacheInner::new());
-}
+pub(crate) static CACHE: FnvCache<TypeId, ValueUnbound> = new_fnv_cache();
 
 pub(crate) unsafe fn mark_constructed_type_cache(ptls: PTls, full: bool) {
     unsafe {
-        let cache = CACHE.get_unchecked();
-        if full || cache.is_dirty() {
-            cache.map(|value| {
+        if full || CACHE.is_dirty() {
+            CACHE.map(|value| {
                 mark_queue_obj(ptls, value.as_weak());
             });
-            cache.clear_dirty();
+            CACHE.clear_dirty();
         }
     }
 }
@@ -256,7 +248,7 @@ pub unsafe trait ConstructType: Sized {
     {
         if Self::CACHEABLE {
             unsafe {
-                let cache = ConstructedTypes::new(CACHE.get_unchecked());
+                let cache = ConstructedTypes::new(&CACHE);
                 cache.find_or_construct::<Self>().root(target)
             }
         } else {
@@ -285,7 +277,7 @@ pub unsafe trait ConstructType: Sized {
     {
         if Self::CACHEABLE {
             unsafe {
-                let cache = ConstructedTypes::new(CACHE.get_unchecked());
+                let cache = ConstructedTypes::new(&CACHE);
                 cache.find_or_construct_with_env::<Self>(env).root(target)
             }
         } else {

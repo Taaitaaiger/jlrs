@@ -15,11 +15,10 @@ use super::Weak;
 use crate::{
     catch::{catch_exceptions, unwrap_exc},
     data::{
-        cache::{CacheMap, FxCache},
+        cache::{CacheMap, FxCache, new_fx_cache},
         managed::private::ManagedPriv,
     },
     error::{JlrsError, JlrsResult},
-    gc_safe::GcSafeOnceLock,
     impl_julia_typecheck,
     memory::target::{Target, TargetException, TargetResult, unrooted::Unrooted},
     private::Private,
@@ -27,13 +26,7 @@ use crate::{
 
 pub mod static_symbol;
 
-type CacheInner = FxCache<Box<[u8]>, Symbol<'static>>;
-type Cache = GcSafeOnceLock<CacheInner>;
-pub(crate) static CACHE: Cache = Cache::new();
-
-pub(crate) fn init_symbol_cache() {
-    CACHE.get_or_init(|| CacheInner::new());
-}
+pub(crate) static CACHE: FxCache<Box<[u8]>, Symbol<'static>> = new_fx_cache();
 
 /// `Symbol`s are used Julia to represent identifiers, `:x` represents the `Symbol` `x`. Things
 /// that can be accessed using a `Symbol` include submodules, functions, and globals. However,
@@ -55,9 +48,8 @@ impl<'scope> Symbol<'scope> {
         Tgt: Target<'scope>,
     {
         let bytes = symbol.as_ref().as_bytes();
-        let cache = unsafe { CACHE.get_unchecked() };
 
-        if let Some(sym) = cache.get(bytes) {
+        if let Some(sym) = CACHE.get(bytes) {
             return sym;
         }
 
@@ -65,7 +57,7 @@ impl<'scope> Symbol<'scope> {
         unsafe {
             let sym = jl_symbol_n(bytes.as_ptr().cast(), bytes.len());
             let sym = Symbol::wrap_non_null(NonNull::new_unchecked(sym), Private);
-            cache.insert(bytes.into(), sym);
+            CACHE.insert(bytes.into(), sym);
             sym
         }
     }
@@ -77,9 +69,7 @@ impl<'scope> Symbol<'scope> {
         Tgt: Target<'scope>,
     {
         let bytes = symbol.as_ref();
-        let cache = unsafe { CACHE.get_unchecked() };
-
-        if let Some(sym) = cache.get(bytes) {
+        if let Some(sym) = CACHE.get(bytes) {
             unsafe {
                 return target.exception_from_ptr(Ok(sym), Private);
             }
@@ -91,7 +81,7 @@ impl<'scope> Symbol<'scope> {
             match catch_exceptions(callback, unwrap_exc) {
                 Ok(sym) => {
                     let sym = Symbol::wrap_non_null(NonNull::new_unchecked(sym), Private);
-                    cache.insert(bytes.into(), sym);
+                    CACHE.insert(bytes.into(), sym);
                     Ok(sym)
                 }
                 Err(e) => target.exception_from_ptr(Err(e), Private),
@@ -110,8 +100,7 @@ impl<'scope> Symbol<'scope> {
     {
         let bytes = symbol.as_ref();
 
-        let cache = unsafe { CACHE.get_unchecked() };
-        if let Some(sym) = cache.get(bytes) {
+        if let Some(sym) = CACHE.get(bytes) {
             return sym;
         }
 
@@ -119,7 +108,7 @@ impl<'scope> Symbol<'scope> {
         unsafe {
             let sym = jl_symbol_n(bytes.as_ptr().cast(), bytes.len());
             let sym = Symbol::wrap_non_null(NonNull::new_unchecked(sym), Private);
-            cache.insert(bytes.into(), sym);
+            CACHE.insert(bytes.into(), sym);
             sym
         }
     }

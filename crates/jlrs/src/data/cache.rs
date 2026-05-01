@@ -16,11 +16,26 @@ pub(crate) struct Cache<K, V, S = RandomState> {
 }
 
 pub(crate) type FnvCache<K, V> = Cache<K, V, FnvBuildHasher>;
+
+pub(crate) const fn new_fnv_cache<K, V>() -> FnvCache<K, V> {
+    let hasher = FnvBuildHasher::new();
+    Cache {
+        map: GcSafeRwLock::new(HashMap::with_hasher(hasher)),
+        dirty: AtomicBool::new(false),
+    }
+}
+
 pub(crate) type FxCache<K, V> = Cache<K, V, FxBuildHasher>;
 
-pub(crate) trait CacheMap<'a, K: 'a + Eq + Hash, V: 'a + Clone, S: BuildHasher> {
-    fn new() -> Self;
+pub(crate) const fn new_fx_cache<K, V>() -> FxCache<K, V> {
+    let hasher = FxBuildHasher;
+    Cache {
+        map: GcSafeRwLock::new(HashMap::with_hasher(hasher)),
+        dirty: AtomicBool::new(false),
+    }
+}
 
+pub(crate) trait CacheMap<'a, K: 'a + Eq + Hash, V: 'a + Clone, S: BuildHasher> {
     fn insert(&self, key: K, value: V) -> Option<V>;
 
     fn get<Q>(&'a self, key: &Q) -> Option<V>
@@ -36,14 +51,6 @@ pub(crate) trait CacheMap<'a, K: 'a + Eq + Hash, V: 'a + Clone, S: BuildHasher> 
 }
 
 impl<'a, K: 'a + Eq + Hash, V: 'a + Clone> CacheMap<'a, K, V, FxBuildHasher> for FxCache<K, V> {
-    fn new() -> Self {
-        let hasher = FxBuildHasher;
-        Cache {
-            map: GcSafeRwLock::new(HashMap::with_hasher(hasher)),
-            dirty: AtomicBool::new(false),
-        }
-    }
-
     fn insert(&self, key: K, value: V) -> Option<V> {
         let res = unsafe { gc_safe(|| self.map.write().insert(key, value)) };
         self.dirty.store(true, Ordering::Relaxed);
@@ -79,14 +86,6 @@ impl<'a, K: 'a + Eq + Hash, V: 'a + Clone> CacheMap<'a, K, V, FxBuildHasher> for
 }
 
 impl<'a, K: 'a + Eq + Hash, V: 'a + Clone> CacheMap<'a, K, V, FnvBuildHasher> for FnvCache<K, V> {
-    fn new() -> Self {
-        let hasher = FnvBuildHasher::new();
-        Cache {
-            map: GcSafeRwLock::new(HashMap::with_hasher(hasher)),
-            dirty: AtomicBool::new(false),
-        }
-    }
-
     fn insert(&self, key: K, value: V) -> Option<V> {
         let res = self.map.write().insert(key, value);
         self.dirty.store(true, Ordering::Relaxed);
