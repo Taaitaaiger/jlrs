@@ -41,10 +41,9 @@ pub(crate) unsafe fn mark_static_data_cache(ptls: PTls, full: bool) {
     unsafe {
         let cache = CACHE.get_unchecked();
         if full || cache.is_dirty() {
-            for item_ref in cache.iter() {
-                let value = item_ref.value();
+            cache.map(|value| {
                 mark_queue_obj(ptls, value.as_weak());
-            }
+            });
             cache.clear_dirty();
         }
     }

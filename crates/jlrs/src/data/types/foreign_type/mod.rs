@@ -822,7 +822,7 @@ unsafe impl<F: OpaqueType> IntoJulia for F {
             let cache = CACHE.get_unchecked();
             let key = TypeId::of::<F>();
             let ty = if let Some(ty) = cache.get(&key) {
-                ty.value().clone()
+                ty
             } else {
                 if let Some(func) = Self::TYPE_FN {
                     let ty = func();
@@ -879,7 +879,7 @@ unsafe impl<T: OpaqueType> Typecheck for T {
         let cache = unsafe { CACHE.get_unchecked() };
         let key = TypeId::of::<T>();
         if let Some(found_ty) = cache.get(&key) {
-            ty.unwrap(Private) == found_ty.value().unwrap(Private)
+            ty.unwrap(Private) == found_ty.unwrap(Private)
         } else {
             false
         }
