@@ -226,18 +226,15 @@ pub unsafe trait ConstructType: Sized {
     /// id.
     type Static: 'static + ConstructType;
 
+    /// The `TypeId` of `Self::Static`.
+    const TYPE_ID: TypeId = TypeId::of::<Self::Static>();
+
     /// Indicates whether the type might be cacheable.
     ///
     /// If set to `false`, `construct_type` will never try to cache or look up the
     /// constructed type. It should be set to `false` if the constructed type is not globally
     /// rooted.
     const CACHEABLE: bool = true;
-
-    /// Returns the `TypeId` of `Self::Static`.
-    #[inline(always)]
-    fn type_id() -> TypeId {
-        TypeId::of::<Self::Static>()
-    }
 
     /// Construct the type object and try to cache the result. If a cached entry is available, it
     /// is returned.
@@ -628,7 +625,7 @@ impl<'scope> TypeVarEnv<'scope> {
     /// `UnionAll`. Due to this conversion, `TypeVar`s defined by the environment may end up not
     /// being used. To avoid exposing unused `TypeVar`s to Julia, the environment is filtered with
     /// this method.
-    pub unsafe fn filter<'target, Tgt: Target<'target> + RootingTarget<'target>>(
+    pub unsafe fn filter<'target, Tgt: RootingTarget<'target>>(
         &self,
         target: Tgt,
         arg_types: Vector,
@@ -1382,7 +1379,7 @@ where
 {
     const N: usize = 1;
     fn add_variants(ids: &mut FxHashSet<TypeId>) {
-        ids.insert(Self::type_id());
+        ids.insert(Self::TYPE_ID);
     }
 }
 
@@ -1546,7 +1543,7 @@ impl<'a> ConstructedTypes<'a> {
 
     #[inline]
     fn find_or_construct<T: ConstructType>(&self) -> WeakValue<'static, 'static> {
-        let tid = T::type_id();
+        let tid = T::TYPE_ID;
         let res = self.data.get(&tid).map(|s| s.as_weak());
 
         if let Some(res) = res {
@@ -1561,7 +1558,7 @@ impl<'a> ConstructedTypes<'a> {
         &self,
         env: &TypeVarEnv,
     ) -> WeakValue<'static, 'static> {
-        let tid = T::type_id();
+        let tid = T::TYPE_ID;
         let res = self.data.get(&tid).map(|s| s.as_weak());
 
         if let Some(res) = res {

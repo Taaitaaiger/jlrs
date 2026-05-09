@@ -4,7 +4,7 @@ use std::{fs::File, io::Read, path::PathBuf};
 
 use clap::Parser;
 use syn::{
-    Attribute, File as SynFile, Ident, ItemMod, MetaList, Signature, Type, TypePath, TypePtr,
+    Attribute, File as SynFile, Ident, Item, ItemMod, MetaList, Signature, Type, TypePath, TypePtr,
     meta::ParseNestedMeta,
 };
 
@@ -273,27 +273,28 @@ struct FunctionsMod<'a> {
     functions: &'a ItemMod,
 }
 
+fn functions_from_item<'a>(item: &'a Item) -> impl Iterator<Item = Function<'a>> {
+    if let syn::Item::ForeignMod(foreign) = item {
+        foreign.items.iter().map(|item| match item {
+            syn::ForeignItem::Fn(item_fn) => {
+                let signature = &item_fn.sig;
+                let version_range = VersionRange::from_attributes(&item_fn.attrs);
+                Function {
+                    signature,
+                    version_range,
+                }
+            }
+            _ => unreachable!(),
+        })
+    } else {
+        unreachable!()
+    }
+}
+
 impl<'a> FunctionsMod<'a> {
     fn functions(&'a self) -> impl Iterator<Item = Function<'a>> {
         let items = &self.functions.content.as_ref().unwrap().1;
-
-        assert_eq!(items.len(), 1);
-        let inner = &items[0];
-        if let syn::Item::ForeignMod(foreign) = inner {
-            foreign.items.iter().map(|item| match item {
-                syn::ForeignItem::Fn(item_fn) => {
-                    let signature = &item_fn.sig;
-                    let version_range = VersionRange::from_attributes(&item_fn.attrs);
-                    Function {
-                        signature,
-                        version_range,
-                    }
-                }
-                _ => unreachable!(),
-            })
-        } else {
-            unreachable!()
-        }
+        items.iter().map(|item| functions_from_item(item)).flatten()
     }
 
     fn print_return_types(&self) {

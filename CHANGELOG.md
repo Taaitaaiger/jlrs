@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.24
+
+- `ConstructedType::type_id` has been replaced with the constant `ConstructedType::TYPE_ID`.
+
+- `catch_exceptions` no longer catches panics; it's UB for Julia exceptions jump over `catch_unwind`, and it's UB for a panic to unwind a Julia try/catch block. The trampolines use the `C` instead of the `C-unwind` ABI and will abort if a panic tries to unwind them.
+
 ## v0.23
 
 - Implement `Clone` for `Tracked`. Note that this will break your code if the tracked type implements `Clone`, and the tracked handle was used to clone the data; this will now return a cloned handle, instead of the cloned underlying type.

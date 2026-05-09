@@ -275,7 +275,7 @@ pub type TargetResult<'scope, 'data, T, Tgt> =
 pub type TargetException<'scope, 'data, T, Tgt> = Result<T, ValueData<'scope, 'data, Tgt>>;
 
 /// Extension trait for rooting targets.
-pub trait RootingTarget<'target>: TargetType<'target> + Target<'target> {
+pub trait RootingTarget<'target>: Target<'target> {
     /// Convert data rooted with this target to an instance of the concrete type.
     fn into_concrete_type<'data, M: Managed<'target, 'data>>(t: Self::Data<'data, M>) -> M {
         // Safety: for rooting targets M == Self::Data<'data, M>

@@ -21,15 +21,7 @@
 //!
 //! [blog post]: https://blog.rust-lang.org/inside-rust/2021/01/26/ffi-unwind-longjmp.html#pofs-and-stack-deallocating-functions
 
-use std::{
-    any::Any,
-    cell::Cell,
-    marker::PhantomData,
-    mem::MaybeUninit,
-    os::raw::c_void,
-    panic::{AssertUnwindSafe, catch_unwind, resume_unwind},
-    ptr::{NonNull, null_mut},
-};
+use std::{cell::Cell, marker::PhantomData, mem::MaybeUninit, ptr::NonNull};
 
 use jl_sys::{jl_print_backtrace, jl_rethrow, jl_rethrow_other, jl_value_t};
 use jlrs_sys::{
@@ -118,8 +110,6 @@ pub unsafe fn catch_exceptions<T, E>(
         let mut result = MaybeUninit::<T>::uninit();
         let mut err = MaybeUninit::<E>::uninit();
 
-        let mut panic_payload: *mut Box<dyn Any + 'static + Send> = null_mut();
-
         let res = jlrs_sys::jlrs_try_catch(
             func as *mut _ as *mut _,
             handler as *mut _ as *mut _,
@@ -127,35 +117,26 @@ pub unsafe fn catch_exceptions<T, E>(
             catch_trampoline,
             (&mut result) as *mut _ as *mut _,
             (&mut err) as *mut _ as *mut _,
-            (&mut panic_payload) as *mut _ as *mut _,
         );
 
         match res {
             jlrs_catch_tag_t::Ok => Ok(result.assume_init()),
             jlrs_catch_tag_t::Exception => Err(err.assume_init()),
-            jlrs_catch_tag_t::Panic => resume_unwind(Box::from_raw(panic_payload)),
         }
     }
 }
 
 #[inline]
-unsafe extern "C-unwind" fn try_trampoline<F: FnOnce() -> T, T>(
+unsafe extern "C" fn try_trampoline<F: FnOnce() -> T, T>(
     func: &mut Option<F>,
     result: &mut MaybeUninit<T>,
-) -> *mut c_void {
-    let res = catch_unwind(AssertUnwindSafe(|| {
-        let res = func.take().unwrap()();
-        result.write(res);
-    }));
-
-    match res {
-        Ok(_) => null_mut(),
-        Err(e) => Box::leak(Box::new(e)) as *mut _ as *mut _,
-    }
+) {
+    let res = func.take().unwrap()();
+    result.write(res);
 }
 
 #[inline]
-unsafe extern "C-unwind" fn catch_trampoline<F, E>(func: &mut Option<F>, error: &mut MaybeUninit<E>)
+unsafe extern "C" fn catch_trampoline<F, E>(func: &mut Option<F>, error: &mut MaybeUninit<E>)
 where
     F: for<'scope> FnOnce(Exception<'scope, '_>) -> E,
 {
@@ -170,7 +151,7 @@ where
 {
     unsafe {
         std::mem::transmute::<
-            Option<unsafe extern "C-unwind" fn(&mut Option<F>, &mut MaybeUninit<T>) -> *mut c_void>,
+            Option<unsafe extern "C" fn(&mut Option<F>, &mut MaybeUninit<T>)>,
             Option<jlrs_try_trampoline_t>,
         >(Some(try_trampoline::<F, T>))
     }
@@ -182,7 +163,7 @@ fn trampoline_for_catch<F: for<'scope> FnOnce(Exception<'scope, '_>) -> E, E>(
 ) -> Option<jlrs_catch_trampoline_t> {
     unsafe {
         std::mem::transmute::<
-            Option<unsafe extern "C-unwind" fn(&mut Option<F>, &mut MaybeUninit<E>)>,
+            Option<unsafe extern "C" fn(&mut Option<F>, &mut MaybeUninit<E>)>,
             Option<jlrs_catch_trampoline_t>,
         >(Some(catch_trampoline::<F, E>))
     }

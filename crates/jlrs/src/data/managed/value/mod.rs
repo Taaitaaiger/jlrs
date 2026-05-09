@@ -23,18 +23,6 @@
 //! [`TypedArray<isize>`]: crate::data::managed::array::TypedArray
 //! [`named_tuple`]: crate::named_tuple!
 
-/*
-    TODO
-
-    Atomic operations:
-
-        jl_atomic_cmpswap_bits
-        jl_atomic_bool_cmpswap_bits
-        jl_atomic_new_bits
-        jl_atomic_store_bits
-        jl_atomic_swap_bits
-*/
-
 pub mod field_accessor;
 pub mod tracked;
 pub mod typed;

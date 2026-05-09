@@ -102,7 +102,7 @@ impl<'scope> Module<'scope> {
         Tgt: Target<'target>,
     {
         unsafe {
-            let tid = T::type_id();
+            let tid = T::TYPE_ID;
 
             let path = path.as_ref();
             if let Some(cached) = CACHE.get(path.as_bytes()) {

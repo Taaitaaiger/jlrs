@@ -27,33 +27,19 @@ extern "C"
         jlrs_try_trampoline_t try_trampoline,
         jlrs_catch_trampoline_t catch_trampoline,
         void *result,
-        void *exc,
-        void **panic_payload)
+        void *exc)
     {
         jlrs_catch_tag_t res;
 
         JL_TRY
         {
             res = JLRS_CATCH_OK;
-            *panic_payload = try_trampoline(callback, result);
-
-            if (*panic_payload != NULL)
-            {
-                // Trigger an exception to force state restoration
-                jl_error("");
-            }
+            try_trampoline(callback, result);
         }
         JL_CATCH
         {
-            if (*panic_payload == NULL)
-            {
-                res = JLRS_CATCH_EXCEPTION;
-                catch_trampoline(err_callback, exc);
-            }
-            else
-            {
-                res = JLRS_CATCH_PANIC;
-            }
+            res = JLRS_CATCH_EXCEPTION;
+            catch_trampoline(err_callback, exc);
         }
 
         return res;

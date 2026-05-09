@@ -24,7 +24,7 @@ extern "C"
 
     jl_value_t *jlrs_current_exception(void);
 
-    typedef void *(*jlrs_try_trampoline_t)(void *callback, void *result);
+    typedef void (*jlrs_try_trampoline_t)(void *callback, void *result);
 
     typedef void (*jlrs_catch_trampoline_t)(void *callback, void *exc);
 
@@ -34,8 +34,7 @@ extern "C"
         jlrs_try_trampoline_t try_trampoline,
         jlrs_catch_trampoline_t catch_trampoline,
         void *result,
-        void *exc,
-        void **panic_payload);
+        void *exc);
 
     typedef void (*jlrs_unsized_scope_trampoline_t)(jl_gcframe_t *frame, void *callback, void *result);
 
