@@ -2,7 +2,13 @@
 
 #[cfg(target_os = "windows")]
 use std::str::FromStr;
-use std::{env, io::Read, path::PathBuf, process::Command};
+use std::{
+    env,
+    fs::File,
+    io::{Read, Write},
+    path::{Path, PathBuf},
+    process::Command,
+};
 
 /// Detected Julia version
 #[derive(Clone)]
@@ -126,7 +132,13 @@ impl Version {
         }
     }
 
-    fn emit_metadata(&self, min_minor_version: u32, max_minor_version: u32) {
+    fn emit_metadata(
+        &self,
+        min_minor_version: u32,
+        max_minor_version: u32,
+        nightly_minor_version: u32,
+        warn: bool,
+    ) {
         let major = self.major();
         let minor = self.minor();
         let patch = self.patch();
@@ -136,19 +148,49 @@ impl Version {
         }
 
         if self.is_dev() {
-            println!(
-                "cargo::warning=Detected development version of Julia {major}.{minor}.{patch}, \
-                bindings may not be up-to-date. Please report any issues you encounter at \
-                https://www.github.com/Taaitaaiger/jlrs/issues"
-            );
+            if warn {
+                println!(
+                    "cargo::warning=Detected development version of Julia {major}.{minor}.{patch}, \
+                    bindings may not be up-to-date. Please report any issues you encounter at \
+                    https://www.github.com/Taaitaaiger/jlrs/issues"
+                );
+            }
         }
 
-        if minor > max_minor_version {
-            println!(
-                "cargo::warning=Detected unsupported version of Julia {major}.{minor}.{patch}, \
-                assuming compatibility with 1.{max_minor_version}. Please report any issues you \
-                encounter at https://www.github.com/Taaitaaiger/jlrs/issues"
-            );
+        if minor > nightly_minor_version {
+            if warn {
+                println!(
+                    "cargo::warning=Detected too recent version of Julia {major}.{minor}.{patch}, \
+                    assuming compatibility with 1.{nightly_minor_version}. Please report any issues you \
+                    encounter at https://www.github.com/Taaitaaiger/jlrs/issues"
+                );
+            }
+
+            let mut version = self.clone();
+            version.minor = nightly_minor_version;
+            version.patch = 0;
+            version.emit_metadata_unchecked();
+        } else if minor == nightly_minor_version {
+            if warn {
+                println!(
+                    "cargo::warning=Detected nightly version of Julia {major}.{minor}.{patch}. \
+                    Please report any issues you encounter at \
+                    https://www.github.com/Taaitaaiger/jlrs/issues"
+                );
+            }
+
+            let mut version = self.clone();
+            version.minor = nightly_minor_version;
+            version.patch = 0;
+            version.emit_metadata_unchecked();
+        } else if minor > max_minor_version {
+            if warn {
+                println!(
+                    "cargo::warning=Detected unsupported version of Julia {major}.{minor}.{patch}, \
+                    assuming compatibility with 1.{max_minor_version}. Please report any issues you \
+                    encounter at https://www.github.com/Taaitaaiger/jlrs/issues"
+                );
+            }
 
             let mut version = self.clone();
             version.minor = max_minor_version;
@@ -206,6 +248,16 @@ impl JuliaDir {
         }
     }
 
+    pub fn docs(stable_major: u32, stable_minor: u32) -> Self {
+        JuliaDir {
+            is_binary_builder: false,
+            windows: false,
+            path: PathBuf::new(),
+            version: Version::new(stable_major, stable_minor, 0, false),
+            debug: false,
+        }
+    }
+
     /// The version of this Julia installation
     pub fn version(&self) -> Version {
         self.version.clone()
@@ -258,7 +310,13 @@ impl JuliaDir {
     }
 
     /// Emit detected Julia installation metadata.
-    pub fn emit_metadata(&self, min_minor_version: u32, max_minor_version: u32) {
+    pub fn emit_metadata(
+        &self,
+        min_minor_version: u32,
+        max_minor_version: u32,
+        nightly_minor_version: u32,
+        warn: bool,
+    ) {
         println!("cargo::metadata=julia_dir={}", self.path.display());
 
         let is_debug = if self.debug { 1 } else { 0 };
@@ -267,8 +325,12 @@ impl JuliaDir {
         let is_windows = if self.windows { 1 } else { 0 };
         println!("cargo::metadata=windows={}", is_windows);
 
-        self.version
-            .emit_metadata(min_minor_version, max_minor_version);
+        self.version.emit_metadata(
+            min_minor_version,
+            max_minor_version,
+            nightly_minor_version,
+            warn,
+        );
     }
 
     /// Load the installation detected when jl-sys was built.
@@ -296,6 +358,25 @@ impl JuliaDir {
                 windows,
             })
         }
+    }
+
+    pub fn write_version_file(
+        &self,
+        path: &Path,
+        lts_version: u32,
+        nightly_minor_version: u32,
+    ) -> std::io::Result<()> {
+        let mut output = File::create(path)?;
+        write!(
+            output,
+            "const MAJOR_VERSION: usize = 1;
+const MIN_MINOR_VERSION: usize = {};
+const NIGHTLY_MINOR_VERSION: usize = {};
+const SELECTED_MINOR_VERSION: usize = {};",
+            lts_version, nightly_minor_version, self.version.minor
+        )?;
+
+        Ok(())
     }
 }
 

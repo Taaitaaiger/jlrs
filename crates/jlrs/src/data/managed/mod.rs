@@ -297,6 +297,8 @@ pub mod parachute;
 pub mod simple_vector;
 pub mod string;
 pub mod symbol;
+#[cfg(not(any(julia_1_10, julia_1_11, julia_1_12, julia_1_13)))]
+pub mod type_eq;
 pub mod type_name;
 pub mod type_var;
 pub mod union;

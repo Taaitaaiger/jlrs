@@ -124,6 +124,10 @@ extern "C"
     const jl_datatype_layout_t *jl_datatype_layout(jl_datatype_t *t);
 #endif
 
+#if JULIA_VERSION_MINOR >= 14
+    jl_value_t *jlrs_typeeq_T(jl_typeeq_t *v);
+#endif
+
 #ifdef __cplusplus
 }
 #endif // __cplusplus

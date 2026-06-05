@@ -10,11 +10,11 @@ fn main() {
     println!("cargo::rerun-if-env-changed=JLRS_JULIA_DIR");
 
     // Enable julia_1_x configs
-    enable_version_cfgs(MIN_MINOR_VERSION, MAX_MINOR_VERSION);
+    enable_version_cfgs(MIN_MINOR_VERSION, NIGHTLY_MINOR_VERSION);
 
     if building_docs() {
         // Don't link Julia when building the docs
-        let version = Version::new(STABLE_MAJOR_VERSION, STABLE_MINOR_VERSION, 0, false);
+        let version = Version::new(MAJOR_VERSION, DOCS_MINOR_VERSION, 0, false);
         version.emit_metadata_unchecked();
     } else {
         // Detect active version of Julia, emit metadata, and link Julia.
@@ -26,7 +26,12 @@ fn main() {
         let julia_dir = JuliaDir::find(windows_build(), false)
             .expect("JLRS_JULIA_DIR is not set and no installed version of Julia can be found");
 
-        julia_dir.emit_metadata(MIN_MINOR_VERSION, MAX_MINOR_VERSION);
+        julia_dir.emit_metadata(
+            MIN_MINOR_VERSION,
+            MAX_MINOR_VERSION,
+            NIGHTLY_MINOR_VERSION,
+            true,
+        );
         julia_dir.link();
     }
 }

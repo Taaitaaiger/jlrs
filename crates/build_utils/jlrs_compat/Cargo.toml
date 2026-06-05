@@ -1,9 +1,9 @@
 [package]
 name = "jlrs-compat"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Thomas van Doornmalen <thomas.vandoornmalen@gmail.com>"]
 description = """
-Defines compatible and stable versions of Julia supporte by jlrs
+Defines compatible and stable versions of Julia supported by jlrs
 """
 documentation = "https://docs.rs/jlrs"
 homepage = "https://github.com/Taaitaaiger/jlrs"

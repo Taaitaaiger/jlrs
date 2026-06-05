@@ -216,6 +216,9 @@ pub mod globals {
         #[cfg(any(julia_1_10, julia_1_11))]
         pub static mut jl_kwcall_func: *mut crate::types::jl_value_t;
 
+        // Added in Julia 1.14
+        #[cfg(not(any(julia_1_10, julia_1_11, julia_1_12, julia_1_13)))]
+        pub static mut jl_typeeq_type: *mut crate::types::jl_datatype_t;
     }
 }
 

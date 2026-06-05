@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.24
+
+- Handle version compatibility solely through jlrs-compat.
+
+- Support `TypeEq` in Julia 1.14.
+
 ## v0.23
 
 - Implement `Clone` for `Tracked`. Note that this will break your code if the tracked type implements `Clone`, and the tracked handle was used to clone the data; this will now return a cloned handle, instead of the cloned underlying type.

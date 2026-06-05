@@ -1,6 +1,6 @@
 [package]
 name = "find-julia"
-version = "0.1.1"
+version = "0.2.0"
 authors = ["Thomas van Doornmalen <thomas.vandoornmalen@gmail.com>"]
 description = """
 Finds the installed version of Julia through environment variables
