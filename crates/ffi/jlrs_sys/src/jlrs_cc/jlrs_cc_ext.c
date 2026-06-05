@@ -398,6 +398,12 @@ extern "C"
     return (int)a->flags.how;
 #endif
     }
+
+#if JULIA_VERSION_MINOR >= 14
+    jl_value_t *jlrs_typeeq_T(jl_typeeq_t *v) {
+        return v->T;
+    }
+#endif
 #ifdef __cplusplus
 }
 #endif

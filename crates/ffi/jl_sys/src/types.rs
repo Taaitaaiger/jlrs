@@ -178,3 +178,10 @@ pub struct jl_binding_t {
     _unused: [u8; 0],
     _marker: PhantomData<(*mut u8, PhantomPinned)>,
 }
+
+#[repr(C)]
+#[derive(Copy, Clone, Debug)]
+pub struct jl_typeeq_t {
+    _unused: [u8; 0],
+    _marker: PhantomData<(*mut u8, PhantomPinned)>,
+}

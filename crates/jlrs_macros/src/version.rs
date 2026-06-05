@@ -2,30 +2,13 @@ use std::ops::RangeInclusive;
 
 use proc_macro::{Delimiter, TokenStream, TokenTree};
 
-const MAJOR_VERSION: usize = 1;
-const LTS_MINOR_VERSION: usize = 10;
-const NIGHTLY_MINOR_VERSION: usize = 13;
-
-#[cfg(any(
-    all(julia_1_10, julia_1_11),
-    all(julia_1_10, julia_1_12),
-    all(julia_1_10, julia_1_13),
-    all(julia_1_11, julia_1_12),
-    all(julia_1_11, julia_1_13),
-    all(julia_1_12, julia_1_13),
-))]
-compile_error!("Multiple Julia versions have been detected");
-
-#[cfg(not(any(julia_1_10, julia_1_11, julia_1_12, julia_1_13)))]
-const SELECTED_MINOR_VERSION: usize = 10;
-#[cfg(julia_1_10)]
-const SELECTED_MINOR_VERSION: usize = 10;
-#[cfg(julia_1_11)]
-const SELECTED_MINOR_VERSION: usize = 11;
-#[cfg(julia_1_12)]
-const SELECTED_MINOR_VERSION: usize = 12;
-#[cfg(julia_1_13)]
-const SELECTED_MINOR_VERSION: usize = 13;
+// Set in included file:
+// const MAJOR_VERSION: usize = 1;
+// const MIN_MINOR_VERSION: usize = 10;
+// const MAX_MINOR_VERSION: usize = 13;
+// const NIGHTLY_MINOR_VERSION: usize = 14;
+// const SELECTED_MINOR_VERSION: usize = 14;
+include!(concat!(env!("OUT_DIR"), "/version.rs"));
 
 pub fn emit_if_compatible(attr: TokenStream, item: TokenStream) -> TokenStream {
     let mut tts = attr.into_iter();
@@ -37,21 +20,21 @@ pub fn emit_if_compatible(attr: TokenStream, item: TokenStream) -> TokenStream {
         match tts.next() {
             Some(TokenTree::Ident(ident)) => match ident.to_string().as_ref() {
                 "since" => {
-                    expect_punt_eq(&mut tts);
+                    expect_punct_eq(&mut tts);
                     since = Some(unwrap_version(&mut tts));
                     if !expect_comma_or_end(&mut tts) {
                         break;
                     }
                 }
                 "until" => {
-                    expect_punt_eq(&mut tts);
+                    expect_punct_eq(&mut tts);
                     until = Some(unwrap_version(&mut tts));
                     if !expect_comma_or_end(&mut tts) {
                         break;
                     }
                 }
                 "except" => {
-                    expect_punt_eq(&mut tts);
+                    expect_punct_eq(&mut tts);
                     except = Some(unwrap_version_group(&mut tts));
                     if !expect_comma_or_end(&mut tts) {
                         break;
@@ -64,7 +47,7 @@ pub fn emit_if_compatible(attr: TokenStream, item: TokenStream) -> TokenStream {
         }
     }
 
-    let since = since.unwrap_or(Version::new(MAJOR_VERSION, LTS_MINOR_VERSION));
+    let since = since.unwrap_or(Version::new(MAJOR_VERSION, MIN_MINOR_VERSION));
     let until = until.unwrap_or(Version::new(MAJOR_VERSION, NIGHTLY_MINOR_VERSION));
     let except = except.unwrap_or_default();
 
@@ -75,7 +58,7 @@ pub fn emit_if_compatible(attr: TokenStream, item: TokenStream) -> TokenStream {
     }
 }
 
-fn expect_punt_eq<T: Iterator<Item = TokenTree>>(iter: &mut T) {
+fn expect_punct_eq<T: Iterator<Item = TokenTree>>(iter: &mut T) {
     match iter.next() {
         Some(TokenTree::Punct(punct)) => {
             let punct = punct.as_char();
@@ -143,7 +126,7 @@ fn unwrap_version<T: Iterator<Item = TokenTree>>(iter: &mut T) -> Version {
             assert!(iter.next().is_none(), "Expected of the form major.minor");
 
             let version = Version::new(major, minor);
-            version.assert_valid(MAJOR_VERSION, LTS_MINOR_VERSION..=NIGHTLY_MINOR_VERSION);
+            version.assert_valid(MAJOR_VERSION, MIN_MINOR_VERSION..=NIGHTLY_MINOR_VERSION);
 
             version
         }

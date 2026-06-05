@@ -4,6 +4,8 @@ mod util;
 mod tests {
     use std::{ffi::c_void, ptr::null_mut};
 
+    #[cfg(not(any(julia_1_10, julia_1_11, julia_1_12, julia_1_13)))]
+    use jlrs::data::managed::type_eq::TypeEq;
     use jlrs::{
         data::{
             managed::{named_tuple::NamedTuple, union_all::UnionAll},
@@ -225,6 +227,23 @@ mod tests {
         })
     }
 
+    #[cfg(not(any(julia_1_10, julia_1_11, julia_1_12, julia_1_13)))]
+    fn type_type_typecheck() {
+        JULIA.with(|handle| {
+            handle.borrow_mut().with_stack(|mut stack| {
+                stack.scope(|mut frame| unsafe {
+                    let args = [DataType::uint8_type(&frame).as_value()];
+                    let _ty = UnionAll::type_type(&frame)
+                        .as_value()
+                        .apply_type_unchecked(&mut frame, args)
+                        .cast::<TypeEq>()
+                        .unwrap();
+                })
+            })
+        })
+    }
+
+    #[cfg(any(julia_1_10, julia_1_11, julia_1_12, julia_1_13))]
     fn type_type_typecheck() {
         JULIA.with(|handle| {
             handle.borrow_mut().with_stack(|mut stack| {

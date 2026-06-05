@@ -263,5 +263,8 @@ pub mod jlrs_cc {
             symbol: *const std::ffi::c_char,
             value: *mut *mut std::ffi::c_void,
         ) -> std::ffi::c_int;
+
+        #[cfg(not(any(julia_1_10, julia_1_11, julia_1_12, julia_1_13)))]
+        pub fn jlrs_typeeq_T(v: *mut crate::types::jl_typeeq_t) -> *mut crate::types::jl_value_t;
     }
 }

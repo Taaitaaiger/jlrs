@@ -21,8 +21,8 @@ extern "C"
     void jlrs_unlock_value(jl_value_t *v);
 
 #if JULIA_VERSION_MINOR >= 11
-    jl_genericmemoryref_t jlrs_memoryrefindex(jl_genericmemoryref_t m JL_ROOTING_ARGUMENT, size_t idx);
-    void jlrs_memoryrefset(jl_genericmemoryref_t m JL_ROOTING_ARGUMENT, jl_value_t *rhs JL_ROOTED_ARGUMENT JL_MAYBE_UNROOTED, int isatomic);
+    jl_genericmemoryref_t jlrs_memoryrefindex(jl_genericmemoryref_t m, size_t idx);
+    void jlrs_memoryrefset(jl_genericmemoryref_t m, jl_value_t *rhs, int isatomic);
     char *jlrs_genericmemory_typetagdata(jl_genericmemory_t *m);
 #endif
 

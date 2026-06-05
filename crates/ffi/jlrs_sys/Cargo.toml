@@ -26,11 +26,11 @@ windows = []
 docs = []
 
 [dependencies]
-jl-sys = { path = "../jl_sys", version = "0.27"}
+jl-sys = { path = "../jl_sys", version = "0.28"}
 
 [build-dependencies]
-find-julia = { path = "../../build_utils/find_julia", version = "0.1" }
-jlrs-compat = { path = "../../build_utils/jlrs_compat", version = "0.1" }
+find-julia = { path = "../../build_utils/find_julia", version = "0.2" }
+jlrs-compat = { path = "../../build_utils/jlrs_compat", version = "0.2" }
 cc = "1"
 cfg-if = "1"
 
