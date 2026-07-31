@@ -79,6 +79,7 @@ impl<'a> Apply<Type> for ResolvedParameterList<'a> {
                         return Ok(Type::Path(TypePath {
                             path: (*parameter_path).clone(),
                             qself: None,
+                            attrs: vec![],
                         }));
                     }
                 }
@@ -86,6 +87,7 @@ impl<'a> Apply<Type> for ResolvedParameterList<'a> {
                 Ok(Type::Path(TypePath {
                     path: self.apply_with_parent(path, parent)?,
                     qself: None,
+                    attrs: vec![],
                 }))
             }
             _ => todo!(),
@@ -121,10 +123,17 @@ impl<'a> Apply<FnArg> for ResolvedParameterList<'a> {
         match to {
             FnArg::Receiver(receiver) => {
                 assert!(parent.is_some());
-                let mutability = receiver.mutability.as_ref();
-                Ok(
-                    parse_quote! { #mutability this: ::jlrs::data::managed::value::typed::TypedValue<#parent> },
-                )
+                match &receiver.kind {
+                    syn::ReceiverKind::Reference(_, _, mutability) => Ok(
+                        parse_quote! { #mutability this: ::jlrs::data::managed::value::typed::TypedValue<#parent> },
+                    ),
+                    _ => {
+                        let mutability = receiver.mutability.as_ref();
+                        Ok(
+                            parse_quote! { #mutability this: ::jlrs::data::managed::value::typed::TypedValue<#parent> },
+                        )
+                    }
+                }
             }
             FnArg::Typed(pat) => Ok(FnArg::Typed(self.apply_with_parent(pat, parent)?)),
         }

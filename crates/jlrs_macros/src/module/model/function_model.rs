@@ -110,15 +110,13 @@ impl FunctionKind {
                     ))?
                 };
 
-                let mutable = receiver.mutability.is_some();
-                let reference = receiver.reference.is_some();
                 let untracked_self = attributes.untracked_self;
-                match (mutable, reference) {
-                    (true, true) => FunctionKind::MutRefSelfMethod {
+                match receiver.kind {
+                    syn::ReceiverKind::Reference(_, _, Some(_)) => FunctionKind::MutRefSelfMethod {
                         untracked_self,
                         parent,
                     },
-                    (false, true) => FunctionKind::RefSelfMethod {
+                    syn::ReceiverKind::Reference(_, _, None) => FunctionKind::RefSelfMethod {
                         untracked_self,
                         parent,
                     },
@@ -187,10 +185,15 @@ impl<'a> FunctionVariant<'a> {
             match signature.inputs.first_mut() {
                 Some(x) => {
                     let new = match x {
-                        FnArg::Receiver(receiver) => {
-                            let mutability = receiver.mutability.as_ref();
-                            parse_quote! { #mutability this: ::jlrs::data::managed::value::typed::TypedValue<#parent> }
-                        }
+                        FnArg::Receiver(receiver) => match &receiver.kind {
+                            syn::ReceiverKind::Reference(_, _, mutability) => {
+                                parse_quote! { #mutability this: ::jlrs::data::managed::value::typed::TypedValue<#parent> }
+                            }
+                            _ => {
+                                let mutability = receiver.mutability.as_ref();
+                                parse_quote! { #mutability this: ::jlrs::data::managed::value::typed::TypedValue<#parent> }
+                            }
+                        },
                         FnArg::Typed(pat_type) => FnArg::Typed(pat_type.clone()),
                     };
 
@@ -241,6 +244,95 @@ mod tests {
                 assert!(!model.public);
                 assert_eq!(model.variants.len(), 1);
                 assert!(!model.variants[0].gc_safe);
+            }
+            _ => assert!(false),
+        }
+    }
+
+    #[test]
+    fn ref_self_method() {
+        let ast: JuliaModuleAst = parse_quote! {
+            become init_fn;
+
+            in Foo fn foo(&self)
+        };
+
+        let mut expanded = ExpandedModule::from_ast(ast).unwrap();
+        assert_eq!(expanded.items.len(), 1);
+
+        match expanded.items.pop().unwrap() {
+            ExpandedModuleItem::Function(expanded_fn) => {
+                let model = FunctionModel::from_expanded(&expanded_fn).unwrap();
+                assert!(!model.public);
+                assert_eq!(model.variants.len(), 1);
+                assert!(!model.variants[0].gc_safe);
+
+                let x = expanded_fn.signature.inputs.first().unwrap();
+                match x {
+                    syn::FnArg::Receiver(receiver) => assert!(receiver.mutability.is_none()),
+                    syn::FnArg::Typed(_) => assert!(false),
+                }
+            }
+            _ => assert!(false),
+        }
+    }
+
+    #[test]
+    fn self_method() {
+        let ast: JuliaModuleAst = parse_quote! {
+            become init_fn;
+
+            in Foo fn foo(self)
+        };
+
+        let mut expanded = ExpandedModule::from_ast(ast).unwrap();
+        assert_eq!(expanded.items.len(), 1);
+
+        match expanded.items.pop().unwrap() {
+            ExpandedModuleItem::Function(expanded_fn) => {
+                let model = FunctionModel::from_expanded(&expanded_fn).unwrap();
+                assert!(!model.public);
+                assert_eq!(model.variants.len(), 1);
+                assert!(!model.variants[0].gc_safe);
+
+                let x = expanded_fn.signature.inputs.first().unwrap();
+                match x {
+                    syn::FnArg::Receiver(receiver) => assert!(receiver.mutability.is_none()),
+                    syn::FnArg::Typed(_) => assert!(false),
+                }
+            }
+            _ => assert!(false),
+        }
+    }
+
+    #[test]
+    fn ref_mut_self_method() {
+        let ast: JuliaModuleAst = parse_quote! {
+            become init_fn;
+
+            in Foo fn foo(&mut self)
+        };
+
+        let mut expanded = ExpandedModule::from_ast(ast).unwrap();
+        assert_eq!(expanded.items.len(), 1);
+
+        match expanded.items.pop().unwrap() {
+            ExpandedModuleItem::Function(expanded_fn) => {
+                let model = FunctionModel::from_expanded(&expanded_fn).unwrap();
+                assert!(!model.public);
+                assert_eq!(model.variants.len(), 1);
+                assert!(!model.variants[0].gc_safe);
+
+                let x = expanded_fn.signature.inputs.first().unwrap();
+                match x {
+                    syn::FnArg::Receiver(receiver) => match &receiver.kind {
+                        syn::ReceiverKind::Reference(_, _, mutability) => {
+                            assert!(mutability.is_some())
+                        }
+                        _ => todo!(),
+                    },
+                    syn::FnArg::Typed(_) => assert!(false),
+                }
             }
             _ => assert!(false),
         }

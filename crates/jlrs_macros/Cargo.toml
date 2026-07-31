@@ -27,10 +27,10 @@ proc-macro = true
 
 [dependencies]
 proc-macro2 = { version = "1", optional = true }
-syn = { version = "2", features = ["full", "extra-traits", "printing"] }
+syn = { version = "3", features = ["full", "extra-traits", "printing"] }
 quote = { version = "1" }
-itertools = "0.14"
 jl-sys = { path = "../ffi/jl_sys", version = "0.28"}
+itertools = "0.15"
 
 [build-dependencies]
 jlrs-compat = { path = "../build_utils/jlrs_compat", version = "0.2"}
