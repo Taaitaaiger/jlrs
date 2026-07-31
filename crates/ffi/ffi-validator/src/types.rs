@@ -198,7 +198,10 @@ impl<'a> From<&'a TypePath> for ItemType<'a> {
 
 impl<'a> From<&'a TypePtr> for PtrType<'a> {
     fn from(value: &'a TypePtr) -> Self {
-        let mutability = value.mutability.is_some();
+        let mutability = match value.mutability {
+            syn::PointerMutability::Const(_) => false,
+            syn::PointerMutability::Mut(_) => true,
+        };
         let inner = ItemType::from(value.elem.as_ref());
 
         PtrType {

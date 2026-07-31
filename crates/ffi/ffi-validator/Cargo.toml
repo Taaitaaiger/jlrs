@@ -5,5 +5,5 @@ edition = "2024"
 
 [dependencies]
 clap = { version = "4", features = ["derive"] }
-syn = { version = "2", features = ["full", "extra-traits", "printing"] }
+syn = { version = "3", features = ["full", "extra-traits", "printing"] }
 

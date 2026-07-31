@@ -383,10 +383,9 @@ fn type_ptr_to_string(type_ptr: &TypePtr) -> String {
         _ => todo!(),
     };
 
-    if type_ptr.mutability.is_some() {
-        format!("*mut {s}")
-    } else {
-        format!("*const {s}")
+    match type_ptr.mutability {
+        syn::PointerMutability::Const(_) => format!("*const {s}"),
+        syn::PointerMutability::Mut(_) => format!("*mut {s}"),
     }
 }
 

@@ -181,6 +181,7 @@ impl ExpandNode for Type {
                     Type::Path(TypePath {
                         path,
                         qself: type_path.qself.clone(),
+                        attrs: vec![],
                     })
                 }));
             }
