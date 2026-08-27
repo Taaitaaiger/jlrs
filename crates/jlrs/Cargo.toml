@@ -13,7 +13,7 @@ keywords = ["Julia", "math", "mathematics", "bindings", "ffi"]
 categories = ["api-bindings", "mathematics"]
 license = "MIT"
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.97"
 
 [features]
 default = []

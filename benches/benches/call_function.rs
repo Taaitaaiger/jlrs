@@ -1,15 +1,10 @@
-#[macro_use]
-extern crate criterion;
-use criterion::{Criterion, black_box};
+use std::hint::black_box;
+
+use criterion::{Criterion, criterion_group, criterion_main};
 use jlrs::{
     memory::{gc::Gc, scope::Scope, target::frame::GcFrame},
     prelude::{Call, JlrsResult, Value},
     runtime::{builder::Builder, handle::with_stack::WithStack},
-};
-#[cfg(not(target_os = "windows"))]
-use pprof::{
-    criterion::{Output, PProfProfiler},
-    flamegraph::Options,
 };
 
 #[inline(never)]
@@ -164,22 +159,6 @@ fn bench_group(c: &mut Criterion) {
     })
 }
 
-#[cfg(not(target_os = "windows"))]
-fn opts() -> Option<Options<'static>> {
-    let mut opts = Options::default();
-    opts.image_width = Some(1920);
-    opts.min_width = 0.01;
-    Some(opts)
-}
-
-#[cfg(not(target_os = "windows"))]
-criterion_group! {
-    name = call_function;
-    config = Criterion::default().with_profiler(PProfProfiler::new(1000, Output::Flamegraph(opts())));
-    targets = bench_group
-}
-
-#[cfg(target_os = "windows")]
 criterion_group! {
     name = call_function;
     config = Criterion::default();

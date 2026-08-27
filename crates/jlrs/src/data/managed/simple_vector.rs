@@ -10,7 +10,7 @@ use jl_sys::{
     jl_alloc_svec, jl_alloc_svec_uninit, jl_emptysvec, jl_simplevector_type, jl_svec_copy,
     jl_svec_t,
 };
-use jlrs_sys::{jlrs_svec_data, jlrs_svec_len, jlrs_svecref, jlrs_svecset};
+use jlrs_sys::{jlrs_is_svec, jlrs_svec_data, jlrs_svec_len, jlrs_svecref, jlrs_svecset};
 
 use super::{AtomicSlice, Managed, ManagedData, Weak, datatype::DataType, private::ManagedPriv};
 use crate::{
@@ -219,6 +219,11 @@ unsafe impl<'scope> Typecheck for SimpleVector<'scope> {
         // Safety: can only be called from a thread known to Julia
         let unrooted = unsafe { Unrooted::new() };
         t == DataType::simplevector_type(&unrooted)
+    }
+
+    #[inline]
+    fn typecheck_value(v: Value) -> bool {
+        unsafe { jlrs_is_svec(v.unwrap(Private)) != 0 }
     }
 }
 

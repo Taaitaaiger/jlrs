@@ -12,7 +12,7 @@ use jl_sys::{
     jl_base_module, jl_core_module, jl_get_global, jl_is_const, jl_main_module, jl_module_t,
     jl_module_type, jl_set_global,
 };
-use jlrs_sys::{jlrs_module_name, jlrs_module_parent};
+use jlrs_sys::{jlrs_is_module, jlrs_module_name, jlrs_module_parent};
 
 use super::{
     Managed, Weak, erase_scope_lifetime,
@@ -469,7 +469,7 @@ impl<'scope> Module<'scope> {
     }
 }
 
-impl_julia_typecheck!(Module<'target>, jl_module_type, 'target);
+impl_julia_typecheck!(Module<'target>, jl_module_type, f: jlrs_is_module, 'target);
 impl_debug!(Module<'_>);
 
 impl<'scope> ManagedPriv<'scope, '_> for Module<'scope> {

@@ -19,7 +19,7 @@ fn main() {
     } else {
         // Detect active version of Julia, emit metadata, and link Julia.
         #[cfg(feature = "debug")]
-        let julia_dir = JuliaDir::find(true)
+        let julia_dir = JuliaDir::find(windows_build(), true)
             .expect("JLRS_JULIA_DIR is not set and no installed version of Julia can be found");
 
         #[cfg(not(feature = "debug"))]

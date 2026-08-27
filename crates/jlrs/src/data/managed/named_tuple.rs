@@ -11,6 +11,7 @@ use std::{fmt, marker::PhantomData, ptr::NonNull};
 
 use fnv::FnvHashMap;
 use jl_sys::{jl_field_index, jl_get_nth_field, jl_namedtuple_type, jl_value_t};
+use jlrs_sys::jlrs_is_namedtuple;
 use smallvec::SmallVec;
 
 use crate::{
@@ -649,6 +650,11 @@ unsafe impl Typecheck for NamedTuple<'_, '_> {
     #[inline]
     fn typecheck(t: DataType) -> bool {
         unsafe { t.type_name() == TypeName::of_namedtuple(&Unrooted::new()) }
+    }
+
+    #[inline]
+    fn typecheck_value(v: Value) -> bool {
+        unsafe { jlrs_is_namedtuple(v.unwrap(Private)) != 0 }
     }
 }
 

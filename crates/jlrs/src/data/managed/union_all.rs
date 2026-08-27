@@ -8,7 +8,7 @@ use jl_sys::{
     jl_type_unionall, jl_unionall_t, jl_unionall_type, jl_value_t,
 };
 use jlrs_macros::julia_version;
-use jlrs_sys::{jlrs_unionall_body, jlrs_unionall_tvar};
+use jlrs_sys::{jlrs_is_unionall, jlrs_unionall_body, jlrs_unionall_tvar};
 
 use super::{
     Managed, Weak, erase_scope_lifetime,
@@ -320,7 +320,7 @@ impl<'base> UnionAll<'base> {
     }
 }
 
-impl_julia_typecheck!(UnionAll<'scope>, jl_unionall_type, 'scope);
+impl_julia_typecheck!(UnionAll<'scope>, jl_unionall_type, f: jlrs_is_unionall, 'scope);
 impl_debug!(UnionAll<'_>);
 
 impl<'scope> ManagedPriv<'scope, '_> for UnionAll<'scope> {

@@ -8,7 +8,7 @@ use std::{
 };
 
 use jl_sys::{jl_gensym, jl_sym_t, jl_symbol_n, jl_symbol_type, jl_tagged_gensym};
-use jlrs_sys::{jlrs_symbol_hash, jlrs_symbol_name};
+use jlrs_sys::{jlrs_is_symbol, jlrs_symbol_hash, jlrs_symbol_name};
 
 use self::static_symbol::{StaticSymbol, Sym};
 use super::Weak;
@@ -232,7 +232,7 @@ impl<S: StaticSymbol> PartialEq<Sym<'_, PhantomData<S>>> for Symbol<'_> {
     }
 }
 
-impl_julia_typecheck!(Symbol<'scope>, jl_symbol_type, 'scope);
+impl_julia_typecheck!(Symbol<'scope>, jl_symbol_type, f: jlrs_is_symbol, 'scope);
 impl_debug!(Symbol<'_>);
 
 impl<'scope> ManagedPriv<'scope, '_> for Symbol<'scope> {

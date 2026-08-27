@@ -9,7 +9,7 @@ applications and to write interop libraries to Rust crates that can be used by J
 Julia versions 1.10, 1.11 and 1.12 are currently supported. In general jlrs aims to support all
 versions starting at the current LTS version, but only the LTS and stable versions are actively
 tested. Using the current stable version of Julia is highly recommended. The minimum supported
-Rust version is currently 1.85.
+Rust version is currently 1.97.
 
 This readme only contains information about what features are supported by jlrs, what
 prerequisites must be met, and how to meet them. A complete tutorial is available
@@ -41,9 +41,9 @@ An incomplete list of features that are currently supported by jlrs:
 ## Prerequisites
 
 To use jlrs, supported versions of Rust and Julia must have been installed. Currently, Julia 1.10,
-1.11 and 1.12 are supported, the minimum supported Rust version is 1.85. Some features may require
-a more recent version of Rust. jlrs uses the JlrsCore package for Julia, if this package has not
-been installed, the latest version will be installed automatically by default.
+1.11, 1.12, and 1.13 are supported, the minimum supported Rust version is 1.97. Some features may
+require a more recent version of Rust. jlrs uses the JlrsCore package for Julia, if this package
+has not been installed, the latest version will be installed automatically by default.
 
 ### With juliaup
 

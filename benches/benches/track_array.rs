@@ -1,12 +1,9 @@
-use criterion::{Criterion, black_box, criterion_group, criterion_main};
+use std::hint::black_box;
+
+use criterion::{Criterion, criterion_group, criterion_main};
 use jlrs::{
     memory::{gc::Gc, target::frame::GcFrame},
     prelude::*,
-};
-#[cfg(not(target_os = "windows"))]
-use pprof::{
-    criterion::{Output, PProfProfiler},
-    flamegraph::Options,
 };
 
 #[inline(never)]
@@ -114,22 +111,6 @@ fn criterion_benchmark(c: &mut Criterion) {
     })
 }
 
-#[cfg(not(target_os = "windows"))]
-fn opts() -> Option<Options<'static>> {
-    let mut opts = Options::default();
-    opts.image_width = Some(1920);
-    opts.min_width = 0.01;
-    Some(opts)
-}
-
-#[cfg(not(target_os = "windows"))]
-criterion_group! {
-    name = track_array;
-    config = Criterion::default().with_profiler(PProfProfiler::new(1000, Output::Flamegraph(opts())));
-    targets = criterion_benchmark
-}
-
-#[cfg(target_os = "windows")]
 criterion_group! {
     name = track_array;
     config = Criterion::default();

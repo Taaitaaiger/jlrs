@@ -2,7 +2,6 @@ use std::{
     mem::MaybeUninit,
     ptr::{NonNull, null_mut},
     sync::atomic::{AtomicPtr, AtomicU8, AtomicU16, AtomicU32, AtomicU64, Ordering},
-    usize,
 };
 
 use jl_sys::jl_value_t;

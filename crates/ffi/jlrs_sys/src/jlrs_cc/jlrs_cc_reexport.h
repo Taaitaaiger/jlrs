@@ -4,6 +4,45 @@
 #ifndef JLRS_CC_REEXPORT_H
 #define JLRS_CC_REEXPORT_H
 
+#define PREDICATES_10(XX)                           \
+    XX(is_nothing, jl_is_nothing)                   \
+    XX(is_tuple, jl_is_tuple)                       \
+    XX(is_namedtuple, jl_is_namedtuple)             \
+    XX(is_svec, jl_is_svec)                         \
+    XX(is_datatype, jl_is_datatype)                 \
+    XX(is_mutable, jl_is_mutable)                   \
+    XX(is_mutable_datatype, jl_is_mutable_datatype) \
+    XX(is_immutable, jl_is_immutable)               \
+    XX(is_uniontype, jl_is_uniontype)               \
+    XX(is_typevar, jl_is_typevar)                   \
+    XX(is_unionall, jl_is_unionall)                 \
+    XX(is_vararg, jl_is_vararg)                     \
+    XX(is_typename, jl_is_typename)                 \
+    XX(is_int8, jl_is_int8)                         \
+    XX(is_int16, jl_is_int16)                       \
+    XX(is_int32, jl_is_int32)                       \
+    XX(is_int64, jl_is_int64)                       \
+    XX(is_uint8, jl_is_uint8)                       \
+    XX(is_uint16, jl_is_uint16)                     \
+    XX(is_uint32, jl_is_uint32)                     \
+    XX(is_uint64, jl_is_uint64)                     \
+    XX(is_bool, jl_is_bool)                         \
+    XX(is_symbol, jl_is_symbol)                     \
+    XX(is_expr, jl_is_expr)                         \
+    XX(is_binding, jl_is_binding)                   \
+    XX(is_module, jl_is_module)                     \
+    XX(is_task, jl_is_task)                         \
+    XX(is_string, jl_is_string)                     \
+    XX(is_uint8pointer, jl_is_uint8pointer)
+
+#define PREDICATES_12(XX)                                       \
+    XX(may_be_immutable_datatype, jl_may_be_immutable_datatype) \
+    XX(is_array_any, jl_is_array_any)
+
+#define PREDICATES_14(XX)       \
+    XX(is_typeeq, jl_is_typeeq) \
+    XX(is_typeegal, jl_is_typeegal)
+
 #ifdef __cplusplus
 extern "C"
 {
@@ -41,6 +80,16 @@ extern "C"
     int8_t jlrs_gc_unsafe_enter(jl_ptls_t ptls);
     void jlrs_gc_safe_leave(jl_ptls_t ptls, int8_t state);
     void jlrs_gc_unsafe_leave(jl_ptls_t ptls, int8_t state);
+
+#define XX(name, function) int jlrs_##name(jl_value_t *v);
+    PREDICATES_10(XX)
+#if JULIA_VERSION_MINOR >= 12
+    PREDICATES_12(XX)
+#endif
+#if JULIA_VERSION_MINOR >= 14
+    PREDICATES_14(XX)
+#endif
+#undef XX
 
 #ifdef __cplusplus
 }

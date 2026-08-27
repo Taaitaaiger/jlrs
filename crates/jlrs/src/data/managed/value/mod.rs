@@ -61,7 +61,6 @@ use std::{
     marker::PhantomData,
     mem::MaybeUninit,
     ptr::NonNull,
-    usize,
 };
 
 use jl_sys::{
@@ -462,7 +461,7 @@ impl Value<'_, '_> {
     /// [here]: ../../../layout/typecheck/trait.Typecheck.html#implementors
     #[inline]
     pub fn is<T: Typecheck>(self) -> bool {
-        self.datatype().is::<T>()
+        T::typecheck_value(self)
     }
 
     /// Returns true if `self` is a subtype of `sup`.
