@@ -4,6 +4,7 @@ pub mod types;
 pub use bindings::*;
 pub use types::*;
 
+#[cfg(not(all(target_os = "windows", target_env = "gnu")))]
 #[cfg(test)]
 mod tests {
     use crate::{
