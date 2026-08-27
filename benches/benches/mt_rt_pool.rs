@@ -1,14 +1,7 @@
-use std::{cell::RefCell, future::Future};
+use std::{cell::RefCell, future::Future, hint::black_box};
 
-use criterion::{
-    /* criterion_group, criterion_main, */ Criterion, async_executor::AsyncExecutor, black_box,
-};
+use criterion::{/* criterion_group, criterion_main, */ Criterion, async_executor::AsyncExecutor,};
 use jlrs::{prelude::*, runtime::handle::mt_handle::MtHandle};
-#[cfg(not(target_os = "windows"))]
-use pprof::{
-    criterion::{Output, PProfProfiler},
-    flamegraph::Options,
-};
 use tokio::{runtime::Runtime, task::LocalSet};
 
 thread_local! {
@@ -83,22 +76,6 @@ fn use_local(handle: &mut MtHandle, c: &mut Criterion) {
     });
 }
 
-#[cfg(not(target_os = "windows"))]
-fn opts() -> Option<Options<'static>> {
-    let mut opts = Options::default();
-    opts.image_width = Some(1920);
-    opts.min_width = 0.01;
-    Some(opts)
-}
-
-// #[cfg(not(target_os = "windows"))]
-// criterion_group! {
-//     name = mt_rt_pool;
-//     config = Criterion::default().with_profiler(PProfProfiler::new(1000, Output::Flamegraph(opts())));
-//     targets = criterion_benchmark
-// }
-
-// #[cfg(target_os = "windows")]
 // criterion_group! {
 //     name = mt_rt_pool;
 //     config = Criterion::default();
@@ -109,10 +86,6 @@ fn opts() -> Option<Options<'static>> {
 fn main() {
     Builder::new()
         .start_mt(|mut handle| {
-            #[cfg(not(target_os = "windows"))]
-            let mut c = Criterion::default()
-                .with_profiler(PProfProfiler::new(1000, Output::Flamegraph(opts())));
-            #[cfg(target_os = "windows")]
             let mut c = Criterion::default();
 
             blocking_task(&handle, &mut c);

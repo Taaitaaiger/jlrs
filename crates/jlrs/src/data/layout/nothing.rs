@@ -1,6 +1,7 @@
 //! Layout type for `Nothing`.
 
 use jl_sys::jl_nothing_type;
+use jlrs_sys::jlrs_is_nothing;
 
 use super::is_bits::IsBits;
 use crate::{
@@ -17,7 +18,7 @@ use crate::{
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct Nothing;
 
-impl_julia_typecheck!(Nothing, jl_nothing_type);
+impl_julia_typecheck!(Nothing, f: jlrs_is_nothing);
 impl_valid_layout!(Nothing, jl_nothing_type);
 
 unsafe impl Unbox for Nothing {

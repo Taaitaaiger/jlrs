@@ -8,14 +8,11 @@ edition = "2024"
 lto = ["jlrs/lto"]
 
 [dependencies]
-jlrs = { version = "0.23", path = "../crates/jlrs", features = ["full"] }
+jlrs = { version = "0.24", path = "../crates/jlrs", features = ["full"] }
 
 [dev-dependencies]
-criterion = { version = "0.5", features = ["html_reports", "async"] }
+criterion = { version = "0.8", features = ["html_reports", "async"] }
 tokio = { version = "1", features = ["rt"]}
-
-[target.'cfg(unix)'.dev-dependencies]
-pprof = { version = "0.15", features = ["flamegraph", "criterion"] }
 
 [profile.bench]
 debug = true
@@ -68,6 +65,10 @@ harness = false
 
 [[bench]]
 name = "type_construction"
+harness = false
+
+[[bench]]
+name = "typecheck"
 harness = false
 
 [[bench]]

@@ -3,7 +3,7 @@
 use std::{marker::PhantomData, ptr::NonNull};
 
 use jl_sys::{jl_expr_t, jl_expr_type};
-use jlrs_sys::{jlrs_expr_head, jlrs_expr_nargs, jlrs_exprarg, jlrs_exprargset};
+use jlrs_sys::{jlrs_expr_head, jlrs_expr_nargs, jlrs_exprarg, jlrs_exprargset, jlrs_is_expr};
 
 use super::{
     Managed,
@@ -66,7 +66,7 @@ impl<'scope> Expr<'scope> {
     }
 }
 
-impl_julia_typecheck!(Expr<'scope>, jl_expr_type, 'scope);
+impl_julia_typecheck!(Expr<'scope>, jl_expr_type, f: jlrs_is_expr, 'scope);
 impl_debug!(Expr<'_>);
 
 impl<'scope> ManagedPriv<'scope, '_> for Expr<'scope> {

@@ -13,9 +13,9 @@ use jl_sys::{
 };
 use jlrs_macros::julia_version;
 use jlrs_sys::{
-    jlrs_typename_abstract, jlrs_typename_atomicfields, jlrs_typename_constfields,
-    jlrs_typename_mayinlinealloc, jlrs_typename_module, jlrs_typename_mutable, jlrs_typename_name,
-    jlrs_typename_names, jlrs_typename_wrapper,
+    jlrs_is_typename, jlrs_typename_abstract, jlrs_typename_atomicfields,
+    jlrs_typename_constfields, jlrs_typename_mayinlinealloc, jlrs_typename_module,
+    jlrs_typename_mutable, jlrs_typename_name, jlrs_typename_names, jlrs_typename_wrapper,
 };
 
 use super::{Weak, simple_vector::SimpleVector, value::Value};
@@ -213,7 +213,7 @@ impl<'base> TypeName<'base> {
     }
 }
 
-impl_julia_typecheck!(TypeName<'scope>, jl_typename_type, 'scope);
+impl_julia_typecheck!(TypeName<'scope>, jl_typename_type, f: jlrs_is_typename,'scope);
 impl_debug!(TypeName<'_>);
 
 impl<'scope> ManagedPriv<'scope, '_> for TypeName<'scope> {

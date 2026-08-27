@@ -21,7 +21,7 @@
 
 use std::{marker::PhantomData, ptr::NonNull};
 
-use jlrs_sys::jlrs_tuple_of;
+use jlrs_sys::{jlrs_is_tuple, jlrs_tuple_of};
 
 use crate::{
     catch::{catch_exceptions, unwrap_exc},
@@ -95,6 +95,11 @@ unsafe impl Typecheck for Tuple {
     #[inline]
     fn typecheck(t: DataType) -> bool {
         unsafe { t.type_name() == TypeName::of_tuple(&Unrooted::new()) }
+    }
+
+    #[inline]
+    fn typecheck_value(v: Value) -> bool {
+        unsafe { jlrs_is_tuple(v.unwrap(Private)) != 0 }
     }
 }
 

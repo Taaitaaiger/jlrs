@@ -73,6 +73,16 @@ extern "C"
     {
         jl_gc_unsafe_leave(ptls, state);
     }
+
+#define XX(name, function) int jlrs_##name(jl_value_t *v) { return function(v); };
+PREDICATES_10(XX)
+#if JULIA_VERSION_MINOR >= 12
+PREDICATES_12(XX)
+#endif
+#if JULIA_VERSION_MINOR >= 14
+PREDICATES_14(XX)
+#endif
+#undef XX
 #ifdef __cplusplus
 }
 #endif

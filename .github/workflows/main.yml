@@ -114,7 +114,7 @@ jobs:
         id: setup-julia
         uses: julia-actions/setup-julia@v2
         with:
-          version: '1.12'
+          version: '1.12.6'
 
       - uses: ilammy/msvc-dev-cmd@v1
 

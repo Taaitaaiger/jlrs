@@ -3,7 +3,7 @@
 use std::{marker::PhantomData, ptr::NonNull};
 
 use jl_sys::{jl_new_typevar, jl_tvar_t, jl_tvar_type};
-use jlrs_sys::{jlrs_tvar_lb, jlrs_tvar_name, jlrs_tvar_ub};
+use jlrs_sys::{jlrs_is_typevar, jlrs_tvar_lb, jlrs_tvar_name, jlrs_tvar_ub};
 
 use super::{Weak, value::ValueData};
 use crate::{
@@ -161,7 +161,7 @@ impl<'scope> TypeVar<'scope> {
     }
 }
 
-impl_julia_typecheck!(TypeVar<'scope>, jl_tvar_type, 'scope);
+impl_julia_typecheck!(TypeVar<'scope>, jl_tvar_type, f: jlrs_is_typevar, 'scope);
 impl_debug!(TypeVar<'_>);
 
 impl<'scope> ManagedPriv<'scope, '_> for TypeVar<'scope> {

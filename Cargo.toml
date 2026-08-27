@@ -10,3 +10,10 @@ members = [
     "examples",
 ]
 exclude = ["crates/ffi/ffi-validator", "tests/julia_module_test", "benches"]
+
+[profile.bench]
+debug = true
+opt-level = 0
+lto = "thin"
+codegen-units = 1
+strip = "none"

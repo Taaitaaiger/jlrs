@@ -9,7 +9,7 @@ use std::{
 };
 
 use jl_sys::{jl_pchar_to_string, jl_string_ptr, jl_string_type};
-use jlrs_sys::jlrs_string_len;
+use jlrs_sys::{jlrs_is_string, jlrs_string_len};
 
 use super::Weak;
 use crate::{
@@ -105,7 +105,7 @@ impl<'scope> JuliaString<'scope> {
 
 impl_construct_type_managed!(JuliaString, 1, jl_string_type);
 
-impl_julia_typecheck!(JuliaString<'scope>, jl_string_type, 'scope);
+impl_julia_typecheck!(JuliaString<'scope>, jl_string_type, f: jlrs_is_string, 'scope);
 
 unsafe impl Unbox for String {
     // Julia strings may contain null bytes, so unbox as Vec<u8> if it isn't a valid string,

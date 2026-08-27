@@ -1,11 +1,8 @@
-use criterion::{Criterion, black_box, criterion_group, criterion_main};
+use std::hint::black_box;
+
+use criterion::{Criterion, criterion_group, criterion_main};
 use jlrs::{
     data::managed::background_task::spawn_background_task, prelude::*, weak_handle_unchecked,
-};
-#[cfg(not(target_os = "windows"))]
-use pprof::{
-    criterion::{Output, PProfProfiler},
-    flamegraph::Options,
 };
 
 #[inline(never)]
@@ -37,22 +34,6 @@ fn criterion_benchmark(c: &mut Criterion) {
     std::mem::drop(handle)
 }
 
-#[cfg(not(target_os = "windows"))]
-fn opts() -> Option<Options<'static>> {
-    let mut opts = Options::default();
-    opts.image_width = Some(1920);
-    opts.min_width = 0.01;
-    Some(opts)
-}
-
-#[cfg(not(target_os = "windows"))]
-criterion_group! {
-    name = background_task;
-    config = Criterion::default().with_profiler(PProfProfiler::new(1000, Output::Flamegraph(opts())));
-    targets = criterion_benchmark
-}
-
-#[cfg(target_os = "windows")]
 criterion_group! {
     name = background_task;
     config = Criterion::default();

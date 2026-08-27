@@ -11,15 +11,29 @@
 //! [`Unbox`]: crate::convert::unbox::Unbox
 use std::{ffi::c_void, marker::PhantomData};
 
-// TODO: Unify with other ConstructType and abstract types?
 use jl_sys::jl_string_type;
+use jlrs_sys::{
+    jlrs_is_bool, jlrs_is_immutable, jlrs_is_int8, jlrs_is_int16, jlrs_is_int32, jlrs_is_int64,
+    jlrs_is_mutable, jlrs_is_string, jlrs_is_uint8, jlrs_is_uint16, jlrs_is_uint32, jlrs_is_uint64,
+};
 
+// TODO: Unify with other ConstructType and abstract types?
+// pub fn jlrs_is_mutable_datatype(value: *mut crate::types::jl_value_t) -> std::ffi::c_int;
+// pub fn jlrs_is_vararg(value: *mut crate::types::jl_value_t) -> std::ffi::c_int;
+// pub fn jlrs_is_binding(value: *mut crate::types::jl_value_t) -> std::ffi::c_int;
+// pub fn jlrs_is_task(value: *mut crate::types::jl_value_t) -> std::ffi::c_int;
+// pub fn jlrs_is_uint8pointer(value: *mut crate::types::jl_value_t) -> std::ffi::c_int;
+// More value-specific checks?
 use super::abstract_type::AbstractType;
 use crate::{
     convert::into_julia::IntoJulia,
-    data::managed::{Managed, datatype::DataType, type_name::TypeName, union_all::UnionAll},
+    data::managed::{
+        Managed, datatype::DataType, private::ManagedPriv, type_name::TypeName,
+        union_all::UnionAll, value::Value,
+    },
     memory::target::unrooted::Unrooted,
     prelude::LocalScope,
+    private::Private,
 };
 
 /// This trait is used in combination with [`Value::is`] and [`DataType::is`] to check if that
@@ -41,6 +55,11 @@ use crate::{
 pub unsafe trait Typecheck {
     /// Returns whether the property implied by `Self` holds true.
     fn typecheck(t: DataType) -> bool;
+
+    /// Returns whether the property implied by `Self` holds true for the `DataType` of `v`.
+    fn typecheck_value(v: Value) -> bool {
+        Self::typecheck(v.datatype())
+    }
 }
 
 /// Type that implements [`Typecheck`] for every [`AbstractType`] `A`.
@@ -70,6 +89,43 @@ macro_rules! impl_julia_typecheck {
             }
         }
     };
+    ($type:ty, $jl_type:expr_2021, f: $function:ident, $($lt:lifetime),*) => {
+        unsafe impl<$($lt),*> crate::data::types::typecheck::Typecheck for $type {
+            #[inline]
+            fn typecheck(t: $crate::data::managed::datatype::DataType) -> bool {
+                unsafe {
+                    <$crate::data::managed::datatype::DataType as $crate::data::managed::private::ManagedPriv>::unwrap(t, crate::private::Private) == $jl_type
+                }
+            }
+
+            #[inline]
+            fn typecheck_value(v: crate::data::managed::value::Value) -> bool {
+                unsafe {
+                    let ptr = <$crate::data::managed::value::Value as $crate::data::managed::private::ManagedPriv>::unwrap(v, crate::private::Private);
+                    $function(ptr) != 0
+                }
+            }
+        }
+    };
+    ($type:ty, f: $function:ident) => {
+        unsafe impl crate::data::types::typecheck::Typecheck for $type {
+            #[inline]
+            fn typecheck(t: crate::data::managed::datatype::DataType) -> bool {
+                unsafe {
+                    let global = $crate::memory::target::unrooted::Unrooted::new();
+                    <$crate::data::managed::datatype::DataType as $crate::data::managed::private::ManagedPriv>::unwrap(t, crate::private::Private) == <$type as $crate::convert::into_julia::IntoJulia>::julia_type(global).ptr().as_ptr()
+                }
+            }
+
+            #[inline]
+            fn typecheck_value(v: crate::data::managed::value::Value) -> bool {
+                unsafe {
+                    let ptr = <$crate::data::managed::value::Value as $crate::data::managed::private::ManagedPriv>::unwrap(v, crate::private::Private);
+                    $function(ptr) != 0
+                }
+            }
+        }
+    };
     ($type:ty, $jl_type:expr_2021) => {
         unsafe impl crate::data::types::typecheck::Typecheck for $type {
             #[inline]
@@ -93,19 +149,19 @@ macro_rules! impl_julia_typecheck {
     };
 }
 
-impl_julia_typecheck!(i8);
-impl_julia_typecheck!(i16);
-impl_julia_typecheck!(i32);
-impl_julia_typecheck!(i64);
+impl_julia_typecheck!(i8, f: jlrs_is_int8);
+impl_julia_typecheck!(i16, f: jlrs_is_int16);
+impl_julia_typecheck!(i32, f: jlrs_is_int32);
+impl_julia_typecheck!(i64, f: jlrs_is_int64);
 impl_julia_typecheck!(isize);
-impl_julia_typecheck!(u8);
-impl_julia_typecheck!(u16);
-impl_julia_typecheck!(u32);
-impl_julia_typecheck!(u64);
+impl_julia_typecheck!(u8, f: jlrs_is_uint8);
+impl_julia_typecheck!(u16, f: jlrs_is_uint16);
+impl_julia_typecheck!(u32, f: jlrs_is_uint32);
+impl_julia_typecheck!(u64, f: jlrs_is_uint64);
 impl_julia_typecheck!(usize);
 impl_julia_typecheck!(f32);
 impl_julia_typecheck!(f64);
-impl_julia_typecheck!(bool);
+impl_julia_typecheck!(bool, f: jlrs_is_bool);
 impl_julia_typecheck!(char);
 impl_julia_typecheck!(*mut c_void);
 
@@ -211,6 +267,10 @@ unsafe impl Typecheck for Mutable {
     fn typecheck(t: DataType) -> bool {
         t.mutable()
     }
+
+    fn typecheck_value(v: Value) -> bool {
+        unsafe { jlrs_is_mutable(v.datatype().unwrap(Private).cast()) != 0 }
+    }
 }
 
 /// A typecheck that can be used in combination with `DataType::is`. This method returns true if
@@ -220,6 +280,10 @@ unsafe impl Typecheck for Immutable {
     #[inline]
     fn typecheck(t: DataType) -> bool {
         !t.mutable()
+    }
+
+    fn typecheck_value(v: Value) -> bool {
+        unsafe { jlrs_is_immutable(v.unwrap(Private)) != 0 }
     }
 }
 
@@ -257,7 +321,7 @@ unsafe impl Typecheck for Singleton {
     }
 }
 
-impl_julia_typecheck!(String, jl_string_type);
+impl_julia_typecheck!(String, jl_string_type, f: jlrs_is_string,);
 
 /// A typecheck that can be used in combination with `DataType::is`. This method returns true if
 /// a value of this type is a pointer to data not owned by Julia.

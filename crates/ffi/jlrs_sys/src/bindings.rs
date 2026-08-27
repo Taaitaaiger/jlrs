@@ -264,6 +264,78 @@ pub mod jlrs_cc {
             value: *mut *mut std::ffi::c_void,
         ) -> std::ffi::c_int;
 
+        pub fn jlrs_is_nothing(value: *mut crate::types::jl_value_t) -> std::ffi::c_int;
+
+        pub fn jlrs_is_tuple(value: *mut crate::types::jl_value_t) -> std::ffi::c_int;
+
+        pub fn jlrs_is_namedtuple(value: *mut crate::types::jl_value_t) -> std::ffi::c_int;
+
+        pub fn jlrs_is_svec(value: *mut crate::types::jl_value_t) -> std::ffi::c_int;
+
+        pub fn jlrs_is_datatype(value: *mut crate::types::jl_value_t) -> std::ffi::c_int;
+
+        pub fn jlrs_is_mutable(value: *mut crate::types::jl_value_t) -> std::ffi::c_int;
+
+        pub fn jlrs_is_mutable_datatype(value: *mut crate::types::jl_value_t) -> std::ffi::c_int;
+
+        pub fn jlrs_is_immutable(value: *mut crate::types::jl_value_t) -> std::ffi::c_int;
+
+        pub fn jlrs_is_uniontype(value: *mut crate::types::jl_value_t) -> std::ffi::c_int;
+
+        pub fn jlrs_is_typevar(value: *mut crate::types::jl_value_t) -> std::ffi::c_int;
+
+        pub fn jlrs_is_unionall(value: *mut crate::types::jl_value_t) -> std::ffi::c_int;
+
+        pub fn jlrs_is_vararg(value: *mut crate::types::jl_value_t) -> std::ffi::c_int;
+
+        pub fn jlrs_is_typename(value: *mut crate::types::jl_value_t) -> std::ffi::c_int;
+
+        pub fn jlrs_is_int8(value: *mut crate::types::jl_value_t) -> std::ffi::c_int;
+
+        pub fn jlrs_is_int16(value: *mut crate::types::jl_value_t) -> std::ffi::c_int;
+
+        pub fn jlrs_is_int32(value: *mut crate::types::jl_value_t) -> std::ffi::c_int;
+
+        pub fn jlrs_is_int64(value: *mut crate::types::jl_value_t) -> std::ffi::c_int;
+
+        pub fn jlrs_is_uint8(value: *mut crate::types::jl_value_t) -> std::ffi::c_int;
+
+        pub fn jlrs_is_uint16(value: *mut crate::types::jl_value_t) -> std::ffi::c_int;
+
+        pub fn jlrs_is_uint32(value: *mut crate::types::jl_value_t) -> std::ffi::c_int;
+
+        pub fn jlrs_is_uint64(value: *mut crate::types::jl_value_t) -> std::ffi::c_int;
+
+        pub fn jlrs_is_bool(value: *mut crate::types::jl_value_t) -> std::ffi::c_int;
+
+        pub fn jlrs_is_symbol(value: *mut crate::types::jl_value_t) -> std::ffi::c_int;
+
+        pub fn jlrs_is_expr(value: *mut crate::types::jl_value_t) -> std::ffi::c_int;
+
+        pub fn jlrs_is_binding(value: *mut crate::types::jl_value_t) -> std::ffi::c_int;
+
+        pub fn jlrs_is_module(value: *mut crate::types::jl_value_t) -> std::ffi::c_int;
+
+        pub fn jlrs_is_task(value: *mut crate::types::jl_value_t) -> std::ffi::c_int;
+
+        pub fn jlrs_is_string(value: *mut crate::types::jl_value_t) -> std::ffi::c_int;
+
+        pub fn jlrs_is_uint8pointer(value: *mut crate::types::jl_value_t) -> std::ffi::c_int;
+
+        #[cfg(not(any(julia_1_10, julia_1_11)))]
+        pub fn jlrs_may_be_immutable_datatype(
+            value: *mut crate::types::jl_value_t,
+        ) -> std::ffi::c_int;
+
+        #[cfg(not(any(julia_1_10, julia_1_11)))]
+        pub fn jlrs_is_array_any(value: *mut crate::types::jl_value_t) -> std::ffi::c_int;
+
+        #[cfg(not(any(julia_1_10, julia_1_11, julia_1_12, julia_1_13)))]
+        pub fn jlrs_is_typeeq(value: *mut crate::types::jl_value_t) -> std::ffi::c_int;
+
+        #[cfg(not(any(julia_1_10, julia_1_11, julia_1_12, julia_1_13)))]
+        pub fn jlrs_is_typeegal(value: *mut crate::types::jl_value_t) -> std::ffi::c_int;
+
         #[cfg(not(any(julia_1_10, julia_1_11, julia_1_12, julia_1_13)))]
         pub fn jlrs_typeeq_T(v: *mut crate::types::jl_typeeq_t) -> *mut crate::types::jl_value_t;
     }

@@ -160,6 +160,7 @@ fn compile_jlrs_cc(julia_dir: &JuliaDir, target: Option<BBTarget>) {
         c.define("JLRS_FAST_TLS", None);
     }
 
+    c.link_lib_modifier("+whole-archive");
     c.compile("jlrs_cc");
 }
 

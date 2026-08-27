@@ -133,7 +133,7 @@ mod tests {
                     let y = Value::new(&mut frame, 3u64);
 
                     let mut_struct = func.call(&mut frame, &mut [x, y]).unwrap();
-                    assert!(mut_struct.is::<Mutable>());
+                    assert!(mut_struct.datatype().is::<Mutable>());
 
                     assert!(mut_struct.get_field(&mut frame, "x").is_ok());
                     let x_val = mut_struct.get_field_ref("x");

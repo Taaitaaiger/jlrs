@@ -22,7 +22,7 @@ use jlrs_sys::{
     jlrs_datatype_mutable, jlrs_datatype_nfields, jlrs_datatype_parameters, jlrs_datatype_size,
     jlrs_datatype_super, jlrs_datatype_typename, jlrs_datatype_zeroinit, jlrs_field_isptr,
     jlrs_field_offset, jlrs_field_size, jlrs_get_fieldtypes, jlrs_is_concrete_type,
-    jlrs_is_primitivetype, jlrs_isbits, jlrs_nparams,
+    jlrs_is_datatype, jlrs_is_primitivetype, jlrs_isbits, jlrs_nparams,
 };
 
 use super::{Weak, type_name::TypeName, value::ValueData};
@@ -1154,7 +1154,7 @@ impl<'scope, 'data> PartialEq<Value<'scope, 'data>> for DataType<'scope> {
 
 impl<'scope> Eq for DataType<'scope> {}
 impl_debug!(DataType<'_>);
-impl_julia_typecheck!(DataType<'frame>, jl_datatype_type, 'frame);
+impl_julia_typecheck!(DataType<'frame>, jl_datatype_type, f: jlrs_is_datatype, 'frame);
 
 impl<'scope> ManagedPriv<'scope, '_> for DataType<'scope> {
     type Wraps = jl_datatype_t;
