@@ -80,8 +80,7 @@ use jlrs_sys::{jlrs_call_unchecked, jlrs_egal, jlrs_field_isptr};
 use self::{field_accessor::FieldAccessor, typed::TypedValue};
 use super::{Weak, type_var::TypeVar};
 use crate::{
-    args::Values,
-    call::Call,
+    call::{Call, args::Values},
     catch::{catch_exceptions, unwrap_exc},
     convert::{into_julia::IntoJulia, to_symbol::ToSymbol, unbox::Unbox},
     data::{
