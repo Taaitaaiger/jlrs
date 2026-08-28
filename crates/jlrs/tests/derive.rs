@@ -1023,7 +1023,10 @@ mod tests {
 
                 let with_u128 = WithU128::new(a, b, c);
                 let with_u128_v = Value::new(&mut frame, with_u128);
-                assert_eq!(with_u128_v.datatype().size().unwrap() as usize, size_of::<WithU128>());
+                assert_eq!(
+                    with_u128_v.datatype().size().unwrap() as usize,
+                    size_of::<WithU128>()
+                );
 
                 let a_v = with_u128_v.get_field(&mut frame, "a").unwrap();
                 assert_eq!(a_v.unbox::<i8>().unwrap(), a);
@@ -1051,7 +1054,10 @@ mod tests {
 
                 let with_i128 = WithI128::new(a, b, c);
                 let with_i128_v = Value::new(&mut frame, with_i128);
-                assert_eq!(with_i128_v.datatype().size().unwrap() as usize, size_of::<WithI128>());
+                assert_eq!(
+                    with_i128_v.datatype().size().unwrap() as usize,
+                    size_of::<WithI128>()
+                );
 
                 let a_v = with_i128_v.get_field(&mut frame, "a").unwrap();
                 assert_eq!(a_v.unbox::<i8>().unwrap(), a);

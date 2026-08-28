@@ -12,11 +12,13 @@ use crate::{
     data::{
         managed::{
             Managed,
+            datatype::DataType,
             union_all::UnionAll,
             value::{Value, ValueData},
         },
         types::construct_type::{ConstructType, TypeVarEnv},
     },
+    inline_static_ref,
     memory::{scope::LocalScopeExt, target::Target},
 };
 
@@ -149,5 +151,65 @@ unsafe impl<U: ConstructType> ConstructType for *mut U {
                     .apply_type_unchecked(target, [ty])
             }
         })
+    }
+}
+
+unsafe impl ConstructType for u128 {
+    type Static = Self;
+
+    fn construct_type_uncached<'target, Tgt>(target: Tgt) -> ValueData<'target, 'static, Tgt>
+    where
+        Tgt: Target<'target>,
+    {
+        Self::base_type(&target).unwrap().root(target)
+    }
+
+    #[inline]
+    fn base_type<'target, Tgt>(target: &Tgt) -> Option<Value<'target, 'static>>
+    where
+        Tgt: Target<'target>,
+    {
+        let dt = inline_static_ref!(U128_TYPE, DataType, "Base.UInt128", target);
+        Some(dt.as_value())
+    }
+
+    fn construct_type_with_env_uncached<'target, Tgt>(
+        target: Tgt,
+        _env: &TypeVarEnv,
+    ) -> ValueData<'target, 'static, Tgt>
+    where
+        Tgt: Target<'target>,
+    {
+        Self::base_type(&target).unwrap().root(target)
+    }
+}
+
+unsafe impl ConstructType for i128 {
+    type Static = Self;
+
+    fn construct_type_uncached<'target, Tgt>(target: Tgt) -> ValueData<'target, 'static, Tgt>
+    where
+        Tgt: Target<'target>,
+    {
+        Self::base_type(&target).unwrap().root(target)
+    }
+
+    #[inline]
+    fn base_type<'target, Tgt>(target: &Tgt) -> Option<Value<'target, 'static>>
+    where
+        Tgt: Target<'target>,
+    {
+        let dt = inline_static_ref!(I128_TYPE, DataType, "Base.Int128", target);
+        Some(dt.as_value())
+    }
+
+    fn construct_type_with_env_uncached<'target, Tgt>(
+        target: Tgt,
+        _env: &TypeVarEnv,
+    ) -> ValueData<'target, 'static, Tgt>
+    where
+        Tgt: Target<'target>,
+    {
+        Self::base_type(&target).unwrap().root(target)
     }
 }
