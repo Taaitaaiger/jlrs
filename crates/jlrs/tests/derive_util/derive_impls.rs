@@ -954,8 +954,11 @@ pub struct WithElidedInUnion {
             f64,
             i16,
             ElidedTypeConstructor<
-                ::jlrs::data::types::construct_type::ConstantBool<true>,
-                ElidedTypeConstructor<::jlrs::data::types::construct_type::ConstantI64<1>, i64>,
+                ::jlrs::data::types::construct_type::constants::ConstantBool<true>,
+                ElidedTypeConstructor<
+                    ::jlrs::data::types::construct_type::constants::ConstantI64<1>,
+                    i64,
+                >,
             >
         ],
         8,

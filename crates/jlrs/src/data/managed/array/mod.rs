@@ -164,7 +164,9 @@ use crate::{
         },
         types::{
             abstract_type::AnyType,
-            construct_type::{BitsUnionCtor, ConstructType, IfConcreteElse},
+            construct_type::{
+                ConstructType, if_concrete_else::IfConcreteElse, union_types::BitsUnionCtor,
+            },
             typecheck::Typecheck,
         },
     },

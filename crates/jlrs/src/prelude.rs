@@ -47,7 +47,7 @@ pub use crate::{
             value::{Value, ValueData, ValueResult, WeakValue},
         },
     },
-    define_fast_array_key, define_fast_key,
+    define_fast_key,
     error::JlrsResult,
     memory::{
         scope::{LocalScope, LocalScopeExt, Scope},

@@ -8,7 +8,7 @@ use std::{
 use fnv::FnvBuildHasher;
 use rustc_hash::FxBuildHasher;
 
-use crate::{gc_safe::GcSafeRwLock, memory::gc::gc_safe};
+use crate::gc_safe::GcSafeRwLock;
 
 pub(crate) struct Cache<K, V, S = RandomState> {
     map: GcSafeRwLock<HashMap<K, V, S>>,
@@ -50,9 +50,12 @@ pub(crate) trait CacheMap<'a, K: 'a + Eq + Hash, V: 'a + Clone, S: BuildHasher> 
     unsafe fn map(&'a self, func: impl Fn(V));
 }
 
-impl<'a, K: 'a + Eq + Hash, V: 'a + Clone> CacheMap<'a, K, V, FxBuildHasher> for FxCache<K, V> {
+impl<'a, K: 'a + Eq + Hash + Clone, V: 'a + Clone> CacheMap<'a, K, V, FxBuildHasher>
+    for FxCache<K, V>
+{
     fn insert(&self, key: K, value: V) -> Option<V> {
-        let res = unsafe { gc_safe(|| self.map.write().insert(key, value)) };
+        let mut guard = self.map.write();
+        let res = guard.insert(key, value);
         self.dirty.store(true, Ordering::Relaxed);
         res
     }
@@ -62,7 +65,8 @@ impl<'a, K: 'a + Eq + Hash, V: 'a + Clone> CacheMap<'a, K, V, FxBuildHasher> for
         K: Borrow<Q>,
         Q: Hash + Eq + ?Sized,
     {
-        self.map.read().get(key).cloned()
+        let guard = self.map.read();
+        guard.get(key).cloned()
     }
 
     fn clear_dirty(&self) {
@@ -86,9 +90,12 @@ impl<'a, K: 'a + Eq + Hash, V: 'a + Clone> CacheMap<'a, K, V, FxBuildHasher> for
     }
 }
 
-impl<'a, K: 'a + Eq + Hash, V: 'a + Clone> CacheMap<'a, K, V, FnvBuildHasher> for FnvCache<K, V> {
+impl<'a, K: 'a + Eq + Hash + Clone, V: 'a + Clone> CacheMap<'a, K, V, FnvBuildHasher>
+    for FnvCache<K, V>
+{
     fn insert(&self, key: K, value: V) -> Option<V> {
-        let res = self.map.write().insert(key, value);
+        let mut guard = self.map.write();
+        let res = guard.insert(key, value);
         self.dirty.store(true, Ordering::Relaxed);
         res
     }
@@ -98,7 +105,8 @@ impl<'a, K: 'a + Eq + Hash, V: 'a + Clone> CacheMap<'a, K, V, FnvBuildHasher> fo
         K: Borrow<Q>,
         Q: Hash + Eq + ?Sized,
     {
-        self.map.read().get(key).cloned()
+        let guard = self.map.read();
+        guard.get(key).cloned()
     }
 
     fn clear_dirty(&self) {

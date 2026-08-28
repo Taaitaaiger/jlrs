@@ -9,8 +9,10 @@ pub(crate) mod tests {
             types::{
                 abstract_type::Number,
                 construct_type::{
-                    ArrayTypeConstructor, ConstantChar, ConstantIsize, ConstantSize, ConstructType,
-                    TypeVarConstructor,
+                    ConstructType,
+                    array::ArrayTypeConstructor,
+                    constants::{ConstantChar, ConstantIsize, ConstantSize},
+                    type_var::TypeVarConstructor,
                 },
             },
         },

@@ -3,7 +3,7 @@ pub(crate) mod tests {
     use jlrs::{
         data::{
             managed::array::data::accessor::{Accessor, AccessorMut},
-            types::construct_type::ConstantBool,
+            types::construct_type::constants::ConstantBool,
         },
         prelude::*,
     };

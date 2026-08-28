@@ -4,7 +4,7 @@
 
 use std::marker::PhantomData;
 
-use super::construct_type::{ConstructType, TypeVarEnv};
+use super::construct_type::{ConstructType, type_var::TypeVarEnv};
 use crate::{
     data::managed::{
         Managed,

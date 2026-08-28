@@ -897,7 +897,7 @@ unsafe impl<T: OpaqueType> ConstructType for T {
 
     fn construct_type_with_env_uncached<'target, Tgt>(
         target: Tgt,
-        _env: &super::construct_type::TypeVarEnv,
+        _env: &super::construct_type::type_var::TypeVarEnv,
     ) -> ValueData<'target, 'static, Tgt>
     where
         Tgt: Target<'target>,

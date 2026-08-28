@@ -1,7 +1,7 @@
 #[cfg(feature = "local-rt")]
 pub(crate) mod tests {
     use jlrs::{
-        data::types::{abstract_type::AnyType, construct_type::UnionTypeConstructor},
+        data::types::{abstract_type::AnyType, construct_type::union_types::UnionTypeConstructor},
         prelude::*,
     };
 

@@ -1,4 +1,4 @@
-//! Construct Julia types, check their properties, and create types that contain Rust data.
+//! Construct Julia types, check their properties, and define types that contain Rust data.
 
 pub mod abstract_type;
 pub mod construct_type;

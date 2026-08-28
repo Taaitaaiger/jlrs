@@ -12,7 +12,7 @@ mod tests {
                 tuple::{Tuple1, Tuple2},
                 valid_layout::{ValidField, ValidLayout},
             },
-            types::construct_type::{ConstantBool, ConstructType},
+            types::construct_type::{ConstructType, constants::ConstantBool},
         },
         prelude::*,
     };

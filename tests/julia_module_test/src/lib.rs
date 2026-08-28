@@ -12,7 +12,7 @@ use jlrs::{
         },
         types::{
             abstract_type::{AnyType, Number},
-            construct_type::{ArrayTypeConstructor, ConstantIsize},
+            construct_type::{array::ArrayTypeConstructor, constants::ConstantIsize},
         },
     },
     prelude::*,

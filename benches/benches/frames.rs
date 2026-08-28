@@ -76,9 +76,11 @@ fn push_pop_frame_local_2(handle: &LocalHandle, c: &mut Criterion) {
 fn push_pop_frame_local_n(handle: &LocalHandle, c: &mut Criterion) {
     c.bench_function("push_pop_frame_local_n", |b| {
         b.iter(|| {
-            black_box(handle.unsized_local_scope(black_box(2), |f| {
-                black_box(&f);
-            }))
+            black_box(unsafe {
+                handle.unsized_local_scope(black_box(2), |f| {
+                    black_box(&f);
+                })
+            })
         })
     });
 }
@@ -87,9 +89,11 @@ fn push_pop_frame_local_n(handle: &LocalHandle, c: &mut Criterion) {
 fn push_pop_frame_local_const_n(handle: &LocalHandle, c: &mut Criterion) {
     c.bench_function("push_pop_frame_local_const_n", |b| {
         b.iter(|| {
-            black_box(handle.unsized_local_scope(2, |f| {
-                black_box(&f);
-            }))
+            black_box(unsafe {
+                handle.unsized_local_scope(2, |f| {
+                    black_box(&f);
+                })
+            })
         })
     });
 }

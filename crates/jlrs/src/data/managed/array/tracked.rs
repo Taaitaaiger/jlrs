@@ -28,7 +28,7 @@ use crate::{
         layout::{is_bits::IsBits, typed_layout::HasLayout, valid_layout::ValidField},
         managed::{array::How, private::ManagedPriv},
         types::{
-            construct_type::{BitsUnionCtor, ConstructType},
+            construct_type::{ConstructType, union_types::BitsUnionCtor},
             typecheck::Typecheck,
         },
     },
