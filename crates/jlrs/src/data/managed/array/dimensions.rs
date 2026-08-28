@@ -26,7 +26,11 @@ use super::{ArrayData, sized_dim_tuple, unsized_dim_tuple};
 use crate::{
     data::{
         managed::{datatype::DataTypeData, private::ManagedPriv as _},
-        types::construct_type::{ArrayTypeConstructor, ConstantIsize, ConstantSize, ConstructType},
+        types::construct_type::{
+            ConstructType,
+            array::ArrayTypeConstructor,
+            constants::{ConstantIsize, ConstantSize},
+        },
     },
     memory::scope::{LocalScope, LocalScopeExt},
     prelude::{Array, Managed, Target, Value, ValueData},

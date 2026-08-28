@@ -13,7 +13,7 @@ use jl_sys::jl_symbol_n;
 use crate::{
     data::{
         managed::{private::ManagedPriv, symbol::Symbol},
-        types::construct_type::{ConstructType, TypeVarName},
+        types::construct_type::{ConstructType, type_var::TypeVarName},
     },
     memory::target::{Target, unrooted::Unrooted},
     prelude::Managed,

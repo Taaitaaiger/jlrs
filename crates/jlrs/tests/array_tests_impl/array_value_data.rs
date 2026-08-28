@@ -4,7 +4,8 @@ pub(crate) mod tests {
 
     use jlrs::{
         data::{
-            managed::array::data::accessor::Accessor, types::construct_type::UnionTypeConstructor,
+            managed::array::data::accessor::Accessor,
+            types::construct_type::union_types::UnionTypeConstructor,
         },
         prelude::*,
     };

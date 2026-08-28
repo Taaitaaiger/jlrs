@@ -2,7 +2,7 @@ use criterion::{Criterion, criterion_group, criterion_main};
 use jlrs::{
     data::types::{
         abstract_type::{AbstractSet, Integer, Number},
-        construct_type::{ArrayTypeConstructor, ConstantIsize, ConstructType},
+        construct_type::{ConstructType, array::ArrayTypeConstructor, constants::ConstantIsize},
     },
     memory::target::frame::GcFrame,
     prelude::*,

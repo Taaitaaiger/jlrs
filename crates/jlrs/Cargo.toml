@@ -74,8 +74,8 @@ docs = ["jl-sys/docs", "jlrs-sys/docs", "jlrs-macros/docs", "full"]
 
 [dependencies]
 jl-sys = { version = "0.28", path = "../ffi/jl_sys" }
-jlrs-sys = { version = "0.2", path = "../ffi/jlrs_sys" }
-jlrs-macros = { version = "0.6", path = "../jlrs_macros" }
+jlrs-sys = { version = "0.3", path = "../ffi/jlrs_sys" }
+jlrs-macros = { version = "0.7", path = "../jlrs_macros" }
 smallvec = {version = "1", features = ["const_generics"]}
 thiserror = "2"
 once_cell = "1"

@@ -1,7 +1,10 @@
 #[cfg(feature = "local-rt")]
 pub(crate) mod tests {
     use jlrs::{
-        data::{managed::array::data::accessor::Accessor, types::construct_type::ConstantBool},
+        data::{
+            managed::array::data::accessor::Accessor,
+            types::construct_type::constants::ConstantBool,
+        },
         prelude::*,
     };
 

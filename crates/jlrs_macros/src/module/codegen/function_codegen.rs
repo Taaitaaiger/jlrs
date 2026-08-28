@@ -160,9 +160,9 @@ fn function_info_fragment(
 
 fn type_var_env_expr(type_var_env: Option<&Type>) -> Expr {
     if let Some(x) = type_var_env {
-        parse_quote! { <#x as ::jlrs::data::types::construct_type::TypeVars>::into_env(&mut frame) }
+        parse_quote! { <#x as ::jlrs::data::types::construct_type::type_var::TypeVars>::into_env(&mut frame) }
     } else {
-        parse_quote! { ::jlrs::data::types::construct_type::TypeVarEnv::empty(&frame) }
+        parse_quote! { ::jlrs::data::types::construct_type::type_var::TypeVarEnv::empty(&frame) }
     }
 }
 

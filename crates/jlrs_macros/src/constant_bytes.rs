@@ -54,13 +54,13 @@ where
 fn wrap_bytes(pair: Pair<u8>) -> Type {
     match pair {
         Pair::Two(a, b) => parse_quote! {
-            ::jlrs::data::types::construct_type::ConstantBytes<
-                ::jlrs::data::types::construct_type::ConstantU8<#a>,
-                ::jlrs::data::types::construct_type::ConstantU8<#b>,
+            ::jlrs::data::types::construct_type::bytes::ConstantBytes<
+                ::jlrs::data::types::construct_type::constants::ConstantU8<#a>,
+                ::jlrs::data::types::construct_type::constants::ConstantU8<#b>,
             >
         },
         Pair::One(a) => parse_quote! {
-            ::jlrs::data::types::construct_type::ConstantU8<#a>
+            ::jlrs::data::types::construct_type::constants::ConstantU8<#a>
         },
     }
 }
@@ -68,7 +68,7 @@ fn wrap_bytes(pair: Pair<u8>) -> Type {
 fn wrap_tokens(pair: Pair<&Type>) -> Type {
     match pair {
         Pair::Two(a, b) => parse_quote! {
-            ::jlrs::data::types::construct_type::ConstantBytes<
+            ::jlrs::data::types::construct_type::bytes::ConstantBytes<
                 #a,
                 #b,
             >

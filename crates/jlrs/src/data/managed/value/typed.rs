@@ -39,7 +39,9 @@ use crate::{
         managed::{Managed, Weak, datatype::DataType, private::ManagedPriv},
         types::{
             abstract_type::AnyType,
-            construct_type::{ArrayTypeConstructor, ConstantIsize, ConstructType},
+            construct_type::{
+                ConstructType, array::ArrayTypeConstructor, constants::ConstantIsize,
+            },
             typecheck::Typecheck,
         },
     },

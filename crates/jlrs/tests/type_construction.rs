@@ -11,8 +11,11 @@ mod tests {
                     AbstractArray, AbstractChar, AbstractString, Integer, Real, RefTypeConstructor,
                 },
                 construct_type::{
-                    ArrayTypeConstructor, ConstantIsize, ConstructType, Name, TypeVarConstructor,
-                    TypeVarName, TypeVars, UnionTypeConstructor,
+                    ConstructType,
+                    array::ArrayTypeConstructor,
+                    constants::ConstantIsize,
+                    type_var::{Name, TypeVarConstructor, TypeVarName, TypeVars},
+                    union_types::UnionTypeConstructor,
                 },
             },
         },

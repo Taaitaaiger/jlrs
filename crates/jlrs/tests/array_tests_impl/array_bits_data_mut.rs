@@ -6,7 +6,7 @@ pub(crate) mod tests {
                 TypedRankedArray,
                 data::accessor::{Accessor, AccessorMut},
             },
-            types::construct_type::ConstantBool,
+            types::construct_type::constants::ConstantBool,
         },
         prelude::*,
     };

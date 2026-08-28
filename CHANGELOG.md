@@ -14,6 +14,12 @@
 
 - `catch_exceptions` no longer catches panics, but aborts.
 
+- The module `jlrs::data::types::construct_type` has been divided into several submodules, only `ConstructType` and `TypeVarEnv` are still exported from the `construct_type` module. Other items can be found in the appropriate submodules.
+
+- The trait method `ConstructType::type_id` has been with the constant `ConstructType::TYPE_ID`.
+
+- The macro `define_fast_array_key` has been removed, the same syntax is supported by `define_fast_key`.
+
 ## v0.23
 
 - Implement `Clone` for `Tracked`. Note that this will break your code if the tracked type implements `Clone`, and the tracked handle was used to clone the data; this will now return a cloned handle, instead of the cloned underlying type.

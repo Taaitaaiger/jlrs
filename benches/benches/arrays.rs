@@ -15,7 +15,7 @@ fn construct_array_1d_unrooted(frame: &mut GcFrame, c: &mut Criterion) {
 
 #[inline(never)]
 fn construct_array_1d_unrooted2(frame: &mut GcFrame, c: &mut Criterion) {
-    jlrs::define_fast_array_key!(pub Foo, f32, 1);
+    jlrs::define_fast_key!(pub Foo, f32, 1);
 
     c.bench_function("Array<f64,1>_unrooted2", |b| {
         b.iter(|| {
@@ -55,7 +55,7 @@ fn construct_array_2d_unchecked_unrooted(frame: &mut GcFrame, c: &mut Criterion)
 
 #[inline(never)]
 fn construct_array_2d_unchecked_unrooted2(frame: &mut GcFrame, c: &mut Criterion) {
-    jlrs::define_fast_array_key!(pub Foo, f32, 2);
+    jlrs::define_fast_key!(pub Foo, f32, 2);
 
     c.bench_function("Array<f64,2>_unchecked_unrooted2", |b| {
         b.iter(|| unsafe { Foo::new_unchecked(&frame, [4, 4]) })
