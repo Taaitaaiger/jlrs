@@ -33,15 +33,17 @@ mod tests {
                 let out = stack.scope(|mut frame| {
                     let output = frame.output();
 
-                    frame
-                        .unsized_local_scope(1, |mut frame| {
-                            assert_eq!(frame.frame_size(), 1);
-                            assert_eq!(frame.n_roots(), 0);
-                            let v = Value::new(&mut frame, 1usize);
-                            assert_eq!(frame.n_roots(), 1);
-                            v.root(output)
-                        })
-                        .unbox::<usize>()
+                    unsafe {
+                        frame
+                            .unsized_local_scope(1, |mut frame| {
+                                assert_eq!(frame.frame_size(), 1);
+                                assert_eq!(frame.n_roots(), 0);
+                                let v = Value::new(&mut frame, 1usize);
+                                assert_eq!(frame.n_roots(), 1);
+                                v.root(output)
+                            })
+                            .unbox::<usize>()
+                    }
                 });
 
                 assert_eq!(out.unwrap(), 1);

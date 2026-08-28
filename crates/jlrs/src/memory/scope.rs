@@ -13,13 +13,47 @@ use super::target::{
     Target,
     frame::{GcFrame, LocalFrame, LocalGcFrame, UnsizedLocalGcFrame},
 };
-use crate::catch::{Exception, catch_exceptions};
+use crate::{
+    catch::{Exception, catch_exceptions},
+    memory::target::frame::PinnedLocalFrame,
+};
+
+struct Droppable<'a, 'scope, const N: usize>(&'a PinnedLocalFrame<'scope, N>);
+impl<'a, 'scope, const N: usize> Drop for Droppable<'a, 'scope, N> {
+    fn drop(&mut self) {
+        unsafe {
+            self.0.pop();
+        }
+    }
+}
 
 /// Create new local scopes, local scopes can store a prespecified number of roots.
 pub unsafe trait LocalScope: private::LocalScopePriv {
     /// Create a local scope with capacity for `N` roots and call `func`.
+    ///
+    /// NB: It is UB for an unhandled Julia exception to be thrown by `func`; use
+    /// [`LocalScope::exception_safe_local_scope`] if `func` may throw an exception.
     #[inline]
     fn local_scope<T, const N: usize>(
+        &self,
+        func: impl for<'scope> FnOnce(LocalGcFrame<'scope, N>) -> T,
+    ) -> T {
+        let mut local_frame = LocalFrame::new();
+        unsafe {
+            let pinned = Droppable(&local_frame.pin());
+            let ret = func(LocalGcFrame::new(pinned.0));
+            std::mem::drop(pinned);
+            ret
+        }
+    }
+
+    /// Create a local scope with capacity for `N` roots and call `func`.
+    ///
+    /// Safety:
+    ///
+    /// It is safe to jump out of this scope when a Julia exception is thrown in `func`.
+    /// It is UB for `func` to panic; this corrupts the GC stack.
+    unsafe fn exception_safe_local_scope<T, const N: usize>(
         &self,
         func: impl for<'scope> FnOnce(LocalGcFrame<'scope, N>) -> T,
     ) -> T {
@@ -32,19 +66,30 @@ pub unsafe trait LocalScope: private::LocalScopePriv {
         }
     }
 
-    /// Call [`LocalScope::local_scope`] inside [`catch_exceptions`].
-    fn catching_local_scope<T, E, const N: usize>(
+    /// Call [`LocalScope::exception_safe_local_scope`] inside [`catch_exceptions`].
+    ///
+    /// Safety:
+    ///
+    /// It is safe to jump out of this scope when a Julia exception is thrown in `func`.
+    /// It is UB for `func` to panic; this corrupts the exception stack.
+    unsafe fn catching_local_scope<T, E, const N: usize>(
         &self,
         func: impl for<'scope> FnOnce(LocalGcFrame<'scope, N>) -> T,
         exception_handler: impl for<'exc> FnOnce(Exception<'exc, '_>) -> E,
     ) -> Result<T, E> {
-        let cb = || self.local_scope(func);
+        let cb = || unsafe { self.exception_safe_local_scope(func) };
         unsafe { catch_exceptions(cb, exception_handler) }
     }
 
     /// Create a local scope with capacity for `size` roots and call `func`.
+    ///
+    /// Safety:
+    ///
+    /// It is safe to jump out of this scope when a Julia exception is thrown in `func`.
+    /// It is UB for `func` to panic; this corrupts the GC stack. If `func` panics, the process is
+    /// aborted.
     #[inline]
-    fn unsized_local_scope<T>(
+    unsafe fn unsized_local_scope<T>(
         &self,
         size: usize,
         func: impl for<'scope> FnOnce(UnsizedLocalGcFrame<'scope>) -> T,
@@ -59,13 +104,18 @@ pub unsafe trait LocalScope: private::LocalScopePriv {
     }
 
     /// Call [`LocalScope::unsized_local_scope`] inside [`catch_exceptions`].
-    fn catching_unsized_local_scope<T, E>(
+    ///
+    /// Safety:
+    ///
+    /// It is UB for `func` to panic; this corrupts the GC stack. If `func` panics, the process is
+    /// aborted.
+    unsafe fn catching_unsized_local_scope<T, E>(
         &self,
         size: usize,
         func: impl for<'scope> FnOnce(UnsizedLocalGcFrame<'scope>) -> T,
         exception_handler: impl for<'exc> FnOnce(Exception<'exc, '_>) -> E,
     ) -> Result<T, E> {
-        let cb = || self.unsized_local_scope(size, func);
+        let cb = || unsafe { self.unsized_local_scope(size, func) };
         unsafe { catch_exceptions(cb, exception_handler) }
     }
 }
@@ -82,6 +132,25 @@ pub unsafe trait LocalScopeExt<'target>: Target<'target> {
     ) -> T {
         let mut local_frame = LocalFrame::new();
         unsafe {
+            let pinned = Droppable(&local_frame.pin());
+            let ret = func(self, LocalGcFrame::new(pinned.0));
+            std::mem::drop(pinned);
+            ret
+        }
+    }
+
+    /// Create a local scope with capacity for `N` roots and call `func`.
+    ///
+    /// Safety:
+    ///
+    /// It is safe to jump out of this scope when a Julia exception is thrown in `func`.
+    /// It is UB for `func` to panic; this corrupts the GC stack.
+    unsafe fn with_exception_safe_local_scope<T, const N: usize>(
+        self,
+        func: impl for<'scope> FnOnce(Self, LocalGcFrame<'scope, N>) -> T,
+    ) -> T {
+        let mut local_frame = LocalFrame::new();
+        unsafe {
             let pinned = local_frame.pin();
             let res = func(self, LocalGcFrame::new(&pinned));
             pinned.pop();
@@ -89,10 +158,14 @@ pub unsafe trait LocalScopeExt<'target>: Target<'target> {
         }
     }
 
-    /// Create a new unsized local scope and call `func` with target and new frame.
+    /// Create a new unsized local scope with capacity for `size` roots and call `func`.
     ///
-    /// The `UnsizedLocalGcFrame` has capacity for `size` roots.
-    fn with_unsized_local_scope<T>(
+    /// Safety:
+    ///
+    /// It is safe to jump out of this scope when a Julia exception is thrown in `func`.
+    /// It is UB for `func` to panic; this corrupts the GC stack. If `func` panics, the process is
+    /// aborted.
+    unsafe fn with_unsized_local_scope<T>(
         self,
         size: usize,
         func: impl for<'scope> FnOnce(Self, UnsizedLocalGcFrame<'scope>) -> T,

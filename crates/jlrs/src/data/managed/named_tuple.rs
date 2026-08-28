@@ -425,22 +425,24 @@ impl<'scope, 'data> NamedTuple<'scope, 'data> {
     {
         let n_roots = self.as_value().n_fields();
         let fnames = self.field_names();
-        target.with_unsized_local_scope(n_roots, |target, mut frame| {
-            let mut keys = Vec::with_capacity(n_roots - remove.len());
-            let mut values = Vec::with_capacity(n_roots - remove.len());
+        unsafe {
+            target.with_unsized_local_scope(n_roots, |target, mut frame| {
+                let mut keys = Vec::with_capacity(n_roots - remove.len());
+                let mut values = Vec::with_capacity(n_roots - remove.len());
 
-            for key in fnames.iter().copied() {
-                if !remove.contains(&key) {
-                    let value = self.as_value().get_field(&mut frame, key).unwrap();
+                for key in fnames.iter().copied() {
+                    if !remove.contains(&key) {
+                        let value = self.as_value().get_field(&mut frame, key).unwrap();
 
-                    keys.push(key);
-                    values.push(value);
+                        keys.push(key);
+                        values.push(value);
+                    }
                 }
-            }
 
-            // Safety: there cannot be any duplicates
-            unsafe { Self::new_unchecked(target, keys.as_ref(), values.as_ref()) }
-        })
+                // Safety: there cannot be any duplicates
+                Self::new_unchecked(target, keys.as_ref(), values.as_ref())
+            })
+        }
     }
 
     /// Creates a new named tuple from `self`, and adds additional pairs from `keys` and `values`.
@@ -464,10 +466,10 @@ impl<'scope, 'data> NamedTuple<'scope, 'data> {
 
         let field_names = self.field_names();
 
-        target.with_unsized_local_scope(n_fields, |target, mut frame| {
-            let mut map = FnvHashMap::default();
+        unsafe {
+            target.with_unsized_local_scope(n_fields, |target, mut frame| {
+                let mut map = FnvHashMap::default();
 
-            unsafe {
                 for i in 0..n_fields {
                     let key = field_names[i];
                     let value = nt.get_nth_field(&mut frame, i).unwrap();
@@ -480,8 +482,8 @@ impl<'scope, 'data> NamedTuple<'scope, 'data> {
 
                 // There cannot be any duplicates
                 Self::from_iter_unchecked(target, map.iter().map(|(a, b)| (*a, *b)))
-            }
-        })
+            })
+        }
     }
 
     /// Create a new named tuple from this one and an iterator of key-value pairs. New values
@@ -499,10 +501,10 @@ impl<'scope, 'data> NamedTuple<'scope, 'data> {
 
         let field_names = self.field_names();
 
-        target.with_unsized_local_scope(n_fields, |target, mut frame| {
-            let mut map = FnvHashMap::default();
+        unsafe {
+            target.with_unsized_local_scope(n_fields, |target, mut frame| {
+                let mut map = FnvHashMap::default();
 
-            unsafe {
                 for i in 0..n_fields {
                     let key = field_names[i];
                     let value = nt.get_nth_field(&mut frame, i).unwrap();
@@ -515,8 +517,8 @@ impl<'scope, 'data> NamedTuple<'scope, 'data> {
 
                 // There cannot be any duplicates
                 Self::from_iter_unchecked(target, map.iter().map(|(a, b)| (*a, *b)))
-            }
-        })
+            })
+        }
     }
 
     /// Combines [`Self::filter`] and [`Self::extend`]. All duplicates are removed, later elements
@@ -539,36 +541,38 @@ impl<'scope, 'data> NamedTuple<'scope, 'data> {
         let field_names = self.field_names();
         let n_fields = field_names.len();
 
-        target.with_unsized_local_scope(n_fields, |target, mut frame| {
-            let mut retained_keys = Vec::with_capacity(n_fields - remove.len());
-            let mut retained_values = Vec::with_capacity(n_fields - remove.len());
+        unsafe {
+            target.with_unsized_local_scope(n_fields, |target, mut frame| {
+                let mut retained_keys = Vec::with_capacity(n_fields - remove.len());
+                let mut retained_values = Vec::with_capacity(n_fields - remove.len());
 
-            for key in field_names.iter().copied() {
-                if !remove.contains(&key) {
-                    let value = self
-                        .as_value()
-                        .get_field(&mut frame, key)
-                        .expect("missing field");
+                for key in field_names.iter().copied() {
+                    if !remove.contains(&key) {
+                        let value = self
+                            .as_value()
+                            .get_field(&mut frame, key)
+                            .expect("missing field");
 
-                    retained_keys.push(key);
-                    retained_values.push(value);
+                        retained_keys.push(key);
+                        retained_values.push(value);
+                    }
                 }
-            }
 
-            let mut map = FnvHashMap::default();
-            for (key, value) in retained_keys
-                .iter()
-                .copied()
-                .zip(retained_values.iter().copied())
-            {
-                map.insert(key, value);
-            }
-            for (key, value) in keys.iter().copied().zip(values.iter().copied()) {
-                map.insert(key, value);
-            }
+                let mut map = FnvHashMap::default();
+                for (key, value) in retained_keys
+                    .iter()
+                    .copied()
+                    .zip(retained_values.iter().copied())
+                {
+                    map.insert(key, value);
+                }
+                for (key, value) in keys.iter().copied().zip(values.iter().copied()) {
+                    map.insert(key, value);
+                }
 
-            unsafe { Self::from_iter_unchecked(target, map.iter().map(|(a, b)| (*a, *b))) }
-        })
+                Self::from_iter_unchecked(target, map.iter().map(|(a, b)| (*a, *b)))
+            })
+        }
     }
 
     /// Combines [`Self::filter`] and [`Self::extend_iter`]. All duplicates are removed, later
@@ -585,36 +589,38 @@ impl<'scope, 'data> NamedTuple<'scope, 'data> {
         let field_names = self.field_names();
         let n_roots = field_names.len();
 
-        target.with_unsized_local_scope(n_roots, |target, mut frame| {
-            let mut retained_keys = Vec::with_capacity(n_roots - remove.len());
-            let mut retained_values = Vec::with_capacity(n_roots - remove.len());
+        unsafe {
+            target.with_unsized_local_scope(n_roots, |target, mut frame| {
+                let mut retained_keys = Vec::with_capacity(n_roots - remove.len());
+                let mut retained_values = Vec::with_capacity(n_roots - remove.len());
 
-            for key in field_names.iter().copied() {
-                if !remove.contains(&key) {
-                    let value = self
-                        .as_value()
-                        .get_field(&mut frame, key)
-                        .expect("missing field");
+                for key in field_names.iter().copied() {
+                    if !remove.contains(&key) {
+                        let value = self
+                            .as_value()
+                            .get_field(&mut frame, key)
+                            .expect("missing field");
 
-                    retained_keys.push(key);
-                    retained_values.push(value);
+                        retained_keys.push(key);
+                        retained_values.push(value);
+                    }
                 }
-            }
 
-            let mut map = FnvHashMap::default();
-            for (key, value) in retained_keys
-                .iter()
-                .copied()
-                .zip(retained_values.iter().copied())
-            {
-                map.insert(key, value);
-            }
-            for (key, value) in items {
-                map.insert(key, value);
-            }
+                let mut map = FnvHashMap::default();
+                for (key, value) in retained_keys
+                    .iter()
+                    .copied()
+                    .zip(retained_values.iter().copied())
+                {
+                    map.insert(key, value);
+                }
+                for (key, value) in items {
+                    map.insert(key, value);
+                }
 
-            unsafe { Self::from_iter_unchecked(target, map.iter().map(|(a, b)| (*a, *b))) }
-        })
+                Self::from_iter_unchecked(target, map.iter().map(|(a, b)| (*a, *b)))
+            })
+        }
     }
 }
 
