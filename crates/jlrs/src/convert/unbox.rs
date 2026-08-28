@@ -105,3 +105,11 @@ impl_unboxer!(isize, jlrs_unbox_long);
 unsafe impl<T: IntoJulia> Unbox for *mut T {
     type Output = Self;
 }
+
+unsafe impl Unbox for u128 {
+    type Output = Self;
+}
+
+unsafe impl Unbox for i128 {
+    type Output = Self;
+}

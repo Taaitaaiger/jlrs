@@ -164,6 +164,8 @@ impl_julia_typecheck!(f64);
 impl_julia_typecheck!(bool, f: jlrs_is_bool);
 impl_julia_typecheck!(char);
 impl_julia_typecheck!(*mut c_void);
+impl_julia_typecheck!(u128);
+impl_julia_typecheck!(i128);
 
 unsafe impl<T: IntoJulia> Typecheck for *mut T {
     #[inline]

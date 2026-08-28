@@ -22,6 +22,8 @@
 
 - The `args` module is now a submodule of the `call` module.
 
+- Support for `u128` and `i128`. The traits `Unbox`, `IntoJulia`, `Typecheck`, `ValidLayout`, `ValidField`, `ConstructType`, `IsBits`, `CCallArg`, `CCallReturn`, `PrimitiveType`, `IsBits`, and `IntegerType` have been implemented for these types.
+
 ## v0.23
 
 - Implement `Clone` for `Tracked`. Note that this will break your code if the tracked type implements `Clone`, and the tracked handle was used to clone the data; this will now return a cloned handle, instead of the cloned underlying type.
