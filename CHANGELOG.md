@@ -10,6 +10,10 @@
 
 - Support Typecheck on values, not just types.
 
+- `LocalScope::local_scope` is now panic-safe, but not exception-safe. `LocalScope::exception_safe_local_scope` is exception-safe, but not panic-safe. `LocalScope::unsized_local_scope` is exception-safe, but not panic-safe. Panic-unsafe methods are unsafe, panic-safe methods are safe. It is the responsibility of callers of any functions that can throw exceptions (generally `_unchecked` functions) that those exceptions do not jump over any exception-unsafe code. Code is exception-safe if the exception does not jump over any pending drops or `catch_unwind` calls.
+
+- `catch_exceptions` no longer catches panics, but aborts.
+
 ## v0.23
 
 - Implement `Clone` for `Tracked`. Note that this will break your code if the tracked type implements `Clone`, and the tracked handle was used to clone the data; this will now return a cloned handle, instead of the cloned underlying type.
