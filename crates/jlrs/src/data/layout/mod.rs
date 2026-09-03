@@ -82,6 +82,8 @@ pub mod f16;
 pub mod is_bits;
 pub mod julia_enum;
 pub mod nothing;
+#[cfg(feature = "static-arrays")]
+pub mod static_arrays;
 pub mod tuple;
 pub mod typed_layout;
 pub mod union;

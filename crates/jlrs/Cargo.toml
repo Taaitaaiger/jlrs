@@ -19,7 +19,7 @@ rust-version = "1.97"
 default = []
 
 # Enable all features
-full = ["local-rt", "tokio-rt", "jlrs-ndarray", "f16", "complex", "jlrs-derive", "ccall", "multi-rt"]
+full = ["local-rt", "tokio-rt", "jlrs-ndarray", "f16", "complex", "static-arrays", "jlrs-derive", "ccall", "multi-rt"]
 
 # Enable all features except any  runtimes
 full-no-rt = ["async", "jlrs-ndarray", "f16", "jlrs-derive", "ccall"]
@@ -53,6 +53,8 @@ f16 = ["half"]
 complex = ["num-complex"]
 # Enable converting a Julia array to an `ArrayView(Mut)` from ndarray
 jlrs-ndarray = ["ndarray"]
+# Enable support for the StaticArrays Julia package
+static-arrays = []
 # Enable derive macros
 jlrs-derive = ["jlrs-macros/derive"]
 # Compile the support library with support for cross-language LTO.
