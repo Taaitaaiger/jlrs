@@ -61,3 +61,27 @@ pub fn swap_marray_blocks(marray: &mut MArray<f32, Dims3D<2, 2, 2>, 8, 3>) {
         data[i + 4] = tmp;
     }
 }
+
+pub fn returns_svector() -> SVector<f32, 2> {
+    SVector::new([1.0, 2.0])
+}
+
+pub fn returns_mvector() -> MVector<f32, 2> {
+    MVector::new([1.0, 2.0])
+}
+
+pub fn returns_smatrix() -> SMatrix<f32, 2, 1> {
+    SMatrix::new([[1.0, 2.0]])
+}
+
+pub fn returns_mmatrix() -> MMatrix<f32, 2, 1> {
+    MMatrix::new([[1.0, 2.0]])
+}
+
+pub fn returns_sarray() -> SArray<f32, Dims3D<1, 1, 1>, 1, 3> {
+    SArray::new([1.0])
+}
+
+pub fn returns_marray() -> MArray<f32, Dims3D<1, 1, 1>, 1, 3> {
+    MArray::new([1.0])
+}

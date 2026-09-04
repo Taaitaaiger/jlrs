@@ -309,4 +309,28 @@ end
     swapped = MArray{Tuple{2, 2, 2}, Float32}([5.0f0 6.0f0 7.0f0 8.0f0 1.0f0 2.0f0 3.0f0 4.0f0])
     JuliaModuleTest.swap_marray_blocks(marray)
     @test marray == swapped
+
+    svector = SVector{2, Float32}([1.0f0 2.0f0])
+    rs_svector = JuliaModuleTest.returns_svector()
+    @test svector == rs_svector
+
+    mvector = MVector{2, Float32}([1.0f0 2.0f0])
+    rs_mvector = JuliaModuleTest.returns_mvector()
+    @test mvector == rs_mvector
+
+    smatrix = SMatrix{2, 1, Float32, 2}([1.0f0 2.0f0])
+    rs_smatrix = JuliaModuleTest.returns_smatrix()
+    @test smatrix == rs_smatrix
+
+    mmatrix = MMatrix{2, 1, Float32, 2}([1.0f0 2.0f0])
+    rs_mmatrix = JuliaModuleTest.returns_mmatrix()
+    @test mmatrix == rs_mmatrix
+
+    sarray = SArray{Tuple{1, 1, 1}, Float32}([1.0f0])
+    rs_sarray = JuliaModuleTest.returns_sarray()
+    @test sarray == rs_sarray
+
+    marray = MArray{Tuple{1, 1, 1}, Float32}([1.0f0])
+    rs_marray = JuliaModuleTest.returns_marray()
+    @test marray == rs_marray
 end

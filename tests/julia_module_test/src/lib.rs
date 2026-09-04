@@ -221,4 +221,10 @@ julia_module! {
     pub fn sum_sarray_ref(sarray: &SArray<f32, Dims3D<2, 2, 2>, 8, 3>) -> f32;
     pub fn sum_marray_ref(marray: &MArray<f32, Dims3D<2, 2, 2>, 8, 3>) -> f32;
     fn swap_marray_blocks(marray: &mut MArray<f32, Dims3D<2, 2, 2>, 8, 3>);
+    fn returns_svector() -> SVector<f32, 2>;
+    fn returns_mvector() -> MVector<f32, 2>;
+    fn returns_smatrix() -> SMatrix<f32, 2, 1>;
+    fn returns_mmatrix() -> MMatrix<f32, 2, 1>;
+    fn returns_sarray() -> SArray<f32, Dims3D<1, 1, 1>, 1, 3>;
+    fn returns_marray() -> MArray<f32, Dims3D<1, 1, 1>, 1, 3>;
 }
