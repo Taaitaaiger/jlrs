@@ -1,9 +1,5 @@
 [deps]
 JuliaModuleTest = "61727b1b-1923-47f0-bc7b-0f086361f7f4"
-StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 
 [sources]
 JuliaModuleTest = {path = ".."}
-
-[compat]
-StaticArrays = "1.9"

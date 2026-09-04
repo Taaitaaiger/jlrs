@@ -1,6 +1,6 @@
 push!(LOAD_PATH,"../src/")
 
-using Documenter, StaticArrays, JuliaModuleTest, Documenter.Remotes
+using Documenter, JuliaModuleTest, Documenter.Remotes
 makedocs(
     sitename="JuliaModuleTest",
     modules = [JuliaModuleTest],

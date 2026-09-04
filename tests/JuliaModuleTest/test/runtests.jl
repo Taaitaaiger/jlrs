@@ -1,8 +1,7 @@
-using StaticArrays
-
 using Test
 using JuliaModuleTest
 using JlrsCore
+using StaticArrays
 
 
 @testset "Freestanding functions" begin

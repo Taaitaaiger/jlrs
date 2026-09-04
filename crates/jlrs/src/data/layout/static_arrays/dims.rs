@@ -1,5 +1,27 @@
 //! Static dimensions
 
+/// Macro to generate new implementations of `Dims`
+///
+/// Example for rank-4 arrays:
+///
+/// ```
+/// jlrs::define_dims!(pub Dims4D<A, B, C, D; 4>);
+/// ```
+///
+/// This creates `Dims4D<const A: usize, const B: usize, const C: usize, const D: usize>`
+/// and implements `Dims<4>` for it.
+#[macro_export]
+macro_rules! define_dims {
+    ($vis:vis $name:ident<$($n:ident),+; $r:literal>) => {
+        #[derive(Clone)]
+        $vis struct $name<$(const $n: usize),+>;
+        impl <$(const $n: usize),+> $crate::data::layout::static_arrays::dims::Dims<$r> for $name<$($n),+> {
+            const PARAMS: [usize; $r] = [$($n),+];
+            const N: usize = $crate::product!($($n),+);
+        }
+    };
+}
+
 /// Dimensions for a rank-R array.
 ///
 /// Implementations of this trait should be created with [`define_dims`].
@@ -76,27 +98,5 @@ macro_rules! product {
     };
     ($t:ident) => {
         $t
-    };
-}
-
-/// Macro to generate new implementations of `Dims`
-///
-/// Example for rank-4 arrays:
-///
-/// ```
-/// jlrs::define_dims!(pub Dims4D<A, B, C, D; 4>);
-/// ```
-///
-/// This creates `Dims4D<const A: usize, const B: usize, const C: usize, const D: usize>`
-/// and implements `Dims<4>` for it.
-#[macro_export]
-macro_rules! define_dims {
-    ($vis:vis $name:ident<$($n:ident),+; $r:literal>) => {
-        #[derive(Clone)]
-        $vis struct $name<$(const $n: usize),+>;
-        impl <$(const $n: usize),+> $crate::data::layout::static_arrays::dims::Dims<$r> for $name<$($n),+> {
-            const PARAMS: [usize; $r] = [$($n),+];
-            const N: usize = $crate::product!($($n),+);
-        }
     };
 }
