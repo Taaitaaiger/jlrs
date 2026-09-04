@@ -20,6 +20,8 @@
 
 - The macro `define_fast_array_key` has been removed, the same syntax is supported by `define_fast_key`.
 
+- Types from the StaticArrays package are supported when the `static-arrays` feature is enabled.
+
 ## v0.23
 
 - Implement `Clone` for `Tracked`. Note that this will break your code if the tracked type implements `Clone`, and the tracked handle was used to clone the data; this will now return a cloned handle, instead of the cloned underlying type.

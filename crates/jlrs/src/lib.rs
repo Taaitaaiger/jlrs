@@ -144,6 +144,10 @@
 //!
 //!   Access the content of a Julia array as an `ArrayView` or `ArrayViewMut` from ndarray.
 //!
+//! - `static-arrays`
+//!
+//!   Adds support for working with statically-sized array types from the StaticArrays package.
+//! 
 //! - `f16`
 //!
 //!   Adds support for working with Julia's `Float16` type from Rust using half's `f16` type.
