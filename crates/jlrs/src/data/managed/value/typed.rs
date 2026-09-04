@@ -29,6 +29,11 @@ use super::{
     Value, ValueData, WeakValue,
     tracked::{Tracked, TrackedMut},
 };
+#[cfg(feature = "static-arrays")]
+use crate::data::layout::static_arrays::{
+    dims::Dims, m_array::MArray, m_matrix::MMatrix, m_vector::MVector, s_array::SArray,
+    s_matrix::SMatrix, s_vector::SVector,
+};
 use crate::{
     convert::{
         ccall_types::{CCallArg, CCallReturn},
@@ -162,6 +167,100 @@ impl<'scope, 'data, U: ValidLayout + ConstructType> TypedValue<'scope, 'data, U>
         &'tracked mut self,
     ) -> JlrsResult<TrackedMut<'tracked, 'scope, 'data, U>> {
         unsafe { self.deref_mut().track_exclusive() }
+    }
+}
+
+#[cfg(feature = "static-arrays")]
+impl<'scope, 'data, T, const N: usize> TypedValue<'scope, 'data, SVector<T, N>> {
+    /// Convert `self` to a reference to an `SVector`
+    pub fn as_svector_ref(self) -> &'scope SVector<T, N> {
+        unsafe { self.0.cast().as_ref() }
+    }
+}
+#[cfg(feature = "static-arrays")]
+impl<'scope, 'data, T, const N: usize> TypedValue<'scope, 'data, MVector<T, N>> {
+    /// Convert `self` to a reference to an `MVector`
+    ///
+    /// Safety:
+    ///
+    /// There must be no active mutable borrows of this data.
+    pub unsafe fn as_mvector_ref(self) -> &'scope MVector<T, N> {
+        unsafe { self.0.cast().as_ref() }
+    }
+
+    /// Convert `self` to a mutable reference to an `MVector`
+    ///
+    /// Safety:
+    ///
+    /// There must be no active mutable borrows of this data.
+    pub unsafe fn as_mvector_mut(self) -> &'scope mut MVector<T, N> {
+        unsafe { self.0.cast().as_mut() }
+    }
+}
+
+#[cfg(feature = "static-arrays")]
+impl<'scope, 'data, T, const ROWS: usize, const COLS: usize>
+    TypedValue<'scope, 'data, SMatrix<T, ROWS, COLS>>
+{
+    /// Convert `self` to a reference to an `SMatrix`
+    pub fn as_smatrix_ref(self) -> &'scope SMatrix<T, ROWS, COLS> {
+        unsafe { self.0.cast().as_ref() }
+    }
+}
+
+#[cfg(feature = "static-arrays")]
+impl<'scope, 'data, T, const ROWS: usize, const COLS: usize>
+    TypedValue<'scope, 'data, MMatrix<T, ROWS, COLS>>
+{
+    /// Convert `self` to a reference to an `MMatrix`
+    ///
+    /// Safety:
+    ///
+    /// There must be no active mutable borrows of this data.
+    pub unsafe fn as_mmatrix_ref(self) -> &'scope MMatrix<T, ROWS, COLS> {
+        unsafe { self.0.cast().as_ref() }
+    }
+
+    /// Convert `self` to a mutable reference to an `MMatrix`
+    ///
+    /// Safety:
+    ///
+    /// There must be no active mutable borrows of this data.
+    pub unsafe fn as_mmatrix_mut(self) -> &'scope mut MMatrix<T, ROWS, COLS> {
+        unsafe { self.0.cast().as_mut() }
+    }
+}
+
+#[cfg(feature = "static-arrays")]
+impl<'scope, 'data, T, D: Dims<R>, const N: usize, const R: usize>
+    TypedValue<'scope, 'data, SArray<T, D, N, R>>
+{
+    /// Convert `self` to a reference to an `SArray`
+    pub fn as_sarray_ref(self) -> &'scope SArray<T, D, N, R> {
+        unsafe { self.0.cast().as_ref() }
+    }
+}
+
+#[cfg(feature = "static-arrays")]
+impl<'scope, 'data, T, D: Dims<R>, const N: usize, const R: usize>
+    TypedValue<'scope, 'data, MArray<T, D, N, R>>
+{
+    /// Convert `self` to a reference to an `MArray`
+    ///
+    /// Safety:
+    ///
+    /// There must be no active mutable borrows of this data.
+    pub unsafe fn as_marray_ref(self) -> &'scope MArray<T, D, N, R> {
+        unsafe { self.0.cast().as_ref() }
+    }
+
+    /// Convert `self` to a mutable reference to an `MArray`
+    ///
+    /// Safety:
+    ///
+    /// There must be no active mutable borrows of this data.
+    pub unsafe fn as_marray_mut(self) -> &'scope mut MArray<T, D, N, R> {
+        unsafe { self.0.cast().as_mut() }
     }
 }
 

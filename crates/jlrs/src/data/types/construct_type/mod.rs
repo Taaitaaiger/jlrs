@@ -75,7 +75,7 @@ pub unsafe trait ConstructType: Sized {
     /// No new type vars are constructed, if one is used and it don't already exist in `env`,
     /// this method panics. The result may have free `TypeVar`s, you can call
     /// [`DataType::wrap_with_env`] to create the appropriate `UnionAll`.
-    /// 
+    ///
     /// [`DataType::wrap_with_env`]: crate::data::managed::datatype::DataType::wrap_with_env
     #[inline]
     fn construct_type_with_env<'target, Tgt>(

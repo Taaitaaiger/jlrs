@@ -1,5 +1,9 @@
 use jlrs::{
     data::{
+        layout::static_arrays::{
+            dims::Dims3D, m_array::MArray, m_matrix::MMatrix, m_vector::MVector, s_array::SArray,
+            s_matrix::SMatrix, s_vector::SVector,
+        },
         managed::{
             array::{ArrayRet, RankedArrayRet, TypedArrayRet, TypedRankedArrayRet},
             ccall_ref::{CCallRef, CCallRefRet},
@@ -28,6 +32,7 @@ pub mod generics;
 pub mod isbits;
 pub mod named_tuple;
 pub mod ref_types;
+pub mod static_arrays;
 pub mod typed_value;
 
 use array::*;
@@ -39,6 +44,7 @@ use generics::*;
 use isbits::*;
 use named_tuple::*;
 use ref_types::*;
+use static_arrays::*;
 use typed_value::*;
 
 julia_module! {
@@ -201,4 +207,24 @@ julia_module! {
     in OpaqueEnum fn new_f64(value: f64) -> TypedValueRet<OpaqueEnum> as OpaqueEnum;
     in OpaqueEnum fn is_usize(&self) -> bool;
     in OpaqueEnum fn is_f64(&self) -> bool;
+
+    // Functions from static_arrays
+    fn sum_svector(svector: SVector<f32, 3>) -> f32;
+    fn sum_svector_ref(svector: &SVector<f32, 3>) -> f32;
+    fn sum_mvector_ref(mvector: &MVector<f32, 3>) -> f32;
+    fn reverse_mvector(mvector: &mut MVector<f32, 3>);
+    pub fn sum_smatrix(smatrix: SMatrix<f32, 3, 2>) -> f32;
+    pub fn sum_smatrix_ref(smatrix: &SMatrix<f32, 3, 2>) -> f32;
+    pub fn sum_mmatrix_ref(mmatrix: &MMatrix<f32, 3, 2>) -> f32;
+    pub fn swap_mmatrix_cols(mmatrix: &mut MMatrix<f32, 3, 2>);
+    pub fn sum_sarray(sarray: SArray<f32, Dims3D<2, 2, 2>, 8, 3>) -> f32;
+    pub fn sum_sarray_ref(sarray: &SArray<f32, Dims3D<2, 2, 2>, 8, 3>) -> f32;
+    pub fn sum_marray_ref(marray: &MArray<f32, Dims3D<2, 2, 2>, 8, 3>) -> f32;
+    fn swap_marray_blocks(marray: &mut MArray<f32, Dims3D<2, 2, 2>, 8, 3>);
+    fn returns_svector() -> SVector<f32, 2>;
+    fn returns_mvector() -> MVector<f32, 2>;
+    fn returns_smatrix() -> SMatrix<f32, 2, 1>;
+    fn returns_mmatrix() -> MMatrix<f32, 2, 1>;
+    fn returns_sarray() -> SArray<f32, Dims3D<1, 1, 1>, 1, 3>;
+    fn returns_marray() -> MArray<f32, Dims3D<1, 1, 1>, 1, 3>;
 }

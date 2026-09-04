@@ -51,7 +51,7 @@ use crate::{
     note = "Custom types that implement `IntoJulia` should be generated with JlrsCore.reflect",
     note = "Do not implement `ForeignType` or `OpaqueType` unless this type is exported to Julia with `julia_module!`"
 )]
-pub unsafe trait IntoJulia: Sized + 'static {
+pub unsafe trait IntoJulia: Sized {
     /// Returns the associated Julia type of the implementor.
     ///
     /// The layout of that type and the Rust type must match exactly, and it must be an `isbits`
@@ -70,7 +70,6 @@ pub unsafe trait IntoJulia: Sized + 'static {
         // associated
         unsafe {
             let ty = Self::julia_type(&target).as_managed();
-            debug_assert!(ty.is_bits());
 
             if let Some(instance) = ty.instance() {
                 target.data_from_ptr(instance.unwrap_non_null(Private), Private)
