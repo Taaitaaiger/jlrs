@@ -1,3 +1,5 @@
+//! Statically-sized mutable matrices
+
 use std::{marker::PhantomData, mem::MaybeUninit, ptr::NonNull};
 
 use jl_sys::jl_new_struct_uninit;
@@ -36,6 +38,7 @@ use crate::{
     weak_handle_unchecked,
 };
 
+/// A mutable matrix with `ROWS` rows and `COLS` colums
 #[derive(Clone)]
 #[repr(C)]
 pub struct MMatrix<T, const ROWS: usize, const COLS: usize> {
@@ -44,18 +47,26 @@ pub struct MMatrix<T, const ROWS: usize, const COLS: usize> {
 }
 
 impl<T, const ROWS: usize, const COLS: usize> MMatrix<T, ROWS, COLS> {
+    /// Create a mutable matrix with `ROWS` rows and `COLS` columns
     pub const fn new(data: [[T; ROWS]; COLS]) -> Self {
         MMatrix {
             data,
             _d: PhantomData,
         }
     }
+
+    /// Get a reference to the elements of `self`
+    ///
+    /// The data is stored in column-major order
     pub const fn data(&self) -> &[[T; ROWS]; COLS] {
         &self.data
     }
 }
 
 impl<T: IsBits, const ROWS: usize, const COLS: usize> MMatrix<T, ROWS, COLS> {
+    /// Get a mutable reference to the elements of `self`
+    ///
+    /// The data is stored in column-major order
     pub const fn data_mut(&mut self) -> &mut [[T; ROWS]; COLS] {
         &mut self.data
     }

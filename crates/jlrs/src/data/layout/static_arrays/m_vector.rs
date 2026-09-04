@@ -1,3 +1,5 @@
+//! Statically-sized mutable vectors
+
 use std::{marker::PhantomData, mem::MaybeUninit, ptr::NonNull};
 
 use jl_sys::jl_new_struct_uninit;
@@ -36,6 +38,7 @@ use crate::{
     weak_handle_unchecked,
 };
 
+/// A mutable vector with `N` elements
 #[derive(Clone)]
 #[repr(C)]
 pub struct MVector<T, const N: usize> {
@@ -44,6 +47,7 @@ pub struct MVector<T, const N: usize> {
 }
 
 impl<T, const N: usize> MVector<T, N> {
+    /// Create a mutable vector with `N` elements
     pub const fn new(data: [T; N]) -> Self {
         MVector {
             data,
@@ -51,12 +55,14 @@ impl<T, const N: usize> MVector<T, N> {
         }
     }
 
+    /// Get a reference to the elements of `self`
     pub const fn data(&self) -> &[T; N] {
         &self.data
     }
 }
 
 impl<T: IsBits, const N: usize> MVector<T, N> {
+    /// Get a mutable reference to the elements of `self`
     pub const fn data_mut(&mut self) -> &mut [T; N] {
         &mut self.data
     }

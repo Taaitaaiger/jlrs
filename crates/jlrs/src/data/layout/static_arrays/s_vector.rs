@@ -1,3 +1,5 @@
+//! Statically-sized immutable vectors
+
 use std::{marker::PhantomData, mem::MaybeUninit, ptr::NonNull};
 
 use jl_sys::jl_new_struct_uninit;
@@ -36,6 +38,7 @@ use crate::{
     weak_handle_unchecked,
 };
 
+/// An immutable vector with `N` elements
 #[derive(Clone)]
 #[repr(C)]
 pub struct SVector<T, const N: usize> {
@@ -44,12 +47,15 @@ pub struct SVector<T, const N: usize> {
 }
 
 impl<T, const N: usize> SVector<T, N> {
+    /// Create an immutable vector with `N` elements
     pub const fn new(data: [T; N]) -> Self {
         SVector {
             data,
             _d: PhantomData,
         }
     }
+
+    /// Get a reference to the elements of `self`
     pub const fn data(&self) -> &[T; N] {
         &self.data
     }

@@ -1,3 +1,13 @@
+//! Support for StaticArrays
+//!
+//! The [StaticArrays] package for Julia provides statically sized array types.
+//!
+//! The types provided in this module can be used in functions exported with the `julia_module`
+//! macro. All types can be passed by reference, mutable array types can be passed by mutable
+//! reference. Be aware that Rust's aliasing rules apply: never alias a mutable reference.
+//!
+//! [StaticArrays]: https://https://juliaarrays.github.io/StaticArrays.jl/stable/
+
 pub mod dims;
 pub mod m_array;
 pub mod m_matrix;

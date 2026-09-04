@@ -1,3 +1,5 @@
+//! Statically-sized immutable arrays
+
 use std::{marker::PhantomData, mem::MaybeUninit, ptr::NonNull};
 
 use jl_sys::jl_new_struct_uninit;
@@ -36,6 +38,7 @@ use crate::{
     weak_handle_unchecked,
 };
 
+/// An immutable array of rank `R` with dimensions `D` and `N` elements
 #[derive(Clone)]
 #[repr(C)]
 pub struct SArray<T, D: Dims<R>, const N: usize, const R: usize> {
@@ -44,6 +47,7 @@ pub struct SArray<T, D: Dims<R>, const N: usize, const R: usize> {
 }
 
 impl<T, D: Dims<R>, const N: usize, const R: usize> SArray<T, D, N, R> {
+    /// Create an immutable array of rank `R` with dimensions `D` and `N` elements
     pub const fn new(data: [T; N]) -> Self {
         const {
             if D::N != N {
@@ -55,6 +59,10 @@ impl<T, D: Dims<R>, const N: usize, const R: usize> SArray<T, D, N, R> {
             _d: PhantomData,
         }
     }
+
+    /// Get a reference to the elements of `self`
+    ///
+    /// The data is stored in column-major order
     pub const fn data(&self) -> &[T; N] {
         &self.data
     }

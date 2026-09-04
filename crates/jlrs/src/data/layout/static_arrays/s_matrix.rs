@@ -1,3 +1,5 @@
+//! Statically-sized immutable matrices
+
 use std::{marker::PhantomData, mem::MaybeUninit, ptr::NonNull};
 
 use jl_sys::jl_new_struct_uninit;
@@ -36,6 +38,7 @@ use crate::{
     weak_handle_unchecked,
 };
 
+/// An immutable matrix with `ROWS` rows and `COLS` colums
 #[derive(Clone)]
 #[repr(C)]
 pub struct SMatrix<T, const ROWS: usize, const COLS: usize> {
@@ -44,12 +47,17 @@ pub struct SMatrix<T, const ROWS: usize, const COLS: usize> {
 }
 
 impl<T, const ROWS: usize, const COLS: usize> SMatrix<T, ROWS, COLS> {
+    /// Create na immutable matrix with `ROWS` rows and `COLS` columns
     pub const fn new(data: [[T; ROWS]; COLS]) -> Self {
         SMatrix {
             data,
             _d: PhantomData,
         }
     }
+
+    /// Get a reference to the elements of `self`
+    ///
+    /// The data is stored in column-major order
     pub const fn data(&self) -> &[[T; ROWS]; COLS] {
         &self.data
     }
