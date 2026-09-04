@@ -13,7 +13,7 @@ use crate::{
     data::{
         layout::{
             is_bits::IsBits,
-            static_arrays::dims::Dims,
+            static_arrays::dims::{Dims, index_in},
             valid_layout::{ValidField, ValidLayout},
         },
         managed::{
@@ -65,6 +65,12 @@ impl<T, D: Dims<R>, const N: usize, const R: usize> SArray<T, D, N, R> {
     /// The data is stored in column-major order
     pub const fn data(&self) -> &[T; N] {
         &self.data
+    }
+
+    /// Get a reference to the element at index `I`
+    pub const fn get<I: Dims<R>>(&self) -> &T {
+        let index = index_in::<D, I, R>();
+        &self.data()[index]
     }
 }
 

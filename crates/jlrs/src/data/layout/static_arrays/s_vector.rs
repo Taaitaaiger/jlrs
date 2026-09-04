@@ -13,7 +13,7 @@ use crate::{
     data::{
         layout::{
             is_bits::IsBits,
-            static_arrays::dims::Dims1D,
+            static_arrays::dims::{Dims, Dims1D},
             valid_layout::{ValidField, ValidLayout},
         },
         managed::{
@@ -58,6 +58,11 @@ impl<T, const N: usize> SVector<T, N> {
     /// Get a reference to the elements of `self`
     pub const fn data(&self) -> &[T; N] {
         &self.data
+    }
+
+    /// Get a reference to the element at index `I`
+    pub const fn get<I: Dims<1>>(&self) -> &T {
+        &self.data()[I::PARAMS[0]]
     }
 }
 

@@ -13,7 +13,7 @@ use crate::{
     data::{
         layout::{
             is_bits::IsBits,
-            static_arrays::dims::Dims2D,
+            static_arrays::dims::{Dims, Dims2D},
             valid_layout::{ValidField, ValidLayout},
         },
         managed::{
@@ -60,6 +60,11 @@ impl<T, const ROWS: usize, const COLS: usize> SMatrix<T, ROWS, COLS> {
     /// The data is stored in column-major order
     pub const fn data(&self) -> &[[T; ROWS]; COLS] {
         &self.data
+    }
+
+    /// Get a reference to the element at index `I`
+    pub const fn get<I: Dims<2>>(&self) -> &T {
+        &self.data()[I::PARAMS[1]][I::PARAMS[0]]
     }
 }
 

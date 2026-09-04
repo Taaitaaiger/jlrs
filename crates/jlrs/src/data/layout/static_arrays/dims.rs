@@ -10,6 +10,37 @@ pub trait Dims<const R: usize>: 'static + Clone {
     const N: usize;
 }
 
+pub const fn index_in<S: Dims<R>, I: Dims<R>, const R: usize>() -> usize {
+    const {
+        let mut i = 0;
+        loop {
+            if I::PARAMS[i] >= S::PARAMS[i] {
+                panic!("Index out of bounds")
+            }
+
+            i += 1;
+            if i == R {
+                break;
+            }
+        }
+    }
+
+    let mut i = 1;
+    let mut index = I::PARAMS[0];
+    let mut step = S::PARAMS[0];
+
+    loop {
+        index += I::PARAMS[i] * step;
+        step *= S::PARAMS[i];
+        i += 1;
+        if i == R {
+            break;
+        }
+    }
+
+    index
+}
+
 /// Dimension of a rank-1 array
 #[derive(Clone)]
 pub struct Dims1D<const N: usize>;

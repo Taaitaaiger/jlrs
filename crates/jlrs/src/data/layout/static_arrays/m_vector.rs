@@ -13,7 +13,7 @@ use crate::{
     data::{
         layout::{
             is_bits::IsBits,
-            static_arrays::dims::Dims1D,
+            static_arrays::dims::{Dims, Dims1D},
             valid_layout::{ValidField, ValidLayout},
         },
         managed::{
@@ -59,12 +59,22 @@ impl<T, const N: usize> MVector<T, N> {
     pub const fn data(&self) -> &[T; N] {
         &self.data
     }
+
+    /// Get a reference to the element at index `I`
+    pub const fn get<I: Dims<1>>(&self) -> &T {
+        &self.data()[I::PARAMS[0]]
+    }
 }
 
 impl<T: IsBits, const N: usize> MVector<T, N> {
     /// Get a mutable reference to the elements of `self`
     pub const fn data_mut(&mut self) -> &mut [T; N] {
         &mut self.data
+    }
+
+    /// Get a mutable reference to the element at index `I`
+    pub const fn get_mut<I: Dims<1>>(&mut self) -> &mut T {
+        &mut self.data_mut()[I::PARAMS[0]]
     }
 }
 

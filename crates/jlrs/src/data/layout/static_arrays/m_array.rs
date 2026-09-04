@@ -13,7 +13,7 @@ use crate::{
     data::{
         layout::{
             is_bits::IsBits,
-            static_arrays::dims::Dims,
+            static_arrays::dims::{Dims, index_in},
             valid_layout::{ValidField, ValidLayout},
         },
         managed::{
@@ -66,6 +66,12 @@ impl<T, D: Dims<R>, const N: usize, const R: usize> MArray<T, D, N, R> {
     pub const fn data(&self) -> &[T; N] {
         &self.data
     }
+
+    /// Get a reference to the element at index `I`
+    pub const fn get<I: Dims<R>>(&self) -> &T {
+        let index = index_in::<D, I, R>();
+        &self.data()[index]
+    }
 }
 
 impl<T: IsBits, D: Dims<R>, const N: usize, const R: usize> MArray<T, D, N, R> {
@@ -74,6 +80,12 @@ impl<T: IsBits, D: Dims<R>, const N: usize, const R: usize> MArray<T, D, N, R> {
     /// The data is stored in column-major order
     pub const fn data_mut(&mut self) -> &mut [T; N] {
         &mut self.data
+    }
+
+    /// Get a mutable reference to the element at index `I`
+    pub const fn get_mut<I: Dims<R>>(&mut self) -> &mut T {
+        let index = index_in::<D, I, _>();
+        &mut self.data_mut()[index]
     }
 }
 

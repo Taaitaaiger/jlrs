@@ -13,7 +13,7 @@ use crate::{
     data::{
         layout::{
             is_bits::IsBits,
-            static_arrays::dims::Dims2D,
+            static_arrays::dims::{Dims, Dims2D},
             valid_layout::{ValidField, ValidLayout},
         },
         managed::{
@@ -61,6 +61,11 @@ impl<T, const ROWS: usize, const COLS: usize> MMatrix<T, ROWS, COLS> {
     pub const fn data(&self) -> &[[T; ROWS]; COLS] {
         &self.data
     }
+
+    /// Get a reference to the element at index `I`
+    pub const fn get<I: Dims<2>>(&self) -> &T {
+        &self.data()[I::PARAMS[1]][I::PARAMS[0]]
+    }
 }
 
 impl<T: IsBits, const ROWS: usize, const COLS: usize> MMatrix<T, ROWS, COLS> {
@@ -69,6 +74,11 @@ impl<T: IsBits, const ROWS: usize, const COLS: usize> MMatrix<T, ROWS, COLS> {
     /// The data is stored in column-major order
     pub const fn data_mut(&mut self) -> &mut [[T; ROWS]; COLS] {
         &mut self.data
+    }
+
+    /// Get a mutable reference to the element at index `I`
+    pub const fn get_mut<I: Dims<2>>(&mut self) -> &mut T {
+        &mut self.data_mut()[I::PARAMS[1]][I::PARAMS[0]]
     }
 }
 
