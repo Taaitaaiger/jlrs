@@ -27,4 +27,25 @@ impl<const ROWS: usize, const COLS: usize, const Z: usize> Dims<3> for Dims3D<RO
     const N: usize = ROWS * COLS * Z;
 }
 
-// TODO: macro
+#[macro_export]
+macro_rules! product {
+    ($t:ident, $($x:ident),+) => {
+        $t * product!($($x),+)
+    };
+    ($t:ident) => {
+        $t
+    };
+}
+
+#[macro_export]
+macro_rules! define_dims {
+    ($vis:vis $name:ident<$($n:ident),+; $r:literal>) => {
+        #[derive(Clone)]
+        $vis struct $name<$(const $n: usize),+>;
+        impl <$(const $n: usize),+> $crate::data::layout::static_arrays::dims::Dims<$r> for $name<$($n),+> {
+            const PARAMS: [usize; $r] = [$($n),+];
+            const N: usize = $crate::product!($($n),+);
+        }
+    };
+
+}

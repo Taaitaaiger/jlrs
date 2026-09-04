@@ -17,4 +17,4 @@ lto = ["jlrs/lto"]
 crate-type = ["cdylib"]
 
 [dependencies]
-jlrs = { path = "../../crates/jlrs", features = ["ccall", "jlrs-derive"] }
+jlrs = { path = "../../crates/jlrs", features = ["ccall", "jlrs-derive", "static-arrays"] }

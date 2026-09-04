@@ -60,6 +60,12 @@ impl<T, D: Dims<R>, const N: usize, const R: usize> MArray<T, D, N, R> {
     }
 }
 
+impl<T: IsBits, D: Dims<R>, const N: usize, const R: usize> MArray<T, D, N, R> {
+    pub const fn data_mut(&mut self) -> &mut [T; N] {
+        &mut self.data
+    }
+}
+
 unsafe impl<T: ConstructType, D: Dims<R>, const N: usize, const R: usize> Typecheck
     for MArray<T, D, N, R>
 {
@@ -182,7 +188,7 @@ unsafe impl<T: ConstructType, D: Dims<R>, const N: usize, const R: usize> Constr
             let m_array_ua = m_array.cast::<UnionAll>().unwrap();
 
             m_array_ua
-                .apply_types_unchecked(&mut frame, [s, t, n, rank])
+                .apply_types_unchecked(&mut frame, [s, t, rank, n])
                 .cast::<DataType>()
                 .unwrap()
                 .rewrap(target)
@@ -213,7 +219,7 @@ unsafe impl<T: ConstructType, D: Dims<R>, const N: usize, const R: usize> Constr
             let m_array_ua = m_array.cast_unchecked::<UnionAll>();
 
             m_array_ua
-                .apply_types_unchecked(&mut frame, [s, t, n, rank])
+                .apply_types_unchecked(&mut frame, [s, t, rank, n])
                 .cast_unchecked::<DataType>()
                 .wrap_with_env(target, env)
         })
@@ -232,6 +238,13 @@ unsafe impl<T: IsBits, D: Dims<R>, const N: usize, const R: usize> IsBits for MA
 
 unsafe impl<T: ConstructType, D: Dims<R>, const N: usize, const R: usize> CCallArg
     for &MArray<T, D, N, R>
+{
+    type CCallArgType = RefTypeConstructor<MArray<T, D, N, R>>;
+    type FunctionArgType = MArray<T, D, N, R>;
+}
+
+unsafe impl<T: ConstructType, D: Dims<R>, const N: usize, const R: usize> CCallArg
+    for &mut MArray<T, D, N, R>
 {
     type CCallArgType = RefTypeConstructor<MArray<T, D, N, R>>;
     type FunctionArgType = MArray<T, D, N, R>;

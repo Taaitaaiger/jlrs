@@ -1,6 +1,8 @@
 module JuliaModuleTest
 using JlrsCore.Wrap
 
+using StaticArrays
+
 struct FourGenericsI{A, B, C, D}
     a::A
     b::B

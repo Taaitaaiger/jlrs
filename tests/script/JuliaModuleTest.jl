@@ -4,6 +4,8 @@ using JlrsCore
 using JlrsCore.Ledger
 using Test
 
+using StaticArrays
+
 @testset "Freestanding functions" begin
     @test isnothing(JuliaModuleTest.takes_no_args_returns_nothing())
     @inferred JuliaModuleTest.takes_no_args_returns_nothing()
@@ -275,4 +277,36 @@ end
 
     enum_f64 = JuliaModuleTest.OpaqueEnum(6.0)
     @test JuliaModuleTest.is_f64(enum_f64)
+end
+
+@testset "StaticArrays" begin
+    svector = SVector{3, Float32}([1.0f0, 2.0f0, 3.0f0])
+    @test JuliaModuleTest.sum_svector(svector) == 6.0f0
+    @test JuliaModuleTest.sum_svector_ref(svector) == 6.0f0
+
+    mvector = MVector{3, Float32}([1.0f0, 2.0f0, 3.0f0])
+    @test JuliaModuleTest.sum_mvector_ref(mvector) == 6.0f0
+    reversed = MVector{3, Float32}([3.0f0, 2.0f0, 1.0f0])
+    JuliaModuleTest.reverse_mvector(mvector)
+    @test mvector == reversed
+
+    smatrix = SMatrix{3, 2, Float32, 6}([1.0f0, 2.0f0, 3.0f0, 4.0f0, 5.0f0, 6.0f0])
+    @test JuliaModuleTest.sum_smatrix(smatrix) == 21.0f0
+    @test JuliaModuleTest.sum_smatrix_ref(smatrix) == 21.0f0
+
+    mmatrix = MMatrix{3, 2, Float32, 6}([1.0f0, 2.0f0, 3.0f0, 4.0f0, 5.0f0, 6.0f0])
+    @test JuliaModuleTest.sum_mmatrix_ref(mmatrix) == 21.0f0
+    swapped = MMatrix{3, 2, Float32, 6}([4.0f0, 5.0f0, 6.0f0, 1.0f0, 2.0f0, 3.0f0])
+    JuliaModuleTest.swap_mmatrix_cols(mmatrix)
+    @test mmatrix == swapped
+
+    sarray = SArray{Tuple{2, 2, 2}, Float32}([1.0f0 2.0f0 3.0f0 4.0f0 5.0f0 6.0f0 7.0f0 8.0f0])
+    @test JuliaModuleTest.sum_sarray(sarray) == 36.0f0
+    @test JuliaModuleTest.sum_sarray_ref(sarray) == 36.0f0
+
+    marray = MArray{Tuple{2, 2, 2}, Float32}([1.0f0 2.0f0 3.0f0 4.0f0 5.0f0 6.0f0 7.0f0 8.0f0])
+    @test JuliaModuleTest.sum_marray_ref(marray) == 36.0f0
+    swapped = MArray{Tuple{2, 2, 2}, Float32}([5.0f0 6.0f0 7.0f0 8.0f0 1.0f0 2.0f0 3.0f0 4.0f0])
+    JuliaModuleTest.swap_marray_blocks(marray)
+    @test marray == swapped
 end

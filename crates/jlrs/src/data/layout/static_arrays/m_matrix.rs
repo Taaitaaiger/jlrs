@@ -55,6 +55,12 @@ impl<T, const ROWS: usize, const COLS: usize> MMatrix<T, ROWS, COLS> {
     }
 }
 
+impl<T: IsBits, const ROWS: usize, const COLS: usize> MMatrix<T, ROWS, COLS> {
+    pub const fn data_mut(&mut self) -> &mut [[T; ROWS]; COLS] {
+        &mut self.data
+    }
+}
+
 unsafe impl<T: ConstructType, const ROWS: usize, const COLS: usize> Typecheck
     for MMatrix<T, ROWS, COLS>
 {

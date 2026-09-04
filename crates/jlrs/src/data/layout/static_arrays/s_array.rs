@@ -178,7 +178,7 @@ unsafe impl<T: ConstructType, D: Dims<R>, const N: usize, const R: usize> Constr
             let s_array_ua = s_array.cast::<UnionAll>().unwrap();
 
             s_array_ua
-                .apply_types_unchecked(&mut frame, [s, t, n, rank])
+                .apply_types_unchecked(&mut frame, [s, t, rank, n])
                 .cast::<DataType>()
                 .unwrap()
                 .rewrap(target)
@@ -209,7 +209,7 @@ unsafe impl<T: ConstructType, D: Dims<R>, const N: usize, const R: usize> Constr
             let s_array_ua = s_array.cast_unchecked::<UnionAll>();
 
             s_array_ua
-                .apply_types_unchecked(&mut frame, [s, t, n, rank])
+                .apply_types_unchecked(&mut frame, [s, t, rank, n])
                 .cast_unchecked::<DataType>()
                 .wrap_with_env(target, env)
         })
