@@ -15,8 +15,7 @@ use jl_sys::{jl_call, jl_call1, jl_exception_occurred};
 use jlrs_sys::jlrs_current_task;
 
 use crate::{
-    args::Values,
-    call::Call,
+    call::{Call, args::Values},
     data::managed::{
         Managed, erase_scope_lifetime,
         module::{JlrsCore, Module},

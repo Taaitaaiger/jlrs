@@ -20,6 +20,8 @@
 
 - The macro `define_fast_array_key` has been removed, the same syntax is supported by `define_fast_key`.
 
+- The `args` module is now a submodule of the `call` module.
+
 - Types from the StaticArrays package are supported when the `static-arrays` feature is enabled.
 
 ## v0.23

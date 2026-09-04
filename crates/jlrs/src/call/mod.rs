@@ -268,6 +268,7 @@
 //!
 //! [`named_tuple`]: crate::named_tuple
 
+pub mod args;
 #[cfg(feature = "async")]
 pub mod call_async;
 
@@ -278,8 +279,8 @@ pub use call_async::CallAsync;
 use jl_sys::{jl_call, jl_exception_occurred};
 use jlrs_sys::jlrs_call_unchecked;
 
+use self::args::Values;
 use crate::{
-    args::Values,
     data::managed::{
         named_tuple::NamedTuple,
         private::ManagedPriv,
