@@ -1168,6 +1168,9 @@ pub(crate) unsafe fn init_jlrs(install_jlrs_core: &InstallJlrsCore, allow_overri
 
         init_ledger();
         Stack::init(&unrooted);
+
+        #[cfg(feature = "static-arrays")]
+        data::layout::static_arrays::init_static_arrays();
     }
 }
 

@@ -204,7 +204,7 @@ jobs:
 
       - name: Run tests
         run: |
-          julia -e 'import Pkg; Pkg.add(url="https://github.com/Taaitaaiger/JlrsCore.jl", rev="3fc603a1cf8d4e0c16a57027f15d00232f47ac4a"); Pkg.add(\"StaticArrays\")'
+          julia -e 'import Pkg; Pkg.add(url="https://github.com/Taaitaaiger/JlrsCore.jl", rev="3fc603a1cf8d4e0c16a57027f15d00232f47ac4a"); Pkg.add("StaticArrays")'
           cargo test --features full --verbose
 
   test-windows-msvc-lts:
