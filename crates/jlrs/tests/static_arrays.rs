@@ -19,12 +19,6 @@ mod tests {
 
     use super::util::JULIA;
 
-    fn use_static_arrays() {
-        JULIA.with(|j| unsafe {
-            j.borrow().using("StaticArrays").unwrap();
-        });
-    }
-
     fn svector_test() {
         JULIA.with(|j| {
             j.borrow().local_scope::<_, 2>(|mut frame| {
@@ -699,8 +693,6 @@ mod tests {
 
     #[test]
     fn runtime_test() {
-        use_static_arrays();
-
         svector_test();
         svector_ref_test();
         mvector_test();
