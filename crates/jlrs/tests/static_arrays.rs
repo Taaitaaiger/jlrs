@@ -2,14 +2,17 @@ mod util;
 #[cfg(all(feature = "local-rt", feature = "static-arrays"))]
 mod tests {
     use jlrs::{
-        data::layout::static_arrays::{
-            dims::{Dims1D, Dims2D, Dims3D},
-            m_array::MArray,
-            m_matrix::MMatrix,
-            m_vector::MVector,
-            s_array::SArray,
-            s_matrix::SMatrix,
-            s_vector::SVector,
+        data::{
+            layout::static_arrays::{
+                dims::{Dims1D, Dims2D, Dims3D},
+                m_array::MArray,
+                m_matrix::MMatrix,
+                m_vector::MVector,
+                s_array::SArray,
+                s_matrix::SMatrix,
+                s_vector::SVector,
+            },
+            managed::value::typed::TypedValue,
         },
         prelude::*,
     };
@@ -568,6 +571,132 @@ mod tests {
         })
     }
 
+    fn typed_value_svector_test() {
+        JULIA.with(|j| {
+            j.borrow().local_scope::<_, 1>(|mut frame| {
+                let svector = SVector::new([1.0f32, 2.0f32, 3.0f32]);
+                let boxed_svector = Value::new(&mut frame, svector);
+                let typed = boxed_svector.cast::<TypedValue<SVector<f32, 3>>>().unwrap();
+
+                let svector_ref = typed.as_svector_ref();
+                assert_eq!(svector_ref.get::<Dims1D<0>>(), &1.0f32);
+            })
+        });
+    }
+
+    fn typed_value_mvector_test() {
+        JULIA.with(|j| {
+            j.borrow().local_scope::<_, 1>(|mut frame| {
+                let mvector = MVector::new([1.0f32, 2.0f32, 3.0f32]);
+                let boxed_mvector = Value::new(&mut frame, mvector);
+                let typed = boxed_mvector.cast::<TypedValue<MVector<f32, 3>>>().unwrap();
+
+                let mvector_ref = unsafe { typed.as_mvector_ref() };
+                assert_eq!(mvector_ref.get::<Dims1D<0>>(), &1.0f32);
+            })
+        });
+    }
+
+    fn typed_value_mvector_mut_test() {
+        JULIA.with(|j| {
+            j.borrow().local_scope::<_, 1>(|mut frame| {
+                let mvector = MVector::new([1.0f32, 2.0f32, 3.0f32]);
+                let boxed_mvector = Value::new(&mut frame, mvector);
+                let typed = boxed_mvector.cast::<TypedValue<MVector<f32, 3>>>().unwrap();
+
+                let mvector_ref = unsafe { typed.as_mvector_mut() };
+                assert_eq!(mvector_ref.get_mut::<Dims1D<0>>(), &mut 1.0f32);
+            })
+        });
+    }
+
+    fn typed_value_smatrix_test() {
+        JULIA.with(|j| {
+            j.borrow().local_scope::<_, 1>(|mut frame| {
+                let smatrix = SMatrix::new([[1.0f32, 2.0f32]]);
+                let boxed_smatrix = Value::new(&mut frame, smatrix);
+                let typed = boxed_smatrix
+                    .cast::<TypedValue<SMatrix<f32, 2, 1>>>()
+                    .unwrap();
+
+                let smatrix_ref = typed.as_smatrix_ref();
+                assert_eq!(smatrix_ref.get::<Dims2D<0, 0>>(), &1.0f32);
+            })
+        });
+    }
+
+    fn typed_value_mmatrix_test() {
+        JULIA.with(|j| {
+            j.borrow().local_scope::<_, 1>(|mut frame| {
+                let mmatrix = MMatrix::new([[1.0f32, 2.0f32]]);
+                let boxed_mmatrix = Value::new(&mut frame, mmatrix);
+                let typed = boxed_mmatrix
+                    .cast::<TypedValue<MMatrix<f32, 2, 1>>>()
+                    .unwrap();
+
+                let mmatrix_ref = unsafe { typed.as_mmatrix_ref() };
+                assert_eq!(mmatrix_ref.get::<Dims2D<0, 0>>(), &1.0f32);
+            })
+        });
+    }
+
+    fn typed_value_mmatrix_mut_test() {
+        JULIA.with(|j| {
+            j.borrow().local_scope::<_, 1>(|mut frame| {
+                let mmatrix = MMatrix::new([[1.0f32, 2.0f32]]);
+                let boxed_mmatrix = Value::new(&mut frame, mmatrix);
+                let typed = boxed_mmatrix
+                    .cast::<TypedValue<MMatrix<f32, 2, 1>>>()
+                    .unwrap();
+
+                let mmatrix_ref = unsafe { typed.as_mmatrix_mut() };
+                assert_eq!(mmatrix_ref.get::<Dims2D<0, 0>>(), &mut 1.0f32);
+            })
+        });
+    }
+
+    fn typed_value_sarray_test() {
+        JULIA.with(|j| {
+            j.borrow().local_scope::<_, 1>(|mut frame| {
+                type ArrayType = SArray<f32, Dims3D<1, 2, 3>, 6, 3>;
+                let sarray = ArrayType::new([1.0f32, 2.0f32, 3.0f32, 4.0f32, 5.0f32, 6.0f32]);
+                let boxed_sarray = Value::new(&mut frame, sarray);
+                let typed = boxed_sarray.cast::<TypedValue<ArrayType>>().unwrap();
+
+                let sarray_ref = typed.as_sarray_ref();
+                assert_eq!(sarray_ref.get::<Dims3D<0, 0, 0>>(), &1.0f32);
+            })
+        });
+    }
+
+    fn typed_value_marray_test() {
+        JULIA.with(|j| {
+            j.borrow().local_scope::<_, 1>(|mut frame| {
+                type ArrayType = MArray<f32, Dims3D<1, 2, 3>, 6, 3>;
+                let marray = ArrayType::new([1.0f32, 2.0f32, 3.0f32, 4.0f32, 5.0f32, 6.0f32]);
+                let boxed_marray = Value::new(&mut frame, marray);
+                let typed = boxed_marray.cast::<TypedValue<ArrayType>>().unwrap();
+
+                let marray_ref = unsafe { typed.as_marray_ref() };
+                assert_eq!(marray_ref.get::<Dims3D<0, 0, 0>>(), &1.0f32);
+            })
+        });
+    }
+
+    fn typed_value_marray_mut_test() {
+        JULIA.with(|j| {
+            j.borrow().local_scope::<_, 1>(|mut frame| {
+                type ArrayType = MArray<f32, Dims3D<1, 2, 3>, 6, 3>;
+                let marray = ArrayType::new([1.0f32, 2.0f32, 3.0f32, 4.0f32, 5.0f32, 6.0f32]);
+                let boxed_marray = Value::new(&mut frame, marray);
+                let typed = boxed_marray.cast::<TypedValue<ArrayType>>().unwrap();
+
+                let marray_ref = unsafe { typed.as_marray_mut() };
+                assert_eq!(marray_ref.get::<Dims3D<0, 0, 0>>(), &mut 1.0f32);
+            })
+        });
+    }
+
     #[test]
     fn runtime_test() {
         use_static_arrays();
@@ -601,5 +730,17 @@ mod tests {
         mmatrix_mapping_test();
         sarray_mapping_test();
         marray_mapping_test();
+
+        typed_value_svector_test();
+        typed_value_mvector_test();
+        typed_value_mvector_mut_test();
+
+        typed_value_smatrix_test();
+        typed_value_mmatrix_test();
+        typed_value_mmatrix_mut_test();
+
+        typed_value_sarray_test();
+        typed_value_marray_test();
+        typed_value_marray_mut_test();
     }
 }
