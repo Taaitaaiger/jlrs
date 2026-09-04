@@ -45,6 +45,11 @@ pub struct SArray<T, D: Dims<R>, const N: usize, const R: usize> {
 
 impl<T, D: Dims<R>, const N: usize, const R: usize> SArray<T, D, N, R> {
     pub const fn new(data: [T; N]) -> Self {
+        const {
+            if D::N != N {
+                panic!("Wrong number of elements for static array")
+            }
+        };
         SArray {
             data,
             _d: PhantomData,

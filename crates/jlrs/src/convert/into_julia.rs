@@ -70,7 +70,6 @@ pub unsafe trait IntoJulia: Sized {
         // associated
         unsafe {
             let ty = Self::julia_type(&target).as_managed();
-            debug_assert!(ty.is_bits());
 
             if let Some(instance) = ty.instance() {
                 target.data_from_ptr(instance.unwrap_non_null(Private), Private)

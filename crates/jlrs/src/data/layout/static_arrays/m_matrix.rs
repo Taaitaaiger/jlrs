@@ -112,8 +112,8 @@ unsafe impl<T: 'static + ConstructType + Clone, const ROWS: usize, const COLS: u
     }
 }
 
-unsafe impl<'a, T: 'static + ConstructType + Clone, const ROWS: usize, const COLS: usize> IntoJulia
-    for &MMatrix<T, ROWS, COLS>
+unsafe impl<'a, T: 'static + ConstructType + IsBits + Clone, const ROWS: usize, const COLS: usize>
+    IntoJulia for &MMatrix<T, ROWS, COLS>
 {
     fn julia_type<'scope, Tgt>(target: Tgt) -> DataTypeData<'scope, Tgt>
     where
@@ -134,7 +134,6 @@ unsafe impl<'a, T: 'static + ConstructType + Clone, const ROWS: usize, const COL
     {
         unsafe {
             let ty = Self::julia_type(&target).as_managed();
-            debug_assert!(ty.is_bits());
 
             let container = jl_new_struct_uninit(ty.unwrap(Private));
             debug_assert!(!container.is_null());

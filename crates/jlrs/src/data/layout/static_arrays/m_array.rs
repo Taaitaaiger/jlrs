@@ -45,6 +45,11 @@ pub struct MArray<T, D: Dims<R>, const N: usize, const R: usize> {
 
 impl<T, D: Dims<R>, const N: usize, const R: usize> MArray<T, D, N, R> {
     pub const fn new(data: [T; N]) -> Self {
+        const {
+            if D::N != N {
+                panic!("Wrong number of elements for static array")
+            }
+        };
         MArray {
             data,
             _d: PhantomData,
@@ -112,8 +117,13 @@ unsafe impl<T: 'static + ConstructType + Clone, D: Dims<R>, const N: usize, cons
     }
 }
 
-unsafe impl<'a, T: 'static + ConstructType + Clone, D: Dims<R>, const N: usize, const R: usize>
-    IntoJulia for &MArray<T, D, N, R>
+unsafe impl<
+    'a,
+    T: 'static + ConstructType + IsBits + Clone,
+    D: Dims<R>,
+    const N: usize,
+    const R: usize,
+> IntoJulia for &MArray<T, D, N, R>
 {
     fn julia_type<'scope, Tgt>(target: Tgt) -> DataTypeData<'scope, Tgt>
     where
@@ -134,7 +144,6 @@ unsafe impl<'a, T: 'static + ConstructType + Clone, D: Dims<R>, const N: usize, 
     {
         unsafe {
             let ty = Self::julia_type(&target).as_managed();
-            debug_assert!(ty.is_bits());
 
             let container = jl_new_struct_uninit(ty.unwrap(Private));
             debug_assert!(!container.is_null());

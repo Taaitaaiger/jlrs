@@ -109,7 +109,9 @@ unsafe impl<T: 'static + ConstructType + Clone, const N: usize> IntoJulia for MV
     }
 }
 
-unsafe impl<'a, T: 'static + ConstructType + Clone, const N: usize> IntoJulia for &MVector<T, N> {
+unsafe impl<'a, T: 'static + ConstructType + IsBits + Clone, const N: usize> IntoJulia
+    for &MVector<T, N>
+{
     fn julia_type<'scope, Tgt>(target: Tgt) -> DataTypeData<'scope, Tgt>
     where
         Tgt: Target<'scope>,
@@ -129,7 +131,6 @@ unsafe impl<'a, T: 'static + ConstructType + Clone, const N: usize> IntoJulia fo
     {
         unsafe {
             let ty = Self::julia_type(&target).as_managed();
-            debug_assert!(ty.is_bits());
 
             let container = jl_new_struct_uninit(ty.unwrap(Private));
             debug_assert!(!container.is_null());
