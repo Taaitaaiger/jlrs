@@ -24,6 +24,8 @@
 
 - Types from the StaticArrays package are supported when the `static-arrays` feature is enabled.
 
+- The `jl-docs` feature can be enabled when building libraries that use `julia_module`. When this is enabled, the source links will link to the original documentation in the Rust crate.
+
 ## v0.23
 
 - Implement `Clone` for `Tracked`. Note that this will break your code if the tracked type implements `Clone`, and the tracked handle was used to clone the data; this will now return a cloned handle, instead of the cloned underlying type.

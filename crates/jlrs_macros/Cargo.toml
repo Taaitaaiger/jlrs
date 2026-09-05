@@ -21,12 +21,13 @@ windows = []
 derive = ["proc-macro2"]
 ccall = ["proc-macro2"]
 docs = []
+jl-docs = []
 
 [lib]
 proc-macro = true
 
 [dependencies]
-proc-macro2 = { version = "1", optional = true }
+proc-macro2 = { version = "1", optional = true, features = ["span-locations"] }
 syn = { version = "3", features = ["full", "extra-traits", "printing"] }
 quote = { version = "1" }
 jl-sys = { path = "../ffi/jl_sys", version = "0.28"}

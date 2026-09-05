@@ -59,6 +59,8 @@ static-arrays = []
 jlrs-derive = ["jlrs-macros/derive"]
 # Compile the support library with support for cross-language LTO.
 lto = ["jlrs-sys/lto"]
+# Expose the absolute source path in wrapped modules for documentation source links.
+jl-docs = ["jlrs-macros/jl-docs"]
 
 # Target or link a specific Julia build or arch.
 

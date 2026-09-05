@@ -5,6 +5,8 @@ edition = "2024"
 
 [profile.release]
 panic = "abort"
+codegen-units = 1
+lto = "thin"
 
 [profile.dev]
 panic = "abort"

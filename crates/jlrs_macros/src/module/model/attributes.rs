@@ -7,6 +7,14 @@ pub struct Documentation<'a> {
 }
 
 impl<'a> Documentation<'a> {
+    pub fn line(&self) -> usize {
+        self._original
+            .iter()
+            .map(|a| a.span().start().line)
+            .min()
+            .unwrap_or(1)
+    }
+
     pub fn from_attributes(attrs: Vec<&'a Attribute>) -> Result<Option<Self>> {
         if attrs.len() == 0 {
             return Ok(None);
