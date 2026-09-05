@@ -16,7 +16,10 @@ pub mod s_array;
 pub mod s_matrix;
 pub mod s_vector;
 
-#[cfg(all(feature = "static-arrays", any(feature = "local-rt", feature = "async-rt", feature = "multi-rt")))]
+#[cfg(all(
+    feature = "static-arrays",
+    any(feature = "local-rt", feature = "async-rt", feature = "multi-rt")
+))]
 pub(crate) unsafe fn init_static_arrays() {
     let using = c"using StaticArrays";
     unsafe {

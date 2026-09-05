@@ -1172,7 +1172,10 @@ pub(crate) unsafe fn init_jlrs(install_jlrs_core: &InstallJlrsCore, allow_overri
         init_ledger();
         Stack::init(&unrooted);
 
-        #[cfg(all(feature = "static-arrays", any(feature = "local-rt", feature = "async-rt", feature = "multi-rt")))]
+        #[cfg(all(
+            feature = "static-arrays",
+            any(feature = "local-rt", feature = "async-rt", feature = "multi-rt")
+        ))]
         data::layout::static_arrays::init_static_arrays();
     }
 }

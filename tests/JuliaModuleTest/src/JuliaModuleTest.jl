@@ -3,14 +3,14 @@ using JlrsCore.Wrap
 
 using StaticArrays
 
-struct FourGenericsI{A, B, C, D}
+struct FourGenericsI{A,B,C,D}
     a::A
     b::B
     c::C
     d::D
 end
 
-mutable struct FourGenericsM{A, B, C, D}
+mutable struct FourGenericsM{A,B,C,D}
     a::A
     b::B
     c::C
@@ -23,6 +23,6 @@ test_library_name = Sys.iswindows() ? "julia_module_test" : "libjulia_module_tes
 @wrapmodule("$(test_library_dir)$(separator)$(test_library_name)", :julia_module_tests_init_fn)
 
 function __init__()
-    @initjlrs(Module[StaticArrays])
+    @initjlrs Module[StaticArrays]
 end
 end # module JuliaModuleTest
