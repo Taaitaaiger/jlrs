@@ -42,8 +42,7 @@ impl<'a> DocsCodegen<'a> {
                         let item = ::jlrs::data::managed::symbol::Symbol::new(&frame, #name);
                         let signature = ::jlrs::data::managed::value::Value::bottom_type(&frame);
                         let doc = ::jlrs::data::managed::string::JuliaString::new(&mut frame, #doc);
-                        let filename = #filename;
-                        let filename = ::jlrs::data::managed::string::JuliaString::new(&mut frame, filename);
+                        let filename = ::jlrs::data::managed::string::JuliaString::new(&mut frame, #filename);
                         let line = ::jlrs::data::managed::value::Value::new(&mut frame, #line as isize);
 
                         let doc_it = doc_item_ty.as_value().call(&mut frame, [#module.as_value(), filename.as_value(), line, item.as_value(), signature, doc.as_value()]).unwrap();
