@@ -34,7 +34,7 @@ jobs:
 
       - name: Run tests
         run: |
-          julia -e "import Pkg; Pkg.add(url=\"https://github.com/Taaitaaiger/JlrsCore.jl\", rev=\"5cd90ba3a4b1d529ed134186a7bd40c48cc84f87\"); Pkg.add(\"StaticArrays\")"
+          julia -e "import Pkg; Pkg.add(url=\"https://github.com/Taaitaaiger/JlrsCore.jl\", rev=\"6a1c1790276561c96b9d0adba4503c06ba16a780\"); Pkg.add(\"StaticArrays\")"
           export JLRS_JULIA_DIR="$(dirname $(dirname $(which julia)))"
           export LD_LIBRARY_PATH="${JLRS_JULIA_DIR}/lib:${LD_LIBRARY_PATH}"
           cargo test --features full --verbose
@@ -64,7 +64,7 @@ jobs:
 
       - name: Run tests
         run: |
-          julia -e "import Pkg; Pkg.add(url=\"https://github.com/Taaitaaiger/JlrsCore.jl\", rev=\"5cd90ba3a4b1d529ed134186a7bd40c48cc84f87\"); Pkg.add(\"StaticArrays\")"
+          julia -e "import Pkg; Pkg.add(url=\"https://github.com/Taaitaaiger/JlrsCore.jl\", rev=\"6a1c1790276561c96b9d0adba4503c06ba16a780\"); Pkg.add(\"StaticArrays\")"
           export JLRS_JULIA_DIR="$(dirname $(dirname $(which julia)))"
           export DYLD_LIBRARY_PATH="${JLRS_JULIA_DIR}/lib:${DYLD_LIBRARY_PATH}"
           cargo test --features full --verbose
@@ -94,7 +94,7 @@ jobs:
 
       - name: Run tests
         run: |
-          julia -e 'import Pkg; Pkg.add(url="https://github.com/Taaitaaiger/JlrsCore.jl", rev="5cd90ba3a4b1d529ed134186a7bd40c48cc84f87"); Pkg.add("StaticArrays")'
+          julia -e 'import Pkg; Pkg.add(url="https://github.com/Taaitaaiger/JlrsCore.jl", rev="6a1c1790276561c96b9d0adba4503c06ba16a780"); Pkg.add("StaticArrays")'
           cargo test --features full --verbose
 
   test-windows-msvc:
@@ -125,7 +125,7 @@ jobs:
 
       - name: Run tests
         run: |
-          julia -e 'import Pkg; Pkg.add(url="https://github.com/Taaitaaiger/JlrsCore.jl", rev="5cd90ba3a4b1d529ed134186a7bd40c48cc84f87"); Pkg.add("StaticArrays")'
+          julia -e 'import Pkg; Pkg.add(url="https://github.com/Taaitaaiger/JlrsCore.jl", rev="6a1c1790276561c96b9d0adba4503c06ba16a780"); Pkg.add("StaticArrays")'
           cargo test --features full --verbose
 
   test-linux-lts:
@@ -150,7 +150,7 @@ jobs:
 
       - name: Run tests
         run: |
-          julia -e "import Pkg; Pkg.add(url=\"https://github.com/Taaitaaiger/JlrsCore.jl\", rev=\"5cd90ba3a4b1d529ed134186a7bd40c48cc84f87\"); Pkg.add(\"StaticArrays\")"
+          julia -e "import Pkg; Pkg.add(url=\"https://github.com/Taaitaaiger/JlrsCore.jl\", rev=\"6a1c1790276561c96b9d0adba4503c06ba16a780\"); Pkg.add(\"StaticArrays\")"
           export JLRS_JULIA_DIR="$(dirname $(dirname $(which julia)))"
           export LD_LIBRARY_PATH="${JLRS_JULIA_DIR}/lib:${LD_LIBRARY_PATH}"
           cargo test --features full --verbose
@@ -177,7 +177,7 @@ jobs:
 
       - name: Run tests
         run: |
-          julia -e "import Pkg; Pkg.add(url=\"https://github.com/Taaitaaiger/JlrsCore.jl\", rev=\"5cd90ba3a4b1d529ed134186a7bd40c48cc84f87\"); Pkg.add(\"StaticArrays\")"
+          julia -e "import Pkg; Pkg.add(url=\"https://github.com/Taaitaaiger/JlrsCore.jl\", rev=\"6a1c1790276561c96b9d0adba4503c06ba16a780\"); Pkg.add(\"StaticArrays\")"
           export JLRS_JULIA_DIR="$(dirname $(dirname $(which julia)))"
           export DYLD_LIBRARY_PATH="${JLRS_JULIA_DIR}/lib:${DYLD_LIBRARY_PATH}"
           cargo test --features full --verbose
@@ -204,7 +204,7 @@ jobs:
 
       - name: Run tests
         run: |
-          julia -e 'import Pkg; Pkg.add(url="https://github.com/Taaitaaiger/JlrsCore.jl", rev="5cd90ba3a4b1d529ed134186a7bd40c48cc84f87"); Pkg.add("StaticArrays")'
+          julia -e 'import Pkg; Pkg.add(url="https://github.com/Taaitaaiger/JlrsCore.jl", rev="6a1c1790276561c96b9d0adba4503c06ba16a780"); Pkg.add("StaticArrays")'
           cargo test --features full --verbose
 
   test-windows-msvc-lts:
@@ -232,7 +232,7 @@ jobs:
 
       - name: Run tests
         run: |
-          julia -e 'import Pkg; Pkg.add(url="https://github.com/Taaitaaiger/JlrsCore.jl", rev="5cd90ba3a4b1d529ed134186a7bd40c48cc84f87"); Pkg.add("StaticArrays")'
+          julia -e 'import Pkg; Pkg.add(url="https://github.com/Taaitaaiger/JlrsCore.jl", rev="6a1c1790276561c96b9d0adba4503c06ba16a780"); Pkg.add("StaticArrays")'
           cargo test --features full --verbose
 
   build-benches-linux:
@@ -282,7 +282,7 @@ jobs:
       - name: Script tests
         run: |
           cd tests/script
-          julia -e "import Pkg; Pkg.add(url=\"https://github.com/Taaitaaiger/JlrsCore.jl\", rev=\"5cd90ba3a4b1d529ed134186a7bd40c48cc84f87\"); Pkg.add(\"StaticArrays\")"
+          julia -e "import Pkg; Pkg.add(url=\"https://github.com/Taaitaaiger/JlrsCore.jl\", rev=\"6a1c1790276561c96b9d0adba4503c06ba16a780\"); Pkg.add(\"StaticArrays\")"
           export JULIA_MODULE_TEST_LIB_DIR="${GITHUB_WORKSPACE}/tests/julia_module_test/target/debug"
           julia JuliaModuleTest.jl
 
@@ -346,7 +346,7 @@ jobs:
       - name: Script tests
         run: |
           cd tests/script
-          julia -e "import Pkg; Pkg.add(url=\"https://github.com/Taaitaaiger/JlrsCore.jl\", rev=\"5cd90ba3a4b1d529ed134186a7bd40c48cc84f87\"); Pkg.add(\"StaticArrays\")"
+          julia -e "import Pkg; Pkg.add(url=\"https://github.com/Taaitaaiger/JlrsCore.jl\", rev=\"6a1c1790276561c96b9d0adba4503c06ba16a780\"); Pkg.add(\"StaticArrays\")"
           export JULIA_MODULE_TEST_LIB_DIR="${GITHUB_WORKSPACE}/tests/julia_module_test/target/debug"
           julia JuliaModuleTest.jl
 
@@ -410,7 +410,7 @@ jobs:
       - name: Script tests
         run: |
           cd tests/script
-          julia -e 'import Pkg; Pkg.add(url="https://github.com/Taaitaaiger/JlrsCore.jl", rev="5cd90ba3a4b1d529ed134186a7bd40c48cc84f87"); Pkg.add("StaticArrays")'
+          julia -e 'import Pkg; Pkg.add(url="https://github.com/Taaitaaiger/JlrsCore.jl", rev="6a1c1790276561c96b9d0adba4503c06ba16a780"); Pkg.add("StaticArrays")'
           $env:JULIA_MODULE_TEST_LIB_DIR = "${env:GITHUB_WORKSPACE}\tests\julia_module_test\target\debug"
           julia JuliaModuleTest.jl
 
