@@ -8,8 +8,6 @@
 //!
 //! [StaticArrays]: https://https://juliaarrays.github.io/StaticArrays.jl/stable/
 
-use jl_sys::jl_eval_string;
-
 pub mod dims;
 pub mod m_array;
 pub mod m_matrix;
@@ -18,9 +16,10 @@ pub mod s_array;
 pub mod s_matrix;
 pub mod s_vector;
 
+#[cfg(all(feature = "static-arrays", any(feature = "local-rt", feature = "async-rt", feature = "multi-rt")))]
 pub(crate) unsafe fn init_static_arrays() {
     let using = c"using StaticArrays";
     unsafe {
-        jl_eval_string(using.as_ptr());
+        jl_sys::jl_eval_string(using.as_ptr());
     }
 }

@@ -23,6 +23,6 @@ test_library_name = Sys.iswindows() ? "julia_module_test" : "libjulia_module_tes
 @wrapmodule("$(test_library_dir)$(separator)$(test_library_name)", :julia_module_tests_init_fn)
 
 function __init__()
-    @initjlrs
+    @initjlrs(Module[StaticArrays])
 end
 end # module JuliaModuleTest

@@ -147,7 +147,7 @@
 //! - `static-arrays`
 //!
 //!   Adds support for working with statically-sized array types from the StaticArrays package.
-//! 
+//!
 //! - `f16`
 //!
 //!   Adds support for working with Julia's `Float16` type from Rust using half's `f16` type.
@@ -1031,7 +1031,7 @@ pub mod util;
 /// The version of the jlrs API this version of jlrs is compatible with.
 ///
 /// If this version number doesn't match `JLRS_API_VERSION` in JlrsCore.jl, initialization fails.
-pub const JLRS_API_VERSION: isize = 5;
+pub const JLRS_API_VERSION: isize = 6;
 
 /// Installation method for the JlrsCore package. If JlrsCore is already installed the installed version
 /// is used.
@@ -1172,7 +1172,7 @@ pub(crate) unsafe fn init_jlrs(install_jlrs_core: &InstallJlrsCore, allow_overri
         init_ledger();
         Stack::init(&unrooted);
 
-        #[cfg(feature = "static-arrays")]
+        #[cfg(all(feature = "static-arrays", any(feature = "local-rt", feature = "async-rt", feature = "multi-rt")))]
         data::layout::static_arrays::init_static_arrays();
     }
 }

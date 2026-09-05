@@ -54,6 +54,7 @@ pub fn codegen(ir: JuliaModuleIR) -> TokenStream {
         pub unsafe extern "C" fn #init_fn_ident(
             module: ::jlrs::data::managed::module::Module,
             precompiling: u8,
+            deps: ::jlrs::data::managed::array::TypedVector<::jlrs::data::managed::module::Module>
         ) -> ::jlrs::data::managed::value::ValueRet {
             static IS_INIT: ::std::sync::atomic::AtomicBool = ::std::sync::atomic::AtomicBool::new(false);
             if IS_INIT.compare_exchange(false, true, ::std::sync::atomic::Ordering::Relaxed, ::std::sync::atomic::Ordering::Relaxed).is_err() {
@@ -62,7 +63,7 @@ pub fn codegen(ir: JuliaModuleIR) -> TokenStream {
             }
 
             unsafe {
-                ::jlrs::data::static_data::set_loading_package(Some(module));
+                ::jlrs::data::static_data::set_loading_package(Some((module, deps)));
 
                 #struct_init_fn
 
