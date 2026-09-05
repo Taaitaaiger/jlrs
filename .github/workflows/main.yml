@@ -277,7 +277,7 @@ jobs:
       - name: Build library
         run: |
           cd tests/julia_module_test
-          cargo build
+          cargo build --features "jlrs/jl-docs"
 
       - name: Script tests
         run: |
@@ -344,7 +344,7 @@ jobs:
       - name: Build library
         run: |
           cd tests/julia_module_test
-          cargo build
+          cargo build --features "jlrs/jl-docs"
 
       - name: Script tests
         run: |
@@ -411,7 +411,7 @@ jobs:
       - name: Build library
         run: |
           cd tests/julia_module_test
-          cargo build
+          cargo build --features "jlrs/jl-docs"
 
       - name: Script tests
         run: |
