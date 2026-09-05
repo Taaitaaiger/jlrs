@@ -171,6 +171,12 @@ All other features are called utility features. The following are available:
   easily export functions, types, and data in combination with the macros from the Wrap
   module in the JlrsCore package.
 
+- `jl-docs`
+
+  This feature can be used with `julia_module` to generate documentation items whose source links
+  link to the original documentation in the Rust crate. This should only be used when generating
+  documentation to avoid leaking absolute paths in the library.
+
 - `lto`
 
   jlrs depends on a support library written in C, if this feature is enabled this support library
