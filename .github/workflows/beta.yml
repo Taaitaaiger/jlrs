@@ -156,6 +156,7 @@ jobs:
       - name: Instantiate docs
         run: |
           cd tests/JuliaModuleTest
+          export JULIA_MODULE_TEST_LIB_DIR="${GITHUB_WORKSPACE}/tests/julia_module_test/target/debug"
           julia --project=docs -e '
             using Pkg
             Pkg.develop(PackageSpec(path=pwd()))
@@ -168,6 +169,7 @@ jobs:
       - name: Doctests
         run: |
           cd tests/JuliaModuleTest
+          export JULIA_MODULE_TEST_LIB_DIR="${GITHUB_WORKSPACE}/tests/julia_module_test/target/debug"
           julia --project=docs -e '
             using Documenter: doctest
             using JuliaModuleTest
@@ -176,6 +178,7 @@ jobs:
       - name: Docs
         run: |
           cd tests/JuliaModuleTest
+          export JULIA_MODULE_TEST_LIB_DIR="${GITHUB_WORKSPACE}/tests/julia_module_test/target/debug"
           julia --project=docs docs/make.jl
         env:
           JULIA_PKG_SERVER: ""
@@ -220,6 +223,7 @@ jobs:
       - name: Instantiate docs
         run: |
           cd tests/JuliaModuleTest
+          export JULIA_MODULE_TEST_LIB_DIR="${GITHUB_WORKSPACE}/tests/julia_module_test/target/debug"
           julia --project=docs -e '
             using Pkg
             Pkg.develop(PackageSpec(path=pwd()))
@@ -232,6 +236,7 @@ jobs:
       - name: Doctests
         run: |
           cd tests/JuliaModuleTest
+          export JULIA_MODULE_TEST_LIB_DIR="${GITHUB_WORKSPACE}/tests/julia_module_test/target/debug"
           julia --project=docs -e '
             using Documenter: doctest
             using JuliaModuleTest
@@ -240,6 +245,7 @@ jobs:
       - name: Docs
         run: |
           cd tests/JuliaModuleTest
+          export JULIA_MODULE_TEST_LIB_DIR="${GITHUB_WORKSPACE}/tests/julia_module_test/target/debug"
           julia --project=docs docs/make.jl
         env:
           JULIA_PKG_SERVER: ""
@@ -284,6 +290,7 @@ jobs:
       - name: Instantiate docs
         run: |
           cd tests/JuliaModuleTest
+          $env:JULIA_MODULE_TEST_LIB_DIR = "${env:GITHUB_WORKSPACE}\tests\julia_module_test\target\debug"
           julia --project=docs -e '
             using Pkg
             Pkg.develop(PackageSpec(path=pwd()))
@@ -296,6 +303,7 @@ jobs:
       - name: Doctests
         run: |
           cd tests/JuliaModuleTest
+          $env:JULIA_MODULE_TEST_LIB_DIR = "${env:GITHUB_WORKSPACE}\tests\julia_module_test\target\debug"
           julia --project=docs -e '
             using Documenter: doctest
             using JuliaModuleTest
@@ -304,6 +312,7 @@ jobs:
       - name: Docs
         run: |
           cd tests/JuliaModuleTest
+          $env:JULIA_MODULE_TEST_LIB_DIR = "${env:GITHUB_WORKSPACE}\tests\julia_module_test\target\debug"
           julia --project=docs docs/make.jl
 
   ffi-check:
