@@ -227,4 +227,10 @@ julia_module! {
     fn returns_mmatrix() -> MMatrix<f32, 2, 1>;
     fn returns_sarray() -> SArray<f32, Dims3D<1, 1, 1>, 1, 3>;
     fn returns_marray() -> MArray<f32, Dims3D<1, 1, 1>, 1, 3>;
+
+    for T in [f32, f64] {
+        for N in [1, 2] {
+            fn sum_svector_n(svector: &SVector<T, N>) -> T;
+        }
+    }
 }

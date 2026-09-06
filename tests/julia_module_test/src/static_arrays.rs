@@ -1,3 +1,5 @@
+use std::iter::Sum;
+
 use jlrs::data::layout::static_arrays::{
     dims::Dims3D, m_array::MArray, m_matrix::MMatrix, m_vector::MVector, s_array::SArray,
     s_matrix::SMatrix, s_vector::SVector,
@@ -64,6 +66,10 @@ pub fn swap_marray_blocks(marray: &mut MArray<f32, Dims3D<2, 2, 2>, 8, 3>) {
 
 pub fn returns_svector() -> SVector<f32, 2> {
     SVector::new([1.0, 2.0])
+}
+
+pub fn sum_svector_n<T: Copy + Sum<T>, const N: usize>(svector: &SVector<T, N>) -> T {
+    svector.data().iter().copied().sum()
 }
 
 pub fn returns_mvector() -> MVector<f32, 2> {

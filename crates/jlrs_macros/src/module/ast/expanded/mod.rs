@@ -388,7 +388,7 @@ mod tests {
                 assert_eq!(parameters.len(), 1);
                 let parameter = &parameters[0];
                 assert_eq!(parameter.name.to_string(), "T");
-                assert_eq!(parameter.types.len(), 2);
+                assert_eq!(parameter.args.len(), 2);
             }
             _ => unreachable!(),
         }
@@ -416,10 +416,10 @@ mod tests {
                 assert_eq!(parameters.len(), 2);
                 let parameter = &parameters[0];
                 assert_eq!(parameter.name.to_string(), "T");
-                assert_eq!(parameter.types.len(), 2);
+                assert_eq!(parameter.args.len(), 2);
                 let parameter = &parameters[1];
                 assert_eq!(parameter.name.to_string(), "U");
-                assert_eq!(parameter.types.len(), 3);
+                assert_eq!(parameter.args.len(), 3);
             }
             _ => unreachable!(),
         }

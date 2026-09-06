@@ -15,7 +15,7 @@
 
 use itertools::Itertools;
 use syn::{
-    AngleBracketedGenericArguments, Ident, Path, PathSegment, Type, TypePath,
+    AngleBracketedGenericArguments, GenericArgument, Ident, Path, PathSegment, Type, TypePath,
     punctuated::Punctuated,
 };
 
@@ -24,15 +24,15 @@ use crate::ast::raw::for_ast::ForAst;
 #[derive(Clone, Debug)]
 pub struct Parameter {
     pub name: Ident,
-    pub types: Vec<Path>,
+    pub args: Vec<GenericArgument>,
 }
 
 impl Parameter {
     pub fn from_for_ast(for_ast: &ForAst) -> Self {
         let name = for_ast.type_param.clone();
-        let types = for_ast.types.iter().cloned().unique().collect();
+        let args = for_ast.args.iter().cloned().unique().collect();
 
-        Parameter { name, types }
+        Parameter { name, args }
     }
 
     pub fn into_environment(self) -> Environment {
@@ -46,19 +46,19 @@ impl Parameter {
     }
 
     pub fn n_types(&self) -> usize {
-        self.types.len()
+        self.args.len()
     }
 
     pub fn expand(&mut self, env: &Environment) {
         let mut types = Vec::new();
 
         for parameter in env.parameters.iter() {
-            for path in self.types.iter() {
-                types.extend_from_slice(&path.expand_node(parameter));
+            for arg in self.args.iter() {
+                types.extend_from_slice(&arg.expand_node(parameter));
             }
         }
 
-        self.types = types.into_iter().unique().collect();
+        self.args = types.into_iter().unique().collect();
     }
 }
 
@@ -83,50 +83,31 @@ impl Environment {
         self.parameters.iter().map(Parameter::n_types).product()
     }
 
-    pub fn nth_combination<'a>(&'a self, list: &mut Vec<&'a Path>, mut combination: usize) {
+    pub fn nth_combination<'a>(
+        &'a self,
+        list: &mut Vec<&'a GenericArgument>,
+        mut combination: usize,
+    ) {
         list.clear();
         for parameter in self.parameters.iter() {
             let variants = parameter.n_types();
             let div = combination / variants;
             let rem = combination % variants;
             combination = div;
-            list.push(&parameter.types[rem]);
+            list.push(&parameter.args[rem]);
         }
         assert!(combination == 0)
     }
 }
 
 trait ExpandNode: Sized {
-    fn expand_node(&self, parameter: &Parameter) -> Vec<Self>;
-}
-
-impl ExpandNode for Path {
-    fn expand_node(&self, parameter: &Parameter) -> Vec<Self> {
-        let parameter_name = &parameter.name;
-
-        let mut paths = Vec::new();
-        if let Some(ident) = self.get_ident() {
-            if ident == parameter_name {
-                paths.extend(parameter.types.clone());
-            } else {
-                paths.push(self.clone());
-            }
-        } else if let Some(segment) = self.segments.last() {
-            let segments = segment.expand_node(parameter);
-            for segment in segments {
-                let mut path = self.clone();
-                let last = path.segments.last_mut().unwrap();
-                *last = segment;
-                paths.push(path);
-            }
-        }
-
-        paths
-    }
+    type Output;
+    fn expand_node(&self, parameter: &Parameter) -> Vec<Self::Output>;
 }
 
 impl ExpandNode for PathSegment {
-    fn expand_node(&self, parameter: &Parameter) -> Vec<PathSegment> {
+    type Output = Self;
+    fn expand_node(&self, parameter: &Parameter) -> Vec<Self::Output> {
         let mut segments = Vec::new();
 
         match &self.arguments {
@@ -137,15 +118,7 @@ impl ExpandNode for PathSegment {
                 let args = angle_bracketed_generic_arguments
                     .args
                     .iter()
-                    .map(|arg| match arg {
-                        syn::GenericArgument::Type(ty) => {
-                            let tys = ty.expand_node(parameter);
-                            tys.into_iter()
-                                .map(syn::GenericArgument::Type)
-                                .collect::<Vec<_>>()
-                        }
-                        _ => vec![arg.clone()],
-                    })
+                    .map(|arg| arg.expand_node(parameter))
                     .collect::<Vec<_>>();
 
                 let seg_iter = CombinationIter::new(args).map(|v| {
@@ -170,38 +143,69 @@ impl ExpandNode for PathSegment {
     }
 }
 
-impl ExpandNode for Type {
-    fn expand_node(&self, parameter: &Parameter) -> Vec<Self> {
-        let mut tys = Vec::new();
+impl ExpandNode for Path {
+    type Output = GenericArgument;
+    fn expand_node(&self, parameter: &Parameter) -> Vec<Self::Output> {
+        let parameter_name = &parameter.name;
 
-        match self {
-            Type::Path(type_path) => {
-                let paths = type_path.path.expand_node(parameter);
-                tys.extend(paths.into_iter().map(|path| {
-                    Type::Path(TypePath {
-                        path,
-                        qself: type_path.qself.clone(),
-                        attrs: vec![],
-                    })
+        if let Some(ident) = self.get_ident() {
+            if ident == parameter_name {
+                parameter.args.clone()
+            } else {
+                let arg = GenericArgument::Type(Type::Path(TypePath {
+                    attrs: vec![],
+                    qself: None,
+                    path: self.clone(),
                 }));
+                vec![arg]
             }
-            // Type::Ptr(type_ptr) => todo!(),
-            // Type::Array(type_array) => todo!(),
-            // Type::BareFn(type_bare_fn) => todo!(),
-            // Type::Group(type_group) => todo!(),
-            // Type::ImplTrait(type_impl_trait) => todo!(),
-            // Type::Macro(type_macro) => todo!(),
-            // Type::Never(type_never) => todo!(),
-            // Type::Paren(type_paren) => todo!(),
-            // Type::Reference(type_reference) => todo!(),
-            // Type::Slice(type_slice) => todo!(),
-            // Type::TraitObject(type_trait_object) => todo!(),
-            // Type::Tuple(type_tuple) => todo!(),
-            // Type::Verbatim(token_stream) => todo!(),
-            _ => todo!(),
-        }
+        } else if let Some(segment) = self.segments.last() {
+            let mut args = Vec::new();
+            let segments = segment.expand_node(parameter);
+            for segment in segments {
+                let mut path = self.clone();
+                let last = path.segments.last_mut().unwrap();
+                *last = segment;
+                let arg = GenericArgument::Type(Type::Path(TypePath {
+                    attrs: vec![],
+                    qself: None,
+                    path,
+                }));
+                args.push(arg);
+            }
 
-        tys
+            args
+        } else {
+            vec![]
+        }
+    }
+}
+
+impl ExpandNode for TypePath {
+    type Output = GenericArgument;
+
+    fn expand_node(&self, parameter: &Parameter) -> Vec<Self::Output> {
+        self.path.expand_node(parameter)
+    }
+}
+
+impl ExpandNode for Type {
+    type Output = GenericArgument;
+    fn expand_node(&self, parameter: &Parameter) -> Vec<Self::Output> {
+        match self {
+            Type::Path(type_path) => type_path.expand_node(parameter),
+            t => vec![GenericArgument::Type(t.clone())],
+        }
+    }
+}
+
+impl ExpandNode for GenericArgument {
+    type Output = Self;
+    fn expand_node(&self, parameter: &Parameter) -> Vec<Self::Output> {
+        match self {
+            GenericArgument::Type(ty) => ty.expand_node(parameter),
+            arg => vec![arg.clone()],
+        }
     }
 }
 
@@ -258,10 +262,16 @@ impl<T: Clone> ExactSizeIterator for CombinationIter<T> {
 
 #[cfg(test)]
 mod tests {
-    use syn::parse_quote;
+    use syn::{GenericArgument, Path, Type, parse_quote};
 
     use crate::ast::{expanded::environment::Parameter, raw::for_ast::ForAst};
 
+    fn generic_arg_to_path(arg: &GenericArgument) -> &Path {
+        match arg {
+            GenericArgument::Type(Type::Path(path)) => &path.path,
+            _ => todo!(),
+        }
+    }
     #[test]
     fn expand_environment() {
         let for_ast_outer: ForAst = parse_quote! {
@@ -277,11 +287,11 @@ mod tests {
         let env = param_t.into_environment();
         let env2 = env.add_parameter(param_u);
 
-        let Parameter { name, types } = &env2.parameters[1];
+        let Parameter { name, args: types } = &env2.parameters[1];
         assert_eq!(name.to_string(), "U");
 
         assert_eq!(types.len(), 1);
-        assert_eq!(types[0].get_ident().unwrap(), "f64");
+        assert_eq!(generic_arg_to_path(&types[0]).get_ident().unwrap(), "f64");
     }
 
     #[test]
@@ -299,11 +309,11 @@ mod tests {
         let env = param_t.into_environment();
         let env2 = env.add_parameter(param_u);
 
-        let Parameter { name, types } = &env2.parameters[1];
+        let Parameter { name, args: types } = &env2.parameters[1];
         assert_eq!(name, "U");
 
         assert_eq!(types.len(), 1);
-        let last_segment = types[0].segments.last().unwrap();
+        let last_segment = generic_arg_to_path(&types[0]).segments.last().unwrap();
         assert_eq!(last_segment.ident, "Foo");
         assert!(!last_segment.arguments.is_empty());
 
@@ -340,11 +350,14 @@ mod tests {
         let env = param_t.into_environment();
         let env2 = env.add_parameter(param_u);
 
-        let Parameter { name: _, types } = &env2.parameters[1];
+        let Parameter {
+            name: _,
+            args: types,
+        } = &env2.parameters[1];
 
         assert_eq!(types.len(), 2);
         {
-            let last_segment = types[0].segments.last().unwrap();
+            let last_segment = generic_arg_to_path(&types[0]).segments.last().unwrap();
             assert_eq!(last_segment.ident, "Foo");
             assert!(!last_segment.arguments.is_empty());
 
@@ -366,7 +379,7 @@ mod tests {
             }
         }
         {
-            let last_segment = types[1].segments.last().unwrap();
+            let last_segment = generic_arg_to_path(&types[1]).segments.last().unwrap();
             assert_eq!(last_segment.ident, "Foo");
             assert!(!last_segment.arguments.is_empty());
 

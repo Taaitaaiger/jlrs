@@ -333,4 +333,14 @@ end
     marray = MArray{Tuple{1, 1, 1}, Float32}([1.0f0])
     rs_marray = JuliaModuleTest.returns_marray()
     @test marray == rs_marray
+
+    @test length(methods(JuliaModuleTest.sum_svector_n)) == 4
+    svector_f32_1 = SVector{1, Float32}([1.0f0])
+    @test JuliaModuleTest.sum_svector_n(svector_f32_1) == 1.0f0
+    svector_f32_2 = SVector{2, Float32}([1.0f0, 2.0f0])
+    @test JuliaModuleTest.sum_svector_n(svector_f32_2) == 3.0f0
+    svector_f64_1 = SVector{1, Float64}([1.0])
+    @test JuliaModuleTest.sum_svector_n(svector_f64_1) == 1.0
+    svector_f64_2 = SVector{2, Float32}([1.0, 2.0])
+    @test JuliaModuleTest.sum_svector_n(svector_f64_2) == 3.0
 end

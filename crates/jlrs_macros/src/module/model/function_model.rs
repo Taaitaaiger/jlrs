@@ -250,6 +250,29 @@ mod tests {
     }
 
     #[test]
+    fn const_generic_function() {
+        let ast: JuliaModuleAst = parse_quote! {
+            become init_fn;
+
+            for N in [1usize, 2usize] {
+                /// Foo
+                fn foo(arg: &SVector<f32, N>)
+            }
+        };
+
+        let mut expanded = ExpandedModule::from_ast(ast).unwrap();
+        assert_eq!(expanded.items.len(), 1);
+
+        match expanded.items.pop().unwrap() {
+            ExpandedModuleItem::Function(expanded_fn) => {
+                let model = FunctionModel::from_expanded(&expanded_fn).unwrap();
+                assert_eq!(model.variants.len(), 2);
+            }
+            _ => assert!(false),
+        }
+    }
+
+    #[test]
     fn ref_self_method() {
         let ast: JuliaModuleAst = parse_quote! {
             become init_fn;
