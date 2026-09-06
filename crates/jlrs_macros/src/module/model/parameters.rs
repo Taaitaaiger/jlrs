@@ -9,7 +9,7 @@ use crate::ast::expanded::environment::Environment;
 pub struct ResolvedParameterList<'a> {
     env: &'a Environment,
     parameters: Vec<&'a Ident>,
-    paths: Vec<&'a Path>,
+    paths: Vec<&'a GenericArgument>,
     n_combinations: usize,
 }
 
@@ -51,15 +51,22 @@ impl<'a> Apply<Path> for ResolvedParameterList<'a> {
     fn apply_with_parent(&self, to: &Path, _parent: Option<&Path>) -> Result<Path> {
         self.assert_resolved();
 
-        for (parameter, parameter_path) in self.parameters.iter().copied().zip(self.paths.iter()) {
-            if to.is_ident(parameter) {
-                return Ok((*parameter_path).clone());
+        if let Some(to_ident) = to.get_ident() {
+            for (parameter, parameter_path) in
+                self.parameters.iter().copied().zip(self.paths.iter())
+            {
+                match parameter_path {
+                    GenericArgument::Type(Type::Path(type_path)) if to_ident == parameter => {
+                        return Ok(type_path.path.clone());
+                    }
+                    _ => continue,
+                }
             }
         }
 
         let mut path = to.clone();
         for (parameter, parameter_path) in self.parameters.iter().copied().zip(self.paths.iter()) {
-            apply_parameter(&mut path, parameter, parameter_path)
+            apply_parameter_to_path(&mut path, parameter, parameter_path)
         }
 
         Ok(path)
@@ -72,15 +79,17 @@ impl<'a> Apply<Type> for ResolvedParameterList<'a> {
 
         match to {
             Type::Path(TypePath { path, .. }) => {
-                for (parameter, parameter_path) in
+                for (parameter_name, parameter_arg) in
                     self.parameters.iter().copied().zip(self.paths.iter())
                 {
-                    if path.is_ident(parameter) {
-                        return Ok(Type::Path(TypePath {
-                            path: (*parameter_path).clone(),
-                            qself: None,
-                            attrs: vec![],
-                        }));
+                    if let GenericArgument::Type(Type::Path(type_path)) = parameter_arg {
+                        if path.is_ident(parameter_name) {
+                            return Ok(Type::Path(TypePath {
+                                path: type_path.path.clone(),
+                                qself: None,
+                                attrs: vec![],
+                            }));
+                        }
                     }
                 }
 
@@ -89,6 +98,12 @@ impl<'a> Apply<Type> for ResolvedParameterList<'a> {
                     qself: None,
                     attrs: vec![],
                 }))
+            }
+            Type::Reference(refty) => {
+                let applied = self.apply_with_parent(refty.elem.as_ref(), parent)?;
+                let mut refty = refty.clone();
+                *(refty.elem) = applied;
+                Ok(Type::Reference(refty))
             }
             _ => todo!(),
         }
@@ -169,18 +184,43 @@ impl<'a> Apply<Signature> for ResolvedParameterList<'a> {
     }
 }
 
-fn apply_parameter(path: &mut Path, parameter: &Ident, parameter_path: &Path) {
-    if path.is_ident(parameter) {
-        *path = parameter_path.clone();
-        return;
+fn apply_parameter_to_arg(
+    arg: &mut GenericArgument,
+    parameter_name: &Ident,
+    parameter_arg: &GenericArgument,
+) {
+    if let GenericArgument::Type(Type::Path(type_path)) = arg {
+        if type_path.path.is_ident(parameter_name) {
+            *arg = parameter_arg.clone();
+            return;
+        }
+
+        let segment = type_path.path.segments.last_mut().unwrap();
+        if let PathArguments::AngleBracketed(bracketed) = &mut segment.arguments {
+            for segment_arg in bracketed.args.iter_mut() {
+                apply_parameter_to_arg(segment_arg, parameter_name, parameter_arg)
+            }
+        }
+    }
+}
+
+// Called for parent path and struct path
+fn apply_parameter_to_path(
+    path: &mut Path,
+    parameter_name: &Ident,
+    parameter_arg: &GenericArgument,
+) {
+    if let GenericArgument::Type(Type::Path(type_path)) = parameter_arg {
+        if path.is_ident(parameter_name) {
+            *path = type_path.path.clone();
+            return;
+        }
     }
 
     let segment = path.segments.last_mut().unwrap();
     if let PathArguments::AngleBracketed(bracketed) = &mut segment.arguments {
         for arg in bracketed.args.iter_mut() {
-            if let GenericArgument::Type(Type::Path(ty)) = arg {
-                apply_parameter(&mut ty.path, parameter, parameter_path)
-            }
+            apply_parameter_to_arg(arg, parameter_name, parameter_arg)
         }
     }
 }

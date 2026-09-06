@@ -1,7 +1,7 @@
-//! `for <ident> in [<type_paths>] { <generic_items>; }`
+//! `for <ident> in [<generic_args>] { <generic_items>; }`
 
 use syn::{
-    Ident, Path, Result, Token, braced, bracketed,
+    GenericArgument, Ident, Result, Token, braced, bracketed,
     parse::{Parse, ParseStream},
     punctuated::Punctuated,
     token::{Brace, Bracket},
@@ -98,7 +98,7 @@ pub struct ForAst {
     pub type_param: Ident,
     pub _in_token: Token![in],
     pub _bracket: Bracket,
-    pub types: Punctuated<Path, Token![,]>,
+    pub args: Punctuated<GenericArgument, Token![,]>,
     pub _brace: Brace,
     pub items: Punctuated<ForItem, Token![;]>,
 }
@@ -111,7 +111,7 @@ impl Parse for ForAst {
 
         let content;
         let bracket = bracketed!(content in input);
-        let types = content.parse_terminated(Path::parse, Token![,])?;
+        let args = content.parse_terminated(GenericArgument::parse, Token![,])?;
 
         let content;
         let brace = braced!(content in input);
@@ -122,7 +122,7 @@ impl Parse for ForAst {
             type_param,
             _in_token: in_token,
             _bracket: bracket,
-            types,
+            args,
             _brace: brace,
             items,
         })
@@ -183,7 +183,7 @@ mod tests {
             }
         };
 
-        assert_eq!(ast.types.len(), 2);
+        assert_eq!(ast.args.len(), 2);
         assert_eq!(ast.items.len(), 1);
     }
 
@@ -196,7 +196,7 @@ mod tests {
             }
         };
 
-        assert_eq!(ast.types.len(), 2);
+        assert_eq!(ast.args.len(), 2);
         assert_eq!(ast.items.len(), 2);
     }
 }

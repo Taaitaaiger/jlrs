@@ -14,7 +14,7 @@ use crate::{
         layout::{
             is_bits::IsBits,
             static_arrays::dims::{Dims, index_in},
-            valid_layout::{ValidField, ValidLayout},
+            valid_layout::ValidLayout,
         },
         managed::{
             Managed,
@@ -101,18 +101,6 @@ unsafe impl<T: ConstructType, D: Dims<R>, const N: usize, const R: usize> ValidL
     for MArray<T, D, N, R>
 {
     fn valid_layout(ty: Value) -> bool {
-        Self::valid_field(ty)
-    }
-
-    fn type_object<'target, Tgt: Target<'target>>(target: &Tgt) -> Value<'target, 'static> {
-        unsafe { Self::construct_type(target).as_value() }
-    }
-}
-
-unsafe impl<T: ConstructType, D: Dims<R>, const N: usize, const R: usize> ValidField
-    for MArray<T, D, N, R>
-{
-    fn valid_field(ty: Value) -> bool {
         unsafe {
             let handle = weak_handle_unchecked!();
             handle.local_scope::<_, 1>(|mut frame| {
@@ -120,6 +108,10 @@ unsafe impl<T: ConstructType, D: Dims<R>, const N: usize, const R: usize> ValidF
                 t == ty
             })
         }
+    }
+
+    fn type_object<'target, Tgt: Target<'target>>(target: &Tgt) -> Value<'target, 'static> {
+        unsafe { Self::construct_type(target).as_value() }
     }
 }
 

@@ -14,7 +14,7 @@ use crate::{
         layout::{
             is_bits::IsBits,
             static_arrays::dims::{Dims, Dims1D},
-            valid_layout::{ValidField, ValidLayout},
+            valid_layout::ValidLayout,
         },
         managed::{
             Managed,
@@ -31,7 +31,7 @@ use crate::{
     },
     inline_static_ref,
     memory::{
-        scope::{LocalScope, LocalScopeExt},
+        scope::{LocalScope as _, LocalScopeExt},
         target::Target,
     },
     private::Private,
@@ -86,16 +86,6 @@ unsafe impl<T: ConstructType, const N: usize> Typecheck for MVector<T, N> {
 
 unsafe impl<T: ConstructType, const N: usize> ValidLayout for MVector<T, N> {
     fn valid_layout(ty: Value) -> bool {
-        Self::valid_field(ty)
-    }
-
-    fn type_object<'target, Tgt: Target<'target>>(target: &Tgt) -> Value<'target, 'static> {
-        unsafe { Self::construct_type(target).as_value() }
-    }
-}
-
-unsafe impl<T: ConstructType, const N: usize> ValidField for MVector<T, N> {
-    fn valid_field(ty: Value) -> bool {
         unsafe {
             let handle = weak_handle_unchecked!();
             handle.local_scope::<_, 1>(|mut frame| {
@@ -103,6 +93,10 @@ unsafe impl<T: ConstructType, const N: usize> ValidField for MVector<T, N> {
                 t == ty
             })
         }
+    }
+
+    fn type_object<'target, Tgt: Target<'target>>(target: &Tgt) -> Value<'target, 'static> {
+        unsafe { Self::construct_type(target).as_value() }
     }
 }
 
