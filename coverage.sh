@@ -3,7 +3,7 @@
 set -euxo pipefail
 
 cargo llvm-cov clean --workspace;
-cargo llvm-cov --features full,ccall --workspace --no-report
+cargo llvm-cov --features full --workspace --no-report
 cargo llvm-cov --example ccall --no-report -- --test-threads=1
 cargo llvm-cov --example ccall_throw_exception --no-report -- --test-threads=1
 cargo llvm-cov run --example async_tasks --no-report

@@ -5,6 +5,8 @@
 //! hold on to a reference to this data. This module provides [`StaticGlobal`] and [`StaticRef`],
 //! and macros to create and access them.
 
+#[cfg(feature = "static-cache")]
+use std::ffi::c_void;
 use std::{
     marker::PhantomData,
     ptr::{NonNull, null_mut},
@@ -12,11 +14,15 @@ use std::{
 };
 
 use jl_sys::{jl_array_t, jl_module_t, jl_sym_t, jl_symbol_n, jl_value_t};
+#[cfg(feature = "static-cache")]
+use static_generics::{Namespace, Zeroable};
 
 use super::{
     managed::private::ManagedPriv,
     types::{construct_type::ConstructType, typecheck::Typecheck},
 };
+#[cfg(feature = "static-cache")]
+use crate::data::managed::ManagedWeak;
 use crate::{
     data::{
         cache::{CacheMap, FnvCache, new_fnv_cache},
@@ -558,3 +564,41 @@ macro_rules! inline_static_symbol_ref {
 pub use inline_static_global;
 pub use inline_static_ref;
 pub use inline_static_symbol_ref;
+
+#[cfg(feature = "static-cache")]
+pub(crate) struct StaticConstRef<Label: 'static, Data: 'static + ManagedWeak<'static, 'static>> {
+    addr: AtomicPtr<c_void>,
+    _t: PhantomData<Label>,
+    _d: PhantomData<Data>,
+}
+
+#[cfg(feature = "static-cache")]
+unsafe impl<T: 'static, D: 'static + ManagedWeak<'static, 'static>> Zeroable
+    for StaticConstRef<T, D>
+{
+}
+
+#[cfg(feature = "static-cache")]
+impl<T: 'static, D: ManagedWeak<'static, 'static>> StaticConstRef<T, D> {
+    pub(crate) fn load<NS: Namespace>(order: Ordering) -> Option<D> {
+        let v = NS::generic_static::<Self>();
+        let ptr = v.addr.load(order) as *mut c_void;
+        NonNull::new(ptr).map(|ptr| unsafe { std::mem::transmute_copy(&ptr) })
+    }
+
+    pub(crate) fn store<NS: Namespace>(data: D, order: Ordering) {
+        let v = NS::generic_static::<Self>();
+        v.addr
+            .store(unsafe { std::mem::transmute_copy(&data) }, order);
+    }
+}
+
+// pub(crate) fn load<T: 'static>() -> *mut c_void {
+//     let v = StaticConstRefNamespace::generic_static::<StaticConstRef<T>>();
+//     v.addr.load(Ordering::Relaxed) as *mut c_void
+// }
+
+// pub(crate) fn store<T: 'static>(value: *mut c_void) {
+//     let v = StaticConstRefNamespace::generic_static::<StaticConstRef<T>>();
+//     v.addr.store(value as usize, Ordering::Relaxed);
+// }

@@ -845,7 +845,11 @@ impl<T: ConstructType, const N: isize> ConstructTypedArray<T, N> for ArrayBase<'
         Tgt: Target<'target>,
         D: DimsExt,
     {
-        dims.array_type::<T, _>(target)
+        if N >= 0 {
+            TypedRankedArray::<T, N>::construct_type(target)
+        } else {
+            dims.array_type::<T, _>(target)
+        }
     }
 }
 
