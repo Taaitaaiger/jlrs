@@ -93,7 +93,7 @@ unsafe impl<T: ConstructType> ConstructType for Complex<T> {
         Tgt: Target<'target>,
     {
         target.with_local_scope::<_, 1>(|target, mut frame| {
-            let t = T::construct_type(&mut frame);
+            let t = T::construct_type_uncached(&mut frame);
             let complex_ua = static_ref!(COMPLEX_UNION_ALL, &frame);
             let complex_t = unsafe { complex_ua.apply_types_unchecked(target, [t]) };
 
@@ -109,7 +109,7 @@ unsafe impl<T: ConstructType> ConstructType for Complex<T> {
         Tgt: Target<'target>,
     {
         target.with_local_scope::<_, 1>(|target, mut frame| {
-            let t = T::construct_type_with_env(&mut frame, env);
+            let t = T::construct_type_with_env_uncached(&mut frame, env);
             let complex_ua = static_ref!(COMPLEX_UNION_ALL, &frame);
             let complex_t = unsafe { complex_ua.apply_types_unchecked(target, [t, t]) };
 

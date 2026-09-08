@@ -33,8 +33,8 @@ unsafe impl<T: ConstructType, N: ConstructType> ConstructType for ArrayTypeConst
     {
         unsafe {
             target.with_local_scope::<_, 3>(|target, mut frame| {
-                let ty_param = T::construct_type(&mut frame);
-                let rank_param = N::construct_type(&mut frame);
+                let ty_param = T::construct_type_uncached(&mut frame);
+                let rank_param = N::construct_type_uncached(&mut frame);
                 if rank_param.is::<isize>() {
                     if rank_param.unbox_unchecked::<isize>() < 0 {
                         panic!("ArrayTypeConstructor rank must be a TypeVar or non-negative ConstantIsize, got {rank_param:?}")
@@ -68,8 +68,8 @@ unsafe impl<T: ConstructType, N: ConstructType> ConstructType for ArrayTypeConst
     {
         unsafe {
             target.with_local_scope::<_, 3>(|target, mut frame| {
-                let ty_param = T::construct_type_with_env(&mut frame, env);
-                let rank_param = N::construct_type_with_env(&mut frame, env);
+                let ty_param = T::construct_type_with_env_uncached(&mut frame, env);
+                let rank_param = N::construct_type_with_env_uncached(&mut frame, env);
                 if rank_param.is::<isize>() {
                     if rank_param.unbox_unchecked::<isize>() < 0 {
                         panic!("ArrayTypeConstructor rank must be a TypeVar or non-negative ConstantIsize, got {rank_param:?}")

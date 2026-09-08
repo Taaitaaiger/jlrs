@@ -406,8 +406,8 @@ impl<N: TypeVarName, U: ConstructType, L: ConstructType> TypeVarConstructor<N, U
         Tgt: Target<'target>,
     {
         target.with_local_scope::<_, 2>(|target, mut frame| {
-            let upper_bound = U::construct_type_with_env(&mut frame, env);
-            let lower_bound = L::construct_type_with_env(&mut frame, env);
+            let upper_bound = U::construct_type_with_env_uncached(&mut frame, env);
+            let lower_bound = L::construct_type_with_env_uncached(&mut frame, env);
             unsafe {
                 TypeVar::new_unchecked(
                     &target,
@@ -431,8 +431,8 @@ unsafe impl<N: TypeVarName, U: ConstructType, L: ConstructType> ConstructType
         Tgt: Target<'target>,
     {
         target.with_local_scope::<_, 2>(|target, mut frame| {
-            let upper_bound = U::construct_type(&mut frame);
-            let lower_bound = L::construct_type(&mut frame);
+            let upper_bound = U::construct_type_uncached(&mut frame);
+            let lower_bound = L::construct_type_uncached(&mut frame);
             unsafe {
                 TypeVar::new_unchecked(
                     &target,

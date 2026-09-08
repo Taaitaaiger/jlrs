@@ -592,13 +592,3 @@ impl<T: 'static, D: ManagedWeak<'static, 'static>> StaticConstRef<T, D> {
             .store(unsafe { std::mem::transmute_copy(&data) }, order);
     }
 }
-
-// pub(crate) fn load<T: 'static>() -> *mut c_void {
-//     let v = StaticConstRefNamespace::generic_static::<StaticConstRef<T>>();
-//     v.addr.load(Ordering::Relaxed) as *mut c_void
-// }
-
-// pub(crate) fn store<T: 'static>(value: *mut c_void) {
-//     let v = StaticConstRefNamespace::generic_static::<StaticConstRef<T>>();
-//     v.addr.store(value as usize, Ordering::Relaxed);
-// }

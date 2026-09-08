@@ -90,7 +90,7 @@ pub fn impl_construct_type(ast: &syn::DeriveInput) -> syn::Result<TokenStream> {
 
                 let mut types: [Option<::jlrs::data::managed::value::Value>; #n_names] = [None; #n_names];
                 #(
-                    types[#nth_generic] = Some(<#param_names as ::jlrs::data::types::construct_type::ConstructType>::construct_type(&mut frame));
+                    types[#nth_generic] = Some(<#param_names as ::jlrs::data::types::construct_type::ConstructType>::construct_type_uncached(&mut frame));
                 )*
                 unsafe {
                     let types = std::mem::transmute::<&[Option<::jlrs::data::managed::value::Value>; #n_names], &[::jlrs::data::managed::value::Value; #n_names]>(&types);
@@ -116,7 +116,7 @@ pub fn impl_construct_type(ast: &syn::DeriveInput) -> syn::Result<TokenStream> {
 
                 let mut types: [Option<::jlrs::data::managed::value::Value>; #n_names] = [None; #n_names];
                 #(
-                    types[#nth_generic] = Some(<#param_names as ::jlrs::data::types::construct_type::ConstructType>::construct_type_with_env(&mut frame, env));
+                    types[#nth_generic] = Some(<#param_names as ::jlrs::data::types::construct_type::ConstructType>::construct_type_with_env_uncached(&mut frame, env));
                 )*
                 unsafe {
                     let types = std::mem::transmute::<&[Option<::jlrs::data::managed::value::Value>; #n_names], &[::jlrs::data::managed::value::Value; #n_names]>(&types);

@@ -3060,7 +3060,7 @@ unsafe impl<'scope, 'data, T: ConstructType, const N: isize> ConstructType
 
         if N == -1 {
             target.with_local_scope::<_, 2>(|target, mut frame| unsafe {
-                let elty = T::construct_type(&mut frame);
+                let elty = T::construct_type_uncached(&mut frame);
                 let tn_n = ty.body().cast_unchecked::<UnionAll>().var();
                 let applied = ty.apply_types_unchecked(&mut frame, [elty, tn_n.as_value()]);
 
@@ -3068,7 +3068,7 @@ unsafe impl<'scope, 'data, T: ConstructType, const N: isize> ConstructType
             })
         } else {
             target.with_local_scope::<_, 3>(|target, mut frame| unsafe {
-                let elty = T::construct_type(&mut frame);
+                let elty = T::construct_type_uncached(&mut frame);
                 let n = Value::new(&mut frame, N);
                 let applied = ty.apply_types_unchecked(&mut frame, [elty, n]);
 
@@ -3101,7 +3101,7 @@ unsafe impl<'scope, 'data, T: ConstructType, const N: isize> ConstructType
             };
 
             target.with_local_scope::<_, 2>(|target, mut frame| unsafe {
-                let t = T::construct_type_with_env(&mut frame, env);
+                let t = T::construct_type_with_env_uncached(&mut frame, env);
                 let applied = ty.apply_types_unchecked(&mut frame, [t, n_param]);
                 assert!(applied.is::<DataType>());
                 applied
@@ -3110,7 +3110,7 @@ unsafe impl<'scope, 'data, T: ConstructType, const N: isize> ConstructType
             })
         } else {
             target.with_local_scope::<_, 3>(|target, mut frame| unsafe {
-                let t = T::construct_type_with_env(&mut frame, env);
+                let t = T::construct_type_with_env_uncached(&mut frame, env);
                 let n = Value::new(&mut frame, N);
                 let applied = ty.apply_types_unchecked(&mut frame, [t, n]);
                 assert!(applied.is::<DataType>());
@@ -3120,10 +3120,6 @@ unsafe impl<'scope, 'data, T: ConstructType, const N: isize> ConstructType
             })
         }
     }
-
-    const CACHEABLE: bool = true;
-
-    const TYPE_ID: std::any::TypeId = std::any::TypeId::of::<Self::Static>();
 
     fn construct_type<'target, Tgt>(target: Tgt) -> ValueData<'target, 'static, Tgt>
     where

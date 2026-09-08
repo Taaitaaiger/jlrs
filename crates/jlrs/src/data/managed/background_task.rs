@@ -168,7 +168,7 @@ where
         Tgt: Target<'target>,
     {
         target.with_local_scope::<_, 1>(|target, mut frame| unsafe {
-            let t = T::construct_type(&mut frame);
+            let t = T::construct_type_uncached(&mut frame);
             let bgtask_ua = JlrsCore::background_task(&target);
             bgtask_ua.apply_types_unchecked(target, [t])
         })
@@ -182,7 +182,7 @@ where
         Tgt: Target<'target>,
     {
         target.with_local_scope::<_, 1>(|target, mut frame| unsafe {
-            let t = T::construct_type(&mut frame);
+            let t = T::construct_type_uncached(&mut frame);
             let bgtask_ua = JlrsCore::background_task(&target);
             bgtask_ua.apply_types_unchecked(target, [t])
         })

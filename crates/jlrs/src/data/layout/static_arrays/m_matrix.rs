@@ -175,7 +175,7 @@ unsafe impl<T: ConstructType, const ROWS: usize, const COLS: usize> ConstructTyp
         Tgt: Target<'target>,
     {
         target.with_local_scope::<_, 6>(|target, mut frame| unsafe {
-            let t = T::construct_type(&mut frame);
+            let t = T::construct_type_uncached(&mut frame);
             let rows = (ROWS as isize).into_julia(&mut frame);
             let cols = (COLS as isize).into_julia(&mut frame);
             let n = ((ROWS * COLS) as isize).into_julia(&mut frame);
@@ -199,7 +199,7 @@ unsafe impl<T: ConstructType, const ROWS: usize, const COLS: usize> ConstructTyp
         Tgt: Target<'target>,
     {
         target.with_local_scope::<_, 6>(|target, mut frame| unsafe {
-            let t = T::construct_type_with_env(&mut frame, env);
+            let t = T::construct_type_with_env_uncached(&mut frame, env);
             let rows = (ROWS as isize).into_julia(&mut frame);
             let cols = (COLS as isize).into_julia(&mut frame);
             let n = ((ROWS * COLS) as isize).into_julia(&mut frame);

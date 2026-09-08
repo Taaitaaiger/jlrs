@@ -176,7 +176,7 @@ unsafe impl<T: ConstructType, D: Dims<R>, const N: usize, const R: usize> Constr
         Tgt: Target<'target>,
     {
         target.with_local_scope::<_, 6>(|target, mut frame| unsafe {
-            let t = T::construct_type(&mut frame);
+            let t = T::construct_type_uncached(&mut frame);
             let rank = (R as isize).into_julia(&mut frame);
             let n = (N as isize).into_julia(&mut frame);
 
@@ -207,7 +207,7 @@ unsafe impl<T: ConstructType, D: Dims<R>, const N: usize, const R: usize> Constr
         Tgt: Target<'target>,
     {
         target.with_local_scope::<_, 6>(|target, mut frame| unsafe {
-            let t = T::construct_type_with_env(&mut frame, env);
+            let t = T::construct_type_with_env_uncached(&mut frame, env);
             let rank = (R as isize).into_julia(&mut frame);
             let n = (N as isize).into_julia(&mut frame);
 
