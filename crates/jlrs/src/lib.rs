@@ -200,8 +200,9 @@
 //!
 //!   Experimental, use static-generics crate to cache constructed types.
 //!
-//! You can enable all features except `debug`, `i686`, `windows`, and `lto` by enabling the
-//! `full` feature. If you don't want to enable any runtimes either, you can use `full-no-rt`.
+//! You can enable all features except `debug`, `i686`, `windows`, `static-cache`, and `lto` by
+//! enabling the `full` feature. If you don't want to enable any runtimes either, you can use
+//! `full-no-rt`.
 //!
 //!
 //! ## Environment variables

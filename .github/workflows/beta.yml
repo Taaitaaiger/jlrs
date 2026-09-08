@@ -200,35 +200,18 @@ jobs:
         env:
           JULIA_PKG_SERVER: ""
 
-  julia-module-test-linux-static-cache:
-    runs-on: ubuntu-latest
-    needs: test-linux
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Setup Julia environment
-        uses: julia-actions/setup-julia@v2
-        with:
-          version: 'pre'
-
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: stable
-
-      - name: Build library
+      - name: Build library with static-cache
         run: |
           cd tests/julia_module_test
           cargo build --features "jlrs/jl-docs,jlrs/static-cache"
 
-      - name: Script tests
+      - name: Script tests with static-cache
         run: |
           cd tests/script
-          julia -e "import Pkg; Pkg.add(url=\"https://github.com/Taaitaaiger/JlrsCore.jl\", rev=\"0f1b7cba4eeedae260cb48374716f3cd551fc8c0\"); Pkg.add(\"StaticArrays\")"
           export JULIA_MODULE_TEST_LIB_DIR="${GITHUB_WORKSPACE}/tests/julia_module_test/target/debug"
           julia JuliaModuleTest.jl
 
-      - name: Package tests
+      - name: Package tests with static-cache
         run: |
           cd tests/JuliaModuleTest
           export JULIA_MODULE_TEST_LIB_DIR="${GITHUB_WORKSPACE}/tests/julia_module_test/target/debug"
@@ -304,35 +287,19 @@ jobs:
         env:
           JULIA_PKG_SERVER: ""
 
-  julia-module-test-macos-static-cache:
-    runs-on: macos-latest
-    needs: test-macos
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Setup Julia environment
-        uses: julia-actions/setup-julia@v2
-        with:
-          version: 'pre'
-
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: stable
-
-      - name: Build library
+      - name: Build library with static-cache
         run: |
           cd tests/julia_module_test
+          cargo clean
           cargo build --features "jlrs/jl-docs,jlrs/static-cache"
 
-      - name: Script tests
+      - name: Script tests with static-cache
         run: |
           cd tests/script
-          julia -e "import Pkg; Pkg.add(url=\"https://github.com/Taaitaaiger/JlrsCore.jl\", rev=\"0f1b7cba4eeedae260cb48374716f3cd551fc8c0\"); Pkg.add(\"StaticArrays\")"
           export JULIA_MODULE_TEST_LIB_DIR="${GITHUB_WORKSPACE}/tests/julia_module_test/target/debug"
           julia JuliaModuleTest.jl
 
-      - name: Package tests
+      - name: Package tests with static-cache
         run: |
           cd tests/JuliaModuleTest
           export JULIA_MODULE_TEST_LIB_DIR="${GITHUB_WORKSPACE}/tests/julia_module_test/target/debug"
@@ -406,35 +373,18 @@ jobs:
           $env:JULIA_MODULE_TEST_LIB_DIR = "${env:GITHUB_WORKSPACE}\tests\julia_module_test\target\debug"
           julia --project=docs docs/make.jl
 
-  julia-module-test-windows-gnu-static-cache:
-    runs-on: windows-2022
-    needs: test-windows-gnu
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Setup Julia environment
-        uses: julia-actions/setup-julia@v2
-        with:
-          version: 'pre'
-
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: stable-x86_64-pc-windows-gnu
-
-      - name: Build library
+      - name: Build library with static-cache
         run: |
           cd tests/julia_module_test
           cargo build --features "jlrs/jl-docs,jlrs/static-cache"
 
-      - name: Script tests
+      - name: Script tests with static-cache
         run: |
           cd tests/script
-          julia -e 'import Pkg; Pkg.add(url="https://github.com/Taaitaaiger/JlrsCore.jl", rev="0f1b7cba4eeedae260cb48374716f3cd551fc8c0"); Pkg.add("StaticArrays")'
           $env:JULIA_MODULE_TEST_LIB_DIR = "${env:GITHUB_WORKSPACE}\tests\julia_module_test\target\debug"
           julia JuliaModuleTest.jl
 
-      - name: Package tests
+      - name: Package tests with static-cache
         run: |
           cd tests/JuliaModuleTest
           $env:JULIA_MODULE_TEST_LIB_DIR = "${env:GITHUB_WORKSPACE}\tests\julia_module_test\target\debug"

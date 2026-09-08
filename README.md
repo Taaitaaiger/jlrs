@@ -210,7 +210,7 @@ All other features are called utility features. The following are available:
 
   Experimental, use static-generics crate to cache constructed types.
 
-You can enable all features except `debug`, `i686`, and `windows` by
+You can enable all features except `debug`, `i686`, `static-cache`, `windows`, and `lto` by
 enabling the `full` feature. If you don't want to enable any runtimes either, you can use
 `full-no-rt`.
 
