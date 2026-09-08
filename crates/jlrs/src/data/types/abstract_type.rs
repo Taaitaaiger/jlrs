@@ -203,8 +203,8 @@ unsafe impl<T: ConstructType, N: ConstructType> ConstructType for AbstractArray<
         Tgt: Target<'target>,
     {
         target.with_local_scope::<_, 3>(|target, mut frame| {
-            let ty_param = T::construct_type(&mut frame);
-            let rank_param = N::construct_type(&mut frame);
+            let ty_param = T::construct_type_uncached(&mut frame);
+            let rank_param = N::construct_type_uncached(&mut frame);
             let params = [ty_param, rank_param];
             unsafe {
                 UnionAll::abstractarray_type(&frame)
@@ -232,8 +232,8 @@ unsafe impl<T: ConstructType, N: ConstructType> ConstructType for AbstractArray<
         Tgt: Target<'target>,
     {
         target.with_local_scope::<_, 3>(|target, mut frame| {
-            let ty_param = T::construct_type_with_env(&mut frame, env);
-            let rank_param = N::construct_type_with_env(&mut frame, env);
+            let ty_param = T::construct_type_with_env_uncached(&mut frame, env);
+            let rank_param = N::construct_type_with_env_uncached(&mut frame, env);
             let params = [ty_param, rank_param];
             unsafe {
                 UnionAll::abstractarray_type(&frame)
@@ -262,8 +262,8 @@ unsafe impl<T: ConstructType, N: ConstructType> ConstructType for DenseArray<T, 
         Tgt: Target<'target>,
     {
         target.with_local_scope::<_, 3>(|target, mut frame| {
-            let ty_param = T::construct_type(&mut frame);
-            let rank_param = N::construct_type(&mut frame);
+            let ty_param = T::construct_type_uncached(&mut frame);
+            let rank_param = N::construct_type_uncached(&mut frame);
             let params = [ty_param, rank_param];
             unsafe {
                 UnionAll::densearray_type(&frame)
@@ -291,8 +291,8 @@ unsafe impl<T: ConstructType, N: ConstructType> ConstructType for DenseArray<T, 
         Tgt: Target<'target>,
     {
         target.with_local_scope::<_, 3>(|target, mut frame| {
-            let ty_param = T::construct_type_with_env(&mut frame, env);
-            let rank_param = N::construct_type_with_env(&mut frame, env);
+            let ty_param = T::construct_type_with_env_uncached(&mut frame, env);
+            let rank_param = N::construct_type_with_env_uncached(&mut frame, env);
             let params = [ty_param, rank_param];
             unsafe {
                 UnionAll::densearray_type(&frame)
@@ -320,7 +320,7 @@ unsafe impl<T: ConstructType> ConstructType for RefTypeConstructor<T> {
         Tgt: Target<'target>,
     {
         target.with_local_scope::<_, 2>(|target, mut frame| {
-            let ty_param = T::construct_type(&mut frame);
+            let ty_param = T::construct_type_uncached(&mut frame);
             let params = [ty_param];
             unsafe {
                 UnionAll::ref_type(&frame)
@@ -348,7 +348,7 @@ unsafe impl<T: ConstructType> ConstructType for RefTypeConstructor<T> {
         Tgt: Target<'target>,
     {
         target.with_local_scope::<_, 2>(|target, mut frame| {
-            let ty_param = T::construct_type_with_env(&mut frame, env);
+            let ty_param = T::construct_type_with_env_uncached(&mut frame, env);
             let params = [ty_param];
             unsafe {
                 UnionAll::ref_type(&frame)
@@ -376,7 +376,7 @@ unsafe impl<T: ConstructType> ConstructType for TypeTypeConstructor<T> {
         Tgt: Target<'target>,
     {
         target.with_local_scope::<_, 2>(|target, mut frame| {
-            let ty_param = T::construct_type(&mut frame);
+            let ty_param = T::construct_type_uncached(&mut frame);
             let params = [ty_param];
             unsafe {
                 UnionAll::type_type(&frame)
@@ -404,7 +404,7 @@ unsafe impl<T: ConstructType> ConstructType for TypeTypeConstructor<T> {
         Tgt: Target<'target>,
     {
         target.with_local_scope::<_, 2>(|target, mut frame| {
-            let ty_param = T::construct_type_with_env(&mut frame, env);
+            let ty_param = T::construct_type_with_env_uncached(&mut frame, env);
             let params = [ty_param];
             unsafe {
                 UnionAll::type_type(&frame)
@@ -432,7 +432,7 @@ unsafe impl<T: ConstructType> ConstructType for AbstractChannel<T> {
         Tgt: Target<'target>,
     {
         target.with_local_scope::<_, 2>(|target, mut frame| {
-            let ty_param = T::construct_type(&mut frame);
+            let ty_param = T::construct_type_uncached(&mut frame);
             let params = [ty_param];
             unsafe {
                 Self::base_type(&frame)
@@ -461,7 +461,7 @@ unsafe impl<T: ConstructType> ConstructType for AbstractChannel<T> {
         Tgt: Target<'target>,
     {
         target.with_local_scope::<_, 2>(|target, mut frame| {
-            let ty_param = T::construct_type_with_env(&mut frame, env);
+            let ty_param = T::construct_type_with_env_uncached(&mut frame, env);
             let params = [ty_param];
             unsafe {
                 Self::base_type(&frame)
@@ -490,8 +490,8 @@ unsafe impl<K: ConstructType, V: ConstructType> ConstructType for AbstractDict<K
         Tgt: Target<'target>,
     {
         target.with_local_scope::<_, 3>(|target, mut frame| {
-            let key_param = K::construct_type(&mut frame);
-            let value_param = V::construct_type(&mut frame);
+            let key_param = K::construct_type_uncached(&mut frame);
+            let value_param = V::construct_type_uncached(&mut frame);
             let params = [key_param, value_param];
             unsafe {
                 Self::base_type(&frame)
@@ -520,8 +520,8 @@ unsafe impl<K: ConstructType, V: ConstructType> ConstructType for AbstractDict<K
         Tgt: Target<'target>,
     {
         target.with_local_scope::<_, 3>(|target, mut frame| {
-            let key_param = K::construct_type_with_env(&mut frame, env);
-            let value_param = V::construct_type_with_env(&mut frame, env);
+            let key_param = K::construct_type_with_env_uncached(&mut frame, env);
+            let value_param = V::construct_type_with_env_uncached(&mut frame, env);
             let params = [key_param, value_param];
             unsafe {
                 Self::base_type(&frame)
@@ -549,7 +549,7 @@ unsafe impl<T: ConstructType> ConstructType for AbstractMatrix<T> {
         Tgt: Target<'target>,
     {
         target.with_local_scope::<_, 2>(|target, mut frame| {
-            let ty_param = T::construct_type(&mut frame);
+            let ty_param = T::construct_type_uncached(&mut frame);
             let params = [ty_param];
             unsafe {
                 Self::base_type(&frame)
@@ -578,7 +578,7 @@ unsafe impl<T: ConstructType> ConstructType for AbstractMatrix<T> {
         Tgt: Target<'target>,
     {
         target.with_local_scope::<_, 2>(|target, mut frame| {
-            let ty_param = T::construct_type_with_env(&mut frame, env);
+            let ty_param = T::construct_type_with_env_uncached(&mut frame, env);
             let params = [ty_param];
             unsafe {
                 Self::base_type(&frame)
@@ -606,7 +606,7 @@ unsafe impl<T: ConstructType> ConstructType for AbstractRange<T> {
         Tgt: Target<'target>,
     {
         target.with_local_scope::<_, 2>(|target, mut frame| {
-            let ty_param = T::construct_type(&mut frame);
+            let ty_param = T::construct_type_uncached(&mut frame);
             let params = [ty_param];
             unsafe {
                 Self::base_type(&frame)
@@ -635,7 +635,7 @@ unsafe impl<T: ConstructType> ConstructType for AbstractRange<T> {
         Tgt: Target<'target>,
     {
         target.with_local_scope::<_, 2>(|target, mut frame| {
-            let ty_param = T::construct_type_with_env(&mut frame, env);
+            let ty_param = T::construct_type_with_env_uncached(&mut frame, env);
             let params = [ty_param];
             unsafe {
                 Self::base_type(&frame)
@@ -663,7 +663,7 @@ unsafe impl<T: ConstructType> ConstructType for AbstractSet<T> {
         Tgt: Target<'target>,
     {
         target.with_local_scope::<_, 2>(|target, mut frame| {
-            let ty_param = T::construct_type(&mut frame);
+            let ty_param = T::construct_type_uncached(&mut frame);
             let params = [ty_param];
             unsafe {
                 Self::base_type(&frame)
@@ -692,7 +692,7 @@ unsafe impl<T: ConstructType> ConstructType for AbstractSet<T> {
         Tgt: Target<'target>,
     {
         target.with_local_scope::<_, 2>(|target, mut frame| {
-            let ty_param = T::construct_type_with_env(&mut frame, env);
+            let ty_param = T::construct_type_with_env_uncached(&mut frame, env);
             let params = [ty_param];
             unsafe {
                 Self::base_type(&frame)
@@ -721,8 +721,8 @@ unsafe impl<T: ConstructType, N: ConstructType> ConstructType for AbstractSlices
         Tgt: Target<'target>,
     {
         target.with_local_scope::<_, 3>(|target, mut frame| {
-            let ty_param = T::construct_type(&mut frame);
-            let n_param = N::construct_type(&mut frame);
+            let ty_param = T::construct_type_uncached(&mut frame);
+            let n_param = N::construct_type_uncached(&mut frame);
             let params = [ty_param, n_param];
             unsafe {
                 Self::base_type(&frame)
@@ -742,8 +742,8 @@ unsafe impl<T: ConstructType, N: ConstructType> ConstructType for AbstractSlices
         Tgt: Target<'target>,
     {
         target.with_local_scope::<_, 3>(|target, mut frame| {
-            let ty_param = T::construct_type_with_env(&mut frame, env);
-            let n_param = N::construct_type_with_env(&mut frame, env);
+            let ty_param = T::construct_type_with_env_uncached(&mut frame, env);
+            let n_param = N::construct_type_with_env_uncached(&mut frame, env);
             let params = [ty_param, n_param];
             unsafe {
                 Self::base_type(&frame)
@@ -778,7 +778,7 @@ unsafe impl<T: ConstructType> ConstructType for AbstractUnitRange<T> {
         Tgt: Target<'target>,
     {
         target.with_local_scope::<_, 2>(|target, mut frame| {
-            let ty_param = T::construct_type(&mut frame);
+            let ty_param = T::construct_type_uncached(&mut frame);
             let params = [ty_param];
             unsafe {
                 Self::base_type(&frame)
@@ -798,7 +798,7 @@ unsafe impl<T: ConstructType> ConstructType for AbstractUnitRange<T> {
         Tgt: Target<'target>,
     {
         target.with_local_scope::<_, 2>(|target, mut frame| {
-            let ty_param = T::construct_type_with_env(&mut frame, env);
+            let ty_param = T::construct_type_with_env_uncached(&mut frame, env);
             let params = [ty_param];
             unsafe {
                 Self::base_type(&frame)
@@ -837,7 +837,7 @@ unsafe impl<T: ConstructType> ConstructType for AbstractVector<T> {
         Tgt: Target<'target>,
     {
         target.with_local_scope::<_, 2>(|target, mut frame| {
-            let ty_param = T::construct_type(&mut frame);
+            let ty_param = T::construct_type_uncached(&mut frame);
             let params = [ty_param];
             unsafe {
                 Self::base_type(&frame)
@@ -857,7 +857,7 @@ unsafe impl<T: ConstructType> ConstructType for AbstractVector<T> {
         Tgt: Target<'target>,
     {
         target.with_local_scope::<_, 2>(|target, mut frame| {
-            let ty_param = T::construct_type_with_env(&mut frame, env);
+            let ty_param = T::construct_type_with_env_uncached(&mut frame, env);
             let params = [ty_param];
             unsafe {
                 Self::base_type(&frame)
@@ -894,7 +894,7 @@ unsafe impl<T: ConstructType> ConstructType for DenseMatrix<T> {
         Tgt: Target<'target>,
     {
         target.with_local_scope::<_, 2>(|target, mut frame| {
-            let ty_param = T::construct_type(&mut frame);
+            let ty_param = T::construct_type_uncached(&mut frame);
             let params = [ty_param];
             unsafe {
                 Self::base_type(&frame)
@@ -914,7 +914,7 @@ unsafe impl<T: ConstructType> ConstructType for DenseMatrix<T> {
         Tgt: Target<'target>,
     {
         target.with_local_scope::<_, 2>(|target, mut frame| {
-            let ty_param = T::construct_type_with_env(&mut frame, env);
+            let ty_param = T::construct_type_with_env_uncached(&mut frame, env);
             let params = [ty_param];
             unsafe {
                 Self::base_type(&frame)
@@ -951,7 +951,7 @@ unsafe impl<T: ConstructType> ConstructType for DenseVector<T> {
         Tgt: Target<'target>,
     {
         target.with_local_scope::<_, 2>(|target, mut frame| {
-            let ty_param = T::construct_type(&mut frame);
+            let ty_param = T::construct_type_uncached(&mut frame);
             let params = [ty_param];
             unsafe {
                 Self::base_type(&frame)
@@ -971,7 +971,7 @@ unsafe impl<T: ConstructType> ConstructType for DenseVector<T> {
         Tgt: Target<'target>,
     {
         target.with_local_scope::<_, 2>(|target, mut frame| {
-            let ty_param = T::construct_type_with_env(&mut frame, env);
+            let ty_param = T::construct_type_with_env_uncached(&mut frame, env);
             let params = [ty_param];
             unsafe {
                 Self::base_type(&frame)
@@ -1008,16 +1008,16 @@ unsafe impl<T: ConstructType> ConstructType for Enum<T> {
         Tgt: Target<'target>,
     {
         target.with_local_scope::<_, 3>(|target, mut frame| {
-            let ty_param = T::construct_type(&mut frame);
+            let ty_param = T::construct_type_uncached(&mut frame);
 
             // Validate bound
             match ty_param.cast::<TypeVar>() {
                 Ok(tvar) => unsafe {
                     let ub = tvar.upper_bound(&frame).as_value();
-                    assert!(ub.subtype(Integer::construct_type(&mut frame)));
+                    assert!(ub.subtype(Integer::construct_type_uncached(&mut frame)));
                 },
                 _ => {
-                    assert!(ty_param.subtype(Integer::construct_type(&mut frame)));
+                    assert!(ty_param.subtype(Integer::construct_type_uncached(&mut frame)));
                 }
             }
 
@@ -1041,16 +1041,19 @@ unsafe impl<T: ConstructType> ConstructType for Enum<T> {
         Tgt: Target<'target>,
     {
         target.with_local_scope::<_, 3>(|target, mut frame| {
-            let ty_param = T::construct_type_with_env(&mut frame, env);
+            let ty_param = T::construct_type_with_env_uncached(&mut frame, env);
 
             // Validate bound
             match ty_param.cast::<TypeVar>() {
                 Ok(tvar) => unsafe {
                     let ub = tvar.upper_bound(&frame).as_value();
-                    assert!(ub.subtype(Integer::construct_type_with_env(&mut frame, env)));
+                    assert!(ub.subtype(Integer::construct_type_with_env_uncached(&mut frame, env)));
                 },
                 _ => {
-                    assert!(ty_param.subtype(Integer::construct_type_with_env(&mut frame, env)));
+                    assert!(
+                        ty_param
+                            .subtype(Integer::construct_type_with_env_uncached(&mut frame, env))
+                    );
                 }
             }
 
@@ -1092,8 +1095,8 @@ unsafe impl<T: ConstructType, S: ConstructType> ConstructType for OrdinalRange<T
         Tgt: Target<'target>,
     {
         target.with_local_scope::<_, 3>(|target, mut frame| {
-            let ty_param = T::construct_type(&mut frame);
-            let n_param = S::construct_type(&mut frame);
+            let ty_param = T::construct_type_uncached(&mut frame);
+            let n_param = S::construct_type_uncached(&mut frame);
             let params = [ty_param, n_param];
             unsafe {
                 Self::base_type(&frame)
@@ -1113,8 +1116,8 @@ unsafe impl<T: ConstructType, S: ConstructType> ConstructType for OrdinalRange<T
         Tgt: Target<'target>,
     {
         target.with_local_scope::<_, 3>(|target, mut frame| {
-            let ty_param = T::construct_type_with_env(&mut frame, env);
-            let n_param = S::construct_type_with_env(&mut frame, env);
+            let ty_param = T::construct_type_with_env_uncached(&mut frame, env);
+            let n_param = S::construct_type_with_env_uncached(&mut frame, env);
             let params = [ty_param, n_param];
             unsafe {
                 Self::base_type(&frame)

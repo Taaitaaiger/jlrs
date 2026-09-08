@@ -109,7 +109,7 @@ unsafe impl<U: ConstructType> ConstructType for *mut U {
         Tgt: Target<'target>,
     {
         target.with_local_scope::<_, 1>(|target, mut frame| {
-            let ty = U::construct_type(&mut frame);
+            let ty = U::construct_type_uncached(&mut frame);
             unsafe {
                 UnionAll::pointer_type(&frame)
                     .as_value()
@@ -142,7 +142,7 @@ unsafe impl<U: ConstructType> ConstructType for *mut U {
         Tgt: Target<'target>,
     {
         target.with_local_scope::<_, 1>(|target, mut frame| {
-            let ty = U::construct_type_with_env(&mut frame, env);
+            let ty = U::construct_type_with_env_uncached(&mut frame, env);
             unsafe {
                 UnionAll::pointer_type(&frame)
                     .as_value()

@@ -46,8 +46,8 @@ unsafe impl<L: ConstructType, R: ConstructType> ConstructType for UnionTypeConst
         Tgt: Target<'target>,
     {
         target.with_local_scope::<_, 2>(|target, mut frame| {
-            let l = L::construct_type(&mut frame);
-            let r = R::construct_type(&mut frame);
+            let l = L::construct_type_uncached(&mut frame);
+            let r = R::construct_type_uncached(&mut frame);
 
             unsafe { crate::data::managed::union::Union::new_unchecked(target, [l, r]) }
         })
@@ -77,8 +77,8 @@ unsafe impl<L: ConstructType, R: ConstructType> ConstructType for UnionTypeConst
         Tgt: Target<'target>,
     {
         target.with_local_scope::<_, 2>(|target, mut frame| {
-            let l = L::construct_type_with_env(&mut frame, env);
-            let r = R::construct_type_with_env(&mut frame, env);
+            let l = L::construct_type_with_env_uncached(&mut frame, env);
+            let r = R::construct_type_with_env_uncached(&mut frame, env);
 
             unsafe { Union::new_unchecked(target, [l, r]) }
         })

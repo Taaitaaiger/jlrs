@@ -12,12 +12,18 @@ fn construct_array_1d_unrooted(frame: &mut GcFrame, c: &mut Criterion) {
         b.iter(|| TypedArray::<f64>::new(&frame, 16))
     });
 }
+#[inline(never)]
+fn construct_vector_unrooted(frame: &mut GcFrame, c: &mut Criterion) {
+    c.bench_function("Vector<f64>_unrooted", |b| {
+        b.iter(|| TypedVector::<f64>::new(&frame, 16))
+    });
+}
 
 #[inline(never)]
-fn construct_array_1d_unrooted2(frame: &mut GcFrame, c: &mut Criterion) {
+fn construct_fast_array_key_array_1d(frame: &mut GcFrame, c: &mut Criterion) {
     jlrs::define_fast_key!(pub Foo, f32, 1);
 
-    c.bench_function("Array<f64,1>_unrooted2", |b| {
+    c.bench_function("fast_array_key_unrooted", |b| {
         b.iter(|| {
             let x: Result<WeakTypedRankedArray<f32, 1>, _> = Foo::new(&frame, 16);
             x
@@ -166,7 +172,12 @@ fn criterion_benchmark(c: &mut Criterion) {
             frame.gc_collect(jlrs::memory::gc::GcCollection::Full);
             frame.gc_collect(jlrs::memory::gc::GcCollection::Full);
             frame.gc_collect(jlrs::memory::gc::GcCollection::Full);
-            construct_array_1d_unrooted2(&mut frame, c);
+            construct_vector_unrooted(&mut frame, c);
+
+            frame.gc_collect(jlrs::memory::gc::GcCollection::Full);
+            frame.gc_collect(jlrs::memory::gc::GcCollection::Full);
+            frame.gc_collect(jlrs::memory::gc::GcCollection::Full);
+            construct_fast_array_key_array_1d(&mut frame, c);
 
             frame.gc_collect(jlrs::memory::gc::GcCollection::Full);
             frame.gc_collect(jlrs::memory::gc::GcCollection::Full);

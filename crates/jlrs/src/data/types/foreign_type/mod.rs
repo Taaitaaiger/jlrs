@@ -102,7 +102,7 @@
 pub mod mark;
 
 use std::{
-    any::{Any, TypeId, type_name},
+    any::{Any, type_name},
     ffi::c_void,
     marker::PhantomData,
     ptr::NonNull,
@@ -118,7 +118,6 @@ use super::typecheck::Typecheck;
 use crate::{
     convert::{into_julia::IntoJulia, unbox::Unbox},
     data::{
-        cache::{CacheMap, FnvCache, new_fnv_cache},
         layout::valid_layout::ValidLayout,
         managed::{
             Managed, Weak,
@@ -129,13 +128,11 @@ use crate::{
             symbol::Symbol,
             value::{Value, ValueData},
         },
-        types::construct_type::ConstructType,
+        types::construct_type::{CACHE, ConstructType},
     },
     memory::{PTls, get_tls, scope::LocalScopeExt, target::Target},
     private::Private,
 };
-
-pub(crate) static CACHE: FnvCache<TypeId, DataType<'static>> = new_fnv_cache();
 
 /// Define a type whose layout is invisible to Julia.
 ///
@@ -288,27 +285,12 @@ pub unsafe trait OpaqueType: Sized + Send + Sync + 'static {
     /// default implementation must not be overridden, it cannot be implemented correctly without
     /// using internal functionality.
     unsafe fn reinit_type(ty: DataType) -> bool {
-        unsafe {
-            if Self::N_PARAMS == 0 {
-                let key = TypeId::of::<Self>();
-                if let Some(_) = CACHE.get(&key) {
-                    return true;
-                }
-
-                CACHE.insert(key, ty.leak().as_managed());
-
-                true
-            } else {
-                let key = TypeId::of::<Key<Self::Key>>();
-                if let Some(_) = CACHE.get(&key) {
-                    return true;
-                }
-
-                CACHE.insert(key, ty.leak().as_managed());
-
-                true
-            }
+        if Self::N_PARAMS == 0 {
+            CACHE.insert_foreign::<Self>(ty);
+        } else {
+            CACHE.insert_foreign::<Key<Self::Key>>(ty);
         }
+        true
     }
 
     /// Creates a new variant of an opaque type named `name`.
@@ -325,14 +307,11 @@ pub unsafe trait OpaqueType: Sized + Send + Sync + 'static {
         Tgt: Target<'target>,
     {
         unsafe {
-            let key = TypeId::of::<Self>();
-            if let Some(ty) = CACHE.get(&key) {
-                return target.data_from_ptr(ty.unwrap_non_null(Private), Private);
+            if let Some(ty) = CACHE.find_or_none::<Self>() {
+                return target.data_from_ptr(ty.ptr().cast(), Private);
             }
 
-            let base_key = TypeId::of::<Key<Self::Key>>();
-            let base_ty = CACHE.get(&base_key);
-
+            let base_ty = CACHE.find_or_none::<Key<Self::Key>>();
             if base_ty.is_none() {
                 panic!("Type {} was not initialized", name.as_str().unwrap());
             }
@@ -344,14 +323,15 @@ pub unsafe trait OpaqueType: Sized + Send + Sync + 'static {
 
                 let ty = base_ty
                     .unwrap_unchecked()
+                    .as_value()
+                    .cast_unchecked::<DataType>()
                     .rewrap(&mut frame)
                     .apply_type(&mut frame, params_slice)
                     .unwrap()
                     .cast::<DataType>()
                     .unwrap();
 
-                CACHE.insert(key, ty.leak().as_managed());
-
+                CACHE.insert_foreign::<Self>(ty);
                 ty.root(target)
             })
         }
@@ -369,14 +349,11 @@ pub unsafe trait OpaqueType: Sized + Send + Sync + 'static {
     /// default implementation must not be overridden, it cannot be implemented correctly without
     /// using internal functionality.
     unsafe fn reinit_variant(ty: DataType) -> bool {
-        unsafe {
-            let key = TypeId::of::<Self>();
-            if CACHE.get(&key).is_none() {
-                CACHE.insert(key, ty.leak().as_managed());
-            }
-
-            true
+        if CACHE.find_or_none::<Self>().is_none() {
+            CACHE.insert_foreign::<Self>(ty);
         }
+
+        true
     }
 }
 
@@ -593,9 +570,8 @@ unsafe impl<T: ForeignType> OpaqueType for T {
         Tgt: Target<'target>,
     {
         unsafe {
-            let key = TypeId::of::<Self>();
-            if let Some(ty) = CACHE.get(&key) {
-                return ty.root(target);
+            if let Some(ty) = CACHE.find_or_none::<Self>() {
+                return ty.as_value().cast_unchecked::<DataType>().root(target);
             }
 
             let large = Self::LARGE as _;
@@ -631,10 +607,10 @@ unsafe impl<T: ForeignType> OpaqueType for T {
                     type_name::<Self>()
                 );
 
-                CACHE.insert(
-                    key,
-                    DataType::wrap_non_null(NonNull::new_unchecked(ty), Private),
-                );
+                CACHE.insert_foreign::<Self>(DataType::wrap_non_null(
+                    NonNull::new_unchecked(ty),
+                    Private,
+                ));
                 target.data_from_ptr(NonNull::new_unchecked(ty), Private)
             })
         }
@@ -642,8 +618,7 @@ unsafe impl<T: ForeignType> OpaqueType for T {
 
     unsafe fn reinit_type(datatype: DataType) -> bool {
         unsafe {
-            let key = TypeId::of::<Self>();
-            if let Some(_) = CACHE.get(&key) {
+            if let Some(_) = CACHE.find_or_none::<Self>() {
                 return true;
             }
 
@@ -661,10 +636,10 @@ unsafe impl<T: ForeignType> OpaqueType for T {
             let ty = datatype.unwrap(Private);
             let ret = jl_reinit_foreign_type(ty, mark::<Self>, sweep::<Self>);
             if ret != 0 {
-                CACHE.insert(
-                    key,
-                    DataType::wrap_non_null(NonNull::new_unchecked(ty), Private),
-                );
+                CACHE.insert_foreign::<Self>(DataType::wrap_non_null(
+                    NonNull::new_unchecked(ty),
+                    Private,
+                ));
 
                 true
             } else {
@@ -698,9 +673,8 @@ where
     Tgt: Target<'target>,
 {
     unsafe {
-        let key = TypeId::of::<Key<T::Key>>();
-        if let Some(ty) = CACHE.get(&key) {
-            return ty.root(target);
+        if let Some(ty) = CACHE.find_or_none::<Key<T::Key>>() {
+            return ty.as_value().cast_unchecked::<DataType>().root(target);
         }
 
         target.with_local_scope::<_, 2>(|target, mut frame| {
@@ -721,10 +695,10 @@ where
             );
 
             debug_assert!(!ty.is_null());
-            CACHE.insert(
-                key,
-                DataType::wrap_non_null(NonNull::new_unchecked(ty), Private),
-            );
+            CACHE.insert_foreign::<Key<T::Key>>(DataType::wrap_non_null(
+                NonNull::new_unchecked(ty),
+                Private,
+            ));
 
             target.data_from_ptr::<DataType>(NonNull::new_unchecked(ty), Private)
         })
@@ -741,9 +715,8 @@ where
     Tgt: Target<'target>,
 {
     unsafe {
-        let key = TypeId::of::<T>();
-        if let Some(ty) = CACHE.get(&key) {
-            return ty.root(target);
+        if let Some(ty) = CACHE.find_or_none::<T>() {
+            return ty.as_value().cast_unchecked::<DataType>().root(target);
         }
 
         target.with_local_scope::<_, 2>(|target, mut frame| {
@@ -764,10 +737,7 @@ where
             );
 
             debug_assert!(!ty.is_null());
-            CACHE.insert(
-                key,
-                DataType::wrap_non_null(NonNull::new_unchecked(ty), Private),
-            );
+            CACHE.insert_foreign::<T>(DataType::wrap_non_null(NonNull::new_unchecked(ty), Private));
 
             target.data_from_ptr::<DataType>(NonNull::new_unchecked(ty), Private)
         })
@@ -789,12 +759,14 @@ unsafe impl<F: OpaqueType> IntoJulia for F {
     where
         Tgt: Target<'scope>,
     {
-        let key = TypeId::of::<F>();
-
-        CACHE
-            .get(&key)
-            .expect("Type has not been initialized")
-            .root(target)
+        unsafe {
+            CACHE
+                .find_or_none::<F>()
+                .expect("Type has not been initialized")
+                .as_value()
+                .cast_unchecked::<DataType>()
+                .root(target)
+        }
     }
 
     fn into_julia<'scope, Tgt>(self, target: Tgt) -> ValueData<'scope, 'static, Tgt>
@@ -802,13 +774,12 @@ unsafe impl<F: OpaqueType> IntoJulia for F {
         Tgt: Target<'scope>,
     {
         unsafe {
-            let key = TypeId::of::<F>();
-            let ty = if let Some(ty) = CACHE.get(&key) {
-                ty
+            let ty = if let Some(ty) = CACHE.find_or_none::<F>() {
+                ty.as_value().cast_unchecked::<DataType>()
             } else {
                 if let Some(func) = Self::TYPE_FN {
                     let ty = func();
-                    CACHE.insert(key, ty);
+                    CACHE.insert_foreign::<F>(ty);
                     ty
                 } else {
                     panic!("Type {} was not initialized", type_name::<Self>())
@@ -850,16 +821,14 @@ unsafe impl<T: OpaqueType> ValidLayout for T {
     }
 
     fn type_object<'target, Tgt: Target<'target>>(_target: &Tgt) -> Value<'target, 'static> {
-        let key = TypeId::of::<T>();
-        CACHE.get(&key).unwrap().as_value()
+        unsafe { CACHE.find_or_none::<T>().unwrap().as_value() }
     }
 }
 
 unsafe impl<T: OpaqueType> Typecheck for T {
     fn typecheck(ty: DataType) -> bool {
-        let key = TypeId::of::<T>();
-        if let Some(found_ty) = CACHE.get(&key) {
-            ty.unwrap(Private) == found_ty.unwrap(Private)
+        if let Some(found_ty) = CACHE.find_or_none::<T>() {
+            ty.as_value().unwrap(Private) == unsafe { found_ty.as_value().unwrap(Private) }
         } else {
             false
         }
@@ -883,16 +852,14 @@ unsafe impl<T: OpaqueType> ConstructType for T {
     where
         Tgt: Target<'target>,
     {
-        let key = TypeId::of::<T>();
-        CACHE.get(&key).unwrap().as_value().root(target)
+        unsafe { CACHE.find_or_none::<T>().unwrap().as_value().root(target) }
     }
 
     fn base_type<'target, Tgt>(_target: &Tgt) -> Option<Value<'target, 'static>>
     where
         Tgt: Target<'target>,
     {
-        let key = TypeId::of::<T>();
-        Some(CACHE.get(&key)?.as_value())
+        Some(unsafe { CACHE.find_or_none::<T>()?.as_value() })
     }
 
     fn construct_type_with_env_uncached<'target, Tgt>(
@@ -902,8 +869,7 @@ unsafe impl<T: OpaqueType> ConstructType for T {
     where
         Tgt: Target<'target>,
     {
-        let key = TypeId::of::<T>();
-        CACHE.get(&key).unwrap().as_value().root(target)
+        unsafe { CACHE.find_or_none::<T>().unwrap().as_value().root(target) }
     }
 }
 

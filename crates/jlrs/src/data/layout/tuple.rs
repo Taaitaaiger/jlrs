@@ -261,7 +261,7 @@ macro_rules! impl_tuple {
 
                 target.with_local_scope::<_, N>(|target, mut frame| {
                     let types = &mut [
-                        $(<$types as $crate::data::types::construct_type::ConstructType>::construct_type(&mut frame)),+
+                        $(<$types as $crate::data::types::construct_type::ConstructType>::construct_type_uncached(&mut frame)),+
                     ];
 
                     let tt = $crate::data::managed::datatype::DataType::anytuple_type(&frame).as_value();
@@ -282,7 +282,7 @@ macro_rules! impl_tuple {
 
                     target.with_local_scope::<_, N>(|target, mut frame| {
                         let types = &mut [
-                            $(<$types as $crate::data::types::construct_type::ConstructType>::construct_type_with_env(&mut frame, env)),+
+                            $(<$types as $crate::data::types::construct_type::ConstructType>::construct_type_with_env_uncached(&mut frame, env)),+
                         ];
 
                         let tt = $crate::data::managed::datatype::DataType::anytuple_type(&frame).as_value();
@@ -529,7 +529,7 @@ unsafe impl<T: ConstructType, const N: usize> ConstructType for NTuple<T, N> {
     {
         unsafe {
             target.with_local_scope::<_, 1>(|target, mut frame| {
-                let ty = T::construct_type(&mut frame);
+                let ty = T::construct_type_uncached(&mut frame);
                 let types = [ty; N];
                 let tt = DataType::anytuple_type(&frame).as_value();
                 tt.apply_type_unchecked(target, types)
@@ -546,7 +546,7 @@ unsafe impl<T: ConstructType, const N: usize> ConstructType for NTuple<T, N> {
     {
         unsafe {
             target.with_local_scope::<_, 1>(|target, mut frame| {
-                let ty = T::construct_type_with_env(&mut frame, env);
+                let ty = T::construct_type_with_env_uncached(&mut frame, env);
                 let types = [ty; N];
                 let tt = DataType::anytuple_type(&frame).as_value();
                 tt.apply_type_unchecked(target, types)

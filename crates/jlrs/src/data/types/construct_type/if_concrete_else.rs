@@ -28,7 +28,7 @@ unsafe impl<T1: ConstructType, T2: ConstructType> ConstructType for IfConcreteEl
     where
         Tgt: Target<'target>,
     {
-        let t1 = T1::construct_type(&target);
+        let t1 = T1::construct_type_uncached(&target);
         unsafe {
             let v = t1.as_value();
             if v.is::<DataType>() {
@@ -37,7 +37,7 @@ unsafe impl<T1: ConstructType, T2: ConstructType> ConstructType for IfConcreteEl
                 }
             }
 
-            T2::construct_type(target)
+            T2::construct_type_uncached(target)
         }
     }
 

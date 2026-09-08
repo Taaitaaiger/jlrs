@@ -12,14 +12,11 @@ pub mod union_types;
 
 use std::any::TypeId;
 
-pub(crate) use cache::mark_constructed_type_cache;
 pub use type_var::TypeVarEnv;
 
+pub(crate) use self::cache::{CACHE, mark_constructed_type_cache};
 use crate::{
-    data::{
-        managed::value::{Value, ValueData},
-        types::construct_type::cache::CACHE,
-    },
+    data::managed::value::{Value, ValueData},
     memory::target::Target,
 };
 

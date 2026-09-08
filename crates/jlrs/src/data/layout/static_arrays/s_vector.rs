@@ -154,7 +154,7 @@ unsafe impl<T: ConstructType, const N: usize> ConstructType for SVector<T, N> {
         Tgt: Target<'target>,
     {
         target.with_local_scope::<_, 4>(|target, mut frame| unsafe {
-            let t = T::construct_type(&mut frame);
+            let t = T::construct_type_uncached(&mut frame);
             let n = (N as isize).into_julia(&mut frame);
 
             let svector = Self::base_type(&mut frame).unwrap();
@@ -176,7 +176,7 @@ unsafe impl<T: ConstructType, const N: usize> ConstructType for SVector<T, N> {
         Tgt: Target<'target>,
     {
         target.with_local_scope::<_, 4>(|target, mut frame| unsafe {
-            let t = T::construct_type_with_env(&mut frame, env);
+            let t = T::construct_type_with_env_uncached(&mut frame, env);
             let n = (N as isize).into_julia(&mut frame);
 
             let svector = Self::base_type(&mut frame).unwrap();

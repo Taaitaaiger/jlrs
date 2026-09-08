@@ -39,6 +39,12 @@ jobs:
           export LD_LIBRARY_PATH="${JLRS_JULIA_DIR}/lib:${LD_LIBRARY_PATH}"
           cargo test --features full --verbose
 
+      - name: Run tests with static-cache
+        run: |
+          export JLRS_JULIA_DIR="$(dirname $(dirname $(which julia)))"
+          export LD_LIBRARY_PATH="${JLRS_JULIA_DIR}/lib:${LD_LIBRARY_PATH}"
+          cargo test --features full,static-cache --verbose
+
   test-macos:
     runs-on: macos-latest
     continue-on-error: ${{ matrix.allow-fail }}
@@ -69,6 +75,13 @@ jobs:
           export DYLD_LIBRARY_PATH="${JLRS_JULIA_DIR}/lib:${DYLD_LIBRARY_PATH}"
           cargo test --features full --verbose
 
+      - name: Run tests with static-cache
+        run: |
+          cargo clean
+          export JLRS_JULIA_DIR="$(dirname $(dirname $(which julia)))"
+          export DYLD_LIBRARY_PATH="${JLRS_JULIA_DIR}/lib:${DYLD_LIBRARY_PATH}"
+          cargo test --features full,static-cache --verbose
+
   test-windows-gnu:
     runs-on: windows-2022
     continue-on-error: ${{ matrix.allow-fail }}
@@ -96,6 +109,10 @@ jobs:
         run: |
           julia -e 'import Pkg; Pkg.add(url="https://github.com/Taaitaaiger/JlrsCore.jl", rev="0f1b7cba4eeedae260cb48374716f3cd551fc8c0"); Pkg.add("StaticArrays")'
           cargo test --features full --verbose
+
+      - name: Run tests with static-cache
+        run: |
+          cargo test --features full,static-cache --verbose
 
   test-windows-msvc:
     runs-on: windows-2022
@@ -127,6 +144,14 @@ jobs:
         run: |
           julia -e 'import Pkg; Pkg.add(url="https://github.com/Taaitaaiger/JlrsCore.jl", rev="0f1b7cba4eeedae260cb48374716f3cd551fc8c0"); Pkg.add("StaticArrays")'
           cargo test --features full --verbose
+
+      - name: Run tests with static-cache
+        run: |
+          cargo test --features full,static-cache --verbose
+
+      - name: Run tests with static-cache
+        run: |
+          cargo test --features full,static-cache --verbose
 
   test-linux-lts:
     runs-on: ubuntu-latest
@@ -325,6 +350,26 @@ jobs:
         env:
           JULIA_PKG_SERVER: ""
 
+      - name: Build library with static-cache
+        run: |
+          cd tests/julia_module_test
+          cargo build --features "jlrs/jl-docs,jlrs/static-cache"
+
+      - name: Script tests with static-cache
+        run: |
+          cd tests/script
+          export JULIA_MODULE_TEST_LIB_DIR="${GITHUB_WORKSPACE}/tests/julia_module_test/target/debug"
+          julia JuliaModuleTest.jl
+
+      - name: Package tests with static-cache
+        run: |
+          cd tests/JuliaModuleTest
+          export JULIA_MODULE_TEST_LIB_DIR="${GITHUB_WORKSPACE}/tests/julia_module_test/target/debug"
+          julia --project=. -e '
+            using Pkg
+            Pkg.instantiate()'
+          julia --project=. test/runtests.jl
+
   julia-module-test-macos:
     runs-on: macos-latest
     needs: test-macos
@@ -392,6 +437,27 @@ jobs:
         env:
           JULIA_PKG_SERVER: ""
 
+      - name: Build library with static-cache
+        run: |
+          cd tests/julia_module_test
+          cargo clean
+          cargo build --features "jlrs/jl-docs,jlrs/static-cache"
+
+      - name: Script tests with static-cache
+        run: |
+          cd tests/script
+          export JULIA_MODULE_TEST_LIB_DIR="${GITHUB_WORKSPACE}/tests/julia_module_test/target/debug"
+          julia JuliaModuleTest.jl
+
+      - name: Package tests with static-cache
+        run: |
+          cd tests/JuliaModuleTest
+          export JULIA_MODULE_TEST_LIB_DIR="${GITHUB_WORKSPACE}/tests/julia_module_test/target/debug"
+          julia --project=. -e '
+            using Pkg
+            Pkg.instantiate()'
+          julia --project=. test/runtests.jl
+
   julia-module-test-windows-gnu:
     runs-on: windows-2022
     needs: test-windows-gnu
@@ -456,6 +522,26 @@ jobs:
           cd tests/JuliaModuleTest
           $env:JULIA_MODULE_TEST_LIB_DIR = "${env:GITHUB_WORKSPACE}\tests\julia_module_test\target\debug"
           julia --project=docs docs/make.jl
+
+      - name: Build library with static-cache
+        run: |
+          cd tests/julia_module_test
+          cargo build --features "jlrs/jl-docs,jlrs/static-cache"
+
+      - name: Script tests with static-cache
+        run: |
+          cd tests/script
+          $env:JULIA_MODULE_TEST_LIB_DIR = "${env:GITHUB_WORKSPACE}\tests\julia_module_test\target\debug"
+          julia JuliaModuleTest.jl
+
+      - name: Package tests with static-cache
+        run: |
+          cd tests/JuliaModuleTest
+          $env:JULIA_MODULE_TEST_LIB_DIR = "${env:GITHUB_WORKSPACE}\tests\julia_module_test\target\debug"
+          julia --project=. -e '
+            using Pkg
+            Pkg.instantiate()'
+          julia --project=. test/runtests.jl
 
   docs:
     runs-on: ubuntu-latest

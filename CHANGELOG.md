@@ -28,6 +28,8 @@
 
 - For-loops in `julia_module` can loop over constants in addition to types.
 
+- The performance of type construction can be greatly improved by enabling the experimental `static-cache` feature. When this feature is enabled, the `static-generics` crate is used to cache constructed types.
+
 ## v0.23
 
 - Implement `Clone` for `Tracked`. Note that this will break your code if the tracked type implements `Clone`, and the tracked handle was used to clone the data; this will now return a cloned handle, instead of the cloned underlying type.
