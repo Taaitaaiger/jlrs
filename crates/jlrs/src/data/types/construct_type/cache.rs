@@ -161,7 +161,7 @@ fn do_construct<T: ConstructType>() -> WeakValue<'static, 'static> {
             let weak_ty = ty.leak();
             if T::CACHEABLE && ty.is::<DataType>() {
                 let dt = ty.cast_unchecked::<DataType>();
-                if !dt.has_free_type_vars() && (!dt.is::<Tuple>() || dt.is_concrete_type()) {
+                if !dt.has_free_type_vars() && !dt.is::<Tuple>() && dt.is_concrete_type() {
                     StaticConstRef::<T::Static, WeakValue>::store::<ConstructedTypesNamespace>(
                         weak_ty,
                         Ordering::Relaxed,
@@ -191,7 +191,7 @@ fn do_construct_with_context<T: ConstructType>(env: &TypeVarEnv) -> WeakValue<'s
             let weak_ty = ty.leak();
             if T::CACHEABLE && ty.is::<DataType>() {
                 let dt = ty.cast_unchecked::<DataType>();
-                if !dt.has_free_type_vars() && (!dt.is::<Tuple>() || dt.is_concrete_type()) {
+                if !dt.has_free_type_vars() && !dt.is::<Tuple>() && dt.is_concrete_type() {
                     INNER_CACHE.insert(T::TYPE_ID, weak_ty.as_managed());
                     StaticConstRef::<T::Static, WeakValue>::store::<ConstructedTypesNamespace>(
                         weak_ty,
@@ -225,7 +225,7 @@ fn do_construct_with_context<T: ConstructType>(
 
             if T::CACHEABLE && ty.is::<DataType>() {
                 let dt = ty.cast_unchecked::<DataType>();
-                if !dt.has_free_type_vars() && (!dt.is::<Tuple>() || dt.is_concrete_type()) {
+                if !dt.has_free_type_vars() && !dt.is::<Tuple>() && dt.is_concrete_type() {
                     ct.data.insert(tid, ty.leak().as_value());
                 }
             } else if ty.is::<u8>() || ty.is::<i8>() {
@@ -251,7 +251,7 @@ fn do_construct<T: ConstructType>(
 
             if T::CACHEABLE && ty.is::<DataType>() {
                 let dt = ty.cast_unchecked::<DataType>();
-                if !dt.has_free_type_vars() && (!dt.is::<Tuple>() || dt.is_concrete_type()) {
+                if !dt.has_free_type_vars() && !dt.is::<Tuple>() && dt.is_concrete_type() {
                     ct.data.insert(tid, ty.leak().as_value());
                 }
             } else if ty.is::<u8>() || ty.is::<i8>() {
