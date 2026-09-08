@@ -217,6 +217,18 @@ pub trait ConstructTypedArray<T: ConstructType, const N: isize> {
         Tgt: Target<'target>,
         D: DimsExt;
 
+    fn array_type_n<'target, D, Tgt>(target: Tgt, dims: &D) -> ValueData<'target, 'static, Tgt>
+    where
+        Tgt: Target<'target>,
+        D: DimsExt,
+    {
+        if N >= 0 {
+            TypedRankedArray::<T, N>::construct_type(target)
+        } else {
+            Self::array_type(target, dims)
+        }
+    }
+
     /// Allocate a new Julia array.
     ///
     /// The element type is `T`, the rank follows from the rank of `D`. If `N >= 0`, the rank of
@@ -256,7 +268,7 @@ pub trait ConstructTypedArray<T: ConstructType, const N: isize> {
 
         unsafe {
             let callback = || {
-                let array_type = Self::array_type(&target, &dims).as_value();
+                let array_type = Self::array_type_n(&target, &dims).as_value();
                 dims.alloc_array(&target, array_type)
             };
 
@@ -286,7 +298,7 @@ pub trait ConstructTypedArray<T: ConstructType, const N: isize> {
     {
         unsafe {
             let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
-            let array_type = Self::array_type(&target, &dims).as_value();
+            let array_type = Self::array_type_n(&target, &dims).as_value();
             let array = dims.alloc_array(&target, array_type);
             target.data_from_ptr(array.ptr(), Private)
         }
@@ -380,7 +392,7 @@ pub trait ConstructTypedArray<T: ConstructType, const N: isize> {
 
         unsafe {
             let callback = || {
-                let array_type = Self::array_type(&target, &dims).as_value();
+                let array_type = Self::array_type_n(&target, &dims).as_value();
                 dims.alloc_array_with_data(&target, array_type, data.as_ptr() as _)
             };
 
@@ -414,7 +426,7 @@ pub trait ConstructTypedArray<T: ConstructType, const N: isize> {
     {
         unsafe {
             let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
-            let array_type = Self::array_type(&target, &dims).as_value();
+            let array_type = Self::array_type_n(&target, &dims).as_value();
             let array = dims.alloc_array_with_data(&target, array_type, data.as_ptr() as _);
             target.data_from_ptr(array.ptr(), Private)
         }
@@ -508,7 +520,7 @@ pub trait ConstructTypedArray<T: ConstructType, const N: isize> {
 
         unsafe {
             let callback = || {
-                let array_type = Self::array_type(&target, &dims).as_value();
+                let array_type = Self::array_type_n(&target, &dims).as_value();
                 let array = dims.alloc_array_with_data(&target, array_type, data.as_mut_ptr() as _);
 
                 #[cfg(not(julia_1_10))]
@@ -553,7 +565,7 @@ pub trait ConstructTypedArray<T: ConstructType, const N: isize> {
             let _ = DimsRankAssert::<D, N>::ASSERT_VALID_RANK;
             let data = Box::leak(data.into_boxed_slice());
 
-            let array_type = Self::array_type(&target, &dims).as_value();
+            let array_type = Self::array_type_n(&target, &dims).as_value();
             let array = dims.alloc_array_with_data(&target, array_type, data.as_mut_ptr() as _);
             #[cfg(not(julia_1_10))]
             let mem = jlrs_sys::inlined::jlrs_array_mem(array.ptr().as_ptr());
@@ -3108,6 +3120,43 @@ unsafe impl<'scope, 'data, T: ConstructType, const N: isize> ConstructType
             })
         }
     }
+
+    const CACHEABLE: bool = true;
+
+    const TYPE_ID: std::any::TypeId = std::any::TypeId::of::<Self::Static>();
+
+    fn construct_type<'target, Tgt>(target: Tgt) -> ValueData<'target, 'static, Tgt>
+    where
+        Tgt: Target<'target>,
+    {
+        if N >= 0 {
+            unsafe {
+                crate::data::types::construct_type::CACHE
+                    .find_or_construct::<Self>()
+                    .root(target)
+            }
+        } else {
+            Self::construct_type_uncached(target)
+        }
+    }
+
+    fn construct_type_with_env<'target, Tgt>(
+        target: Tgt,
+        env: &crate::data::types::construct_type::TypeVarEnv,
+    ) -> ValueData<'target, 'static, Tgt>
+    where
+        Tgt: Target<'target>,
+    {
+        if N >= 0 {
+            unsafe {
+                crate::data::types::construct_type::CACHE
+                    .find_or_construct_with_env::<Self>(env)
+                    .root(target)
+            }
+        } else {
+            Self::construct_type_with_env_uncached(target, env)
+        }
+    }
 }
 
 unsafe impl<'scope, 'data, const N: isize> ConstructType for RankedArray<'scope, 'data, N> {
@@ -3174,6 +3223,39 @@ unsafe impl<'scope, 'data, const N: isize> ConstructType for RankedArray<'scope,
                 let applied = ty.apply_types_unchecked(target, [t_param.as_value(), n]);
                 applied
             })
+        }
+    }
+
+    fn construct_type<'target, Tgt>(target: Tgt) -> ValueData<'target, 'static, Tgt>
+    where
+        Tgt: Target<'target>,
+    {
+        if N >= 0 {
+            unsafe {
+                crate::data::types::construct_type::CACHE
+                    .find_or_construct::<Self>()
+                    .root(target)
+            }
+        } else {
+            Self::construct_type_uncached(target)
+        }
+    }
+
+    fn construct_type_with_env<'target, Tgt>(
+        target: Tgt,
+        env: &crate::data::types::construct_type::TypeVarEnv,
+    ) -> ValueData<'target, 'static, Tgt>
+    where
+        Tgt: Target<'target>,
+    {
+        if N >= 0 {
+            unsafe {
+                crate::data::types::construct_type::CACHE
+                    .find_or_construct_with_env::<Self>(env)
+                    .root(target)
+            }
+        } else {
+            Self::construct_type_with_env_uncached(target, env)
         }
     }
 }

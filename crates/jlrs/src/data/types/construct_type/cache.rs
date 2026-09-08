@@ -84,7 +84,7 @@ impl ConstructedTypes {
     }
 
     #[inline]
-    pub(super) fn find_or_construct<T: ConstructType>(&self) -> WeakValue<'static, 'static> {
+    pub(crate) fn find_or_construct<T: ConstructType>(&self) -> WeakValue<'static, 'static> {
         if let Some(res) = self.find_or_none::<T::Static>() {
             return res;
         }
@@ -93,7 +93,7 @@ impl ConstructedTypes {
     }
 
     #[inline]
-    pub(super) fn find_or_construct_with_env<T: ConstructType>(
+    pub(crate) fn find_or_construct_with_env<T: ConstructType>(
         &self,
         env: &TypeVarEnv,
     ) -> WeakValue<'static, 'static> {
@@ -128,7 +128,7 @@ impl<'a> ConstructedTypes<'a> {
     }
 
     #[inline]
-    pub(super) fn find_or_construct<T: ConstructType>(&self) -> WeakValue<'static, 'static> {
+    pub(crate) fn find_or_construct<T: ConstructType>(&self) -> WeakValue<'static, 'static> {
         if let Some(res) = self.find_or_none::<T::Static>() {
             return res;
         }
@@ -137,7 +137,7 @@ impl<'a> ConstructedTypes<'a> {
     }
 
     #[inline]
-    pub(super) fn find_or_construct_with_env<T: ConstructType>(
+    pub(crate) fn find_or_construct_with_env<T: ConstructType>(
         &self,
         env: &TypeVarEnv,
     ) -> WeakValue<'static, 'static> {
@@ -159,7 +159,7 @@ fn do_construct<T: ConstructType>() -> WeakValue<'static, 'static> {
         handle.local_scope::<_, 1>(|mut frame| {
             let ty = T::construct_type_uncached(&mut frame);
             let weak_ty = ty.leak();
-            if ty.is::<DataType>() {
+            if T::CACHEABLE && ty.is::<DataType>() {
                 let dt = ty.cast_unchecked::<DataType>();
                 if !dt.has_free_type_vars() && (!dt.is::<Tuple>() || dt.is_concrete_type()) {
                     StaticConstRef::<T::Static, WeakValue>::store::<ConstructedTypesNamespace>(
@@ -189,7 +189,7 @@ fn do_construct_with_context<T: ConstructType>(env: &TypeVarEnv) -> WeakValue<'s
         handle.local_scope::<_, 1>(|mut frame| {
             let ty = T::construct_type_with_env_uncached(&mut frame, env);
             let weak_ty = ty.leak();
-            if ty.is::<DataType>() {
+            if T::CACHEABLE && ty.is::<DataType>() {
                 let dt = ty.cast_unchecked::<DataType>();
                 if !dt.has_free_type_vars() && (!dt.is::<Tuple>() || dt.is_concrete_type()) {
                     INNER_CACHE.insert(T::TYPE_ID, weak_ty.as_managed());
@@ -223,7 +223,7 @@ fn do_construct_with_context<T: ConstructType>(
         handle.local_scope::<_, 1>(|mut frame| {
             let ty = T::construct_type_with_env_uncached(&mut frame, env);
 
-            if ty.is::<DataType>() {
+            if T::CACHEABLE && ty.is::<DataType>() {
                 let dt = ty.cast_unchecked::<DataType>();
                 if !dt.has_free_type_vars() && (!dt.is::<Tuple>() || dt.is_concrete_type()) {
                     ct.data.insert(tid, ty.leak().as_value());
@@ -249,7 +249,7 @@ fn do_construct<T: ConstructType>(
         unrooted.with_local_scope::<_, 1>(|target, mut frame| {
             let ty = T::construct_type_uncached(&mut frame);
 
-            if ty.is::<DataType>() {
+            if T::CACHEABLE && ty.is::<DataType>() {
                 let dt = ty.cast_unchecked::<DataType>();
                 if !dt.has_free_type_vars() && (!dt.is::<Tuple>() || dt.is_concrete_type()) {
                     ct.data.insert(tid, ty.leak().as_value());

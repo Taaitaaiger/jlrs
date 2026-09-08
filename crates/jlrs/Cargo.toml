@@ -62,6 +62,7 @@ lto = ["jlrs-sys/lto"]
 # Expose the absolute source path in wrapped modules for documentation source links.
 jl-docs = ["jlrs-macros/jl-docs"]
 
+# Experimental, use static-generics for constructed type caching.
 static-cache = ["static-generics"]
 
 # Target or link a specific Julia build or arch.
