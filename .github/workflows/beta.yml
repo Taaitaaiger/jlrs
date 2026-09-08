@@ -69,32 +69,33 @@ jobs:
           export DYLD_LIBRARY_PATH="${JLRS_JULIA_DIR}/lib:${DYLD_LIBRARY_PATH}"
           cargo test --features full --verbose
 
-  test-macos-static-cache:
-    runs-on: macos-latest
-    continue-on-error: ${{ matrix.allow-fail }}
-    strategy:
-      matrix:
-        rust: [stable]
-        allow-fail: [false]
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Julia environment
-        uses: julia-actions/setup-julia@v2
-        with:
-          version: 'pre'
-
-      - name: Setup Rust
-        uses:  dtolnay/rust-toolchain@master
-        with:
-          toolchain: ${{ matrix.rust }}
-
       - name: Run tests with static-cache
         run: |
+          cargo clean
           julia -e "import Pkg; Pkg.add(url=\"https://github.com/Taaitaaiger/JlrsCore.jl\", rev=\"0f1b7cba4eeedae260cb48374716f3cd551fc8c0\"); Pkg.add(\"StaticArrays\")"
           export JLRS_JULIA_DIR="$(dirname $(dirname $(which julia)))"
           export DYLD_LIBRARY_PATH="${JLRS_JULIA_DIR}/lib:${DYLD_LIBRARY_PATH}"
           cargo test --features full,static-cache --verbose
+
+  # test-macos-static-cache:
+  #   runs-on: macos-latest
+  #   continue-on-error: ${{ matrix.allow-fail }}
+  #   strategy:
+  #     matrix:
+  #       rust: [stable]
+  #       allow-fail: [false]
+  #   steps:
+  #     - uses: actions/checkout@v4
+
+  #     - name: Setup Julia environment
+  #       uses: julia-actions/setup-julia@v2
+  #       with:
+  #         version: 'pre'
+
+  #     - name: Setup Rust
+  #       uses:  dtolnay/rust-toolchain@master
+  #       with:
+  #         toolchain: ${{ matrix.rust }}
 
   test-windows-gnu:
     runs-on: windows-2022
