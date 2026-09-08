@@ -101,7 +101,7 @@ jobs:
           julia -e 'import Pkg; Pkg.add(url="https://github.com/Taaitaaiger/JlrsCore.jl", rev="0f1b7cba4eeedae260cb48374716f3cd551fc8c0"); Pkg.add("StaticArrays")'
           cargo test --features full --verbose
 
-      - name: Run tests with static-cache 
+      - name: Run tests with static-cache
         run: |
           cargo test --features full,static-cache --verbose
 
