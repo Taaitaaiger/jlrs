@@ -62,7 +62,7 @@ jobs:
         with:
           rust-toolchain: ${{ matrix.rust }}
           jlrs-core-revision: '0f1b7cba4eeedae260cb48374716f3cd551fc8c0'
-          julia-version: '1.12'
+          julia-version: '1.12.6'
 
   #     - name: Setup Julia environment
   #       uses: julia-actions/setup-julia@v3
