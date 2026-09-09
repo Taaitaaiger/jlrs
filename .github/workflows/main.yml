@@ -39,19 +39,23 @@ jobs:
         with:
           toolchain: ${{ matrix.rust }}
 
+      - name: Install Julia deps
+        run: |
+          julia -e 'import Pkg; Pkg.add(url="https://github.com/Taaitaaiger/JlrsCore.jl", rev="0f1b7cba4eeedae260cb48374716f3cd551fc8c0"); Pkg.add("StaticArrays")'
+
       - name: Run tests
         run: |
-          julia -e "import Pkg; Pkg.add(url=\"https://github.com/Taaitaaiger/JlrsCore.jl\", rev=\"0f1b7cba4eeedae260cb48374716f3cd551fc8c0\"); Pkg.add(\"StaticArrays\")"
           cargo test --features full --verbose
         env:
           JLRS_JULIA_DIR: "${{ steps.setup-julia.outputs.julia-bindir }}/.."
-          LD_LIBRARY_PATH: "${{ steps.setup-julia.outputs.julia-bindir }}/../lib"
+          LD_LIBRARY_PATH: "${{ env.JLRS_JULIA_DIR }}/lib"
 
       - name: Run tests with static-cache
         run: |
-          export JLRS_JULIA_DIR="$(dirname $(dirname $(which julia)))"
-          export LD_LIBRARY_PATH="${JLRS_JULIA_DIR}/lib:${LD_LIBRARY_PATH}"
           cargo test --features full,static-cache --verbose
+        env:
+          JLRS_JULIA_DIR: "${{ steps.setup-julia.outputs.julia-bindir }}/.."
+          LD_LIBRARY_PATH: "${{ env.JLRS_JULIA_DIR }}/lib"
 
   test-macos:
     runs-on: macos-latest
@@ -228,6 +232,9 @@ jobs:
 
   julia-module-test-linux:
     runs-on: ubuntu-latest
+    permissions: # needed to allow julia-actions/cache to proactively delete old caches that it has created
+      actions: write
+      contents: read
     needs: test-linux
     steps:
       - uses: actions/checkout@v6
@@ -246,6 +253,8 @@ jobs:
         run: |
           cd tests/julia_module_test
           cargo build --features "jlrs/jl-docs"
+
+      - uses: julia-actions/cache@v3
 
       - name: Script tests
         run: |
@@ -315,6 +324,9 @@ jobs:
 
   julia-module-test-macos:
     runs-on: macos-latest
+    permissions: # needed to allow julia-actions/cache to proactively delete old caches that it has created
+      actions: write
+      contents: read
     needs: test-macos
     steps:
       - uses: actions/checkout@v6
@@ -333,6 +345,8 @@ jobs:
         run: |
           cd tests/julia_module_test
           cargo build --features "jlrs/jl-docs"
+
+      - uses: julia-actions/cache@v3
 
       - name: Script tests
         run: |
@@ -403,6 +417,9 @@ jobs:
 
   julia-module-test-windows-gnu:
     runs-on: windows-2022
+    permissions: # needed to allow julia-actions/cache to proactively delete old caches that it has created
+      actions: write
+      contents: read
     needs: test-windows-gnu
     steps:
       - uses: actions/checkout@v6
@@ -421,6 +438,8 @@ jobs:
         run: |
           cd tests/julia_module_test
           cargo build --features "jlrs/jl-docs"
+
+      - uses: julia-actions/cache@v3
 
       - name: Script tests
         run: |
