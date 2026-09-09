@@ -15,7 +15,7 @@ concurrency:
   cancel-in-progress: ${{ startsWith(github.ref, 'refs/pull/') }}
 
 jobs:
-  test:
+  test-linux-macos:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
@@ -42,20 +42,27 @@ jobs:
           julia-version: '1.12'
           
 
-  # test-windows-gnu:
-  #   runs-on: windows-2022
-  #   continue-on-error: ${{ matrix.allow-fail }}
-  #   strategy:
-  #     matrix:
-  #       rust: [stable-x86_64-pc-windows-gnu, beta-x86_64-pc-windows-gnu, stable-x86_64-pc-windows-msvc, beta-x86_64-pc-windows-msvc]
-  #       allow-fail: [false]
-  #       include:
-  #         - rust: nightly-x86_64-pc-windows-gnu
-  #           allow-fail: true
-  #         - rust: nightly-x86_64-pc-windows-msvc
-  #           allow-fail: true
-  #   steps:
-  #     - uses: actions/checkout@v6
+  test-windows:
+    runs-on: windows-2022
+    continue-on-error: ${{ matrix.allow-fail }}
+    strategy:
+      matrix:
+        rust: [stable-x86_64-pc-windows-gnu, beta-x86_64-pc-windows-gnu, stable-x86_64-pc-windows-msvc, beta-x86_64-pc-windows-msvc]
+        allow-fail: [false]
+        include:
+          - rust: nightly-x86_64-pc-windows-gnu
+            allow-fail: true
+          - rust: nightly-x86_64-pc-windows-msvc
+            allow-fail: true
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Embedding tests
+        uses: ./.github/actions/embedding-tests
+        with:
+          rust-toolchain: ${{ matrix.rust }}
+          jlrs-core-revision: '0f1b7cba4eeedae260cb48374716f3cd551fc8c0'
+          julia-version: '1.12'
 
   #     - name: Setup Julia environment
   #       uses: julia-actions/setup-julia@v3
