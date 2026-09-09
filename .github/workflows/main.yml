@@ -34,75 +34,13 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Setup Julia environment
-        id: setup-julia
-        uses: julia-actions/setup-julia@v3
+      - name: Embedding tests
+        uses: ./.github/actions/test
         with:
-          version: '1.12'
-
-      - name: Setup Rust
-        uses:  dtolnay/rust-toolchain@master
-        with:
-          toolchain: ${{ matrix.rust }}
-
-      - name: Install Julia deps
-        run: |
-          julia -e 'import Pkg; Pkg.add(url="https://github.com/Taaitaaiger/JlrsCore.jl", rev="0f1b7cba4eeedae260cb48374716f3cd551fc8c0"); Pkg.add("StaticArrays")'
-
-      - name: Run tests
-        if: ${{ matrix.os == 'ubuntu-latest' }}
-        run: |
-          cargo test --features full --verbose
-          cargo test --features full,static-cache --verbose
-        env:
-          JLRS_JULIA_DIR: "${{ steps.setup-julia.outputs.julia-bindir }}/.."
-          LD_LIBRARY_PATH: "${{ steps.setup-julia.outputs.julia-bindir }}/../lib"
-
-      - name: Run tests
-        if: ${{ matrix.os == 'macos-latest' }}
-        run: |
-          cargo test --features full --verbose
-          cargo test --features full,static-cache --verbose
-        env:
-          JLRS_JULIA_DIR: "${{ steps.setup-julia.outputs.julia-bindir }}/.."
-          DYLD_LIBRARY_PATH: "${{ steps.setup-julia.outputs.julia-bindir }}/../lib"
-
-  # test-macos:
-  #   runs-on: macos-latest
-  #   continue-on-error: ${{ matrix.allow-fail }}
-  #   strategy:
-  #     matrix:
-  #       rust: [stable, beta]
-  #       allow-fail: [false]
-  #       include:
-  #         - rust: nightly
-  #           allow-fail: true
-  #   steps:
-  #     - uses: actions/checkout@v6
-
-  #     - name: Setup Julia environment
-  #       uses: julia-actions/setup-julia@v3
-  #       with:
-  #         version: '1.12'
-
-  #     - name: Setup Rust
-  #       uses:  dtolnay/rust-toolchain@master
-  #       with:
-  #         toolchain: ${{ matrix.rust }}
-
-  #     - name: Run tests
-  #       run: |
-  #         julia -e "import Pkg; Pkg.add(url=\"https://github.com/Taaitaaiger/JlrsCore.jl\", rev=\"0f1b7cba4eeedae260cb48374716f3cd551fc8c0\"); Pkg.add(\"StaticArrays\")"
-  #         export JLRS_JULIA_DIR="$(dirname $(dirname $(which julia)))"
-  #         export DYLD_LIBRARY_PATH="${JLRS_JULIA_DIR}/lib:${DYLD_LIBRARY_PATH}"
-  #         cargo test --features full --verbose
-
-  #     - name: Run tests with static-cache
-  #       run: |
-  #         cargo clean
-  #         export JLRS_JULIA_DIR="$(dirname $(dirname $(which julia)))"
-  #         export DYLD_LIBRARY_PATH="${JLRS_JULIA_DIR}/lib:${DYLD_LIBRARY_PATH}"
-  #         cargo test --features full,static-cache --verbose
+          rust-toolchain: ${{ matrix.rust }}
+          jlrs-core-revision: '0f1b7cba4eeedae260cb48374716f3cd551fc8c0'
+          julia-version: '1.12'
+          
 
   # test-windows-gnu:
   #   runs-on: windows-2022

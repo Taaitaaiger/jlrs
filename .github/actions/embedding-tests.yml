@@ -1,0 +1,46 @@
+name: Embedding tests
+description: Set up Julia and Rust and run the embedding test suite
+
+inputs:
+  julia-version:
+    description: Julia version to use
+    required: false
+
+  rust-toolchain:
+    description: Rust toolchain to use
+    required: true
+
+  jlrs-core-revision:
+    description: "JlrsCore revision to use"
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Julia
+      id: setup-julia
+      uses: julia-actions/setup-julia@v3
+      with:
+        version: ${{ inputs.julia-version }}
+
+    - uses: julia-actions/cache@v3
+
+    - name: Setup Rust
+      uses: dtolnay/rust-toolchain@master
+      with:
+        toolchain: ${{ inputs.rust-toolchain }}
+
+    - name: Install Julia dependencies
+      shell: bash
+      run: |
+        julia -e 'import Pkg; Pkg.add(url="https://github.com/Taaitaaiger/JlrsCore.jl", rev="${{ inputs.jlrs-core-revision }}"); Pkg.add("StaticArrays")'
+
+    - name: Run tests
+      shell: bash
+      env:
+        JLRS_JULIA_DIR: ${{ steps.setup-julia.outputs.julia-bindir }}/..
+        LD_LIBRARY_PATH: ${{ steps.setup-julia.outputs.julia-bindir }}/../lib
+        DYLD_LIBRARY_PATH: ${{ steps.setup-julia.outputs.julia-bindir }}/../lib
+      run: |
+        cargo test --features full --verbose
+        cargo test --features full,static-cache --verbose
