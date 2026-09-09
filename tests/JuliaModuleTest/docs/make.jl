@@ -1,9 +1,23 @@
-push!(LOAD_PATH, "../src/")
+using JuliaModuleTest
+using Documenter
 
-using Documenter, JuliaModuleTest, Documenter.Remotes
+DocMeta.setdocmeta!(JuliaModuleTest, :DocTestSetup, :(using JuliaModuleTest); recursive=true)
 
-makedocs(
-    sitename="JuliaModuleTest",
+makedocs(;
     modules=[JuliaModuleTest],
-    repo=Remotes.GitHub("Taaitaaiger", "jlrs"),
+    authors="Thomas van Doornmalen <thomas.vandoornmalen@gmail.com> and contributors",
+    sitename="JuliaModuleTest.jl",
+    format=Documenter.HTML(;
+        canonical="https://Taaitaaiger.github.io/JuliaModuleTest.jl",
+        edit_link="master",
+        assets=String[],
+    ),
+    pages=[
+        "Home" => "index.md",
+    ],
 )
+
+# deploydocs(;
+#     repo="github.com/Taaitaaiger/jlrs",
+#     devbranch="master",
+# )
