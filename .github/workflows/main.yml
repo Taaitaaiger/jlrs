@@ -51,7 +51,7 @@ jobs:
           cargo test --features full,static-cache --verbose
         env:
           JLRS_JULIA_DIR: "${{ steps.setup-julia.outputs.julia-bindir }}/.."
-          LD_LIBRARY_PATH: "${{ env.JLRS_JULIA_DIR }}/lib"
+          LD_LIBRARY_PATH: "${{ steps.setup-julia.outputs.julia-bindir }}/../lib"
 
   # test-macos:
   #   runs-on: macos-latest
