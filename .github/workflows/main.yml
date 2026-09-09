@@ -15,16 +15,20 @@ concurrency:
   cancel-in-progress: ${{ startsWith(github.ref, 'refs/pull/') }}
 
 jobs:
-  test-linux:
+  test:
     strategy:
       matrix:
-        os: [ubuntu-latest]
+        os: [ubuntu-latest, macos-latest]
         rust: [stable, beta]
         allow-fail: [false]
         include:
           - rust: nightly
             os: ubuntu-latest
             allow-fail: true
+          - rust: nightly
+            os: macos-latest
+            allow-fail: true
+
     continue-on-error: ${{ matrix.allow-fail }}
     runs-on: ${{ matrix.os }}
     steps:
@@ -46,12 +50,22 @@ jobs:
           julia -e 'import Pkg; Pkg.add(url="https://github.com/Taaitaaiger/JlrsCore.jl", rev="0f1b7cba4eeedae260cb48374716f3cd551fc8c0"); Pkg.add("StaticArrays")'
 
       - name: Run tests
+        if: ${{ matrix.os == 'ubuntu-latest' }}
         run: |
           cargo test --features full --verbose
           cargo test --features full,static-cache --verbose
         env:
           JLRS_JULIA_DIR: "${{ steps.setup-julia.outputs.julia-bindir }}/.."
           LD_LIBRARY_PATH: "${{ steps.setup-julia.outputs.julia-bindir }}/../lib"
+
+      - name: Run tests
+        if: ${{ matrix.os == 'macos-latest' }}
+        run: |
+          cargo test --features full --verbose
+          cargo test --features full,static-cache --verbose
+        env:
+          JLRS_JULIA_DIR: "${{ steps.setup-julia.outputs.julia-bindir }}/.."
+          DYLD_LIBRARY_PATH: "${{ steps.setup-julia.outputs.julia-bindir }}/../lib"
 
   # test-macos:
   #   runs-on: macos-latest
