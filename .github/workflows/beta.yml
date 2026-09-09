@@ -8,6 +8,12 @@ on:
 
   workflow_dispatch:
 
+concurrency:
+  # Skip intermediate builds: always.
+  # Cancel intermediate builds: only if it is a pull request build.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ startsWith(github.ref, 'refs/pull/') }}
+
 jobs:
   test-linux:
     runs-on: ubuntu-latest
@@ -107,6 +113,9 @@ jobs:
 
   julia-module-test-linux:
     runs-on: ubuntu-latest
+    permissions: # needed to allow julia-actions/cache to proactively delete old caches that it has created
+      actions: write
+      contents: read
     needs: test-linux
     steps:
       - uses: actions/checkout@v6
@@ -196,6 +205,9 @@ jobs:
 
   julia-module-test-macos:
     runs-on: macos-latest
+    permissions: # needed to allow julia-actions/cache to proactively delete old caches that it has created
+      actions: write
+      contents: read
     needs: test-macos
     steps:
       - uses: actions/checkout@v6
@@ -214,6 +226,8 @@ jobs:
         run: |
           cd tests/julia_module_test
           cargo build --features "jlrs/jl-docs"
+
+      - uses: julia-actions/cache@v3
 
       - name: Script tests
         run: |
@@ -284,6 +298,9 @@ jobs:
 
   julia-module-test-windows-gnu:
     runs-on: windows-2022
+    permissions: # needed to allow julia-actions/cache to proactively delete old caches that it has created
+      actions: write
+      contents: read
     needs: test-windows
     steps:
       - uses: actions/checkout@v6
@@ -302,6 +319,8 @@ jobs:
         run: |
           cd tests/julia_module_test
           cargo build --features "jlrs/jl-docs"
+
+      - uses: julia-actions/cache@v3
 
       - name: Script tests
         run: |
