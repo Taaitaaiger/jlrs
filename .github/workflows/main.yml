@@ -23,6 +23,7 @@ jobs:
         allow-fail: [false]
         include:
           - rust: nightly
+            os: ubuntu-latest
             allow-fail: true
     continue-on-error: ${{ matrix.allow-fail }}
     runs-on: ${{ matrix.os }}
