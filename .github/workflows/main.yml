@@ -16,10 +16,11 @@ concurrency:
 
 jobs:
   test-linux:
-    runs-on: ubuntu-latest
     continue-on-error: ${{ matrix.allow-fail }}
+    runs-on: ${{ matrix.runs-on }}
     strategy:
       matrix:
+        runs-on: [ubuntu-latest]
         rust: [stable, beta]
         allow-fail: [false]
         include:
@@ -44,14 +45,9 @@ jobs:
           julia -e 'import Pkg; Pkg.add(url="https://github.com/Taaitaaiger/JlrsCore.jl", rev="0f1b7cba4eeedae260cb48374716f3cd551fc8c0"); Pkg.add("StaticArrays")'
 
       - name: Run tests
+        if: ${{ matrix.runs-on == 'ubuntu-latest' }}
         run: |
           cargo test --features full --verbose
-        env:
-          JLRS_JULIA_DIR: "${{ steps.setup-julia.outputs.julia-bindir }}/.."
-          LD_LIBRARY_PATH: "${{ env.JLRS_JULIA_DIR }}/lib"
-
-      - name: Run tests with static-cache
-        run: |
           cargo test --features full,static-cache --verbose
         env:
           JLRS_JULIA_DIR: "${{ steps.setup-julia.outputs.julia-bindir }}/.."
@@ -137,6 +133,7 @@ jobs:
         allow-fail: [false]
     steps:
       - uses: actions/checkout@v6
+        id: setup-julia
 
       - name: Setup Julia environment
         uses: julia-actions/setup-julia@v3
@@ -150,10 +147,10 @@ jobs:
 
       - name: Run tests
         run: |
-          julia -e "import Pkg; Pkg.add(url=\"https://github.com/Taaitaaiger/JlrsCore.jl\", rev=\"0f1b7cba4eeedae260cb48374716f3cd551fc8c0\"); Pkg.add(\"StaticArrays\")"
-          export JLRS_JULIA_DIR="$(dirname $(dirname $(which julia)))"
-          export LD_LIBRARY_PATH="${JLRS_JULIA_DIR}/lib:${LD_LIBRARY_PATH}"
           cargo test --features full --verbose
+        env:
+          JLRS_JULIA_DIR: "${{ steps.setup-julia.outputs.julia-bindir }}/.."
+          LD_LIBRARY_PATH: "${{ env.JLRS_JULIA_DIR }}/lib"
 
   test-macos-lts:
     runs-on: macos-latest
@@ -215,6 +212,7 @@ jobs:
 
       - name: Setup Julia environment
         uses: julia-actions/setup-julia@v3
+        id: setup-julia
         with:
           version: '1.12'
 
@@ -225,10 +223,11 @@ jobs:
 
       - name: Build benchmarks
         run: |
-          export JLRS_JULIA_DIR="$(dirname $(dirname $(which julia)))"
-          export LD_LIBRARY_PATH="${JLRS_JULIA_DIR}/lib:${LD_LIBRARY_PATH}"
           cd benches
           cargo build --benches
+        env:
+          JLRS_JULIA_DIR: "${{ steps.setup-julia.outputs.julia-bindir }}/.."
+          LD_LIBRARY_PATH: "${{ env.JLRS_JULIA_DIR }}/lib"
 
   julia-module-test-linux:
     runs-on: ubuntu-latest
