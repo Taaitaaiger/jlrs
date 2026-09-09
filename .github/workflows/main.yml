@@ -16,16 +16,16 @@ concurrency:
 
 jobs:
   test-linux:
-    continue-on-error: ${{ matrix.allow-fail }}
-    runs-on: ${{ matrix.runs-on }}
     strategy:
       matrix:
-        runs-on: [ubuntu-latest]
+        os: [ubuntu-latest]
         rust: [stable, beta]
         allow-fail: [false]
         include:
           - rust: nightly
             allow-fail: true
+    continue-on-error: ${{ matrix.allow-fail }}
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v6
 
