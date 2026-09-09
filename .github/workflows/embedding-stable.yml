@@ -1,0 +1,89 @@
+name: Embedding (stable)
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+  workflow_dispatch:
+
+concurrency:
+  # Skip intermediate builds: always.
+  # Cancel intermediate builds: only if it is a pull request build.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ startsWith(github.ref, 'refs/pull/') }}
+
+jobs:
+  test-linux-macos:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        rust: [stable, beta]
+        allow-fail: [false]
+        include:
+          - rust: nightly
+            os: ubuntu-latest
+            allow-fail: true
+          - rust: nightly
+            os: macos-latest
+            allow-fail: true
+
+    continue-on-error: ${{ matrix.allow-fail }}
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Embedding tests
+        uses: ./.github/actions/embedding-tests
+        with:
+          rust-toolchain: ${{ matrix.rust }}
+          jlrs-core-revision: '0f1b7cba4eeedae260cb48374716f3cd551fc8c0'
+          julia-version: '1.12'
+
+  test-windows:
+    runs-on: windows-2022
+    continue-on-error: ${{ matrix.allow-fail }}
+    strategy:
+      matrix:
+        rust: [stable-x86_64-pc-windows-gnu, beta-x86_64-pc-windows-gnu, stable-x86_64-pc-windows-msvc, beta-x86_64-pc-windows-msvc]
+        allow-fail: [false]
+        include:
+          - rust: nightly-x86_64-pc-windows-gnu
+            allow-fail: true
+          - rust: nightly-x86_64-pc-windows-msvc
+            allow-fail: true
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Embedding tests
+        uses: ./.github/actions/embedding-tests
+        with:
+          rust-toolchain: ${{ matrix.rust }}
+          jlrs-core-revision: '0f1b7cba4eeedae260cb48374716f3cd551fc8c0'
+          julia-version: '1.12.6'
+
+  build-benches-linux:
+    runs-on: ubuntu-latest
+    needs: test-linux-macos
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Julia environment
+        uses: julia-actions/setup-julia@v3
+        id: setup-julia
+        with:
+          version: '1.12'
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+
+      - name: Build benchmarks
+        run: |
+          cd benches
+          cargo build --benches
+        env:
+          JLRS_JULIA_DIR: "${{ steps.setup-julia.outputs.julia-bindir }}/.."
+          LD_LIBRARY_PATH: "$${{ steps.setup-julia.outputs.julia-bindir }}/../lib"

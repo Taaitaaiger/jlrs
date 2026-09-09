@@ -1,0 +1,56 @@
+name: Embedding (LTS)
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+  workflow_dispatch:
+
+concurrency:
+  # Skip intermediate builds: always.
+  # Cancel intermediate builds: only if it is a pull request build.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ startsWith(github.ref, 'refs/pull/') }}
+
+env:
+  JLRS_CORE_REVISION: "0f1b7cba4eeedae260cb48374716f3cd551fc8c0"
+
+jobs:
+  test-linux-macos-lts:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        rust: [stable]
+        allow-fail: [false]
+
+    continue-on-error: ${{ matrix.allow-fail }}
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Embedding tests
+        uses: ./.github/actions/embedding-tests
+        with:
+          rust-toolchain: ${{ matrix.rust }}
+          jlrs-core-revision: ${{ env.JLRS_CORE_REVISION }}
+          julia-version: '1.10'
+
+  test-windows-lts:
+    runs-on: windows-2022
+    continue-on-error: ${{ matrix.allow-fail }}
+    strategy:
+      matrix:
+        rust: [stable-x86_64-pc-windows-gnu, stable-x86_64-pc-windows-msvc]
+        allow-fail: [false]
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Embedding tests
+        uses: ./.github/actions/embedding-tests
+        with:
+          rust-toolchain: ${{ matrix.rust }}
+          jlrs-core-revision: ${{ env.JLRS_CORE_REVISION }}
+          julia-version: '1.10'
