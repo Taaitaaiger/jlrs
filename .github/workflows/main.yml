@@ -29,7 +29,8 @@ jobs:
       - uses: actions/checkout@v6
 
       - name: Setup Julia environment
-        uses: julia-actions/setup-julia@v2
+        id: setup-julia
+        uses: julia-actions/setup-julia@v3
         with:
           version: '1.12'
 
@@ -41,9 +42,10 @@ jobs:
       - name: Run tests
         run: |
           julia -e "import Pkg; Pkg.add(url=\"https://github.com/Taaitaaiger/JlrsCore.jl\", rev=\"0f1b7cba4eeedae260cb48374716f3cd551fc8c0\"); Pkg.add(\"StaticArrays\")"
-          export JLRS_JULIA_DIR="$(dirname $(dirname $(which julia)))"
-          export LD_LIBRARY_PATH="${JLRS_JULIA_DIR}/lib:${LD_LIBRARY_PATH}"
           cargo test --features full --verbose
+        env:
+          JLRS_JULIA_DIR: "${{ steps.setup-julia.outputs.julia-bindir }}/.."
+          LD_LIBRARY_PATH: "${{ steps.setup-julia.outputs.julia-bindir }}/../lib"
 
       - name: Run tests with static-cache
         run: |
@@ -65,7 +67,7 @@ jobs:
       - uses: actions/checkout@v6
 
       - name: Setup Julia environment
-        uses: julia-actions/setup-julia@v2
+        uses: julia-actions/setup-julia@v3
         with:
           version: '1.12'
 
@@ -104,7 +106,7 @@ jobs:
       - uses: actions/checkout@v6
 
       - name: Setup Julia environment
-        uses: julia-actions/setup-julia@v2
+        uses: julia-actions/setup-julia@v3
         with:
           version: '1.12.6'
 
@@ -133,7 +135,7 @@ jobs:
       - uses: actions/checkout@v6
 
       - name: Setup Julia environment
-        uses: julia-actions/setup-julia@v2
+        uses: julia-actions/setup-julia@v3
         with:
           version: '1.10'
 
@@ -160,7 +162,7 @@ jobs:
       - uses: actions/checkout@v6
 
       - name: Setup Julia environment
-        uses: julia-actions/setup-julia@v2
+        uses: julia-actions/setup-julia@v3
         with:
           version: '1.10'
 
@@ -187,7 +189,7 @@ jobs:
       - uses: actions/checkout@v6
 
       - name: Setup Julia environment
-        uses: julia-actions/setup-julia@v2
+        uses: julia-actions/setup-julia@v3
         with:
           version: '1.10'
 
@@ -208,7 +210,7 @@ jobs:
       - uses: actions/checkout@v6
 
       - name: Setup Julia environment
-        uses: julia-actions/setup-julia@v2
+        uses: julia-actions/setup-julia@v3
         with:
           version: '1.12'
 
@@ -231,7 +233,7 @@ jobs:
       - uses: actions/checkout@v6
 
       - name: Setup Julia environment
-        uses: julia-actions/setup-julia@v2
+        uses: julia-actions/setup-julia@v3
         with:
           version: '1.12'
 
@@ -318,7 +320,7 @@ jobs:
       - uses: actions/checkout@v6
 
       - name: Setup Julia environment
-        uses: julia-actions/setup-julia@v2
+        uses: julia-actions/setup-julia@v3
         with:
           version: '1.12'
 
@@ -406,7 +408,7 @@ jobs:
       - uses: actions/checkout@v6
 
       - name: Setup Julia environment
-        uses: julia-actions/setup-julia@v2
+        uses: julia-actions/setup-julia@v3
         with:
           version: '1.12.6'
 
