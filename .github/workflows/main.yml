@@ -106,7 +106,7 @@ jobs:
       - name: Setup Julia environment
         uses: julia-actions/setup-julia@v2
         with:
-          version: '1.12'
+          version: '1.12.6'
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@master
@@ -408,7 +408,7 @@ jobs:
       - name: Setup Julia environment
         uses: julia-actions/setup-julia@v2
         with:
-          version: '1.12'
+          version: '1.12.6'
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@master
