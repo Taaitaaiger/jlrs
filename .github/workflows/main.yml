@@ -87,10 +87,12 @@ jobs:
     continue-on-error: ${{ matrix.allow-fail }}
     strategy:
       matrix:
-        rust: [stable-x86_64-pc-windows-gnu, beta-x86_64-pc-windows-gnu]
+        rust: [stable-x86_64-pc-windows-gnu, beta-x86_64-pc-windows-gnu, stable-x86_64-pc-windows-msvc, beta-x86_64-pc-windows-msvc]
         allow-fail: [false]
         include:
           - rust: nightly-x86_64-pc-windows-gnu
+            allow-fail: true
+          - rust: nightly-x86_64-pc-windows-msvc
             allow-fail: true
     steps:
       - uses: actions/checkout@v6
@@ -109,45 +111,6 @@ jobs:
         run: |
           julia -e 'import Pkg; Pkg.add(url="https://github.com/Taaitaaiger/JlrsCore.jl", rev="0f1b7cba4eeedae260cb48374716f3cd551fc8c0"); Pkg.add("StaticArrays")'
           cargo test --features full --verbose
-
-      - name: Run tests with static-cache
-        run: |
-          cargo test --features full,static-cache --verbose
-
-  test-windows-msvc:
-    runs-on: windows-2022
-    continue-on-error: ${{ matrix.allow-fail }}
-    strategy:
-      matrix:
-        rust: [stable-x86_64-pc-windows-msvc, beta-x86_64-pc-windows-msvc]
-        allow-fail: [false]
-        include:
-          - rust: nightly-x86_64-pc-windows-msvc
-            allow-fail: true
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Setup Julia environment
-        id: setup-julia
-        uses: julia-actions/setup-julia@v2
-        with:
-          version: '1.12.6'
-
-      - uses: ilammy/msvc-dev-cmd@v1
-
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: ${{ matrix.rust }}
-
-      - name: Run tests
-        run: |
-          julia -e 'import Pkg; Pkg.add(url="https://github.com/Taaitaaiger/JlrsCore.jl", rev="0f1b7cba4eeedae260cb48374716f3cd551fc8c0"); Pkg.add("StaticArrays")'
-          cargo test --features full --verbose
-
-      - name: Run tests with static-cache
-        run: |
-          cargo test --features full,static-cache --verbose
 
       - name: Run tests with static-cache
         run: |
@@ -207,12 +170,12 @@ jobs:
           export DYLD_LIBRARY_PATH="${JLRS_JULIA_DIR}/lib:${DYLD_LIBRARY_PATH}"
           cargo test --features full --verbose
 
-  test-windows-gnu-lts:
+  test-windows-lts:
     runs-on: windows-2022
     continue-on-error: ${{ matrix.allow-fail }}
     strategy:
       matrix:
-        rust: [stable-x86_64-pc-windows-gnu]
+        rust: [stable-x86_64-pc-windows-gnu, stable-x86_64-pc-windows-msvc]
         allow-fail: [false]
     steps:
       - uses: actions/checkout@v6
@@ -221,34 +184,6 @@ jobs:
         uses: julia-actions/setup-julia@v2
         with:
           version: '1.10'
-
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: ${{ matrix.rust }}
-
-      - name: Run tests
-        run: |
-          julia -e 'import Pkg; Pkg.add(url="https://github.com/Taaitaaiger/JlrsCore.jl", rev="0f1b7cba4eeedae260cb48374716f3cd551fc8c0"); Pkg.add("StaticArrays")'
-          cargo test --features full --verbose
-
-  test-windows-msvc-lts:
-    runs-on: windows-2022
-    continue-on-error: ${{ matrix.allow-fail }}
-    strategy:
-      matrix:
-        rust: [stable-x86_64-pc-windows-msvc]
-        allow-fail: [false]
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Setup Julia environment
-        id: setup-julia
-        uses: julia-actions/setup-julia@v2
-        with:
-          version: '1.10'
-
-      - uses: ilammy/msvc-dev-cmd@v1
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@master

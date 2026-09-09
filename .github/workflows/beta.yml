@@ -96,8 +96,6 @@ jobs:
         with:
           toolchain: ${{ matrix.rust }}
 
-      # - uses: ilammy/msvc-dev-cmd@v1
-
       - name: Run tests
         run: |
           julia -e 'import Pkg; Pkg.add(url="https://github.com/Taaitaaiger/JlrsCore.jl", rev="0f1b7cba4eeedae260cb48374716f3cd551fc8c0"); Pkg.add("StaticArrays")'
@@ -127,6 +125,8 @@ jobs:
         run: |
           cd tests/julia_module_test
           cargo build --features "jlrs/jl-docs"
+
+      - uses: julia-actions/cache@v3
 
       - name: Script tests
         run: |
