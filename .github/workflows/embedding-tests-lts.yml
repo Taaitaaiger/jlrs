@@ -49,7 +49,6 @@ jobs:
             stable-x86_64-pc-windows-msvc,
           ]
 
-    continue-on-error: true
     runs-on: windows-2022
     permissions: # needed to allow julia-actions/cache to proactively delete old caches that it has created
       actions: write
