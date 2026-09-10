@@ -119,7 +119,7 @@ runs:
       shell: bash
       run: |
         cd tests/julia_module_test
-        cargo build --features "jlrs/jl-docs,jlrs/static-cache""
+        cargo build --features "jlrs/jl-docs,jlrs/static-cache"
 
     - name: Run script tests with static-cache
       shell: bash
