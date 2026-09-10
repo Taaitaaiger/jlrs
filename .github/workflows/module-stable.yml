@@ -1,4 +1,4 @@
-name: Module (LTS)
+name: Module (Stable)
 
 on:
   push:
