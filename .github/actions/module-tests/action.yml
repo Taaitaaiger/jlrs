@@ -54,39 +54,6 @@ runs:
 
     - name: Run package tests
       shell: bash
-      if: inputs.julia-version == '1.10'
-      env:
-        JLRS_JULIA_DIR: ${{ steps.setup-julia.outputs.julia-bindir }}/..
-        LD_LIBRARY_PATH: ${{ steps.setup-julia.outputs.julia-bindir }}/../lib
-        DYLD_LIBRARY_PATH: ${{ steps.setup-julia.outputs.julia-bindir }}/../lib
-        JULIA_MODULE_TEST_LIB_DIR: ${{ github.workspace }}/tests/julia_module_test/target/debug
-      run: |
-        cd tests/JuliaModuleTest
-        julia --project=. -e '
-          using Pkg
-          Pkg.add(url="https://github.com/Taaitaaiger/JlrsCore.jl", rev="${{ inputs.jlrs-core-revision }}")
-          Pkg.instantiate()'
-        julia --project=. test/runtests.jl
-
-    - name: Instantiate docs
-      shell: bash
-      if: inputs.julia-version == '1.10'
-      env:
-        JLRS_JULIA_DIR: ${{ steps.setup-julia.outputs.julia-bindir }}/..
-        LD_LIBRARY_PATH: ${{ steps.setup-julia.outputs.julia-bindir }}/../lib
-        DYLD_LIBRARY_PATH: ${{ steps.setup-julia.outputs.julia-bindir }}/../lib
-        JULIA_MODULE_TEST_LIB_DIR: ${{ github.workspace }}/tests/julia_module_test/target/debug
-      run: |
-        cd tests/JuliaModuleTest
-        julia --project=docs -e '
-          using Pkg
-          Pkg.develop(PackageSpec(path=pwd()))
-          Pkg.add(url="https://github.com/Taaitaaiger/JlrsCore.jl", rev="${{ inputs.jlrs-core-revision }}")
-          Pkg.instantiate()'
-    
-    - name: Run package tests
-      shell: bash
-      if: inputs.julia-version != '1.10'
       env:
         JLRS_JULIA_DIR: ${{ steps.setup-julia.outputs.julia-bindir }}/..
         LD_LIBRARY_PATH: ${{ steps.setup-julia.outputs.julia-bindir }}/../lib
@@ -101,7 +68,6 @@ runs:
 
     - name: Instantiate docs
       shell: bash
-      if: inputs.julia-version != '1.10'
       env:
         JLRS_JULIA_DIR: ${{ steps.setup-julia.outputs.julia-bindir }}/..
         LD_LIBRARY_PATH: ${{ steps.setup-julia.outputs.julia-bindir }}/../lib

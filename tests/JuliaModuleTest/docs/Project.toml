@@ -1,11 +1,3 @@
 [deps]
 JuliaModuleTest = "61727b1b-1923-47f0-bc7b-0f086361f7f4"
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
-JlrsCore = "29be08bc-e5fd-4da2-bbc1-72011c6ea2c9"
-
-[compat]
-JlrsCore = "0.8"
-
-[sources]
-JlrsCore = {url = "https://github.com/Taaitaaiger/JlrsCore.jl", rev = "0f1b7cba4eeedae260cb48374716f3cd551fc8c0"}
-JuliaModuleTest = { path = ".." }
