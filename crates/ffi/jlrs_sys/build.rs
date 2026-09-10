@@ -47,6 +47,7 @@ enum BBTarget {
     WindowsI686,
     I686,
     Arm,
+    Riscv,
     AArch,
 }
 
@@ -71,6 +72,10 @@ fn interpret_binary_builder_target(is_binary_builder: bool) -> Option<BBTarget> 
 
             if target.contains("arm") {
                 return Some(BBTarget::Arm);
+            }
+
+            if target.contains("riscv") {
+                return Some(BBTarget::Riscv);
             }
         }
     }
@@ -115,7 +120,7 @@ fn compile_jlrs_cc(julia_dir: &JuliaDir, target: Option<BBTarget>) {
             .file("src/jlrs_cc/jlrs_cc_fast_tls.c");
 
         match target {
-            Some(BBTarget::I686 | BBTarget::Arm | BBTarget::AArch) => {
+            Some(BBTarget::I686 | BBTarget::Arm | BBTarget::AArch | BBTarget::Riscv) => {
                 c.no_default_flags(true).flag("-O3").flag("-fPIC");
             }
             Some(BBTarget::Windows) => {
