@@ -1,0 +1,54 @@
+name: Module tests
+description: Set up Julia and Rust and run the module test suite
+
+inputs:
+  julia-version:
+    description: Julia version to use
+    required: false
+
+  rust-toolchain:
+    description: Rust toolchain to use
+    required: true
+
+  jlrs-core-revision:
+    description: "JlrsCore revision to use"
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Julia
+      id: setup-julia
+      uses: julia-actions/setup-julia@v3
+      with:
+        version: ${{ inputs.julia-version }}
+
+    - uses: julia-actions/cache@v3
+
+    - name: Setup Rust
+      uses: dtolnay/rust-toolchain@master
+      with:
+        toolchain: ${{ inputs.rust-toolchain }}
+      
+    - name: Build library
+      shell: bash
+      run: |
+        cd tests/julia_module_test
+        cargo build --features "jlrs/jl-docs"
+
+    - uses: julia-actions/cache@v3
+
+    - name: Install Julia dependencies
+      shell: bash
+      run: |
+        julia -e 'import Pkg; Pkg.add(url="https://github.com/Taaitaaiger/JlrsCore.jl", rev="${{ inputs.jlrs-core-revision }}"); Pkg.add("StaticArrays"); Pkg.add("Documenter")'
+
+    - name: Run script tests
+      shell: bash
+      env:
+        JLRS_JULIA_DIR: ${{ steps.setup-julia.outputs.julia-bindir }}/..
+        LD_LIBRARY_PATH: ${{ steps.setup-julia.outputs.julia-bindir }}/../lib
+        DYLD_LIBRARY_PATH: ${{ steps.setup-julia.outputs.julia-bindir }}/../lib
+        JULIA_MODULE_TEST_LIB_DIR: ${{ env.GITHUB_WORKSPACE }}
+      run: |
+        julia JuliaModuleTest.jl

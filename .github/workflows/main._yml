@@ -15,7 +15,7 @@ concurrency:
   cancel-in-progress: ${{ startsWith(github.ref, 'refs/pull/') }}
 
 jobs:
-  test-linux-macos-lts:
+  test-linux-macos:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
@@ -34,7 +34,7 @@ jobs:
           jlrs-core-revision: '0f1b7cba4eeedae260cb48374716f3cd551fc8c0'
           julia-version: '1.10'
 
-  test-windows-lts:
+  test-windows:
     runs-on: windows-2022
     continue-on-error: ${{ matrix.allow-fail }}
     strategy:
