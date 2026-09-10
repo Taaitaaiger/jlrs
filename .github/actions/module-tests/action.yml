@@ -33,7 +33,7 @@ runs:
     - name: Build library
       shell: bash
       run: |
-        cd tests/julia_module_test
+        ${{ env.GITHUB_WORKSPACE }}/tests/julia_module_test
         cargo build --features "jlrs/jl-docs"
 
     - uses: julia-actions/cache@v3
@@ -49,6 +49,7 @@ runs:
         JLRS_JULIA_DIR: ${{ steps.setup-julia.outputs.julia-bindir }}/..
         LD_LIBRARY_PATH: ${{ steps.setup-julia.outputs.julia-bindir }}/../lib
         DYLD_LIBRARY_PATH: ${{ steps.setup-julia.outputs.julia-bindir }}/../lib
-        JULIA_MODULE_TEST_LIB_DIR: ${{ env.GITHUB_WORKSPACE }}
+        JULIA_MODULE_TEST_LIB_DIR: ${{ env.GITHUB_WORKSPACE }}/tests/julia_module_test/target/debug
       run: |
+        ${{ env.GITHUB_WORKSPACE }}/tests/script
         julia JuliaModuleTest.jl
