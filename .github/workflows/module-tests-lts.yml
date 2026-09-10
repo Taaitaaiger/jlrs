@@ -1,0 +1,44 @@
+name: Module (LTS)
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+  workflow_dispatch:
+
+concurrency:
+  # Skip intermediate builds: always.
+  # Cancel intermediate builds: only if it is a pull request build.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ startsWith(github.ref, 'refs/pull/') }}
+
+env:
+  jlrs-core-revision: "0f1b7cba4eeedae260cb48374716f3cd551fc8c0"
+  julia-version: "1.10"
+
+jobs:
+  tests:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        rust: [stable]
+        include:
+          - rust: stable-x86_64-pc-windows-gnu
+            os: windows-2022
+
+    runs-on: ${{ matrix.os }}
+    permissions: # needed to allow julia-actions/cache to proactively delete old caches that it has created
+      actions: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Module tests
+        uses: ./.github/actions/module-tests
+        with:
+          rust-toolchain: ${{ matrix.rust }}
+          jlrs-core-revision: ${{ env.jlrs-core-revision }}
+          julia-version: ${{ env.julia-version }}

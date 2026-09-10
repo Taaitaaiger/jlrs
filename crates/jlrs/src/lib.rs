@@ -1,10 +1,9 @@
 //! jlrs is a crate that provides access to the Julia C API. It can be used to embed Julia in Rust
 //! applications and to write interop libraries to Rust crates that can be used by Julia.
 //!
-//! Julia versions 1.10, 1.11 and 1.12 are currently supported. In general jlrs aims to support all
-//! versions starting at the current LTS version, but only the LTS and stable versions are
-//! actively tested. Using the current stable version of Julia is highly recommended. The minimum
-//! supported Rust version is currently 1.85.
+//! In general jlrs aims to support all versions of Julia starting at the current LTS version, but
+//! only the LTS and stable versions are actively tested. Using the current stable version of Julia
+//! is highly recommended. The minimum supported Rust version is currently 1.97.
 //!
 //! A tutorial is available [here](https://taaitaaiger.github.io/jlrs-tutorial/).
 //!
@@ -34,9 +33,10 @@
 //! # Prerequisites
 //!
 //! To use jlrs, supported versions of Rust and Julia must have been installed. Currently, Julia
-//! 1.10, 1.11 and 1.12 are supported, the minimum supported Rust version is 1.85. Some features may
-//! require a more recent version of Rust. jlrs uses the JlrsCore package for Julia, if this
-//! package has not been installed, the latest version will be installed automatically by default.
+//! 1.10, 1.11, 1.12 and 1.13 are supported, the minimum supported Rust version is 1.97. Some
+//! features may require a more recent version of Rust. jlrs uses the JlrsCore package for Julia,
+//! if this package has not been installed, the latest version will be installed automatically by
+//! default.
 //!
 //! ## With juliaup
 //!
