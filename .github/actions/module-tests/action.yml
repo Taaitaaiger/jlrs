@@ -29,7 +29,7 @@ runs:
       uses: dtolnay/rust-toolchain@master
       with:
         toolchain: ${{ inputs.rust-toolchain }}
-      
+
     - name: Build library
       shell: bash
       run: |
@@ -114,7 +114,7 @@ runs:
       run: |
         cd tests/julia_module_test
         cargo clean
-      
+
     - name: Build library with static-cache
       shell: bash
       run: |

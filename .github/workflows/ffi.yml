@@ -13,7 +13,7 @@ jobs:
     runs-on: ${{ matrix.runs-on }}
     strategy:
       matrix:
-        julia: ['1.10', '1.11', '1.12']
+        julia: ['1.10', '1.11', '1.12', '1.13']
         runs-on: [ubuntu-latest, macos-latest]
 
     steps:

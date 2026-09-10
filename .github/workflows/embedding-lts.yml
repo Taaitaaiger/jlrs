@@ -19,18 +19,59 @@ env:
   julia-version: "1.10"
 
 jobs:
-  tests:
+  test-linux-macos:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
-        rust: [stable]
+        rust: [stable, beta]
+        allow-fail: [false]
         include:
-          - rust: stable-x86_64-pc-windows-gnu
-            os: windows-2022
-          - rust: stable-x86_64-pc-windows-msvc
-            os: windows-2022
+          - rust: nightly
+            os: ubuntu-latest
+            allow-fail: true
+          - rust: nightly
+            os: macos-latest
+            allow-fail: true
 
+    continue-on-error: ${{ matrix.allow-fail }}
     runs-on: ${{ matrix.os }}
+    permissions: # needed to allow julia-actions/cache to proactively delete old caches that it has created
+      actions: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Embedding tests
+        uses: ./.github/actions/embedding-tests
+        with:
+          rust-toolchain: ${{ matrix.rust }}
+          jlrs-core-revision: ${{ env.jlrs-core-revision }}
+          julia-version: ${{ env.julia-version }}
+
+  test-windows:
+    strategy:
+      matrix:
+        rust:
+          [
+            stable-x86_64-pc-windows-gnu,
+            beta-x86_64-pc-windows-gnu,
+            stable-x86_64-pc-windows-msvc,
+            beta-x86_64-pc-windows-msvc,
+          ]
+        allow-fail: [false]
+        include:
+          - rust: nightly-x86_64-pc-windows-gnu
+            allow-fail: true
+          - rust: nightly-x86_64-pc-windows-msvc
+            allow-fail: true
+
+    continue-on-error: ${{ matrix.allow-fail }}
+    runs-on: windows-2022
+    permissions: # needed to allow julia-actions/cache to proactively delete old caches that it has created
+      actions: write
+      contents: read
+
     steps:
       - uses: actions/checkout@v6
 

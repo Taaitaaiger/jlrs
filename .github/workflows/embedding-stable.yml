@@ -16,7 +16,7 @@ concurrency:
 
 env:
   jlrs-core-revision: "0f1b7cba4eeedae260cb48374716f3cd551fc8c0"
-  stable-version: "1.13"
+  julia-version: "1.13"
 
 jobs:
   test-linux-macos:
@@ -47,7 +47,7 @@ jobs:
         with:
           rust-toolchain: ${{ matrix.rust }}
           jlrs-core-revision: ${{ env.jlrs-core-revision }}
-          julia-version: ${{ env.stable-version }}
+          julia-version: ${{ env.julia-version }}
 
   test-windows:
     strategy:
@@ -80,7 +80,7 @@ jobs:
         with:
           rust-toolchain: ${{ matrix.rust }}
           jlrs-core-revision: ${{ env.jlrs-core-revision }}
-          julia-version: "1.12.6"
+          julia-version: ${{ env.julia-version }}
 
   build-benches-linux:
     runs-on: ubuntu-latest
@@ -92,7 +92,7 @@ jobs:
         uses: julia-actions/setup-julia@v3
         id: setup-julia
         with:
-          version: ${{env.stable-version}}
+          version: ${{env.julia-version}}
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@master
