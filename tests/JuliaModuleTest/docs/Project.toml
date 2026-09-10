@@ -1,3 +1,6 @@
 [deps]
 JuliaModuleTest = "61727b1b-1923-47f0-bc7b-0f086361f7f4"
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
+
+[sources]
+JuliaModuleTest = { path = ".." }

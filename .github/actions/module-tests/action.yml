@@ -63,6 +63,7 @@ runs:
         cd tests/JuliaModuleTest
         julia --project=. -e '
           using Pkg
+          Pkg.add(url="https://github.com/Taaitaaiger/JlrsCore.jl", rev="${{ inputs.jlrs-core-revision }}");
           Pkg.instantiate()'
         julia --project=. test/runtests.jl
 
@@ -77,6 +78,7 @@ runs:
         cd tests/JuliaModuleTest
         julia --project=docs -e '
           using Pkg
+          Pkg.add(url="https://github.com/Taaitaaiger/JlrsCore.jl", rev="${{ inputs.jlrs-core-revision }}");
           Pkg.develop(PackageSpec(path=pwd()))
           Pkg.instantiate()'
 
