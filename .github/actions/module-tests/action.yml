@@ -61,15 +61,6 @@ runs:
           using Pkg
           Pkg.add(url="https://github.com/Taaitaaiger/JlrsCore.jl", rev="${{ inputs.jlrs-core-revision }}")'
 
-    - name: Install documentation dependencies
-      if: inputs.julia-version == '1.10'
-      shell: bash
-      run: |
-        cd tests/JuliaModuleTest
-        julia --project=docs -e '
-          using Pkg
-          Pkg.add(url="https://github.com/Taaitaaiger/JlrsCore.jl", rev="${{ inputs.jlrs-core-revision }}")'
-
     - name: Run package tests
       shell: bash
       env:
