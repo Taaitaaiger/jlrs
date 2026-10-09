@@ -691,6 +691,24 @@ mod tests {
         });
     }
 
+    fn cast_ref_test() {
+        JULIA.with(|j| {
+            j.borrow().local_scope::<_, 1>(|mut frame| {
+                let smatrix = SMatrix::new([[1.0f32, 2.0f32]]);
+                let boxed_smatrix = Value::new(&mut frame, smatrix);
+                let typed = boxed_smatrix
+                    .cast::<TypedValue<SMatrix<f32, 2, 1>>>()
+                    .unwrap();
+
+                let smatrix_ref = typed.as_smatrix_ref();
+
+                let nalgebra_smat =
+                    bytemuck::try_cast_ref::<_, nalgebra::SMatrix<f32, 2, 1>>(smatrix_ref);
+                assert!(nalgebra_smat.is_ok());
+            })
+        });
+    }
+
     #[test]
     fn runtime_test() {
         svector_test();
@@ -734,5 +752,7 @@ mod tests {
         typed_value_sarray_test();
         typed_value_marray_test();
         typed_value_marray_mut_test();
+
+        cast_ref_test();
     }
 }

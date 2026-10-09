@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.25
+
+- Static array types implement `Copy` if the element type is `Copy`.
+
+- The `bytemuck` feature implements bytemuck's `Pod` and `Zeroable` traits for the static array types. This enables converting them to nalgebra's static array types if its `bytemuck` feature is also enabled.
+
 ## v0.24
 
 - Handle version compatibility solely through jlrs-compat.

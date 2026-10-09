@@ -5,6 +5,9 @@ mod derive;
 mod module;
 mod version;
 
+// Silence build warning: metadata emitted by jl-sys build script is used by jlrs-macros build
+// script. This metadata can only be accessed by immediate dependents.
+use jl_sys as _;
 use proc_macro::TokenStream;
 
 #[cfg(feature = "ccall")]

@@ -1,12 +1,11 @@
 [package]
 name = "jlrs-sys"
-version = "0.3.1"
+version = "0.3.2"
 authors = ["Thomas van Doornmalen <thomas.vandoornmalen@gmail.com>"]
 description = """
 Low-level extensions to the Julia C API
 """
 documentation = "https://docs.rs/jlrs"
-homepage = "https://github.com/Taaitaaiger/jlrs"
 repository = "https://github.com/Taaitaaiger/jlrs"
 readme = "README.md"
 keywords = []

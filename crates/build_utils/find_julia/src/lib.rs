@@ -289,6 +289,7 @@ impl JuliaDir {
         if !self.is_binary_builder {
             let lib_dir = self.lib_dir();
             println!("cargo::rustc-link-search={}", lib_dir.display());
+            println!("cargo::rustc-link-search={}/julia", lib_dir.display());
 
             if self.debug {
                 println!("cargo::rustc-link-lib=julia-debug");
