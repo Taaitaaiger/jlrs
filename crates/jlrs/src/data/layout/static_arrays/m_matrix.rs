@@ -39,7 +39,7 @@ use crate::{
 };
 
 /// A mutable matrix with `ROWS` rows and `COLS` colums
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 #[repr(C)]
 pub struct MMatrix<T, const ROWS: usize, const COLS: usize> {
     data: [[T; ROWS]; COLS],
@@ -251,4 +251,18 @@ unsafe impl<T: ConstructType, const ROWS: usize, const COLS: usize> CCallReturn
     unsafe fn return_or_throw(self) -> Self::ReturnAs {
         self
     }
+}
+
+#[cfg(feature = "bytemuck")]
+unsafe impl<T: bytemuck::Zeroable, const ROWS: usize, const COLS: usize> bytemuck::Zeroable
+    for MMatrix<T, ROWS, COLS>
+{
+}
+
+#[cfg(feature = "bytemuck")]
+unsafe impl<T: bytemuck::Pod, const ROWS: usize, const COLS: usize> bytemuck::Pod
+    for MMatrix<T, ROWS, COLS>
+where
+    Self: Copy,
+{
 }

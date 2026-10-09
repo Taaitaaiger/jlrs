@@ -13,7 +13,7 @@
 #[macro_export]
 macro_rules! define_dims {
     ($vis:vis $name:ident<$($n:ident),+; $r:literal>) => {
-        #[derive(Clone)]
+        #[derive(Clone, Copy)]
         $vis struct $name<$(const $n: usize),+>;
         impl <$(const $n: usize),+> $crate::data::layout::static_arrays::dims::Dims<$r> for $name<$($n),+> {
             const PARAMS: [usize; $r] = [$($n),+];
@@ -25,7 +25,7 @@ macro_rules! define_dims {
 /// Dimensions for a rank-R array.
 ///
 /// Implementations of this trait should be created with [`define_dims`].
-pub trait Dims<const R: usize>: 'static + Clone {
+pub trait Dims<const R: usize>: 'static + Copy {
     /// The size of each dimension
     const PARAMS: [usize; R];
     // The total number of elements
@@ -64,7 +64,7 @@ pub const fn index_in<S: Dims<R>, I: Dims<R>, const R: usize>() -> usize {
 }
 
 /// Dimension of a rank-1 array
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub struct Dims1D<const N: usize>;
 
 impl<const N: usize> Dims<1> for Dims1D<N> {
@@ -73,7 +73,7 @@ impl<const N: usize> Dims<1> for Dims1D<N> {
 }
 
 /// Dimension of a rank-2 array
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub struct Dims2D<const ROWS: usize, const COLS: usize>;
 
 impl<const ROWS: usize, const COLS: usize> Dims<2> for Dims2D<ROWS, COLS> {
@@ -82,7 +82,7 @@ impl<const ROWS: usize, const COLS: usize> Dims<2> for Dims2D<ROWS, COLS> {
 }
 
 /// Dimension of a rank-3 array
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub struct Dims3D<const ROWS: usize, const COLS: usize, const Z: usize>;
 
 impl<const ROWS: usize, const COLS: usize, const Z: usize> Dims<3> for Dims3D<ROWS, COLS, Z> {

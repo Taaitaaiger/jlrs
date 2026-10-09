@@ -39,7 +39,7 @@ use crate::{
 };
 
 /// A mutable array of rank `R` with dimensions `D` and `N` elements
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 #[repr(C)]
 pub struct MArray<T, D: Dims<R>, const N: usize, const R: usize> {
     data: [T; N],
@@ -276,4 +276,18 @@ unsafe impl<T: ConstructType, D: Dims<R>, const N: usize, const R: usize> CCallR
     unsafe fn return_or_throw(self) -> Self::ReturnAs {
         self
     }
+}
+
+#[cfg(feature = "bytemuck")]
+unsafe impl<T: bytemuck::Zeroable, D: Dims<R>, const N: usize, const R: usize> bytemuck::Zeroable
+    for MArray<T, D, N, R>
+{
+}
+
+#[cfg(feature = "bytemuck")]
+unsafe impl<T: bytemuck::Pod, D: Dims<R>, const N: usize, const R: usize> bytemuck::Pod
+    for MArray<T, D, N, R>
+where
+    Self: Copy,
+{
 }

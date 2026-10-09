@@ -1,12 +1,11 @@
 [package]
 name = "jlrs"
-version = "0.24.0"
+version = "0.25.0"
 authors = ["Thomas van Doornmalen <thomas.vandoornmalen@gmail.com>"]
 description = """
 jlrs provides bindings to the Julia C API that enable Julia code to be called from Rust and more.
 """
 documentation = "https://docs.rs/jlrs"
-homepage = "https://github.com/Taaitaaiger/jlrs"
 repository = "https://github.com/Taaitaaiger/jlrs"
 readme = "../../README.md"
 keywords = ["Julia", "math", "mathematics", "bindings", "ffi"]
@@ -19,10 +18,10 @@ rust-version = "1.97"
 default = []
 
 # Enable all features
-full = ["local-rt", "tokio-rt", "jlrs-ndarray", "f16", "complex", "static-arrays", "jlrs-derive", "ccall", "multi-rt"]
+full = ["local-rt", "tokio-rt", "jlrs-ndarray", "f16", "complex", "static-arrays", "jlrs-derive", "ccall", "multi-rt", "bytemuck"]
 
 # Enable all features except any  runtimes
-full-no-rt = ["async", "jlrs-ndarray", "f16", "jlrs-derive", "ccall"]
+full-no-rt = ["async", "jlrs-ndarray", "f16", "jlrs-derive", "ccall", "bytemuck"]
 
 # Runtimes
 
@@ -55,6 +54,8 @@ complex = ["num-complex"]
 jlrs-ndarray = ["ndarray"]
 # Enable support for the StaticArrays Julia package
 static-arrays = []
+# Enable support for converting static array types with bytemuck
+bytemuck = ["dep:bytemuck"]
 # Enable derive macros
 jlrs-derive = ["jlrs-macros/derive"]
 # Compile the support library with support for cross-language LTO.
@@ -99,9 +100,11 @@ ndarray = { version = "0.17", optional = true }
 tokio = { version = "1", optional = true, features = ["rt", "sync", "time"]}
 num-complex = { version = "0.4", optional = true }
 static-generics = { version = "0.1", optional = true }
+bytemuck = { version = "1", optional = true }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["rt", "time", "sync"]}
+nalgebra = { version = "0.35", features = ["bytemuck"]}
 
 [build-dependencies]
 jlrs-compat = { path = "../build_utils/jlrs_compat", version = "0.2"}
