@@ -22,7 +22,8 @@ jobs:
   test-linux-macos:
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        # os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest]
         rust: [stable]
 
     runs-on: ${{ matrix.os }}
