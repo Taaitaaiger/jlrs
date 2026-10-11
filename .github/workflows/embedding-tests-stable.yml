@@ -22,14 +22,13 @@ jobs:
   test-linux-macos:
     strategy:
       matrix:
-        # os: [ubuntu-latest, macos-latest]
-        # os: [ubuntu-latest]
-        # rust: [stable, beta]
-        # allow-fail: [false]
+        os: [ubuntu-latest, macos-latest]
+        rust: [stable, beta]
+        allow-fail: [false]
         include:
-          # - rust: nightly
-          #   os: ubuntu-latest
-          #   allow-fail: true
+          - rust: nightly
+            os: ubuntu-latest
+            allow-fail: true
           - rust: "nightly"
             os: macos-latest
             allow-fail: true
