@@ -131,6 +131,6 @@ fn compile_jlrs_cc() {
         c.define("JLRS_FAST_TLS", None);
     }
 
-    c.link_lib_modifier("+whole-archive");
+    // c.link_lib_modifier("+whole-archive");
     c.compile("jlrs_cc");
 }
