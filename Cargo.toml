@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "crates/build_utils/find_julia",
     "crates/build_utils/jlrs_compat",
+    "crates/build_utils/julia_metadata",
     "crates/ffi/jl_sys",
     "crates/ffi/jlrs_sys",
     "crates/jlrs",

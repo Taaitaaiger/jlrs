@@ -1,7 +1,4 @@
-use std::env;
-
-use find_julia::{JuliaDir, Version, enable_version_cfgs};
-use jlrs_compat::*;
+use julia_metadata::{emit_metadata, enable_version_cfgs, link_julia};
 
 fn main() {
     println!("cargo::rerun-if-env-changed=PATH");
@@ -9,51 +6,8 @@ fn main() {
     println!("cargo::rerun-if-env-changed=DYLD_LIBRARY_PATH");
     println!("cargo::rerun-if-env-changed=JLRS_JULIA_DIR");
 
-    // Enable julia_1_x configs
-    enable_version_cfgs(MIN_MINOR_VERSION, NIGHTLY_MINOR_VERSION);
+    enable_version_cfgs();
+    emit_metadata();
 
-    if building_docs() {
-        // Don't link Julia when building the docs
-        let version = Version::new(MAJOR_VERSION, DOCS_MINOR_VERSION, 0, false);
-        version.emit_metadata_unchecked();
-    } else {
-        // Detect active version of Julia, emit metadata, and link Julia.
-        #[cfg(feature = "debug")]
-        let julia_dir = JuliaDir::find(windows_build(), true)
-            .expect("JLRS_JULIA_DIR is not set and no installed version of Julia can be found");
-
-        #[cfg(not(feature = "debug"))]
-        let julia_dir = JuliaDir::find(windows_build(), false)
-            .expect("JLRS_JULIA_DIR is not set and no installed version of Julia can be found");
-
-        julia_dir.emit_metadata(
-            MIN_MINOR_VERSION,
-            MAX_MINOR_VERSION,
-            NIGHTLY_MINOR_VERSION,
-            true,
-        );
-
-        #[cfg(not(feature = "no-link"))]
-        julia_dir.link();
-    }
-}
-
-fn building_docs() -> bool {
-    if env::var("DOCS_RS").is_ok() {
-        return true;
-    }
-
-    #[cfg(feature = "docs")]
-    return true;
-
-    #[cfg(not(feature = "docs"))]
-    return false;
-}
-
-fn windows_build() -> bool {
-    #[cfg(any(target_os = "windows", feature = "windows"))]
-    return true;
-
-    #[cfg(not(any(target_os = "windows", feature = "windows")))]
-    return false;
+    link_julia();
 }

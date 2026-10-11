@@ -20,11 +20,11 @@ links = "julia"
 debug = []
 windows = []
 docs = []
-no-link = []
 
 [build-dependencies]
 find-julia = { path = "../../build_utils/find_julia", version = "0.2" }
 jlrs-compat = { path = "../../build_utils/jlrs_compat", version = "0.2" }
+julia-metadata = { path = "../../build_utils/julia_metadata", version = "0.1" }
 
 [package.metadata.docs.rs]
 features = ["docs"]

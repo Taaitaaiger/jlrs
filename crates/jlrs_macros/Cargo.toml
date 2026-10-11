@@ -30,11 +30,7 @@ proc-macro2 = { version = "1", optional = true, features = ["span-locations"] }
 syn = { version = "3", features = ["full", "extra-traits", "printing"] }
 quote = { version = "1" }
 itertools = "0.15"
-jl-sys = { path = "../ffi/jl_sys", version = "0.28", features = ["no-link"]}
-
-[build-dependencies]
-jlrs-compat = { path = "../build_utils/jlrs_compat", version = "0.2"}
-find-julia = { path = "../build_utils/find_julia", version = "0.2"}
+julia-metadata = { version = "0.1.0", path = "../build_utils/julia_metadata"}
 
 [package.metadata.docs.rs]
 features = ["ccall", "derive"]

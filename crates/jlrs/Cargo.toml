@@ -107,8 +107,7 @@ tokio = { version = "1", features = ["rt", "time", "sync"]}
 nalgebra = { version = "0.35", features = ["bytemuck"]}
 
 [build-dependencies]
-jlrs-compat = { path = "../build_utils/jlrs_compat", version = "0.2"}
-find-julia = { path = "../build_utils/find_julia", version = "0.2"}
+julia-metadata = { path = "../build_utils/julia_metadata", version = "0.1"}
 
 [package.metadata.docs.rs]
 features = ["docs"]

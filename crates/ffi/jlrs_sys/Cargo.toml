@@ -28,8 +28,7 @@ docs = []
 jl-sys = { path = "../jl_sys", version = "0.28"}
 
 [build-dependencies]
-find-julia = { path = "../../build_utils/find_julia", version = "0.2" }
-jlrs-compat = { path = "../../build_utils/jlrs_compat", version = "0.2" }
+julia-metadata = { path = "../../build_utils/julia_metadata" }
 cc = "1"
 cfg-if = "1"
 

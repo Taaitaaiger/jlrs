@@ -1,14 +1,7 @@
 use std::ops::RangeInclusive;
 
+use julia_metadata::*;
 use proc_macro::{Delimiter, TokenStream, TokenTree};
-
-// Set in included file:
-// const MAJOR_VERSION: usize = 1;
-// const MIN_MINOR_VERSION: usize = 10;
-// const MAX_MINOR_VERSION: usize = 13;
-// const NIGHTLY_MINOR_VERSION: usize = 14;
-// const SELECTED_MINOR_VERSION: usize = 14;
-include!(concat!(env!("OUT_DIR"), "/version.rs"));
 
 pub fn emit_if_compatible(attr: TokenStream, item: TokenStream) -> TokenStream {
     let mut tts = attr.into_iter();

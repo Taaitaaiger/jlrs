@@ -1,0 +1,18 @@
+[package]
+name = "julia-metadata"
+version = "0.1.0"
+edition = "2024"
+
+[features]
+windows = []
+docs = []
+debug = []
+
+[dependencies]
+
+[build-dependencies]
+find-julia = { path = "../find_julia", version = "0.2" }
+jlrs-compat = { path = "../jlrs_compat", version = "0.2" }
+
+[package.metadata.docs.rs]
+features = ["docs"]

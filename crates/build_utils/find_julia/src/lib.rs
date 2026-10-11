@@ -13,7 +13,7 @@ use std::{
 /// Detected Julia version
 #[derive(Clone)]
 pub struct Version {
-    major: u32,
+    _major: u32,
     minor: u32,
     patch: u32,
     is_dev: bool,
@@ -23,61 +23,11 @@ impl Version {
     /// Create a new version
     pub fn new(major: u32, minor: u32, patch: u32, is_dev: bool) -> Self {
         Version {
-            major,
+            _major: major,
             minor,
             patch,
             is_dev,
         }
-    }
-
-    /// The major version
-    pub fn major(&self) -> u32 {
-        self.major
-    }
-
-    /// The minor version
-    pub fn minor(&self) -> u32 {
-        self.minor
-    }
-
-    /// The patch version
-    pub fn patch(&self) -> u32 {
-        self.patch
-    }
-
-    /// Is the version a dev build or not
-    pub fn is_dev(&self) -> bool {
-        self.is_dev
-    }
-
-    /// Load the version detected when jl-sys was built.
-    pub fn from_detected() -> Option<Self> {
-        let version = env::var("DEP_JULIA_VERSION").ok()?;
-        let dev = env::var("DEP_JULIA_IS_DEV").ok()?;
-
-        let mut parts = version.split('.');
-        let major: u32 = parts.next()?.parse().ok()?;
-        let minor: u32 = parts.next()?.parse().ok()?;
-        let patch: u32 = parts.next()?.parse().ok()?;
-        let is_dev: u32 = dev.parse().ok()?;
-
-        Some(Version {
-            major,
-            minor,
-            patch,
-            is_dev: is_dev != 0,
-        })
-    }
-
-    /// Emit detected version metadata.
-    pub fn emit_metadata_unchecked(&self) {
-        let major = self.major();
-        let minor = self.minor();
-        let patch = self.patch();
-        let is_dev = if self.is_dev() { 1 } else { 0 };
-        println!("cargo::metadata=version={major}.{minor}.{patch}");
-        println!("cargo::metadata=is_dev={is_dev}");
-        println!("cargo::rustc-cfg=julia_{major}_{minor}");
     }
 
     /// Detect the installed version of julia at `julia_dir`.
@@ -125,84 +75,10 @@ impl Version {
         }
 
         Version {
-            major: major as _,
+            _major: major as _,
             minor: minor as _,
             patch: patch as _,
             is_dev,
-        }
-    }
-
-    fn emit_metadata(
-        &self,
-        min_minor_version: u32,
-        max_minor_version: u32,
-        nightly_minor_version: u32,
-        warn: bool,
-    ) {
-        let major = self.major();
-        let minor = self.minor();
-        let patch = self.patch();
-
-        if major != 1 {
-            panic!("Detected unsupported version of Julia {major}.{minor}.{patch}.");
-        }
-
-        if self.is_dev() {
-            if warn {
-                println!(
-                    "cargo::warning=Detected development version of Julia {major}.{minor}.{patch}, \
-                    bindings may not be up-to-date. Please report any issues you encounter at \
-                    https://www.github.com/Taaitaaiger/jlrs/issues"
-                );
-            }
-        }
-
-        if minor > nightly_minor_version {
-            if warn {
-                println!(
-                    "cargo::warning=Detected too recent version of Julia {major}.{minor}.{patch}, \
-                    assuming compatibility with 1.{nightly_minor_version}. Please report any issues you \
-                    encounter at https://www.github.com/Taaitaaiger/jlrs/issues"
-                );
-            }
-
-            let mut version = self.clone();
-            version.minor = nightly_minor_version;
-            version.patch = 0;
-            version.emit_metadata_unchecked();
-        } else if minor == nightly_minor_version {
-            if warn {
-                println!(
-                    "cargo::warning=Detected nightly version of Julia {major}.{minor}.{patch}. \
-                    Please report any issues you encounter at \
-                    https://www.github.com/Taaitaaiger/jlrs/issues"
-                );
-            }
-
-            let mut version = self.clone();
-            version.minor = nightly_minor_version;
-            version.patch = 0;
-            version.emit_metadata_unchecked();
-        } else if minor > max_minor_version {
-            if warn {
-                println!(
-                    "cargo::warning=Detected unsupported version of Julia {major}.{minor}.{patch}, \
-                    assuming compatibility with 1.{max_minor_version}. Please report any issues you \
-                    encounter at https://www.github.com/Taaitaaiger/jlrs/issues"
-                );
-            }
-
-            let mut version = self.clone();
-            version.minor = max_minor_version;
-            version.patch = 0;
-            version.emit_metadata_unchecked();
-        } else if minor < min_minor_version {
-            panic!(
-                "Detected unsupported version of Julia {major}.{minor}.{patch}. Minimum supported version is 1.{min_minor_version}"
-            );
-        } else {
-            // Supported version
-            self.emit_metadata_unchecked();
         }
     }
 }
@@ -214,6 +90,7 @@ pub struct JuliaDir {
     path: PathBuf,
     version: Version,
     debug: bool,
+    docs: bool,
 }
 
 impl JuliaDir {
@@ -234,6 +111,7 @@ impl JuliaDir {
                 path,
                 version,
                 debug,
+                docs: false,
             })
         } else {
             let path = installed_julia_dir()?;
@@ -244,6 +122,7 @@ impl JuliaDir {
                 path,
                 version,
                 debug,
+                docs: false,
             })
         }
     }
@@ -255,139 +134,57 @@ impl JuliaDir {
             path: PathBuf::new(),
             version: Version::new(stable_major, stable_minor, 0, false),
             debug: false,
+            docs: true,
         }
     }
 
-    /// The version of this Julia installation
-    pub fn version(&self) -> Version {
-        self.version.clone()
-    }
-
-    /// The `lib` directory of this Julia installation
-    pub fn lib_dir(&self) -> PathBuf {
-        let mut julia_dir = self.path.clone();
-        julia_dir.push("lib");
-        julia_dir
-    }
-
-    /// The `bin` directory of this Julia installation
-    pub fn bin_dir(&self) -> PathBuf {
-        let mut julia_dir = self.path.clone();
-        julia_dir.push("bin");
-        julia_dir
-    }
-
-    /// The `include/julia` directory of this Julia installation
-    pub fn include_dir(&self) -> PathBuf {
-        let mut julia_dir = self.path.clone();
-        julia_dir.push("include/julia");
-        julia_dir
-    }
-
-    /// Instruct `rustc` to link this installation of Julia
-    pub fn link(&self) {
-        if !self.is_binary_builder {
-            let lib_dir = self.lib_dir();
-            println!("cargo::rustc-link-search={}", lib_dir.display());
-            println!("cargo::rustc-link-search={}/julia", lib_dir.display());
-
-            if self.debug {
-                println!("cargo::rustc-link-lib=julia-debug");
-            } else {
-                println!("cargo::rustc-link-lib=julia");
-            }
-        }
-
-        if self.windows {
-            println!("cargo::rustc-link-arg=-Wl,--stack,8388608");
-        }
-    }
-
-    /// Whether or not BinaryBuilder is currently used
-    ///
-    /// If `bb_target` and `WORKSPACE` have been set, it is assumed that BinaryBuilder is used.
-    pub fn is_binary_builder(&self) -> bool {
-        self.is_binary_builder
-    }
-
-    /// Emit detected Julia installation metadata.
-    pub fn emit_metadata(
-        &self,
-        min_minor_version: u32,
-        max_minor_version: u32,
-        nightly_minor_version: u32,
-        warn: bool,
-    ) {
-        println!("cargo::metadata=julia_dir={}", self.path.display());
-
-        let is_debug = if self.debug { 1 } else { 0 };
-        println!("cargo::metadata=debug={}", is_debug);
-
-        let is_windows = if self.windows { 1 } else { 0 };
-        println!("cargo::metadata=windows={}", is_windows);
-
-        self.version.emit_metadata(
-            min_minor_version,
-            max_minor_version,
-            nightly_minor_version,
-            warn,
-        );
-    }
-
-    /// Load the installation detected when jl-sys was built.
-    pub fn from_detected() -> Option<Self> {
-        let version = Version::from_detected()?;
-        let debug = env::var("DEP_JULIA_DEBUG").ok()?.parse::<u32>().ok()? != 0;
-        let windows = env::var("DEP_JULIA_WINDOWS").ok()?.parse::<u32>().ok()? != 0;
-
-        if building_in_binary_builder() {
-            let path = binary_builer_julia_dir();
-            Some(JuliaDir {
-                is_binary_builder: true,
-                path,
-                version,
-                debug,
-                windows,
-            })
-        } else {
-            let path = PathBuf::from(env::var("DEP_JULIA_JULIA_DIR").ok()?);
-            Some(JuliaDir {
-                is_binary_builder: false,
-                path,
-                version,
-                debug,
-                windows,
-            })
-        }
-    }
-
-    pub fn write_version_file(
+    pub fn write_metadata_file(
         &self,
         path: &Path,
         lts_version: u32,
+        max_minor_version: u32,
         nightly_minor_version: u32,
     ) -> std::io::Result<()> {
         let mut output = File::create(path)?;
+        let bytes = self
+            .path
+            .as_os_str()
+            .as_encoded_bytes()
+            .iter()
+            .map(|b| format!("{b}"))
+            .collect::<Vec<_>>()
+            .join(",");
+
         write!(
             output,
-            "const MAJOR_VERSION: usize = 1;
-const MIN_MINOR_VERSION: usize = {};
-const NIGHTLY_MINOR_VERSION: usize = {};
-const SELECTED_MINOR_VERSION: usize = {};",
-            lts_version, nightly_minor_version, self.version.minor
+            "pub const MAJOR_VERSION: usize = 1;
+pub const MIN_MINOR_VERSION: usize = {};
+pub const MAX_MINOR_VERSION: usize = {};
+pub const NIGHTLY_MINOR_VERSION: usize = {};
+pub const SELECTED_MINOR_VERSION: usize = {};
+pub const SELECTED_PATCH_VERSION: usize = {};
+pub const DEV_BUILD: bool = {};
+pub const DOCS_BUILD: bool = {};
+pub const DEBUG_BUILD: bool = {};
+pub const WINDOWS_BUILD: bool = {};
+pub const BINARY_BUILDER_BUILD: bool = {};
+pub static JULIA_DIR: &[u8] = &[{}];
+",
+            lts_version,
+            max_minor_version,
+            nightly_minor_version,
+            self.version.minor,
+            self.version.patch,
+            self.version.is_dev,
+            self.docs,
+            self.debug,
+            self.windows,
+            self.is_binary_builder,
+            bytes
         )?;
 
         Ok(())
     }
-}
-
-/// Enable the `julia_1_x` version configs from `min_version..=max_version`.
-pub fn enable_version_cfgs(min_version: u32, max_version: u32) {
-    let versions: Vec<String> = (min_version..=max_version)
-        .map(|minor| format!("julia_1_{minor}"))
-        .collect();
-    let versions_joined = versions.join(",");
-    println!("cargo::rustc-check-cfg=cfg({versions_joined})");
 }
 
 fn building_in_binary_builder() -> bool {
