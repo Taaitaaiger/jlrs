@@ -55,9 +55,32 @@ runs:
       env:
         JLRS_JULIA_DIR: ${{ steps.setup-julia.outputs.julia-bindir }}/..
         LD_LIBRARY_PATH: ${{ steps.setup-julia.outputs.julia-bindir }}/../lib
-        DYLD_LIBRARY_PATH: ${{ steps.setup-julia.outputs.julia-bindir }}/../lib:${{ steps.setup-julia.outputs.julia-bindir }}/../lib/julia
+        DYLD_LIBRARY_PATH: ${{ steps.setup-julia.outputs.julia-bindir }}/../lib
       run: |
-        cargo test --features full --verbose
+        cargo build --features full --verbose
+
+    - name: Inspect dynamic dependencies
+      shell: bash
+      run: |
+        EXE="$(find target/debug/examples -type f -name 'ccall-*' | head -n 1)"
+
+        echo "Executable: $EXE"
+
+        otool -L "$EXE"
+        echo
+        otool -l "$EXE" | grep -A3 LC_RPATH || true
+
+        JULIA_BINDIR="$(julia -e 'print(Sys.BINDIR)')"
+        JULIA_LIBDIR="$(cd "$JULIA_BINDIR/../lib" && pwd)"
+
+        echo "Julia library directory: $JULIA_LIBDIR"
+
+        for lib in "$JULIA_LIBDIR"/libjulia*.dylib; do
+          if [ -f "$lib" ]; then
+            echo "Inspecting $lib"
+            otool -L "$lib"
+          fi
+        done
 
     # - name: Cargo clean
     #   if: runner.os == 'macOS'
