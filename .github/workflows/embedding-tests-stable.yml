@@ -30,7 +30,7 @@ jobs:
           # - rust: nightly
           #   os: ubuntu-latest
           #   allow-fail: true
-          - rust: nightly
+          - rust: "1.97.1"
             os: macos-latest
             allow-fail: true
 
