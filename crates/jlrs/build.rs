@@ -1,6 +1,10 @@
-use julia_metadata::{emit_detected_version_metadata, enable_version_cfgs};
+use julia_metadata::{emit_detected_version_metadata, enable_version_cfgs, lib_dir};
 
 fn main() {
     enable_version_cfgs();
     emit_detected_version_metadata(false);
+
+    let lib_dir = lib_dir();
+    println!("cargo::rustc-link-search={}", lib_dir.display());
+    println!("cargo::rustc-link-search={}/julia", lib_dir.display());
 }
