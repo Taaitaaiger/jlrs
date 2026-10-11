@@ -23,7 +23,7 @@ runs:
       with:
         version: ${{ inputs.julia-version }}
 
-    # - uses: julia-actions/cache@v3
+    - uses: julia-actions/cache@v3
 
     - name: Setup Rust
       uses: dtolnay/rust-toolchain@master
@@ -59,38 +59,18 @@ runs:
       run: |
         cargo test --features full --verbose
 
-    - name: Inspect ccall executable
+    - name: Cargo clean
+      if: runner.os == 'macOS'
       shell: bash
       run: |
-        EXE="$(find target/debug/examples -type f -name 'ccall-*' \
-          ! -name '*.d' ! -name '*.rcgu.o' | while read f; do
-            file "$f" | grep -q 'Mach-O.*executable' && echo "$f" && break
-          done)"
+        cd tests/julia_module_test
+        cargo clean
 
-        if [ -z "$EXE" ]; then
-          echo "No compiled ccall executable found"
-          find target/debug/examples -maxdepth 1 -name 'ccall-*' -print
-          exit 1
-        fi
-
-        echo "Executable: $EXE"
-        otool -L "$EXE"
-
-        echo "Runtime paths:"
-        otool -l "$EXE" | grep -A3 LC_RPATH || true
-
-    # - name: Cargo clean
-    #   if: runner.os == 'macOS'
-    #   shell: bash
-    #   run: |
-    #     cd tests/julia_module_test
-    #     cargo clean
-
-    # - name: Run tests with static-cache
-    #   shell: bash
-    #   env:
-    #     JLRS_JULIA_DIR: ${{ steps.setup-julia.outputs.julia-bindir }}/..
-    #     LD_LIBRARY_PATH: ${{ steps.setup-julia.outputs.julia-bindir }}/../lib
-    #     DYLD_LIBRARY_PATH: ${{ steps.setup-julia.outputs.julia-bindir }}/../lib
-    #   run: |
-    #     cargo test --features full,static-cache --verbose
+    - name: Run tests with static-cache
+      shell: bash
+      env:
+        JLRS_JULIA_DIR: ${{ steps.setup-julia.outputs.julia-bindir }}/..
+        LD_LIBRARY_PATH: ${{ steps.setup-julia.outputs.julia-bindir }}/../lib
+        DYLD_LIBRARY_PATH: ${{ steps.setup-julia.outputs.julia-bindir }}/../lib
+      run: |
+        cargo test --features full,static-cache --verbose
