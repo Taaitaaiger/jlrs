@@ -61,7 +61,7 @@ mod tests {
                 stack.scope(|mut frame| unsafe {
                     Value::eval_string(
                         &mut frame,
-                        "ErrorException(\"This is an expected message\")",
+                        "ErrorException(\"This is an expected message\n\")",
                     )
                     .unwrap()
                     .print_error();

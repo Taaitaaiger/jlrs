@@ -22,9 +22,9 @@ jobs:
   tests:
     strategy:
       matrix:
-        # os: [ubuntu-latest, macos-latest]
-        os: [ubuntu-latest]
+        os: [ubuntu-latest, macos-latest]
         rust: [stable]
+        allow-fail: [true]
         include:
           - rust: stable-x86_64-pc-windows-gnu
             os: windows-2022
