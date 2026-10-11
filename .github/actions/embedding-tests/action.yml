@@ -78,7 +78,6 @@ runs:
 
         echo "Runtime paths:"
         otool -l "$EXE" | grep -A3 LC_RPATH || true
-        done
 
     # - name: Cargo clean
     #   if: runner.os == 'macOS'
