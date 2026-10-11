@@ -57,29 +57,27 @@ runs:
         LD_LIBRARY_PATH: ${{ steps.setup-julia.outputs.julia-bindir }}/../lib
         DYLD_LIBRARY_PATH: ${{ steps.setup-julia.outputs.julia-bindir }}/../lib
       run: |
-        cargo build --tests --features full --verbose
+        cargo build --examples --features full --verbose
 
-    - name: Inspect dynamic dependencies
+    - name: Inspect ccall executable
       shell: bash
       run: |
-        EXE="$(find target/debug/examples -type f -name 'ccall-*' | head -n 1)"
+        EXE="$(find target/debug/examples -type f -name 'ccall-*' \
+          ! -name '*.d' ! -name '*.rcgu.o' | while read f; do
+            file "$f" | grep -q 'Mach-O.*executable' && echo "$f" && break
+          done)"
+
+        if [ -z "$EXE" ]; then
+          echo "No compiled ccall executable found"
+          find target/debug/examples -maxdepth 1 -name 'ccall-*' -print
+          exit 1
+        fi
 
         echo "Executable: $EXE"
-
         otool -L "$EXE"
-        echo
+
+        echo "Runtime paths:"
         otool -l "$EXE" | grep -A3 LC_RPATH || true
-
-        JULIA_BINDIR="$(julia -e 'print(Sys.BINDIR)')"
-        JULIA_LIBDIR="$(cd "$JULIA_BINDIR/../lib" && pwd)"
-
-        echo "Julia library directory: $JULIA_LIBDIR"
-
-        for lib in "$JULIA_LIBDIR"/libjulia*.dylib; do
-          if [ -f "$lib" ]; then
-            echo "Inspecting $lib"
-            otool -L "$lib"
-          fi
         done
 
     # - name: Cargo clean
