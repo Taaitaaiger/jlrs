@@ -1,16 +1,16 @@
 use std::{env, path::PathBuf};
 
-use find_julia::JuliaDir;
+use find_julia::JuliaInfo;
 
 fn main() {
     let julia_dir = if building_docs() {
-        JuliaDir::docs(jlrs_compat::MAJOR_VERSION, jlrs_compat::DOCS_MINOR_VERSION)
+        JuliaInfo::docs(jlrs_compat::MAJOR_VERSION, jlrs_compat::DOCS_MINOR_VERSION)
     } else {
-        JuliaDir::find(windows_build(), debug_build())
+        JuliaInfo::find(windows_build(), debug_build())
             .expect("JLRS_JULIA_DIR is not set and no installed version of Julia can be found")
     };
 
-    let out_path = PathBuf::from(env::var("OUT_DIR").unwrap()).join("version.rs");
+    let out_path = PathBuf::from(env::var("OUT_DIR").unwrap()).join("metadata.rs");
     julia_dir
         .write_metadata_file(
             &out_path,

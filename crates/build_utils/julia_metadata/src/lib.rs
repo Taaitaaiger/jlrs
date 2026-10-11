@@ -1,7 +1,7 @@
 use std::{ffi::OsString, path::PathBuf};
 
-include!(concat!(env!("OUT_DIR"), "/version.rs"));
-// pub const MAJOR_VERSION: usize = 1;
+include!(concat!(env!("OUT_DIR"), "/metadata.rs"));
+// pub const MAJOR_VERSION: usize = {};
 // pub const MIN_MINOR_VERSION: usize = {};
 // pub const MAX_MINOR_VERSION: usize = {};
 // pub const NIGHTLY_MINOR_VERSION: usize = {};
@@ -25,22 +25,9 @@ pub fn emit_metadata() {
     if DOCS_BUILD {
         let major = MAJOR_VERSION;
         let minor = SELECTED_MINOR_VERSION;
-        let patch = SELECTED_PATCH_VERSION;
-        let is_dev = DEV_BUILD as u8;
 
-        println!("cargo::metadata=version={major}.{minor}.{patch}");
-        println!("cargo::metadata=is_dev={is_dev}");
         println!("cargo::rustc-cfg=julia_{major}_{minor}");
     } else {
-        let julia_dir = julia_dir();
-        println!("cargo::metadata=julia_dir={}", julia_dir.display());
-
-        let is_debug = DEBUG_BUILD as u8;
-        println!("cargo::metadata=debug={}", is_debug);
-
-        let is_windows = WINDOWS_BUILD as u8;
-        println!("cargo::metadata=windows={}", is_windows);
-
         emit_version_metadata(
             MAJOR_VERSION as _,
             SELECTED_MINOR_VERSION as _,
@@ -87,7 +74,7 @@ pub fn link_julia() {
     }
 }
 
-pub fn julia_dir() -> PathBuf {
+fn julia_dir() -> PathBuf {
     let julia_dir = unsafe { OsString::from_encoded_bytes_unchecked(JULIA_DIR.to_vec()) };
     PathBuf::from(julia_dir)
 }

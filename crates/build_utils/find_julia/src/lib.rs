@@ -13,7 +13,7 @@ use std::{
 /// Detected Julia version
 #[derive(Clone)]
 pub struct Version {
-    _major: u32,
+    major: u32,
     minor: u32,
     patch: u32,
     is_dev: bool,
@@ -23,7 +23,7 @@ impl Version {
     /// Create a new version
     pub fn new(major: u32, minor: u32, patch: u32, is_dev: bool) -> Self {
         Version {
-            _major: major,
+            major,
             minor,
             patch,
             is_dev,
@@ -75,7 +75,7 @@ impl Version {
         }
 
         Version {
-            _major: major as _,
+            major: major as _,
             minor: minor as _,
             patch: patch as _,
             is_dev,
@@ -84,7 +84,7 @@ impl Version {
 }
 
 /// Julia root directory
-pub struct JuliaDir {
+pub struct JuliaInfo {
     is_binary_builder: bool,
     windows: bool,
     path: PathBuf,
@@ -93,7 +93,7 @@ pub struct JuliaDir {
     docs: bool,
 }
 
-impl JuliaDir {
+impl JuliaInfo {
     /// Find the Julia root directory.
     ///
     /// Defaults to the value of the environment variable `JLRS_JULIA_DIR` if it is set, otherwise
@@ -105,7 +105,7 @@ impl JuliaDir {
         if is_bb {
             let path = binary_builer_julia_dir();
             let version = Version::detect(path.clone());
-            Some(JuliaDir {
+            Some(JuliaInfo {
                 windows,
                 is_binary_builder: is_bb,
                 path,
@@ -116,7 +116,7 @@ impl JuliaDir {
         } else {
             let path = installed_julia_dir()?;
             let version = Version::detect(path.clone());
-            Some(JuliaDir {
+            Some(JuliaInfo {
                 windows,
                 is_binary_builder: is_bb,
                 path,
@@ -128,7 +128,7 @@ impl JuliaDir {
     }
 
     pub fn docs(stable_major: u32, stable_minor: u32) -> Self {
-        JuliaDir {
+        JuliaInfo {
             is_binary_builder: false,
             windows: false,
             path: PathBuf::new(),
@@ -157,7 +157,7 @@ impl JuliaDir {
 
         write!(
             output,
-            "pub const MAJOR_VERSION: usize = 1;
+            "pub const MAJOR_VERSION: usize = {};
 pub const MIN_MINOR_VERSION: usize = {};
 pub const MAX_MINOR_VERSION: usize = {};
 pub const NIGHTLY_MINOR_VERSION: usize = {};
@@ -170,6 +170,7 @@ pub const WINDOWS_BUILD: bool = {};
 pub const BINARY_BUILDER_BUILD: bool = {};
 pub static JULIA_DIR: &[u8] = &[{}];
 ",
+            self.version.major,
             lts_version,
             max_minor_version,
             nightly_minor_version,
