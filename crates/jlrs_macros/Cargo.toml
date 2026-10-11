@@ -32,5 +32,8 @@ quote = { version = "1" }
 itertools = "0.15"
 julia-metadata = { version = "0.1.0", path = "../build_utils/julia_metadata"}
 
+[build-dependencies]
+julia-metadata = { version = "0.1.0", path = "../build_utils/julia_metadata"}
+
 [package.metadata.docs.rs]
 features = ["ccall", "derive"]
