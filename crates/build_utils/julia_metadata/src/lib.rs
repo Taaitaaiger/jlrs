@@ -171,11 +171,6 @@ fn emit_version_metadata(
             "Detected unsupported version of Julia {major}.{minor}.{patch}. Minimum supported version is 1.{min_minor_version}"
         );
     } else {
-        // Supported version
-        let is_dev = DEV_BUILD as u8;
-
-        println!("cargo::metadata=version={major}.{minor}.{patch}");
-        println!("cargo::metadata=is_dev={is_dev}");
         println!("cargo::rustc-cfg=julia_{major}_{minor}");
     }
 }
