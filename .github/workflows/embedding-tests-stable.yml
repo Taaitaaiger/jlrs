@@ -16,7 +16,7 @@ concurrency:
 
 env:
   jlrs-core-revision: "0f1b7cba4eeedae260cb48374716f3cd551fc8c0"
-  julia-version: "1.12"
+  julia-version: "1.12.5"
 
 jobs:
   test-linux-macos:
