@@ -9,6 +9,9 @@ jlrs = { version = "0.25", path = "../crates/jlrs", features = ["full"] }
 tokio = { version = "1", features = ["macros", "rt"]}
 rayon = "1.10"
 
+[build-dependencies]
+julia-metadata = { version = "0.1", path = "../crates/build_utils/julia_metadata"}
+
 [[example]]
 name = "async_tasks"
 path = "async_tasks.rs"
