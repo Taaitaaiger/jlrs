@@ -23,7 +23,7 @@ runs:
       with:
         version: ${{ inputs.julia-version }}
 
-    - uses: julia-actions/cache@v3
+    # - uses: julia-actions/cache@v3
 
     - name: Setup Rust
       uses: dtolnay/rust-toolchain@master
