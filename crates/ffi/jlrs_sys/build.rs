@@ -38,9 +38,11 @@ fn main() {
         );
     }
 
+    #[cfg(not(feature = "docs"))]
     compile_jlrs_cc();
 }
 
+#[allow(unused)]
 #[derive(Clone, Copy)]
 enum BBTarget {
     Windows,
@@ -52,6 +54,7 @@ enum BBTarget {
 }
 
 // Interpret `bb_target` to
+#[allow(unused)]
 fn interpret_binary_builder_target() -> Option<BBTarget> {
     if BINARY_BUILDER_BUILD {
         if let Ok(target) = env::var("bb_target") {
@@ -83,7 +86,7 @@ fn interpret_binary_builder_target() -> Option<BBTarget> {
     None
 }
 
-#[allow(unused_variables)]
+#[allow(unused_variables, unused)]
 fn compile_jlrs_cc() {
     let include_dir = include_dir();
     let mut c = cc::Build::new();

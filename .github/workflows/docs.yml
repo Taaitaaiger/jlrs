@@ -26,4 +26,4 @@ jobs:
           toolchain: stable
 
       - name: Build Docs
-        run: cargo doc --features docs,jl-sys/docs
+        run: cargo doc --features docs

@@ -78,7 +78,7 @@ windows = ["jl-sys/windows", "jlrs-sys/windows", "jlrs-macros/windows"]
 macos = ["jlrs-sys/macos"]
 
 # Used to generate docs for docs.rs
-docs = ["jl-sys/docs", "jlrs-sys/docs", "jlrs-macros/docs", "full"]
+docs = ["jl-sys/docs", "jlrs-sys/docs", "jlrs-macros/docs", "julia-metadata/docs", "full"]
 
 [dependencies]
 jl-sys = { version = "0.28", path = "../ffi/jl_sys" }

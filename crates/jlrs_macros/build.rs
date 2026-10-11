@@ -1,3 +1,5 @@
+use julia_metadata as _;
+
 fn main() {
     #[cfg(target_os = "macos")]
     {
