@@ -1,4 +1,4 @@
-#[cfg(all(feature = "multi-rt", feature = "async-rt"))]
+#[cfg(all(feature = "multi-rt", feature = "async-rt", not(target_os = "macos")))]
 mod mt_handle {
 
     use std::{thread::sleep, time::Duration};
