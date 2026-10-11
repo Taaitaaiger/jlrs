@@ -146,7 +146,7 @@ impl Version {
         if major != 1 {
             panic!("Detected unsupported version of Julia {major}.{minor}.{patch}.");
         }
-
+ 
         if self.is_dev() {
             if warn {
                 println!(
