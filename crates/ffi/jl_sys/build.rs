@@ -32,6 +32,8 @@ fn main() {
             NIGHTLY_MINOR_VERSION,
             true,
         );
+
+        #[cfg(not(feature = "no-link"))]
         julia_dir.link();
     }
 }
