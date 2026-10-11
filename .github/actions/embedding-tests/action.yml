@@ -35,21 +35,6 @@ runs:
       run: |
         julia -e 'import Pkg; Pkg.add(url="https://github.com/Taaitaaiger/JlrsCore.jl", rev="${{ inputs.jlrs-core-revision }}"); Pkg.add("StaticArrays")'
 
-    - name: Inspect Julia libunwind
-      shell: bash
-      run: |
-        JULIA_PREFIX="$(dirname "$(dirname "$(which julia)")")"
-        echo "Julia executable: $(which julia)"
-        julia -e 'println(Sys.BINDIR)'
-        julia -e 'println(Sys.MACHINE)'
-
-        JULIA_BINDIR="$(julia -e 'print(Sys.BINDIR)')"
-        JULIA_LIBDIR="$(cd "$JULIA_BINDIR/../lib" && pwd)"
-
-        echo "Julia library directory: $JULIA_LIBDIR"
-        ls -la "$JULIA_LIBDIR"/*unwind* || true
-        find "$JULIA_BINDIR/.." -name '*unwind*' -print
-
     - name: Run tests
       shell: bash
       env:
