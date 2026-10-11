@@ -2,12 +2,16 @@ use std::env;
 
 use cfg_if::cfg_if;
 use julia_metadata::{
-    BINARY_BUILDER_BUILD, emit_detected_version_metadata, enable_version_cfgs, include_dir,
+    BINARY_BUILDER_BUILD, emit_detected_version_metadata, enable_version_cfgs, include_dir, lib_dir,
 };
 
 fn main() {
     enable_version_cfgs();
     emit_detected_version_metadata(false);
+
+    let lib_dir = lib_dir();
+    println!("cargo::rustc-link-search={}", lib_dir.display());
+    println!("cargo::rustc-link-search={}/julia", lib_dir.display());
 
     println!("cargo::rerun-if-changed=src/jlrs_cc/jlrs_cc_ext.c");
     println!("cargo::rerun-if-changed=src/jlrs_cc/jlrs_cc_hacks.c");

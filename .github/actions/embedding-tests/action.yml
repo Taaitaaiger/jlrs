@@ -50,14 +50,14 @@ runs:
         ls -la "$JULIA_LIBDIR"/*unwind* || true
         find "$JULIA_BINDIR/.." -name '*unwind*' -print
 
-    # - name: Run tests
-    #   shell: bash
-    #   env:
-    #     JLRS_JULIA_DIR: ${{ steps.setup-julia.outputs.julia-bindir }}/..
-    #     LD_LIBRARY_PATH: ${{ steps.setup-julia.outputs.julia-bindir }}/../lib
-    #     DYLD_LIBRARY_PATH: ${{ steps.setup-julia.outputs.julia-bindir }}/../lib
-    #   run: |
-    #     cargo test --features full --verbose
+    - name: Run tests
+      shell: bash
+      env:
+        JLRS_JULIA_DIR: ${{ steps.setup-julia.outputs.julia-bindir }}/..
+        LD_LIBRARY_PATH: ${{ steps.setup-julia.outputs.julia-bindir }}/../lib
+        DYLD_LIBRARY_PATH: ${{ steps.setup-julia.outputs.julia-bindir }}/../lib
+      run: |
+        cargo test --features full --verbose
 
     # - name: Cargo clean
     #   if: runner.os == 'macOS'
