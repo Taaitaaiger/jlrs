@@ -57,7 +57,7 @@ runs:
         LD_LIBRARY_PATH: ${{ steps.setup-julia.outputs.julia-bindir }}/../lib
         DYLD_LIBRARY_PATH: ${{ steps.setup-julia.outputs.julia-bindir }}/../lib
       run: |
-        cargo build --examples --features full --verbose
+        cargo build --tests --features full --verbose
 
     - name: Inspect ccall executable
       shell: bash
