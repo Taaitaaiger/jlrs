@@ -39,7 +39,7 @@ use crate::{
 };
 
 /// An immutable array of rank `R` with dimensions `D` and `N` elements
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 #[repr(C)]
 pub struct SArray<T, D: Dims<R>, const N: usize, const R: usize> {
     data: [T; N],

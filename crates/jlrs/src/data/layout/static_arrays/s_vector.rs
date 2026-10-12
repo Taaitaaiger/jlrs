@@ -39,7 +39,7 @@ use crate::{
 };
 
 /// An immutable vector with `N` elements
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 #[repr(C)]
 pub struct SVector<T, const N: usize> {
     data: [T; N],

@@ -39,7 +39,7 @@ use crate::{
 };
 
 /// A mutable vector with `N` elements
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 #[repr(C)]
 pub struct MVector<T, const N: usize> {
     data: [T; N],

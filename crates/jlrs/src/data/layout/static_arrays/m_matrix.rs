@@ -39,7 +39,7 @@ use crate::{
 };
 
 /// A mutable matrix with `ROWS` rows and `COLS` colums
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 #[repr(C)]
 pub struct MMatrix<T, const ROWS: usize, const COLS: usize> {
     data: [[T; ROWS]; COLS],

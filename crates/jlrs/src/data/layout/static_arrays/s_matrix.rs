@@ -39,7 +39,7 @@ use crate::{
 };
 
 /// An immutable matrix with `ROWS` rows and `COLS` colums
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 #[repr(C)]
 pub struct SMatrix<T, const ROWS: usize, const COLS: usize> {
     data: [[T; ROWS]; COLS],
