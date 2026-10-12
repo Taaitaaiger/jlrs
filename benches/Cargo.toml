@@ -8,7 +8,7 @@ edition = "2024"
 lto = ["jlrs/lto"]
 
 [dependencies]
-jlrs = { version = "0.24", path = "../crates/jlrs", features = ["full"] }
+jlrs = { version = "0.25", path = "../crates/jlrs", features = ["full"] }
 
 [dev-dependencies]
 criterion = { version = "0.8", features = ["html_reports", "async"] }
