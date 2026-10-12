@@ -16,8 +16,6 @@ use crate::{
     model::JuliaModuleModel,
 };
 
-use jl_sys as _;
-
 /// Export functions, types and constants defined in Rust as a Julia module.
 ///
 /// This macro generates an initialization function. This function is used in combination with the
