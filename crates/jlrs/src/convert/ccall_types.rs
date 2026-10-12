@@ -19,16 +19,16 @@
 //!
 //! [`julia_module`]: ::jlrs_macros::julia_module
 
-use crate::{
-    call::Call,
-    data::{managed::value::ValueRet, types::construct_type::ConstructType},
-    prelude::{JlrsResult, LocalScope as _, Nothing},
-    weak_handle_unchecked,
-};
 #[cfg(feature = "ccall")]
 use crate::{
+    call::Call,
     data::managed::module::JlrsCore,
-    prelude::{JuliaString, Managed},
+    prelude::{JuliaString, LocalScope as _, Managed},
+    weak_handle_unchecked,
+};
+use crate::{
+    data::{managed::value::ValueRet, types::construct_type::ConstructType},
+    prelude::{JlrsResult, Nothing},
 };
 
 /// Trait implemented by types that can be used as argument types of Rust functions exposed by the
@@ -109,9 +109,9 @@ unsafe impl<T: CCallReturn> CCallReturn for Result<T, ValueRet> {
 
     #[inline]
     unsafe fn return_or_throw(self) -> Self::ReturnAs {
-        unsafe {
+        {
             #[cfg(feature = "ccall")]
-            {
+            unsafe {
                 match self {
                     Ok(t) => t,
                     Err(e) => crate::runtime::handle::ccall::throw_exception(e),
@@ -144,9 +144,9 @@ unsafe impl<T: CCallReturn> CCallReturn for JlrsResult<T> {
 
     #[inline]
     unsafe fn return_or_throw(self) -> Self::ReturnAs {
-        unsafe {
+        {
             #[cfg(feature = "ccall")]
-            {
+            unsafe {
                 match self {
                     Ok(t) => t,
                     Err(e) => {

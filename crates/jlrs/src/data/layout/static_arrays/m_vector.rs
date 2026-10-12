@@ -39,7 +39,7 @@ use crate::{
 };
 
 /// A mutable vector with `N` elements
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 #[repr(C)]
 pub struct MVector<T, const N: usize> {
     data: [T; N],
@@ -227,4 +227,15 @@ unsafe impl<T: ConstructType, const N: usize> CCallReturn for MVector<T, N> {
     unsafe fn return_or_throw(self) -> Self::ReturnAs {
         self
     }
+}
+
+#[cfg(feature = "bytemuck")]
+unsafe impl<T, const N: usize> bytemuck::Zeroable for MVector<T, N> where T: bytemuck::Zeroable {}
+
+#[cfg(feature = "bytemuck")]
+unsafe impl<T, const N: usize> bytemuck::Pod for MVector<T, N>
+where
+    T: bytemuck::Pod,
+    Self: Copy,
+{
 }
