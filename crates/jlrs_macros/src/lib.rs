@@ -151,7 +151,7 @@ pub fn julia_module(item: TokenStream) -> TokenStream {
 
 /// Encode the literal string passed to this macro as [`ConstantBytes`].
 ///
-/// [`ConstantBytes`]: jlrs::data::types::construct_type::ConstantBytes
+/// [`ConstantBytes`]: https://docs.rs/jlrs/latest/jlrs/data/types/construct_type/bytes/struct.ConstantBytes.html
 #[proc_macro]
 pub fn encode_as_constant_bytes(item: TokenStream) -> TokenStream {
     let s: syn::LitStr = syn::parse_macro_input!(item as syn::LitStr);
