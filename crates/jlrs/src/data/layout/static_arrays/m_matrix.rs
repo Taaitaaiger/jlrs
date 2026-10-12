@@ -252,3 +252,17 @@ unsafe impl<T: ConstructType, const ROWS: usize, const COLS: usize> CCallReturn
         self
     }
 }
+
+#[cfg(feature = "bytemuck")]
+unsafe impl<T, const ROWS: usize, const COLS: usize> bytemuck::Zeroable for MMatrix<T, ROWS, COLS> where
+    T: bytemuck::Zeroable
+{
+}
+
+#[cfg(feature = "bytemuck")]
+unsafe impl<T, const ROWS: usize, const COLS: usize> bytemuck::Pod for MMatrix<T, ROWS, COLS>
+where
+    T: bytemuck::Pod,
+    Self: Copy,
+{
+}

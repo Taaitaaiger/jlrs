@@ -18,10 +18,10 @@ rust-version = "1.97"
 default = []
 
 # Enable all features
-full = ["local-rt", "tokio-rt", "jlrs-ndarray", "f16", "complex", "static-arrays", "jlrs-derive", "ccall", "multi-rt"]
+full = ["local-rt", "tokio-rt", "multi-rt", "full-no-rt"]
 
 # Enable all features except any  runtimes
-full-no-rt = ["async", "jlrs-ndarray", "f16", "jlrs-derive", "ccall"]
+full-no-rt = ["async", "jlrs-ndarray", "f16", "jlrs-derive", "ccall", "complex", "bytemuck", "static-arrays"]
 
 # Runtimes
 
@@ -54,6 +54,8 @@ complex = ["num-complex"]
 jlrs-ndarray = ["ndarray"]
 # Enable support for the StaticArrays Julia package
 static-arrays = []
+# Enable support for conversions with bytemuck
+bytemuck = ["dep:bytemuck"]
 # Enable derive macros
 jlrs-derive = ["jlrs-macros/derive"]
 # Compile the support library with support for cross-language LTO.
@@ -98,6 +100,7 @@ ndarray = { version = "0.17", optional = true }
 tokio = { version = "1", optional = true, features = ["rt", "sync", "time"]}
 num-complex = { version = "0.4", optional = true }
 static-generics = { version = "0.1", optional = true }
+bytemuck = { version = "1", optional = true }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["rt", "time", "sync"]}

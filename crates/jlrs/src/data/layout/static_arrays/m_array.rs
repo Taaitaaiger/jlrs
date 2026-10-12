@@ -277,3 +277,20 @@ unsafe impl<T: ConstructType, D: Dims<R>, const N: usize, const R: usize> CCallR
         self
     }
 }
+
+#[cfg(feature = "bytemuck")]
+unsafe impl<T, D, const N: usize, const R: usize> bytemuck::Zeroable for MArray<T, D, N, R>
+where
+    T: bytemuck::Zeroable,
+    D: Dims<R>,
+{
+}
+
+#[cfg(feature = "bytemuck")]
+unsafe impl<T, D, const N: usize, const R: usize> bytemuck::Pod for MArray<T, D, N, R>
+where
+    T: bytemuck::Pod,
+    D: Dims<R>,
+    Self: Copy,
+{
+}

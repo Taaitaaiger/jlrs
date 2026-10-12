@@ -221,3 +221,14 @@ unsafe impl<T: ConstructType, const N: usize> CCallReturn for SVector<T, N> {
         self
     }
 }
+
+#[cfg(feature = "bytemuck")]
+unsafe impl<T, const N: usize> bytemuck::Zeroable for SVector<T, N> where T: bytemuck::Zeroable {}
+
+#[cfg(feature = "bytemuck")]
+unsafe impl<T, const N: usize> bytemuck::Pod for SVector<T, N>
+where
+    T: bytemuck::Pod,
+    Self: Copy,
+{
+}
