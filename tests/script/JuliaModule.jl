@@ -20,7 +20,7 @@ end
 function library_cb()
     separator = Sys.iswindows() ? '\\' : '/'
     test_library_dir = get(ENV, "JULIA_MODULE_TEST_LIB_DIR", ".")
-    test_library_name = Sys.iswindows() ? "julia_module_test" : "libjulia_module_test"
+    test_library_name = Sys.iswindows() ? "julia_module_test.dll" : "libjulia_module_test"
     "$(test_library_dir)$(separator)$(test_library_name)"
 end
 
