@@ -48,7 +48,7 @@ extern "C"
 {
 #endif
     jl_value_t *jlrs_typeof(jl_value_t *v);
-    void jlrs_gc_wb(void *parent, void *ptr);
+    void jlrs_gc_wb(void *parent, void *slot, void* ptr);
     size_t jlrs_svec_len(jl_svec_t *t);
     jl_value_t **jlrs_svec_data(jl_svec_t *t);
     jl_value_t *jlrs_svecref(void *t, size_t i);

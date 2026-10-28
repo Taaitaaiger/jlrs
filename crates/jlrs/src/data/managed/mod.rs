@@ -689,11 +689,13 @@ impl<'borrow, 'data, T: Managed<'borrow, 'data>, P: Managed<'borrow, 'data>>
     /// mutate this data.
     pub unsafe fn store(&self, index: usize, data: Option<T::InScope<'_>>, order: Ordering) {
         unsafe {
-            self.slice[index].store(data, order);
+            let slot_ptr = &raw const self.slice[index] as *const _ as *mut _;
             jlrs_gc_wb(
                 self.parent.unwrap(Private).cast(),
+                slot_ptr,
                 data.map(|x| x.unwrap(Private)).unwrap_or(null_mut()).cast(),
-            )
+            );
+            self.slice[index].store(data, order);
         }
     }
 

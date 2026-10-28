@@ -4,6 +4,7 @@
 //! tracked mutably or immutably with [`Value::track_shared`] and [`Value::track_exclusive`].
 
 use std::{
+    ffi::c_void,
     marker::PhantomData,
     ops::{Deref, DerefMut},
     ptr::NonNull,
@@ -15,6 +16,7 @@ use crate::{
     data::{
         layout::valid_layout::ValidLayout,
         managed::{private::ManagedPriv, value::Value},
+        write_slot::{WriteSlot, WriteSlotAtomic, private::ParentPtr},
     },
     memory::context::ledger::Ledger,
     private::Private,
@@ -168,4 +170,31 @@ impl<T: ValidLayout> Drop for TrackedMut<'_, '_, '_, T> {
             Ledger::unborrow_exclusive(v).unwrap();
         }
     }
+}
+
+unsafe impl<T: ValidLayout> ParentPtr for TrackedMut<'_, '_, '_, T> {
+    fn parent_ptr(&self, _: Private) -> *const c_void {
+        self.t as *const _ as *const _
+    }
+}
+
+unsafe impl<'tracked, 'scope, 'data, T: ValidLayout> WriteSlotAtomic<'data>
+    for TrackedMut<'tracked, 'scope, 'data, T>
+{
+}
+
+unsafe impl<'tracked, 'scope, 'data, T: ValidLayout> WriteSlot<'data>
+    for TrackedMut<'tracked, 'scope, 'data, T>
+{
+}
+
+unsafe impl<T: ValidLayout> ParentPtr for Tracked<'_, '_, '_, T> {
+    fn parent_ptr(&self, _: Private) -> *const c_void {
+        self.tracked as *const _ as *const _
+    }
+}
+
+unsafe impl<'tracked, 'scope, 'data, T: ValidLayout> WriteSlotAtomic<'data>
+    for Tracked<'tracked, 'scope, 'data, T>
+{
 }

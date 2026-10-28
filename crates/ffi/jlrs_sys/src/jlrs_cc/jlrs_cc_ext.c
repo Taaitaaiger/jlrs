@@ -308,9 +308,22 @@ extern "C"
 
     void jlrs_arrayset(jl_array_t *a, jl_value_t *rhs, size_t i)
     {
-#if JULIA_VERSION_MINOR >= 11
         static _Atomic(jl_value_t *) s = NULL;
         jl_value_t *s2 = jl_atomic_load_relaxed(&s);
+#if JULIA_VERSION_MINOR >= 14
+        if (s2 == NULL) {
+            jl_sym_t *arrayset_sym = jl_symbol("arrayset");
+            s2 = jl_get_global(jl_core_module, arrayset_sym);
+            jl_atomic_store_relaxed(&s, s2);
+        }
+
+        jl_value_t* i_val = NULL;
+        JL_GC_PUSH1(&i_val);
+        i_val = jl_box_int64((int64_t)i + 1);
+        jl_value_t *args[4] = {jl_false, (jl_value_t*)a, rhs, i_val};
+        jlrs_call_unchecked(s2, args, 4);
+        JL_GC_POP();
+#elif JULIA_VERSION_MINOR >= 11
         if (s2 == NULL)
         {
             s2 = (jl_value_t *)jl_symbol("atomic");

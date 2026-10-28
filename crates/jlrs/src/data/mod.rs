@@ -41,3 +41,4 @@ pub mod layout;
 pub mod managed;
 pub mod static_data;
 pub mod types;
+pub mod write_slot;

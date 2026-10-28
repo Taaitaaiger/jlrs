@@ -11,7 +11,7 @@ use jl_sys::{
     jl_gc_mark_queue_objarray, jl_gc_safepoint, jl_get_pgcstack,
 };
 use jlrs_sys::{
-    jlrs_gc_safe_enter, jlrs_gc_safe_leave, jlrs_gc_unsafe_enter, jlrs_gc_unsafe_leave, jlrs_gc_wb,
+    jlrs_gc_safe_enter, jlrs_gc_safe_leave, jlrs_gc_unsafe_enter, jlrs_gc_unsafe_leave,
 };
 
 use super::{
@@ -22,10 +22,8 @@ use crate::{
     call::Call,
     data::managed::{
         module::Module,
-        private::ManagedPriv,
         value::{Value, WeakValue},
     },
-    private::Private,
 };
 
 /// Provides access to [`Gc`] to any active handle, can be created with
@@ -217,22 +215,6 @@ pub unsafe fn mark_queue_objarray(ptls: PTls, parent: WeakValue, objs: &[Option<
     unsafe {
         jl_gc_mark_queue_objarray(ptls, parent.ptr().as_ptr(), objs.as_ptr() as _, objs.len())
     }
-}
-
-/// Updates the write barrier.
-///
-/// When a pointer field of `data` has been set to `child`, this method must be called
-/// immediately after changing the field. This must only be done when the child has been
-/// mutated by directly changing the field and `data` is managed by Julia's GC.
-///
-/// This is necessary because the GC must remain aware of all old objects that contain
-/// references to young objects.
-///
-/// Safety: must be called whenever a field of `self` is set to `child` if `self` is
-/// managed by the GC.
-#[inline]
-pub unsafe fn write_barrier<T>(data: &mut T, child: Value) {
-    unsafe { jlrs_gc_wb(data as *mut _ as *mut _, child.unwrap(Private).cast()) }
 }
 
 /// Put the current task in a GC-safe state, call `f`, and return to the previous GC state.
