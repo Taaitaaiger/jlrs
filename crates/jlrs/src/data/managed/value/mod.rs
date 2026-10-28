@@ -101,6 +101,7 @@ use crate::{
             value::tracked::{Tracked, TrackedMut},
         },
         types::{construct_type::ConstructType, typecheck::Typecheck},
+        write_slot::{WriteSlot, WriteSlotAtomic, private::ParentPtr},
     },
     error::{AccessError, CANNOT_DISPLAY_TYPE, JlrsError, JlrsResult, TypeError},
     memory::{
@@ -555,10 +556,9 @@ impl<'scope, 'data> Value<'scope, 'data> {
     /// mutably derefenced and returned as a `TrackedMut` which provides direct access to the
     /// mutable reference.
     ///
-    /// Note that if `T` contains any references to Julia data, if such a reference is mutated
-    /// through `TrackedMut` you must call [`write_barrier`] after mutating it. This ensures the
-    /// garbage collector remains aware of old-generation objects pointing to young-generation
-    /// objects.
+    /// Note that if `T` contains any references to Julia data, such references must be mutated
+    /// through [`WriteSlot::write_slot`]. This ensures the garbage collector remains aware of
+    /// old-generation objects pointing to young-generation objects.
     ///
     /// In general, it's recommended that only fields that contain no references to Julia data are
     /// updated through `TrackedMut`.
@@ -567,8 +567,6 @@ impl<'scope, 'data> Value<'scope, 'data> {
     ///
     /// This method can only track references that exist in Rust code. It also gives unrestricted
     /// mutable access to the contents of the data, which is inherently unsafe.
-    ///
-    /// [`write_barrier`]: crate::memory::gc::write_barrier
     #[inline]
     pub unsafe fn track_exclusive<'borrow, T: ValidLayout>(
         &'borrow mut self,
@@ -1812,3 +1810,13 @@ unsafe fn check_field_isa<L: ValidLayout>(ft: Value, data: &L, offset: usize) ->
         Ok(())
     }
 }
+
+unsafe impl ParentPtr for Value<'_, '_> {
+    fn parent_ptr(&self, _: Private) -> *const c_void {
+        self as *const _ as *const _
+    }
+}
+
+unsafe impl<'scope, 'data> WriteSlotAtomic<'data> for Value<'scope, 'data> {}
+
+unsafe impl<'scope, 'data> WriteSlot<'data> for Value<'scope, 'data> {}

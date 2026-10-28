@@ -1,5 +1,6 @@
 //! Traits for converting data.
 
+pub mod as_maybe_uninit;
 pub mod ccall_types;
 pub mod compatible;
 pub mod into_julia;

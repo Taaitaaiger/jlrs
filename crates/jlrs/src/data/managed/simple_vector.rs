@@ -1,6 +1,7 @@
 //! Managed type for `SimpleVector`.
 
 use std::{
+    ffi::c_void,
     fmt::{Debug, Formatter, Result as FmtResult},
     marker::PhantomData,
     ptr::{NonNull, null_mut},
@@ -18,6 +19,7 @@ use crate::{
         layout::valid_layout::{ValidField, ValidLayout},
         managed::value::Value,
         types::typecheck::Typecheck,
+        write_slot::{WriteSlotAtomic, private::ParentPtr},
     },
     error::{AccessError, JlrsResult},
     memory::target::{Target, TargetResult, unrooted::Unrooted},
@@ -307,3 +309,11 @@ pub type SimpleVectorResult<'target, Tgt> =
 
 impl_ccall_arg_managed!(SimpleVector, 1);
 impl_into_typed!(SimpleVector);
+
+unsafe impl ParentPtr for SimpleVector<'_> {
+    fn parent_ptr(&self, _: Private) -> *const c_void {
+        self as *const _ as *const _
+    }
+}
+
+unsafe impl<'scope> WriteSlotAtomic<'static> for SimpleVector<'scope> {}

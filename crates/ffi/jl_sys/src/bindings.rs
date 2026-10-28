@@ -751,5 +751,10 @@ mod indirect {
 
         #[cfg(not(julia_1_10))]
         pub static mut jl_genericmemoryref: *mut std::ffi::c_void;
+
+        // Added in Julia 1.14
+
+        #[cfg(not(any(julia_1_10, julia_1_11, julia_1_12, julia_1_13)))]
+        pub static mut jl_gc_wb_cold: *mut std::ffi::c_void;
     }
 }

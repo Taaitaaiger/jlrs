@@ -85,8 +85,15 @@ impl<'scope> DelegatedTask<'scope> {
     fn set(self, value: Value<'_, 'static>) {
         unsafe {
             let layout = self.unwrap_non_null(Private).as_ref();
+            let slot = &layout.atomic as *const _ as *mut _;
+
+            jlrs_gc_wb(
+                self.unwrap(Private).cast(),
+                slot,
+                value.unwrap(Private).cast(),
+            );
+
             layout.atomic.store(Some(value), Ordering::Release);
-            jlrs_gc_wb(self.unwrap(Private).cast(), value.unwrap(Private).cast());
         }
     }
 

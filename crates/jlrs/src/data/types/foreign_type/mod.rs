@@ -18,9 +18,17 @@
 //! exported with the `julia_module` macro as follows:
 //!
 //! ```
-//! use std::iter::Sum;
+//! use std::{collections::HashMap, iter::Sum};
 //!
-//! use jlrs::prelude::*;
+//! use jlrs::{
+//!     convert::as_maybe_uninit::AsMaybeUninit,
+//!     data::{
+//!         managed::erase_scope_lifetime,
+//!         types::foreign_type::{ForeignType as FT, mark::Mark},
+//!         write_slot::WriteSlot,
+//!     },
+//!     prelude::*,
+//! };
 //!
 //! #[derive(OpaqueType)]
 //! struct ExportedType {
@@ -48,24 +56,42 @@
 //!     }
 //! }
 //!
+//! unsafe fn mark_map<M: Mark, P: FT>(
+//!     data: &HashMap<(), M>,
+//!     ptls: jlrs::memory::PTls,
+//!     parent: &P,
+//! ) -> usize {
+//!     data.values().map(|v| unsafe { v.mark(ptls, parent) }).sum()
+//! }
+//!
 //! #[derive(ForeignType)]
 //! struct ForeignExportedType {
 //!     #[jlrs(mark)]
 //!     data: Vec<Option<WeakValue<'static, 'static>>>,
+//!     #[jlrs(mark_with = mark_map)]
+//!     map: HashMap<(), Option<WeakValue<'static, 'static>>>,
 //! }
 //!
 //! impl ForeignExportedType {
-//!     // Safety: This method assumes this instance is managed by Julia. It's unsound to
-//!     // call this method on an inlined instance of ForeignExportedType. It's safe to call
-//!     // from Julia because `self` won't be inlined.
-//!     unsafe fn push(&mut self, data: Value<'_, 'static>) {
-//!         let leaked = data.as_weak().leak();
-//!         self.data.push(Some(leaked));
+//!     unsafe fn push<'s>(&mut self, data: Value<'s, 'static>) {
+//!         unsafe {
+//!             self.write_slot(
+//!                 |s| {
+//!                     s.data.push(None);
+//!                     s.data.last_mut().unwrap().as_maybe_uninit()
+//!                 },
+//!                 Some(erase_scope_lifetime(data)),
+//!             );
 //!
-//!         // Safety: the safety requirements of this method guarantee that `self` is the
-//!         // correct parent. We must insert a write barrier because `self` may be old and
-//!         // `data` young.
-//!         unsafe { self.write_barrier(leaked, self) };
+//!             if !self.map.contains_key(&()) {
+//!                 self.map.insert((), None);
+//!             }
+//!
+//!             self.write_slot(
+//!                 |s| s.map.get_mut(&()).unwrap().as_maybe_uninit(),
+//!                 Some(erase_scope_lifetime(data)),
+//!             );
+//!         };
 //!     }
 //! }
 //!
@@ -112,7 +138,6 @@ use jl_sys::{
     jl_emptysvec, jl_gc_add_ptr_finalizer, jl_gc_alloc_typed, jl_gc_schedule_foreign_sweepfunc,
     jl_new_datatype, jl_new_foreign_type, jl_reinit_foreign_type, jl_value_t,
 };
-use jlrs_sys::jlrs_gc_wb;
 
 use super::typecheck::Typecheck;
 use crate::{
@@ -120,7 +145,7 @@ use crate::{
     data::{
         layout::valid_layout::ValidLayout,
         managed::{
-            Managed, Weak,
+            Managed,
             datatype::{DataType, DataTypeData},
             module::Module,
             private::ManagedPriv,
@@ -129,6 +154,7 @@ use crate::{
             value::{Value, ValueData},
         },
         types::construct_type::{CACHE, ConstructType},
+        write_slot::{WriteSlot, WriteSlotAtomic, private::ParentPtr},
     },
     memory::{PTls, get_tls, scope::LocalScopeExt, target::Target},
     private::Private,
@@ -372,8 +398,8 @@ pub unsafe trait OpaqueType: Sized + Send + Sync + 'static {
 /// lifetime of Julia data present in the implementor. This can be done by leaking data with
 /// [`Weak::leak`] or [`Managed::leak`].
 ///
-/// Be aware that whenever fields are mutated to contain new Julia data, a write barrier must be
-/// inserted. See [`ForeignType::write_barrier`] for more information.
+/// A field that references Julia data must be mutated with [`WriteSlot::write_slot`] if the
+/// instance has been allocated as a Julia value.
 ///
 /// Derive:
 ///
@@ -397,7 +423,14 @@ pub unsafe trait OpaqueType: Sized + Send + Sync + 'static {
 /// ```
 /// # use jlrs::prelude::*;
 /// # use std::collections::HashMap;
-/// use jlrs::data::types::foreign_type::{ForeignType as FT, mark::Mark};
+/// use jlrs::{
+///     convert::as_maybe_uninit::AsMaybeUninit,
+///     data::{
+///         managed::erase_scope_lifetime,
+///         types::foreign_type::{ForeignType as FT, mark::Mark},
+///         write_slot::WriteSlot,
+///     },
+/// };
 ///
 /// unsafe fn mark_map<M: Mark, P: FT>(
 ///     data: &HashMap<(), M>,
@@ -412,27 +445,30 @@ pub unsafe trait OpaqueType: Sized + Send + Sync + 'static {
 ///     #[jlrs(mark)]
 ///     data: Vec<Option<WeakValue<'static, 'static>>>,
 ///     #[jlrs(mark_with = mark_map)]
-///     map: HashMap<(), WeakValue<'static, 'static>>,
+///     map: HashMap<(), Option<WeakValue<'static, 'static>>>,
 /// }
 ///
 /// impl ForeignExportedType {
-///     // Safety: This method assumes this instance is managed by Julia. It's unsound to
-///     // call this method on an inlined instance of ForeignExportedType. It's safe to call
-///     // from Julia because `self` won't be inlined.
-///     unsafe fn push(&mut self, data: Value<'_, 'static>) {
-///         let leaked = data.as_weak().leak();
-///         self.data.push(Some(leaked));
+///     // Safety: This method requires that `self` is managed by Julia.
+///     unsafe fn push<'s>(&mut self, data: Value<'s, 'static>) {
+///         unsafe {
+///             self.write_slot(
+///                 |s| {
+///                     s.data.push(None);
+///                     s.data.last_mut().unwrap().as_maybe_uninit()
+///                 },
+///                 Some(erase_scope_lifetime(data)),
+///             );
 ///
-///         // Safety: the safety requirements of this method guarantee that `self` is the
-///         // correct parent. We must insert a write barrier because `self` may be old and
-///         // `data` young.
-///         unsafe { self.write_barrier(leaked, self) };
+///             if !self.map.contains_key(&()) {
+///                 self.map.insert((), None);
+///             }
 ///
-///         self.map.insert((), leaked);
-///
-///         // NB: We've already inserted a write barrier for `leaked`. We can guarantee the GC
-///         // won't run during this function (no new Julia data is allocated), so we don't need
-///         // to insert it again.
+///             self.write_slot(
+///                 |s| s.map.get_mut(&()).unwrap().as_maybe_uninit(),
+///                 Some(erase_scope_lifetime(data)),
+///             );
+///         };
 ///     }
 /// }
 ///
@@ -457,13 +493,11 @@ pub unsafe trait OpaqueType: Sized + Send + Sync + 'static {
 /// mark all these references. If it doesn't reference managed data, `OpaqueType` should be
 /// implemented instead.
 ///
-/// Whenever an internal reference to Julia data is changed while an instance of a foreign type is
-/// managed by Julia, [`ForeignType::write_barrier`] must be called to ensure GC invariants are
-/// maintained.
+/// A field that references Julia data must be mutated with [`WriteSlot::write_slot`] if the
+/// instance has been allocated as a Julia value.
 ///
 /// [`Weak::leak`]: crate::data::managed::Weak::leak
 /// [`ForeignType`]: jlrs_macros::ForeignType
-/// [`write_barrier`]: crate::memory::gc::write_barrier
 /// [`Mark`]: crate::data::types::foreign_type::mark::Mark
 /// [`Mark::mark`]: crate::data::types::foreign_type::mark::Mark::mark
 
@@ -496,36 +530,6 @@ pub unsafe trait ForeignType: Sized + Send + Sync + 'static {
         DataType::any_type(&target).root(target)
     }
 
-    /// Insert a write barrier.
-    ///
-    /// A write barrier must be inserted whenever new managed data is referenced by a foreign
-    /// type. Examples include setting a field to `value`, or inserting it into a hash map. It
-    /// must only be inserted if this instance is managed by Julia (i.e. it has been allocated
-    /// with `(Typed)Value::new`), or if it's referenced by a managed instance (e.g. if it has
-    /// been inlined into another foreign type which is managed).
-    ///
-    /// A write barrier checks if the newly referenced data is young and the parent is old, if
-    /// this is the case the parent is guaranteed to be scanned during the next GC cycle.
-    /// If this didn't happen, an incremental collection cycle would free the young data if its
-    /// old parent is the only live object that references it.
-    ///
-    /// The parent is `&self` if this instance is managed by Julia, otherwise it's a reference to
-    /// the instance of the foreign type which references it.
-    ///
-    /// Safety:
-    ///
-    /// The parent must be correct, see the explanation above. `value` must reference existing
-    /// data.
-    unsafe fn write_barrier<T: Managed<'static, 'static>, P: ForeignType>(
-        &self,
-        value: Weak<'static, 'static, T>,
-        parent: &P,
-    ) {
-        unsafe {
-            jlrs_gc_wb(parent as *const _ as *mut _, value.ptr().as_ptr().cast());
-        }
-    }
-
     /// Mark all references to Julia data.
     ///
     /// For each reference to Julia data you must call [`mark_queue_obj`], if `self` contains an
@@ -545,6 +549,16 @@ pub unsafe trait ForeignType: Sized + Send + Sync + 'static {
     /// [`mark_queue_objarray`]: crate::memory::gc::mark_queue_objarray
     unsafe fn mark<P: ForeignType>(ptls: PTls, data: &Self, parent: &P) -> usize;
 }
+
+unsafe impl<T: ForeignType> ParentPtr for T {
+    fn parent_ptr(&self, _: Private) -> *const c_void {
+        self as *const _ as *const _
+    }
+}
+
+unsafe impl<T: ForeignType> WriteSlotAtomic<'static> for T {}
+
+unsafe impl<T: ForeignType> WriteSlot<'static> for T {}
 
 unsafe impl<T: ForeignType> OpaqueType for T {
     type Key = Self;

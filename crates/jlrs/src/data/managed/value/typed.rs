@@ -17,6 +17,7 @@
 //! [`julia_module`]: ::jlrs_macros::julia_module
 
 use std::{
+    ffi::c_void,
     fmt::Debug,
     marker::PhantomData,
     ops::{Deref, DerefMut},
@@ -49,6 +50,7 @@ use crate::{
             },
             typecheck::Typecheck,
         },
+        write_slot::{WriteSlot, WriteSlotAtomic, private::ParentPtr},
     },
     error::{JlrsResult, TypeError},
     memory::{
@@ -518,3 +520,13 @@ unsafe impl<T: ConstructType> CCallReturn for WeakTypedValue<'static, 'static, T
         self
     }
 }
+
+unsafe impl<T> ParentPtr for TypedValue<'_, '_, T> {
+    fn parent_ptr(&self, _: Private) -> *const c_void {
+        self as *const _ as *const _
+    }
+}
+
+unsafe impl<'scope, 'data, T> WriteSlotAtomic<'data> for TypedValue<'scope, 'data, T> {}
+
+unsafe impl<'scope, 'data, T> WriteSlot<'data> for TypedValue<'scope, 'data, T> {}

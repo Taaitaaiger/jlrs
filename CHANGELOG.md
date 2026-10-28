@@ -6,6 +6,12 @@
 
 - The `bytemuck` feature implements bytemuck's `Pod` and `Zeroable` traits for the static array types. The `bytemuck` features of `half` and `num-complex` are also enabled by this feature.
 
+- Support Julia 1.14.0-alpha1
+
+- The `write_barrier` function has been removed and is replaced by the `WriteSlot` and `WriteSlotAtomic` traits.
+
+- The `AsMaybeUninit` trait has been added to support conversions from `&mut T` to `&mut MaybeUninit<T>`.
+
 ## v0.24
 
 - Handle version compatibility solely through jlrs-compat.

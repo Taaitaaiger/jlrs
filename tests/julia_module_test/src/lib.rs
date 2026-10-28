@@ -141,7 +141,7 @@ julia_module! {
     in ForeignThing fn new(value: Value<'_, 'static>) -> TypedValueRet<ForeignThing> as ForeignThing;
 
     in ForeignThing fn get(&self) -> ValueRet as extract_inner;
-    in ForeignThing fn set(&mut self, value: Value) as set_inner!;
+    in ForeignThing fn set(&mut self, value: Value<'_, 'static>) as set_inner!;
 
     in UnexportedType fn assoc_func() -> isize;
 

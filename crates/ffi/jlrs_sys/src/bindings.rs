@@ -6,7 +6,11 @@ pub mod jlrs_cc {
     unsafe extern "C" {
         pub fn jlrs_typeof(v: *mut crate::types::jl_value_t) -> *mut crate::types::jl_value_t;
 
-        pub fn jlrs_gc_wb(parent: *mut std::ffi::c_void, ptr: *mut std::ffi::c_void);
+        pub fn jlrs_gc_wb(
+            parent: *mut std::ffi::c_void,
+            slot: *mut std::ffi::c_void,
+            ptr: *mut std::ffi::c_void,
+        );
 
         pub fn jlrs_svec_len(t: *mut crate::types::jl_svec_t) -> usize;
 

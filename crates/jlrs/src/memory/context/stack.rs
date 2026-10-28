@@ -8,20 +8,21 @@
 //    keep these stacks linked whenever a frame is pushed to or popped from the stack.
 
 use std::{
-    cell::{Cell, UnsafeCell},
+    cell::UnsafeCell,
     ffi::c_void,
     fmt,
-    ptr::{NonNull, null_mut},
+    ptr::NonNull,
+    sync::atomic::{AtomicPtr, Ordering},
 };
 
 use jl_sys::{jl_gc_mark_queue_objarray, jl_sym_t, jl_tagged_gensym, jl_value_t};
-use jlrs_sys::jlrs_gc_wb;
 
 use crate::{
     call::Call,
     data::{
         managed::{Managed, module::Module, private::ManagedPriv, symbol::Symbol, value::Value},
         types::foreign_type::{ForeignType, OpaqueType},
+        write_slot::WriteSlotAtomic,
     },
     gc_safe::GcSafeOnceLock,
     memory::{PTls, target::unrooted::Unrooted},
@@ -32,7 +33,7 @@ use crate::{
 #[repr(C)]
 #[derive(Default)]
 pub(crate) struct Stack {
-    slots: UnsafeCell<Vec<Cell<*mut c_void>>>,
+    slots: UnsafeCell<Vec<AtomicPtr<c_void>>>,
 }
 
 impl fmt::Debug for Stack {
@@ -143,14 +144,15 @@ impl Stack {
     #[inline]
     pub(crate) unsafe fn push_root(&self, root: NonNull<jl_value_t>) {
         unsafe {
-            {
-                // We can only get here while the GC isn't running, so there are
-                // no active borrows.
-                let slots = &mut *self.slots.get();
-                slots.push(Cell::new(root.cast().as_ptr()));
-            }
-
-            jlrs_gc_wb(self as *const _ as *mut _, root.as_ptr().cast());
+            self.write_slot_atomic(
+                |s| {
+                    let slots = &mut *s.slots.get();
+                    slots.push(AtomicPtr::default());
+                    slots.last().unwrap()
+                },
+                Some(Value::wrap_non_null(root, Private)),
+                Ordering::Relaxed,
+            );
         }
     }
 
@@ -165,7 +167,7 @@ impl Stack {
             // no active borrows.
             let slots = &mut *self.slots.get();
             let offset = slots.len();
-            slots.push(Cell::new(null_mut()));
+            slots.push(AtomicPtr::default());
             offset
         }
     }
@@ -185,11 +187,15 @@ impl Stack {
     #[inline]
     pub(crate) unsafe fn set_root(&self, offset: usize, root: NonNull<jl_value_t>) {
         unsafe {
-            // We can only get here while the GC isn't running, so there are
-            // no active borrows.
-            let slots = &*self.slots.get();
-            slots[offset].set(root.cast().as_ptr());
-            jlrs_gc_wb(self as *const _ as *mut _, root.as_ptr().cast());
+            self.write_slot_atomic(
+                |s| {
+                    let slots = &*s.slots.get();
+                    let slot_ptr = &slots[offset] as *const _ as *const _;
+                    &*slot_ptr
+                },
+                Some(Value::wrap_non_null(root, Private)),
+                Ordering::Relaxed,
+            );
         }
     }
 

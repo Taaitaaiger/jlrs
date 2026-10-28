@@ -2,8 +2,10 @@ use std::{collections::HashMap, ops::AddAssign};
 
 use jlrs::{
     call::Call,
+    convert::as_maybe_uninit::AsMaybeUninit,
     data::{
         managed::{
+            erase_scope_lifetime,
             string::StringRet,
             value::{
                 ValueRet,
@@ -11,8 +13,9 @@ use jlrs::{
             },
         },
         types::{construct_type::ConstructType, foreign_type::mark::Mark},
+        write_slot::WriteSlot,
     },
-    memory::gc::{self, write_barrier},
+    memory::gc::{gc_safe, gc_unsafe},
     prelude::{
         ForeignType, JlrsResult, JuliaString, LocalScope, Managed, OpaqueType, Value, WeakValue,
     },
@@ -126,7 +129,7 @@ unsafe fn mark_map<M: Mark, P: jlrs::data::types::foreign_type::ForeignType>(
 #[derive(ForeignType)]
 pub struct ForeignThing {
     #[jlrs(mark)]
-    a: WeakValue<'static, 'static>,
+    a: Option<WeakValue<'static, 'static>>,
     #[jlrs(mark_with = mark_map)]
     b: HashMap<(), WeakValue<'static, 'static>>,
 }
@@ -140,7 +143,7 @@ impl ForeignThing {
         TypedValue::new(
             weak_handle,
             ForeignThing {
-                a: value.leak(),
+                a: Some(value.leak()),
                 b: HashMap::default(),
             },
         )
@@ -148,13 +151,12 @@ impl ForeignThing {
     }
 
     pub fn get(&self) -> ValueRet {
-        unsafe { self.a.assume_owned().leak() }
+        unsafe { self.a.unwrap().assume_owned().leak() }
     }
 
-    pub fn set(&mut self, value: Value) {
+    pub fn set(&mut self, value: Value<'_, 'static>) {
         unsafe {
-            self.a = value.assume_owned().leak();
-            write_barrier(self, value);
+            self.write_slot(|s| s.a.as_maybe_uninit(), Some(erase_scope_lifetime(value)));
         }
     }
 }
@@ -206,7 +208,7 @@ impl Agent {
     }
     fn act(&self, env: Environment) -> Action {
         unsafe {
-            gc::gc_unsafe(|handle| {
+            gc_unsafe(|handle| {
                 handle.local_scope::<_, 3>(|mut frame| {
                     let callback = self.callback.as_value();
                     let env = Value::new(&mut frame, env);
@@ -230,6 +232,6 @@ fn play_loop(agent: Agent, steps: usize) -> String {
 pub fn play(agent: TypedValue<'_, '_, Agent>, steps: usize) -> JlrsResult<StringRet> {
     let agent_r = agent.unbox::<Agent>()?;
     let handle = unsafe { weak_handle_unchecked!() };
-    let t = unsafe { gc::gc_safe(|| play_loop(agent_r, steps)) };
+    let t = unsafe { gc_safe(|| play_loop(agent_r, steps)) };
     Ok(JuliaString::new(handle, t).leak())
 }
