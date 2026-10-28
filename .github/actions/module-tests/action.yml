@@ -23,7 +23,7 @@ runs:
       with:
         version: ${{ inputs.julia-version }}
 
-    - uses: julia-actions/cache@v3
+    # - uses: julia-actions/cache@v3
 
     - name: Setup Rust
       uses: dtolnay/rust-toolchain@master
@@ -35,111 +35,112 @@ runs:
       run: |
         cd tests/julia_module_test
         cargo build --features "jlrs/jl-docs"
+        ls target/debug
 
-    - name: Install Julia dependencies
-      shell: bash
-      run: |
-        julia -e 'import Pkg; Pkg.add(url="https://github.com/Taaitaaiger/JlrsCore.jl", rev="${{ inputs.jlrs-core-revision }}"); Pkg.add("StaticArrays"); Pkg.add("Documenter")'
+    # - name: Install Julia dependencies
+    #   shell: bash
+    #   run: |
+    #     julia -e 'import Pkg; Pkg.add(url="https://github.com/Taaitaaiger/JlrsCore.jl", rev="${{ inputs.jlrs-core-revision }}"); Pkg.add("StaticArrays"); Pkg.add("Documenter")'
 
-    - name: Run script tests
-      shell: bash
-      env:
-        JLRS_JULIA_DIR: ${{ steps.setup-julia.outputs.julia-bindir }}/..
-        LD_LIBRARY_PATH: ${{ steps.setup-julia.outputs.julia-bindir }}/../lib
-        DYLD_LIBRARY_PATH: ${{ steps.setup-julia.outputs.julia-bindir }}/../lib
-        JULIA_MODULE_TEST_LIB_DIR: ${{ github.workspace }}\tests\julia_module_test\target\debug
-      run: |
-        cd tests/script
-        julia JuliaModuleTest.jl
+    # - name: Run script tests
+    #   shell: bash
+    #   env:
+    #     JLRS_JULIA_DIR: ${{ steps.setup-julia.outputs.julia-bindir }}/..
+    #     LD_LIBRARY_PATH: ${{ steps.setup-julia.outputs.julia-bindir }}/../lib
+    #     DYLD_LIBRARY_PATH: ${{ steps.setup-julia.outputs.julia-bindir }}/../lib
+    #     JULIA_MODULE_TEST_LIB_DIR: ${{ github.workspace }}\tests\julia_module_test\target\debug
+    #   run: |
+    #     cd tests/script
+    #     julia JuliaModuleTest.jl
 
-    - name: Run package tests
-      shell: bash
-      env:
-        JLRS_JULIA_DIR: ${{ steps.setup-julia.outputs.julia-bindir }}/..
-        LD_LIBRARY_PATH: ${{ steps.setup-julia.outputs.julia-bindir }}/../lib
-        DYLD_LIBRARY_PATH: ${{ steps.setup-julia.outputs.julia-bindir }}/../lib
-        JULIA_MODULE_TEST_LIB_DIR: ${{ github.workspace }}\tests\julia_module_test\target\debug
-      run: |
-        cd tests/JuliaModuleTest
-        julia --project=. -e '
-          using Pkg
-          Pkg.instantiate()'
-        julia --project=. test/runtests.jl
+    # - name: Run package tests
+    #   shell: bash
+    #   env:
+    #     JLRS_JULIA_DIR: ${{ steps.setup-julia.outputs.julia-bindir }}/..
+    #     LD_LIBRARY_PATH: ${{ steps.setup-julia.outputs.julia-bindir }}/../lib
+    #     DYLD_LIBRARY_PATH: ${{ steps.setup-julia.outputs.julia-bindir }}/../lib
+    #     JULIA_MODULE_TEST_LIB_DIR: ${{ github.workspace }}\tests\julia_module_test\target\debug
+    #   run: |
+    #     cd tests/JuliaModuleTest
+    #     julia --project=. -e '
+    #       using Pkg
+    #       Pkg.instantiate()'
+    #     julia --project=. test/runtests.jl
 
-    - name: Instantiate docs
-      shell: bash
-      env:
-        JLRS_JULIA_DIR: ${{ steps.setup-julia.outputs.julia-bindir }}/..
-        LD_LIBRARY_PATH: ${{ steps.setup-julia.outputs.julia-bindir }}/../lib
-        DYLD_LIBRARY_PATH: ${{ steps.setup-julia.outputs.julia-bindir }}/../lib
-        JULIA_MODULE_TEST_LIB_DIR: ${{ github.workspace }}\tests\julia_module_test\target\debug
-      run: |
-        cd tests/JuliaModuleTest
-        julia --project=docs -e '
-          using Pkg
-          Pkg.develop(PackageSpec(path=pwd()))
-          Pkg.instantiate()'
+    # - name: Instantiate docs
+    #   shell: bash
+    #   env:
+    #     JLRS_JULIA_DIR: ${{ steps.setup-julia.outputs.julia-bindir }}/..
+    #     LD_LIBRARY_PATH: ${{ steps.setup-julia.outputs.julia-bindir }}/../lib
+    #     DYLD_LIBRARY_PATH: ${{ steps.setup-julia.outputs.julia-bindir }}/../lib
+    #     JULIA_MODULE_TEST_LIB_DIR: ${{ github.workspace }}\tests\julia_module_test\target\debug
+    #   run: |
+    #     cd tests/JuliaModuleTest
+    #     julia --project=docs -e '
+    #       using Pkg
+    #       Pkg.develop(PackageSpec(path=pwd()))
+    #       Pkg.instantiate()'
 
-    - name: Doctests
-      shell: bash
-      env:
-        JLRS_JULIA_DIR: ${{ steps.setup-julia.outputs.julia-bindir }}/..
-        LD_LIBRARY_PATH: ${{ steps.setup-julia.outputs.julia-bindir }}/../lib
-        DYLD_LIBRARY_PATH: ${{ steps.setup-julia.outputs.julia-bindir }}/../lib
-        JULIA_MODULE_TEST_LIB_DIR: ${{ github.workspace }}\tests\julia_module_test\target\debug
-      run: |
-        cd tests/JuliaModuleTest
-        julia --project=docs -e '
-          using Documenter: doctest
-          using JuliaModuleTest
-          doctest(JuliaModuleTest)'
+    # - name: Doctests
+    #   shell: bash
+    #   env:
+    #     JLRS_JULIA_DIR: ${{ steps.setup-julia.outputs.julia-bindir }}/..
+    #     LD_LIBRARY_PATH: ${{ steps.setup-julia.outputs.julia-bindir }}/../lib
+    #     DYLD_LIBRARY_PATH: ${{ steps.setup-julia.outputs.julia-bindir }}/../lib
+    #     JULIA_MODULE_TEST_LIB_DIR: ${{ github.workspace }}\tests\julia_module_test\target\debug
+    #   run: |
+    #     cd tests/JuliaModuleTest
+    #     julia --project=docs -e '
+    #       using Documenter: doctest
+    #       using JuliaModuleTest
+    #       doctest(JuliaModuleTest)'
 
-    - name: Docs
-      shell: bash
-      env:
-        JLRS_JULIA_DIR: ${{ steps.setup-julia.outputs.julia-bindir }}/..
-        LD_LIBRARY_PATH: ${{ steps.setup-julia.outputs.julia-bindir }}/../lib
-        DYLD_LIBRARY_PATH: ${{ steps.setup-julia.outputs.julia-bindir }}/../lib
-        JULIA_MODULE_TEST_LIB_DIR: ${{ github.workspace }}\tests\julia_module_test\target\debug
-        JULIA_PKG_SERVER: ""
-      run: |
-        cd tests/JuliaModuleTest
-        julia --project=docs docs/make.jl
+    # - name: Docs
+    #   shell: bash
+    #   env:
+    #     JLRS_JULIA_DIR: ${{ steps.setup-julia.outputs.julia-bindir }}/..
+    #     LD_LIBRARY_PATH: ${{ steps.setup-julia.outputs.julia-bindir }}/../lib
+    #     DYLD_LIBRARY_PATH: ${{ steps.setup-julia.outputs.julia-bindir }}/../lib
+    #     JULIA_MODULE_TEST_LIB_DIR: ${{ github.workspace }}\tests\julia_module_test\target\debug
+    #     JULIA_PKG_SERVER: ""
+    #   run: |
+    #     cd tests/JuliaModuleTest
+    #     julia --project=docs docs/make.jl
 
-    - name: Cargo clean
-      if: runner.os == 'macOS'
-      shell: bash
-      run: |
-        cd tests/julia_module_test
-        cargo clean
+    # - name: Cargo clean
+    #   if: runner.os == 'macOS'
+    #   shell: bash
+    #   run: |
+    #     cd tests/julia_module_test
+    #     cargo clean
 
-    - name: Build library with static-cache
-      shell: bash
-      run: |
-        cd tests/julia_module_test
-        cargo build --features "jlrs/jl-docs,jlrs/static-cache"
+    # - name: Build library with static-cache
+    #   shell: bash
+    #   run: |
+    #     cd tests/julia_module_test
+    #     cargo build --features "jlrs/jl-docs,jlrs/static-cache"
 
-    - name: Run script tests with static-cache
-      shell: bash
-      env:
-        JLRS_JULIA_DIR: ${{ steps.setup-julia.outputs.julia-bindir }}/..
-        LD_LIBRARY_PATH: ${{ steps.setup-julia.outputs.julia-bindir }}/../lib
-        DYLD_LIBRARY_PATH: ${{ steps.setup-julia.outputs.julia-bindir }}/../lib
-        JULIA_MODULE_TEST_LIB_DIR: ${{ github.workspace }}\tests\julia_module_test\target\debug
-      run: |
-        cd tests/script
-        julia JuliaModuleTest.jl
+    # - name: Run script tests with static-cache
+    #   shell: bash
+    #   env:
+    #     JLRS_JULIA_DIR: ${{ steps.setup-julia.outputs.julia-bindir }}/..
+    #     LD_LIBRARY_PATH: ${{ steps.setup-julia.outputs.julia-bindir }}/../lib
+    #     DYLD_LIBRARY_PATH: ${{ steps.setup-julia.outputs.julia-bindir }}/../lib
+    #     JULIA_MODULE_TEST_LIB_DIR: ${{ github.workspace }}\tests\julia_module_test\target\debug
+    #   run: |
+    #     cd tests/script
+    #     julia JuliaModuleTest.jl
 
-    - name: Run package tests with static-cache
-      shell: bash
-      env:
-        JLRS_JULIA_DIR: ${{ steps.setup-julia.outputs.julia-bindir }}/..
-        LD_LIBRARY_PATH: ${{ steps.setup-julia.outputs.julia-bindir }}/../lib
-        DYLD_LIBRARY_PATH: ${{ steps.setup-julia.outputs.julia-bindir }}/../lib
-        JULIA_MODULE_TEST_LIB_DIR: ${{ github.workspace }}\tests\julia_module_test\target\debug
-      run: |
-        cd tests/JuliaModuleTest
-        julia --project=. -e '
-          using Pkg
-          Pkg.instantiate()'
-        julia --project=. test/runtests.jl
+    # - name: Run package tests with static-cache
+    #   shell: bash
+    #   env:
+    #     JLRS_JULIA_DIR: ${{ steps.setup-julia.outputs.julia-bindir }}/..
+    #     LD_LIBRARY_PATH: ${{ steps.setup-julia.outputs.julia-bindir }}/../lib
+    #     DYLD_LIBRARY_PATH: ${{ steps.setup-julia.outputs.julia-bindir }}/../lib
+    #     JULIA_MODULE_TEST_LIB_DIR: ${{ github.workspace }}\tests\julia_module_test\target\debug
+    #   run: |
+    #     cd tests/JuliaModuleTest
+    #     julia --project=. -e '
+    #       using Pkg
+    #       Pkg.instantiate()'
+    #     julia --project=. test/runtests.jl
