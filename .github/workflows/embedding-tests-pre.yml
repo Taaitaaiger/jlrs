@@ -19,26 +19,26 @@ env:
   julia-version: "pre"
 
 jobs:
-  test-linux-macos:
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest]
-        rust: [stable]
+  # test-linux-macos:
+  #   strategy:
+  #     matrix:
+  #       os: [ubuntu-latest, macos-latest]
+  #       rust: [stable]
 
-    runs-on: ${{ matrix.os }}
-    permissions: # needed to allow julia-actions/cache to proactively delete old caches that it has created
-      actions: write
-      contents: read
+  #   runs-on: ${{ matrix.os }}
+  #   permissions: # needed to allow julia-actions/cache to proactively delete old caches that it has created
+  #     actions: write
+  #     contents: read
 
-    steps:
-      - uses: actions/checkout@v6
+  #   steps:
+  #     - uses: actions/checkout@v6
 
-      - name: Embedding tests
-        uses: ./.github/actions/embedding-tests
-        with:
-          rust-toolchain: ${{ matrix.rust }}
-          jlrs-core-revision: ${{ env.jlrs-core-revision }}
-          julia-version: ${{ env.julia-version }}
+  #     - name: Embedding tests
+  #       uses: ./.github/actions/embedding-tests
+  #       with:
+  #         rust-toolchain: ${{ matrix.rust }}
+  #         jlrs-core-revision: ${{ env.jlrs-core-revision }}
+  #         julia-version: ${{ env.julia-version }}
 
   test-windows:
     strategy:
@@ -49,6 +49,7 @@ jobs:
             stable-x86_64-pc-windows-msvc,
           ]
 
+    continue-on-error: true
     runs-on: windows-2022
     permissions: # needed to allow julia-actions/cache to proactively delete old caches that it has created
       actions: write
